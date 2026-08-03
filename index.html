@@ -1,0 +1,1071 @@
+<title>Technical Marketing Hub</title>
+<style>
+/* ============================================================
+   ORION UI STYLE — PTC enterprise agentic design system (inlined)
+   ============================================================ */
+:root {
+  --orion-green:        #5fa836;
+  --orion-green-strong: #4f9a2c;
+  --orion-green-soft:   #e6f4df;
+  --orion-green-ink:    #2f6b1f;
+  --orion-indigo:       #4f5bd5;
+  --orion-indigo-strong:#4149bf;
+  --orion-indigo-soft:  #eceeFB;
+  --orion-link:         #2563eb;
+  --orion-frame:        #1a1d21;
+  --orion-app-bg:       #2b2f33;
+  --orion-surface:      #ffffff;
+  --orion-surface-2:    #f5f6f8;
+  --orion-surface-3:    #eceef1;
+  --orion-border:       #e3e5e8;
+  --orion-border-md:    #c9ccd1;
+  --orion-border-ink:   #1f2329;
+  --orion-text:         #1f2329;
+  --orion-text-2:       #5b626b;
+  --orion-text-3:       #9aa0a8;
+  --orion-warn-bg:      #f6e2c6;
+  --orion-warn-border:  #e8c89a;
+  --orion-warn-ink:     #8a5414;
+  --orion-warn-body:    #6b4a22;
+  --orion-danger-bg:    #fbe3e3;
+  --orion-danger-ink:   #c0392b;
+  --orion-open-bg:      #fdebcf;
+  --orion-open-ink:     #9a6a16;
+  --orion-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --orion-mono: "SF Mono", "Roboto Mono", Menlo, Consolas, "Courier New", monospace;
+  --orion-radius:    8px;
+  --orion-radius-sm: 6px;
+  --orion-radius-pill: 999px;
+  --orion-shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.04);
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--orion-font);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--orion-text);
+  background: var(--orion-app-bg);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--orion-link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.orion-spark { display: inline-block; width: 18px; height: 18px; color: var(--orion-indigo); vertical-align: -4px; flex: none; }
+.orion-spark--sm { width: 16px; height: 16px; vertical-align: -3px; }
+
+.orion-app {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  height: calc(100vh - 24px);
+  margin: 12px;
+  background: var(--orion-surface);
+  border: 3px solid var(--orion-frame);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.orion-workarea { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.orion-workbody { flex: 1; display: flex; min-height: 0; }
+
+.orion-side { display: flex; flex-direction: column; background: var(--orion-surface-2); border-right: 1px solid var(--orion-border); min-height: 0; }
+.orion-side__brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 16px 16px 12px; font-weight: 600; font-size: 15px; }
+.orion-side__brand .lockup { display: flex; align-items: center; gap: 8px; }
+.orion-side__body { flex: 1; overflow-y: auto; padding: 0 12px 12px; }
+.orion-side__foot { border-top: 1px solid var(--orion-border); padding: 8px 12px; }
+
+.orion-group { font-size: 12px; color: var(--orion-text-3); margin: 16px 4px 6px; text-transform: uppercase; letter-spacing: .04em; }
+.orion-group:first-child { margin-top: 4px; }
+.orion-navitem { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; margin-bottom: 2px; border-radius: var(--orion-radius-sm); color: var(--orion-text); cursor: pointer; font-size: 13.5px; }
+.orion-navitem .label { display: flex; align-items: center; gap: 9px; }
+.orion-navitem:hover { background: var(--orion-surface-3); }
+.orion-navitem--active { background: var(--orion-surface); box-shadow: inset 0 0 0 1px var(--orion-border); font-weight: 600; }
+.orion-navitem .count { color: var(--orion-text-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.orion-divider { height: 1px; background: var(--orion-border); margin: 10px 0; }
+
+.orion-main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--orion-surface); }
+.orion-topbar { padding: 20px 32px 18px; border-bottom: 1px solid var(--orion-border); }
+.orion-breadcrumb { font-size: 13px; color: var(--orion-text-2); margin-bottom: 4px; }
+.orion-breadcrumb a { color: var(--orion-link); }
+.orion-title { font-size: 24px; font-weight: 600; margin: 0 0 4px; }
+.orion-subtle { color: var(--orion-text-2); font-size: 13.5px; }
+
+.orion-thread { flex: 1; overflow-y: auto; padding: 26px 32px 40px; }
+
+.orion-ico { width: 18px; height: 18px; flex: none; vertical-align: -4px; }
+.orion-ico--sm{ width: 15px; height: 15px; vertical-align: -3px; }
+.orion-ico--lg{ width: 22px; height: 22px; vertical-align: -5px; }
+.ico-green { color: var(--orion-green); }
+.ico-amber { color: var(--orion-warn-ink); }
+.ico-indigo { color: var(--orion-indigo); }
+.ico-muted { color: var(--orion-text-3); }
+
+.orion-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: var(--orion-radius-pill); font-size: 11.5px; font-weight: 600; line-height: 1.4; }
+.orion-badge--ok     { background: var(--orion-green-soft); color: var(--orion-green-ink); }
+.orion-badge--risk   { background: var(--orion-danger-bg); color: var(--orion-danger-ink); }
+.orion-badge--open   { background: var(--orion-open-bg);   color: var(--orion-open-ink); }
+
+.orion-logo { display: flex; align-items: center; padding: 8px 4px; }
+.orion-logo svg { height: 22px; width: auto; }
+
+/* ============================================================
+   HERO SEARCH
+   ============================================================ */
+.hero-search { margin-top: 16px; display: flex; gap: 10px; align-items: center; }
+.hero-search__field {
+  flex: 1; display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm);
+  padding: 11px 14px; background: var(--orion-surface);
+}
+.hero-search__field input { flex: 1; border: none; outline: none; font: inherit; font-size: 14px; background: transparent; }
+.hero-search__field input::placeholder { color: var(--orion-text-3); }
+.filter-pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 10px 13px;
+  border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm);
+  background: var(--orion-surface); font-size: 13px; color: var(--orion-text-2); cursor: pointer; white-space: nowrap;
+}
+
+/* ============================================================
+   SECTION HEADERS
+   ============================================================ */
+.section { margin-bottom: 34px; }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+.section-head__title { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 600; }
+.section-head__sub { color: var(--orion-text-3); font-weight: 400; font-size: 12.5px; margin-left: 2px; }
+.section-head__link { font-size: 13px; color: var(--orion-link); display: flex; align-items: center; gap: 3px; }
+
+/* ============================================================
+   ASSET CARDS
+   ============================================================ */
+.asset-row { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 6px; margin: 0 -2px; }
+.asset-row::-webkit-scrollbar { height: 6px; }
+.asset-row::-webkit-scrollbar-thumb { background: var(--orion-border-md); border-radius: 3px; }
+
+.asset-card {
+  flex: 0 0 254px; border: 1px solid var(--orion-border); border-radius: var(--orion-radius);
+  overflow: hidden; background: var(--orion-surface); box-shadow: var(--orion-shadow);
+  display: flex; flex-direction: column;
+}
+.asset-card__thumb {
+  position: relative; height: 130px; background: var(--orion-surface-3);
+  display: flex; align-items: center; justify-content: center;
+  border-bottom: 1px solid var(--orion-border);
+}
+.asset-card__thumb .watermark { width: 46px; height: 46px; color: var(--orion-border-md); }
+.type-chip {
+  position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 4px;
+  background: rgba(255,255,255,.94); border: 1px solid var(--orion-border-md);
+  border-radius: var(--orion-radius-pill); padding: 3px 9px 3px 7px; font-size: 11px; font-weight: 600; color: var(--orion-text-2);
+}
+.new-dot { position: absolute; top: 9px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--orion-green); box-shadow: 0 0 0 2px #fff; }
+.duration-chip {
+  position: absolute; bottom: 8px; right: 8px; background: rgba(31,35,41,.82); color: #fff;
+  font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; font-variant-numeric: tabular-nums;
+}
+.rank-chip {
+  position: absolute; bottom: 8px; left: 8px; background: rgba(31,35,41,.82); color: #fff;
+  font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px;
+}
+.play-btn {
+  width: 42px; height: 42px; border-radius: 50%; background: var(--orion-indigo); border: none;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff;
+  box-shadow: 0 2px 6px rgba(79,91,213,.4);
+}
+.play-btn svg { width: 17px; height: 17px; margin-left: 2px; }
+.play-btn:hover { background: var(--orion-indigo-strong); }
+
+.asset-card__body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.asset-card__title { font-size: 13.5px; font-weight: 600; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.asset-card__meta { font-size: 12px; color: var(--orion-text-2); display: flex; align-items: center; gap: 6px; }
+.meta-logo-chip { display: inline-flex; align-items: center; background: #fff; padding: 2px 5px; border-radius: 4px; line-height: 0; flex: none; box-shadow: 0 0 0 1px var(--orion-border); }
+.nav-mark { height: 15px; width: auto; flex: none; }
+.meta-logo { height: 11px; width: auto; display: block; }
+.asset-card__stats { font-size: 11.5px; color: var(--orion-text-3); display: flex; align-items: center; gap: 5px; }
+.asset-card__uuid { font-size: 10.5px; color: var(--orion-text-3); display: flex; align-items: center; gap: 4px; }
+.asset-card__uuid .orion-mono { font-size: 10px; background: var(--orion-surface-2); padding: 1px 6px; border-radius: 4px; color: var(--orion-text-2); }
+.orion-mono { font-family: var(--orion-mono); }
+.asset-card__actions { margin-top: auto; padding-top: 8px; display: flex; gap: 8px; }
+
+.btn-ghost, .btn-primary-sm {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 7px 8px; border-radius: var(--orion-radius-sm); font-size: 12.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--orion-border-md);
+}
+.btn-ghost { background: var(--orion-surface); color: var(--orion-text); }
+.btn-ghost:hover { background: var(--orion-surface-2); }
+.btn-primary-sm { background: var(--orion-indigo); color: #fff; border-color: var(--orion-indigo); }
+.btn-primary-sm:hover { background: var(--orion-indigo-strong); }
+.asset-card__actions--3 .btn-ghost, .asset-card__actions--3 .btn-primary-sm { padding: 7px 3px; font-size: 11.5px; gap: 3px; }
+
+/* ============================================================
+   COMPACT LIST (Continue where you left off)
+   ============================================================ */
+.compact-list { border: 1px solid var(--orion-border); border-radius: var(--orion-radius); overflow: hidden; }
+.compact-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--orion-border); }
+.compact-row:last-child { border-bottom: none; }
+.compact-row__thumb { width: 42px; height: 30px; border-radius: 4px; background: var(--orion-surface-3); display: flex; align-items: center; justify-content: center; flex: none; color: var(--orion-text-3); }
+.compact-row__thumb svg { width: 15px; height: 15px; }
+.compact-row__title { font-size: 13px; font-weight: 500; }
+.compact-row__meta { font-size: 12px; color: var(--orion-text-3); display: flex; align-items: center; gap: 6px; }
+.compact-row__progress { flex: none; width: 70px; height: 4px; background: var(--orion-surface-3); border-radius: 2px; overflow: hidden; margin-left: auto; }
+.compact-row__progress span { display: block; height: 100%; background: var(--orion-indigo); }
+
+/* ============================================================
+   PRODUCT TILES
+   ============================================================ */
+.product-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.product-tile {
+  display: flex; align-items: center; gap: 13px; padding: 16px; border: 1px solid var(--orion-border);
+  border-radius: var(--orion-radius); cursor: pointer; background: var(--orion-surface);
+}
+.product-tile:hover { background: var(--orion-surface-2); border-color: var(--orion-border-md); }
+.product-tile__mark {
+  width: 40px; height: 40px; border-radius: var(--orion-radius-sm); background: var(--orion-surface-2);
+  display: flex; align-items: center; justify-content: center; flex: none; color: var(--orion-text);
+}
+.product-tile__name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+.product-tile__count { font-size: 12px; color: var(--orion-text-3); }
+.product-logo-chip {
+  display: inline-flex; align-items: center; justify-content: center; background: #fff;
+  padding: 8px 12px; border-radius: var(--orion-radius-sm); flex: none; height: 40px;
+  box-shadow: 0 0 0 1px var(--orion-border);
+}
+.product-logo { height: 20px; width: auto; display: block; }
+
+/* ============================================================
+   FEATURED / EVANGELIZE
+   ============================================================ */
+.featured-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.featured-card {
+  display: flex; gap: 16px; padding: 18px; border: 1px solid var(--orion-border-ink);
+  border-radius: var(--orion-radius); background: var(--orion-surface);
+}
+.featured-card__thumb {
+  flex: none; width: 96px; height: 96px; border-radius: var(--orion-radius-sm); background: var(--orion-surface-2);
+  display: flex; align-items: center; justify-content: center; color: var(--orion-border-md);
+}
+.featured-card__eyebrow { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--orion-green-ink); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.featured-card__title { font-size: 14.5px; font-weight: 600; margin-bottom: 5px; }
+.featured-card__body { font-size: 12.5px; color: var(--orion-text-2); margin-bottom: 10px; }
+.featured-card__foot { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--orion-text-3); }
+
+/* ============================================================
+   STAGE / TYPE PILLS
+   ============================================================ */
+.stage-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.stage-pill {
+  padding: 7px 14px; border-radius: var(--orion-radius-pill); border: 1px solid var(--orion-border-md);
+  font-size: 12.5px; font-weight: 500; cursor: pointer; color: var(--orion-text-2); background: var(--orion-surface);
+}
+.stage-pill--active { background: var(--orion-text); color: #fff; border-color: var(--orion-text); font-weight: 600; }
+
+/* ============================================================
+   DEMOBOARD SHARE MODAL
+   ============================================================ */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(20,22,25,.55);
+  display: none; align-items: center; justify-content: center; z-index: 50; padding: 24px;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  width: 460px; max-width: 100%; max-height: 88vh; overflow-y: auto;
+  background: var(--orion-surface); border-radius: var(--orion-radius);
+  box-shadow: 0 20px 50px rgba(0,0,0,.35); border: 1px solid var(--orion-border);
+}
+.modal__head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--orion-border); }
+.modal__head-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; }
+.modal__close { background: none; border: none; cursor: pointer; color: var(--orion-text-3); padding: 4px; display: flex; }
+.modal__close:hover { color: var(--orion-text); }
+.modal__body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+
+.modal__asset { display: flex; gap: 12px; align-items: center; }
+.modal__asset-thumb { width: 58px; height: 42px; border-radius: 6px; background: var(--orion-surface-2); display: flex; align-items: center; justify-content: center; color: var(--orion-text-3); flex: none; }
+.modal__asset-title { font-size: 13.5px; font-weight: 600; }
+.modal__asset-meta { font-size: 12px; color: var(--orion-text-2); margin-top: 2px; }
+
+.modal__note { display: flex; gap: 8px; align-items: flex-start; background: var(--orion-surface-2); border-radius: var(--orion-radius-sm); padding: 10px 12px; font-size: 12.5px; color: var(--orion-text-2); }
+.modal__note svg { flex: none; margin-top: 1px; }
+
+.form-row { display: flex; flex-direction: column; gap: 5px; }
+.form-row label { font-size: 12px; font-weight: 600; color: var(--orion-text-2); }
+.form-row input { padding: 8px 10px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); font: inherit; font-size: 13px; width: 100%; }
+.chip-input { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); padding: 7px 8px; }
+.chip-input .chip { display: flex; align-items: center; gap: 5px; background: var(--orion-surface-2); border-radius: var(--orion-radius-pill); padding: 3px 9px; font-size: 12px; }
+.chip-input input { border: none; outline: none; flex: 1; min-width: 120px; font: inherit; font-size: 13px; padding: 3px 4px; }
+
+.share-result { background: var(--orion-green-soft); border-radius: var(--orion-radius-sm); padding: 12px 14px; }
+.share-result__label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--orion-green-ink); margin-bottom: 8px; }
+.share-result__link { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--orion-surface); border-radius: 6px; padding: 8px 10px; }
+.share-result__link span { font-family: var(--orion-mono); font-size: 12.5px; color: var(--orion-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-result__link button { flex: none; border: 1px solid var(--orion-border-md); background: var(--orion-surface); border-radius: 6px; padding: 5px 11px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.share-result__link button:hover { background: var(--orion-surface-2); }
+.share-result__meta { font-size: 11.5px; color: var(--orion-green-ink); margin-top: 8px; }
+
+.modal__foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--orion-border); }
+.modal__foot .btn-ghost, .modal__foot .btn-primary-sm { flex: none; padding: 8px 16px; }
+
+.dsr-room-list { display: flex; flex-direction: column; gap: 6px; }
+.dsr-room-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); cursor: pointer; }
+.dsr-room-row:hover { background: var(--orion-surface-2); }
+.dsr-room-row--selected { border-color: var(--orion-indigo); background: var(--orion-indigo-soft); }
+.dsr-room-row__radio { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--orion-border-md); flex: none; position: relative; }
+.dsr-room-row--selected .dsr-room-row__radio { border-color: var(--orion-indigo); }
+.dsr-room-row--selected .dsr-room-row__radio::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; background: var(--orion-indigo); }
+.dsr-room-row__name { font-size: 13px; font-weight: 600; }
+.dsr-room-row__meta { font-size: 11.5px; color: var(--orion-text-3); }
+.dsr-room-row--new { border-style: dashed; }
+.dsr-room-row--new .dsr-room-row__name { color: var(--orion-text-2); font-weight: 500; }
+
+/* dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --orion-surface: #1c1f23; --orion-surface-2: #24272c; --orion-surface-3: #2c3036;
+    --orion-border: #34383e; --orion-border-md: #454a52; --orion-border-ink: #c9ccd1;
+    --orion-text: #eceef1; --orion-text-2: #a7adb6; --orion-text-3: #767c85;
+    --orion-app-bg: #101214;
+  }
+}
+:root[data-theme="dark"] {
+  --orion-surface: #1c1f23; --orion-surface-2: #24272c; --orion-surface-3: #2c3036;
+  --orion-border: #34383e; --orion-border-md: #454a52; --orion-border-ink: #c9ccd1;
+  --orion-text: #eceef1; --orion-text-2: #a7adb6; --orion-text-3: #767c85;
+  --orion-app-bg: #101214;
+}
+:root[data-theme="light"] {
+  --orion-surface: #ffffff; --orion-surface-2: #f5f6f8; --orion-surface-3: #eceef1;
+  --orion-border: #e3e5e8; --orion-border-md: #c9ccd1; --orion-border-ink: #1f2329;
+  --orion-text: #1f2329; --orion-text-2: #5b626b; --orion-text-3: #9aa0a8;
+  --orion-app-bg: #2b2f33;
+}
+
+/* ============================================================
+   VIDEO PREVIEW PAGE
+   ============================================================ */
+.video-preview-page { display: none; flex: 1; overflow-y: auto; padding: 26px 32px 48px; }
+.video-preview-page.active { display: block; }
+.vp-back { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--orion-text-2); cursor: pointer; margin-bottom: 18px; background: none; border: none; padding: 0; font: inherit; }
+.vp-back:hover { color: var(--orion-link); }
+.vp-back svg { width: 15px; height: 15px; }
+
+.vp-player {
+  background: var(--orion-frame); border-radius: var(--orion-radius); aspect-ratio: 16/9; max-height: 440px;
+  display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 22px;
+}
+.vp-player__play {
+  width: 66px; height: 66px; border-radius: 50%; background: var(--orion-indigo); border: none;
+  display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0,0,0,.35);
+}
+.vp-player__play svg { width: 27px; height: 27px; margin-left: 3px; }
+.vp-player__duration {
+  position: absolute; bottom: 14px; right: 16px; background: rgba(0,0,0,.55); color: #fff;
+  font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 4px; font-variant-numeric: tabular-nums;
+}
+
+.vp-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 24px; }
+.vp-title { font-size: 21px; font-weight: 700; margin: 0 0 8px; line-height: 1.3; }
+.vp-meta-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--orion-text-2); margin-bottom: 6px; }
+.vp-stats-row { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--orion-text-3); }
+.vp-actions { display: flex; gap: 8px; flex: none; }
+.vp-actions .btn-ghost, .vp-actions .btn-primary-sm { flex: none; padding: 8px 16px; }
+
+.vp-card { background: var(--orion-surface-2); border-radius: var(--orion-radius); padding: 22px 24px; }
+.vp-card__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.vp-card__head-title { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; }
+.vp-card__head-title svg { color: var(--orion-indigo); width: 19px; height: 19px; }
+.vp-reindex { display: flex; align-items: center; gap: 6px; background: var(--orion-indigo); color: #fff; border: none; padding: 7px 14px; border-radius: var(--orion-radius-sm); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.vp-reindex:hover { background: var(--orion-indigo-strong); }
+.vp-desc { font-size: 13.5px; color: var(--orion-text); line-height: 1.55; margin-bottom: 20px; }
+
+.vp-label { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--orion-text-3); margin-bottom: 10px; }
+.vp-value-drivers { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+.value-driver-chip { background: var(--orion-indigo-soft); color: var(--orion-indigo-strong); font-size: 12.5px; font-weight: 600; padding: 5px 13px; border-radius: var(--orion-radius-pill); }
+
+.capability-card { background: var(--orion-surface); border: 1px solid var(--orion-border); border-radius: var(--orion-radius); padding: 16px 18px; margin-bottom: 12px; }
+.capability-card:last-child { margin-bottom: 0; }
+.capability-card__head { margin-bottom: 10px; display: flex; align-items: baseline; gap: 0; }
+.phase-tag { display: inline-flex; align-items: center; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--orion-indigo); border: 1.5px solid var(--orion-indigo); border-radius: 5px; padding: 2px 8px; margin-right: 10px; flex: none; }
+.capability-card__title { font-size: 14.5px; font-weight: 600; }
+.capability-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; }
+.capability-chip { background: var(--orion-surface-3); color: var(--orion-text-2); font-size: 12px; padding: 4px 10px; border-radius: 6px; }
+.capability-narration { font-size: 12.5px; color: var(--orion-text-2); font-style: italic; line-height: 1.5; }
+</style>
+
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-panel"   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/></symbol>
+  <symbol id="i-search"  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16" y2="16"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></symbol>
+  <symbol id="i-chevron-down"  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></symbol>
+  <symbol id="i-send"    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></symbol>
+  <symbol id="i-play"    viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></symbol>
+  <symbol id="i-eye"     viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-clock"   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></symbol>
+  <symbol id="i-video"   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></symbol>
+  <symbol id="i-box"     viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><line x1="12" y1="13" x2="12" y2="21"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></symbol>
+  <symbol id="i-star"    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
+  <symbol id="i-grid"    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></symbol>
+  <symbol id="i-trend"   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></symbol>
+  <symbol id="i-hex"     viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2l8.7 5v10L12 22 3.3 17V7z"/></symbol>
+  <symbol id="i-flag"    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V4s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="4"/></symbol>
+  <symbol id="i-x"       viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+  <symbol id="i-info"    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/></symbol>
+  <symbol id="i-check"   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></symbol>
+  <symbol id="i-plus"    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  <symbol id="i-target"  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></symbol>
+
+  <!-- Official PTC product logos, extracted from PTC Corporate Template.potx -->
+  <symbol id="logo-creo" viewBox="0 0 1334.88 449.9"><path d="M660.03 295.29C671.49 295.29 681.65 292.06 690.49 285.61 699.33 279.16 705.78 270.8 709.84 260.52L738.88 260.52C733.38 278.21 723.34 292.42 708.77 303.17 693.47 314.16 675.31 319.66 654.29 319.66 628 319.66 606.62 310.7 590.13 292.78 574.12 275.34 566.12 253.48 566.12 227.19 566.12 200.9 574.12 179.04 590.13 161.6 606.62 143.68 628 134.72 654.29 134.72 675.31 134.72 693.47 140.22 708.77 151.21 723.34 161.96 733.37 176.19 738.88 193.86L709.84 193.86C705.77 183.59 699.32 175.22 690.49 168.77 681.65 162.32 671.49 159.09 660.03 159.09 648.57 159.09 638.82 160.89 630.82 164.47 622.81 168.05 616.06 172.95 610.57 179.17 598.86 192.07 593.01 208.09 593.01 227.2 593.01 246.31 598.86 262.33 610.57 275.23 622.52 288.62 639 295.3 660.04 295.3Z" fill="#3D4647"/><path d="M865.4 134.71 865.4 161.59 862.17 161.59C842.82 161.59 827.04 169.36 814.86 184.89 803.39 199.71 797.66 217.39 797.66 237.94L797.66 316.79 770.78 316.79 770.78 137.58 797.66 137.58 797.66 181.67C803.39 163.03 815.82 149.3 834.93 140.45 842.82 136.63 852.37 134.71 863.6 134.71L865.39 134.71Z" fill="#3D4647"/><path d="M967.51 295.29C991.64 295.29 1008.96 285.25 1019.48 265.18L1048.87 265.18C1042.66 281.43 1032.8 294.57 1019.3 304.61 1005.8 314.65 988.41 319.67 967.15 319.67 940.15 319.67 918.17 310.71 901.2 292.79 884.72 275.35 876.47 253.49 876.47 227.2 876.47 200.91 884.35 178.82 900.13 161.61 916.85 143.69 938.6 134.73 965.36 134.73 992.12 134.73 1013.86 143.69 1030.59 161.61 1046.36 178.82 1054.25 200.68 1054.25 227.2L1054.25 237.95 904.07 237.95C905.98 254.44 912.55 268.06 923.78 278.81 935.25 289.8 949.82 295.3 967.51 295.3ZM965.36 159.08C948.87 159.08 935.01 164.23 923.78 174.49 913.26 184.29 906.81 197.07 904.42 212.84L1026.29 212.84C1023.9 197.07 1017.45 184.29 1006.94 174.49 995.7 164.23 981.85 159.08 965.36 159.08Z" fill="#3D4647"/><path d="M1166.54 134.71C1193.3 134.71 1215.05 143.67 1231.77 161.59 1247.54 178.8 1255.43 200.66 1255.43 227.18 1255.43 253.7 1247.55 275.56 1231.77 292.77 1215.04 310.69 1193.29 319.65 1166.54 319.65 1139.79 319.65 1118.03 310.69 1101.31 292.77 1085.54 275.56 1077.65 253.7 1077.65 227.18 1077.65 200.66 1085.54 178.8 1101.31 161.59 1118.04 143.67 1139.78 134.71 1166.54 134.71ZM1166.54 295.29C1185.89 295.29 1201.19 288.6 1212.42 275.22 1223.17 262.55 1228.55 246.55 1228.55 227.19 1228.55 207.83 1223.18 191.83 1212.42 179.16 1201.19 165.78 1185.89 159.09 1166.54 159.09 1147.19 159.09 1131.89 165.79 1120.66 179.16 1109.91 191.83 1104.53 207.83 1104.53 227.19 1104.53 246.55 1109.91 262.55 1120.66 275.22 1131.89 288.61 1147.19 295.29 1166.54 295.29Z" fill="#3D4647"/><path d="M1306.21 141.2C1310.17 141.2 1313.89 141.95 1317.37 143.46 1320.85 144.96 1323.89 147.01 1326.48 149.6 1329.07 152.2 1331.12 155.23 1332.62 158.71 1334.13 162.19 1334.88 165.91 1334.88 169.87 1334.88 173.83 1334.13 177.53 1332.62 180.98 1331.12 184.44 1329.07 187.46 1326.48 190.05 1323.89 192.64 1320.85 194.69 1317.37 196.19 1313.89 197.69 1310.17 198.45 1306.21 198.45 1302.25 198.45 1298.55 197.7 1295.1 196.19 1291.64 194.68 1288.62 192.64 1286.03 190.05 1283.44 187.46 1281.39 184.43 1279.89 180.98 1278.38 177.53 1277.63 173.82 1277.63 169.87 1277.63 165.92 1278.38 162.2 1279.89 158.71 1281.39 155.23 1283.44 152.19 1286.03 149.6 1288.62 147.01 1291.64 144.96 1295.1 143.46 1298.55 141.95 1302.26 141.2 1306.21 141.2ZM1306.21 194.36C1313.01 194.36 1318.81 191.97 1323.6 187.18 1325.83 184.95 1327.58 182.34 1328.87 179.36 1330.15 176.38 1330.79 173.21 1330.79 169.83 1330.79 166.45 1330.15 163.29 1328.87 160.3 1327.58 157.32 1325.83 154.72 1323.6 152.49 1318.81 147.7 1313.01 145.3 1306.21 145.3 1299.41 145.3 1293.59 147.7 1288.91 152.49 1284.12 157.34 1281.72 163.13 1281.72 169.87 1281.72 173.21 1282.36 176.37 1283.64 179.36 1284.92 182.34 1286.68 184.95 1288.91 187.18 1293.59 191.97 1299.36 194.36 1306.21 194.36ZM1320.33 163.35C1320.33 165.25 1319.78 166.93 1318.66 168.4 1317.55 169.88 1316.01 170.93 1314.06 171.54 1317.12 172.43 1318.99 174.94 1319.66 179.06 1319.83 180.12 1319.91 181.06 1319.91 181.9L1319.91 185.83 1314.14 185.83 1314.14 182.65C1314.14 180.25 1313.89 178.53 1313.39 177.47 1312.33 175.24 1310.44 174.13 1307.71 174.13L1299.6 174.13 1299.6 185.83 1293.75 185.83 1293.75 153.9 1307.29 153.9C1311.8 153.9 1315.1 154.76 1317.19 156.49 1319.28 158.22 1320.32 160.5 1320.32 163.34ZM1306.87 169.11C1309.21 169.11 1311.08 168.67 1312.47 167.77 1313.86 166.88 1314.56 165.63 1314.56 164.01 1314.56 162.39 1314.01 161.12 1312.89 160.21 1311.78 159.29 1309.71 158.83 1306.7 158.83L1299.6 158.83 1299.6 169.1 1306.87 169.1Z" fill="#3D4647"/><path d="M198.6 211.68 381.89 105.82 198.6 0 15.14 105.92 198.6 211.68Z" fill="#3D4647"/><path d="M183.44 237.95 0 132.2 0 343.99 183.44 449.9 183.44 237.95Z" fill="#3D4647"/><path d="M213.77 237.95 213.77 449.9 397.21 343.99 397.21 131.99 213.77 237.95Z" fill="#40AA1D"/></symbol>
+
+  <symbol id="logo-windchill" viewBox="0 0 1299.67 299.6"><path d="M458.33 125.02 429 218.64 408.82 218.64 371.98 101.32 390.75 101.32 418.91 196.82 448.71 101.32 467.95 101.32 497.75 196.82 525.91 101.32 544.68 101.32 507.84 218.64 487.66 218.64 458.33 125.02Z" fill="#3D4647"/><path d="M560.24 101.32 577.84 101.32 577.84 218.64 560.24 218.64 560.24 101.32Z" fill="#3D4647"/><path d="M623.66 101.32 623.66 119.62C627.88 113.99 633.05 109.22 639.15 105.31 645.25 101.4 652.21 99.44 660.03 99.44 667.85 99.44 674.58 100.54 680.21 102.73 685.84 104.92 690.77 108.21 694.99 112.59 704.69 122.13 709.54 134.73 709.54 150.37L709.54 218.65 691.94 218.65 691.94 150.84C691.94 140.05 688.89 131.45 682.79 125.03 676.69 118.62 668.79 115.41 659.09 115.41 649.39 115.41 640.86 118.7 633.98 125.27 627.09 132 623.65 140.6 623.65 151.08L623.65 218.66 606.05 218.66 606.05 101.34 623.65 101.34Z" fill="#3D4647"/><path d="M828.65 199.87C819.26 213.64 805.26 220.52 786.65 220.52 769.76 220.52 755.99 214.65 745.35 202.92 735.02 191.34 729.86 177.03 729.86 159.98 729.86 142.93 735.02 128.62 745.35 117.04 755.99 105.31 770.14 99.44 787.82 99.44 805.5 99.44 819.1 106.4 828.65 120.32L828.65 54.39 846.25 54.39 846.25 218.64 828.65 218.64 828.65 199.87ZM788.99 204.56C801.66 204.56 811.67 200.18 819.03 191.42 826.07 183.13 829.59 172.65 829.59 159.98 829.59 147.31 826.07 136.83 819.03 128.54 811.67 119.78 801.66 115.4 788.99 115.4 776.32 115.4 766.3 119.78 758.49 128.54 751.14 136.83 747.46 147.31 747.46 159.98 747.46 172.65 751.13 183.13 758.49 191.42 766.31 200.18 776.48 204.56 788.99 204.56Z" fill="#3D4647"/><path d="M929.45 204.56C936.96 204.56 943.6 202.45 949.39 198.22 955.18 193.99 959.4 188.52 962.06 181.79L981.07 181.79C977.47 193.37 970.9 202.67 961.36 209.71 951.34 216.91 939.46 220.5 925.69 220.5 908.48 220.5 894.48 214.63 883.69 202.9 873.21 191.48 867.97 177.17 867.97 159.96 867.97 142.75 873.21 128.44 883.69 117.02 894.48 105.29 908.48 99.42 925.69 99.42 939.45 99.42 951.34 103.02 961.36 110.21 970.9 117.25 977.47 126.56 981.07 138.13L962.06 138.13C959.4 131.41 955.17 125.93 949.39 121.7 943.6 117.48 936.95 115.36 929.45 115.36 921.95 115.36 915.56 116.53 910.32 118.88 905.08 121.23 900.66 124.43 897.06 128.5 889.4 136.95 885.56 147.43 885.56 159.94 885.56 172.45 889.39 182.94 897.06 191.38 904.88 200.14 915.67 204.52 929.44 204.52Z" fill="#3D4647"/><path d="M1018.38 54.39 1018.38 119.62C1022.6 113.99 1027.77 109.22 1033.87 105.31 1039.97 101.4 1046.93 99.44 1054.75 99.44 1062.57 99.44 1069.3 100.54 1074.93 102.73 1080.56 104.92 1085.49 108.21 1089.71 112.59 1099.41 122.13 1104.26 134.73 1104.26 150.37L1104.26 218.65 1086.66 218.65 1086.66 150.84C1086.66 140.05 1083.61 131.45 1077.51 125.03 1071.41 118.62 1063.51 115.41 1053.81 115.41 1044.11 115.41 1035.58 118.7 1028.7 125.27 1021.81 132 1018.37 140.6 1018.37 151.08L1018.37 218.66 1000.77 218.66 1000.77 54.39 1018.37 54.39Z" fill="#3D4647"/><path d="M1131.13 101.32 1148.73 101.32 1148.73 218.64 1131.13 218.64 1131.13 101.32Z" fill="#3D4647"/><path d="M1194.53 218.64 1176.93 218.64 1176.93 54.39 1194.53 54.39 1194.53 218.64Z" fill="#3D4647"/><path d="M1240.25 218.64 1222.65 218.64 1222.65 54.39 1240.25 54.39 1240.25 218.64Z" fill="#3D4647"/><path d="M1280.9 53.15C1283.49 53.15 1285.92 53.64 1288.2 54.63 1290.48 55.62 1292.47 56.95 1294.16 58.65 1295.86 60.35 1297.2 62.33 1298.18 64.61 1299.16 66.89 1299.66 69.33 1299.66 71.92 1299.66 74.51 1299.17 76.93 1298.18 79.2 1297.19 81.46 1295.85 83.44 1294.16 85.14 1292.46 86.84 1290.47 88.18 1288.2 89.16 1285.92 90.15 1283.48 90.64 1280.9 90.64 1278.32 90.64 1275.88 90.15 1273.62 89.16 1271.36 88.18 1269.38 86.84 1267.68 85.14 1265.98 83.44 1264.64 81.46 1263.66 79.2 1262.68 76.94 1262.18 74.51 1262.18 71.92 1262.18 69.33 1262.67 66.89 1263.66 64.61 1264.65 62.33 1265.99 60.34 1267.68 58.65 1269.38 56.95 1271.36 55.61 1273.62 54.63 1275.88 53.64 1278.31 53.15 1280.9 53.15ZM1280.9 87.95C1285.35 87.95 1289.14 86.38 1292.28 83.25 1293.74 81.79 1294.89 80.08 1295.73 78.13 1296.57 76.18 1296.99 74.1 1296.99 71.89 1296.99 69.68 1296.57 67.6 1295.73 65.65 1294.89 63.7 1293.74 61.99 1292.28 60.53 1289.14 57.39 1285.35 55.82 1280.9 55.82 1276.45 55.82 1272.64 57.39 1269.57 60.53 1266.43 63.7 1264.86 67.5 1264.86 71.91 1264.86 74.1 1265.28 76.17 1266.12 78.12 1266.96 80.07 1268.11 81.78 1269.57 83.24 1272.63 86.38 1276.41 87.94 1280.9 87.94ZM1290.15 67.65C1290.15 68.89 1289.78 69.99 1289.05 70.96 1288.32 71.93 1287.32 72.61 1286.04 73.01 1288.05 73.59 1289.27 75.23 1289.71 77.93 1289.82 78.62 1289.87 79.24 1289.87 79.79L1289.87 82.36 1286.09 82.36 1286.09 80.28C1286.09 78.71 1285.93 77.58 1285.6 76.89 1284.91 75.43 1283.66 74.7 1281.88 74.7L1276.57 74.7 1276.57 82.36 1272.74 82.36 1272.74 61.46 1281.61 61.46C1284.56 61.46 1286.73 62.03 1288.09 63.16 1289.46 64.29 1290.14 65.79 1290.14 67.65ZM1281.34 71.43C1282.87 71.43 1284.09 71.14 1285.01 70.56 1285.92 69.98 1286.38 69.16 1286.38 68.1 1286.38 67.04 1286.01 66.21 1285.28 65.61 1284.55 65.01 1283.2 64.71 1281.23 64.71L1276.58 64.71 1276.58 71.44 1281.34 71.44Z" fill="#3D4647"/><circle cx="569.04" cy="70.11" r="11.5" fill="#4E585A"/><circle cx="1139.93" cy="70.11" r="11.5" fill="#4E585A"/><path d="M182.22 96.58 182.22 30.31 129.73 0 72.39 33.11 182.22 96.58Z" fill="#3D4647"/><path d="M202.08 168.7 259.46 135.54 259.46 74.9 202.08 41.77 202.08 168.7Z" fill="#3D4647"/><path d="M77.23 203.19 77.23 269.29 129.73 299.6 186.92 266.58 77.23 203.19Z" fill="#3D4647"/><path d="M149.49 222.02 206.77 255.12 259.46 224.7 259.46 158.47 149.49 222.02Z" fill="#3D4647"/><path d="M109.81 77.67 52.54 44.57 0 74.9 0 141.13 109.81 77.67Z" fill="#3D4647"/><path d="M57.38 130.9 0 164.06 0 224.7 57.38 257.83 57.38 130.9Z" fill="#3D4647"/><path d="M182.23 180.11 129.73 210.43 77.23 180.11 77.23 119.49 129.73 89.18 182.23 119.49 182.23 180.11Z" fill="#40AA1D"/></symbol>
+
+  <symbol id="logo-servicemax" viewBox="0 0 447.91 82.14"><g><path d="M130.07 33.94 125.12 33.94C124.66 30.56 122 28.86 116.99 28.86 111.98 28.86 109.44 30.42 109.44 33.55 109.44 34.85 109.96 35.83 111.07 36.48 112.11 37.19 113.41 37.72 115.04 38.17 116.67 38.63 118.42 39.02 120.31 39.34 122.2 39.73 123.89 40.25 125.52 40.9 127.15 41.62 128.45 42.53 129.55 43.7 130.59 44.87 131.11 46.5 131.11 48.51 131.11 51.7 129.94 54.11 127.53 55.73 125.12 57.42 121.93 58.27 117.83 58.27 113.47 58.27 110.02 57.16 107.49 55.02 105.15 53.13 103.91 50.6 103.72 47.54L108.8 47.54C109.13 50.53 110.82 52.55 113.87 53.59 114.98 53.92 116.15 54.11 117.25 54.11 118.35 54.11 119.33 54.04 120.31 53.91 121.29 53.78 122.2 53.52 123.11 53.19 125.19 52.34 126.23 50.98 126.23 48.96 126.23 47.59 125.71 46.55 124.67 45.84 123.56 45.12 122.26 44.54 120.64 44.08 119.01 43.62 117.32 43.23 115.43 42.84 113.54 42.51 111.79 41.99 110.16 41.34 108.53 40.69 107.23 39.78 106.19 38.67 105.08 37.56 104.56 36 104.56 33.99 104.56 31.06 105.67 28.72 107.81 27.09 109.96 25.46 113.08 24.68 117.31 24.68 121.28 24.68 124.47 25.66 126.74 27.54 128.63 29.17 129.73 31.25 130.06 33.92Z" stroke-width="0" fill="#3D4647"/><path d="M151.8 53.85C156.16 53.85 159.35 52.03 161.23 48.39L166.56 48.39C165.45 51.32 163.63 53.72 161.23 55.55 158.76 57.37 155.57 58.28 151.73 58.28 146.85 58.28 142.82 56.65 139.76 53.4 136.77 50.21 135.27 46.24 135.27 41.49 135.27 36.74 136.7 32.71 139.56 29.58 142.62 26.33 146.52 24.7 151.4 24.7 156.28 24.7 160.18 26.33 163.24 29.58 166.1 32.7 167.53 36.67 167.53 41.49L167.53 43.44 140.27 43.44C140.6 46.43 141.83 48.91 143.85 50.86 145.93 52.88 148.6 53.85 151.79 53.85ZM151.41 29.13C148.42 29.13 145.88 30.04 143.86 31.93 141.97 33.69 140.8 36.03 140.35 38.89L162.47 38.89C162.01 36.03 160.84 33.68 158.96 31.93 156.94 30.04 154.41 29.13 151.41 29.13Z" stroke-width="0" fill="#3D4647"/><path d="M190.31 24.71 190.64 24.71 190.64 29.59 190.05 29.59C186.54 29.59 183.67 31.02 181.46 33.82 179.38 36.49 178.34 39.74 178.34 43.45L178.34 57.76 173.46 57.76 173.46 25.23 178.34 25.23 178.34 33.23C179.38 29.85 181.66 27.37 185.11 25.75 186.54 25.04 188.3 24.71 190.32 24.71Z" stroke-width="0" fill="#3D4647"/><path d="M217.77 25.23 223.1 25.23 210.41 57.76 204.68 57.76 191.93 25.23 197.26 25.23 207.54 52.56 217.75 25.23Z" stroke-width="0" fill="#3D4647"/><path d="M230 13.25C230.98 13.25 231.76 13.58 232.41 14.23 233.06 14.88 233.39 15.66 233.39 16.57 233.39 17.55 233.06 18.33 232.41 18.98 231.76 19.63 230.98 19.96 230 19.96 229.02 19.96 228.24 19.63 227.59 18.98 226.94 18.33 226.61 17.55 226.61 16.57 226.61 15.66 226.94 14.88 227.59 14.23 228.24 13.58 229.02 13.25 230 13.25ZM227.59 57.76 227.59 25.23 232.47 25.23 232.47 57.76 227.59 57.76Z" stroke-width="0" fill="#3D4647"/><path d="M255.89 53.85C257.97 53.85 259.79 53.27 261.42 52.09 263.05 50.92 264.22 49.42 264.93 47.54L270.2 47.54C269.22 50.73 267.4 53.33 264.73 55.28 261.93 57.3 258.68 58.27 254.84 58.27 250.09 58.27 246.19 56.64 243.19 53.39 240.26 50.2 238.83 46.23 238.83 41.48 238.83 36.73 240.26 32.76 243.19 29.57 246.18 26.32 250.09 24.69 254.84 24.69 258.68 24.69 261.93 25.67 264.73 27.68 267.4 29.63 269.22 32.23 270.2 35.42L264.93 35.42C264.21 33.53 263.04 32.04 261.42 30.87 259.79 29.7 257.97 29.11 255.89 29.11 253.81 29.11 252.05 29.44 250.62 30.09 249.12 30.74 247.89 31.65 246.91 32.76 244.76 35.1 243.72 38.03 243.72 41.48 243.72 44.93 244.76 47.86 246.91 50.2 249.06 52.61 252.05 53.84 255.89 53.84Z" stroke-width="0" fill="#3D4647"/><path d="M290.7 53.85C295.06 53.85 298.25 52.03 300.13 48.39L305.46 48.39C304.35 51.32 302.53 53.72 300.13 55.55 297.66 57.37 294.47 58.28 290.63 58.28 285.75 58.28 281.72 56.65 278.66 53.4 275.67 50.21 274.17 46.24 274.17 41.49 274.17 36.74 275.6 32.71 278.46 29.58 281.52 26.33 285.42 24.7 290.3 24.7 295.18 24.7 299.08 26.33 302.14 29.58 305 32.7 306.43 36.67 306.43 41.49L306.43 43.44 279.17 43.44C279.5 46.43 280.73 48.91 282.75 50.86 284.83 52.88 287.5 53.85 290.69 53.85ZM290.31 29.13C287.32 29.13 284.78 30.04 282.76 31.93 280.87 33.69 279.7 36.03 279.25 38.89L301.37 38.89C300.91 36.03 299.74 33.68 297.86 31.93 295.84 30.04 293.31 29.13 290.31 29.13Z" stroke-width="0" fill="#3D4647"/><path d="M317.25 25.23 317.25 30.17C319.4 26.53 322.71 24.7 327.14 24.7 329.29 24.7 331.3 25.29 333.19 26.39 335.01 27.56 336.44 29.19 337.48 31.27 338.98 28.54 341.25 26.59 344.38 25.41 345.62 24.95 347.05 24.69 348.67 24.69 350.29 24.69 351.73 25.02 353.22 25.6 354.65 26.25 355.95 27.16 357.06 28.33 359.47 30.93 360.7 34.19 360.7 38.09L360.7 57.74 355.82 57.74 355.82 38.22C355.82 35.55 355.04 33.34 353.54 31.58 352.04 29.95 350.09 29.11 347.75 29.11 345.28 29.11 343.2 29.89 341.57 31.52 339.81 33.15 338.97 35.42 338.97 38.29L338.97 57.74 334.09 57.74 334.09 38.22C334.09 35.55 333.31 33.34 331.81 31.58 330.31 29.95 328.36 29.11 326.02 29.11 323.55 29.11 321.47 29.89 319.84 31.52 318.08 33.15 317.24 35.42 317.24 38.29L317.24 57.74 312.36 57.74 312.36 25.23 317.24 25.23Z" stroke-width="0" fill="#3D4647"/><path d="M394.15 57.76 394.15 52.55C391.55 56.39 387.64 58.28 382.5 58.28 377.81 58.28 373.98 56.65 371.05 53.4 368.19 50.21 366.76 46.24 366.76 41.49 366.76 36.74 368.19 32.77 371.05 29.58 373.98 26.33 377.95 24.7 382.83 24.7 387.71 24.7 391.48 26.65 394.15 30.49L394.15 25.22 399.03 25.22 399.03 57.75 394.15 57.75ZM383.16 53.85C386.67 53.85 389.47 52.61 391.49 50.21 393.44 47.93 394.42 45 394.42 41.49 394.42 37.98 393.44 35.05 391.49 32.77 389.47 30.36 386.68 29.13 383.16 29.13 379.64 29.13 376.85 30.37 374.7 32.77 372.68 35.05 371.64 37.98 371.64 41.49 371.64 45 372.68 47.93 374.7 50.21 376.85 52.62 379.71 53.85 383.16 53.85Z" stroke-width="0" fill="#3D4647"/><path d="M433.45 25.23 421.67 40.98 434.29 57.77 428.04 57.77 418.87 44.5 409.63 57.77 403.45 57.77 416.01 40.98 404.23 25.23 410.48 25.23 418.87 37.53 427.2 25.23 433.45 25.23Z" stroke-width="0" fill="#3D4647"/><path d="M442.73 25.38C443.44 25.38 444.12 25.52 444.75 25.79 445.37 26.06 445.93 26.42 446.4 26.89 446.87 27.36 447.23 27.92 447.5 28.54 447.77 29.17 447.91 29.85 447.91 30.56 447.91 31.27 447.77 31.95 447.5 32.57 447.23 33.19 446.87 33.73 446.4 34.2 445.93 34.67 445.37 35.05 444.75 35.32 444.12 35.59 443.44 35.73 442.73 35.73 442.02 35.73 441.34 35.59 440.72 35.32 440.1 35.05 439.56 34.67 439.09 34.2 438.62 33.73 438.24 33.19 437.97 32.57 437.7 31.95 437.56 31.27 437.56 30.56 437.56 29.85 437.7 29.17 437.97 28.54 438.24 27.92 438.62 27.36 439.09 26.89 439.56 26.42 440.1 26.06 440.72 25.79 441.34 25.52 442.02 25.38 442.73 25.38ZM442.73 34.99C443.95 34.99 445.01 34.55 445.87 33.69 446.28 33.28 446.59 32.81 446.82 32.27 447.05 31.74 447.17 31.17 447.17 30.55 447.17 29.93 447.05 29.37 446.82 28.83 446.59 28.3 446.28 27.83 445.87 27.42 445.01 26.56 443.95 26.12 442.73 26.12 441.51 26.12 440.45 26.56 439.6 27.42 438.74 28.3 438.3 29.34 438.3 30.56 438.3 31.16 438.42 31.74 438.65 32.27 438.88 32.81 439.19 33.28 439.6 33.69 440.45 34.55 441.49 34.99 442.73 34.99ZM445.28 29.39C445.28 29.74 445.17 30.04 444.98 30.3 444.78 30.57 444.5 30.77 444.15 30.87 444.71 31.04 445.04 31.49 445.16 32.23 445.19 32.43 445.2 32.59 445.2 32.74L445.2 33.45 444.16 33.45 444.16 32.88C444.16 32.44 444.11 32.14 444.02 31.94 443.82 31.53 443.49 31.34 442.99 31.34L441.52 31.34 441.52 33.45 440.46 33.45 440.46 27.68 442.91 27.68C443.73 27.68 444.33 27.83 444.71 28.15 445.09 28.47 445.27 28.87 445.27 29.39ZM441.54 30.43 442.85 30.43C443.27 30.43 443.61 30.35 443.86 30.19 444.12 30.02 444.24 29.8 444.24 29.51 444.24 29.22 444.13 28.98 443.94 28.81 443.74 28.64 443.37 28.57 442.82 28.57L441.54 28.57 441.54 30.43Z" stroke-width="0" fill="#3D4647"/></g><path d="M35.57 10.46 71.14 30.99 71.14 20.53 35.57 0 35.57 0 0 20.54 9.06 25.77 35.57 10.46" stroke-width="0" fill="#40AA1D"/><path d="M35.57 31.38 71.14 51.92 71.14 41.46 35.57 20.92 35.57 20.92 18.12 30.99 27.18 36.22 35.57 31.38" stroke-width="0" fill="#40AA1D"/><path d="M35.57 71.68 0 51.15 0 61.61 35.57 82.15 35.57 82.15 71.14 61.61 62.08 56.38 35.57 71.69" stroke-width="0" fill="#3D4647"/><path d="M35.57 50.76 0 30.22 0 40.68 35.57 61.22 35.57 61.22 53.02 51.15 43.96 45.92 35.57 50.76" stroke-width="0" fill="#3D4647"/></symbol>
+
+
+  <symbol id="logo-codebeamer" viewBox="0 0 1785 300.76"><path d="M1766.4 91.93C1768.96 91.93 1771.38 92.42 1773.64 93.39 1775.9 94.36 1777.87 95.69 1779.55 97.38 1781.23 99.06 1782.56 101.03 1783.54 103.29 1784.51 105.55 1785 107.96 1785 110.53 1785 113.1 1784.51 115.5 1783.54 117.74 1782.56 119.98 1781.23 121.94 1779.55 123.62 1777.87 125.3 1775.9 126.63 1773.64 127.61 1771.38 128.58 1768.97 129.07 1766.4 129.07 1763.83 129.07 1761.43 128.58 1759.19 127.61 1756.95 126.64 1754.99 125.3 1753.31 123.62 1751.63 121.94 1750.3 119.98 1749.32 117.74 1748.35 115.5 1747.86 113.09 1747.86 110.53 1747.86 107.97 1748.35 105.55 1749.32 103.29 1750.3 101.03 1751.63 99.06 1753.31 97.38 1754.99 95.7 1756.95 94.37 1759.19 93.39 1761.43 92.41 1763.84 91.93 1766.4 91.93ZM1766.4 126.42C1770.81 126.42 1774.57 124.87 1777.68 121.76 1779.13 120.31 1780.27 118.62 1781.1 116.69 1781.93 114.76 1782.35 112.7 1782.35 110.51 1782.35 108.32 1781.93 106.26 1781.1 104.33 1780.27 102.4 1779.13 100.71 1777.68 99.26 1774.57 96.15 1770.81 94.6 1766.4 94.6 1761.99 94.6 1758.21 96.15 1755.18 99.26 1752.07 102.4 1750.52 106.17 1750.52 110.54 1750.52 112.71 1750.94 114.76 1751.77 116.69 1752.6 118.63 1753.74 120.32 1755.19 121.76 1758.23 124.87 1761.97 126.42 1766.41 126.42ZM1775.56 106.3C1775.56 107.53 1775.2 108.62 1774.47 109.58 1773.74 110.54 1772.75 111.21 1771.49 111.61 1773.48 112.19 1774.69 113.81 1775.12 116.49 1775.23 117.18 1775.28 117.79 1775.28 118.33L1775.28 120.88 1771.54 120.88 1771.54 118.82C1771.54 117.27 1771.38 116.15 1771.05 115.46 1770.36 114.01 1769.13 113.29 1767.36 113.29L1762.1 113.29 1762.1 120.88 1758.3 120.88 1758.3 100.17 1767.09 100.17C1770.02 100.17 1772.16 100.73 1773.51 101.85 1774.86 102.97 1775.54 104.45 1775.54 106.3ZM1766.83 110.05C1768.35 110.05 1769.56 109.76 1770.46 109.18 1771.36 108.6 1771.82 107.79 1771.82 106.74 1771.82 105.69 1771.46 104.87 1770.73 104.27 1770 103.67 1768.67 103.38 1766.72 103.38L1762.11 103.38 1762.11 110.05 1766.83 110.05Z" stroke-width="0" fill="#3D4647"/><g><path d="M439.42 194.71C446.89 194.71 453.5 192.61 459.25 188.41 465 184.21 469.2 178.77 471.85 172.08L490.75 172.08C487.17 183.59 480.63 192.84 471.15 199.85 461.19 207.01 449.37 210.58 435.68 210.58 418.56 210.58 404.64 204.75 393.91 193.08 383.48 181.73 378.28 167.49 378.28 150.38 378.28 133.27 383.49 119.03 393.91 107.68 404.64 96.01 418.56 90.18 435.68 90.18 449.37 90.18 461.19 93.76 471.15 100.91 480.64 107.91 487.17 117.17 490.75 128.68L471.85 128.68C469.2 122 465.01 116.55 459.25 112.35 453.49 108.15 446.88 106.05 439.42 106.05 431.96 106.05 425.61 107.22 420.4 109.55 415.19 111.88 410.79 115.08 407.22 119.12 399.59 127.52 395.79 137.95 395.79 150.39 395.79 162.83 399.6 173.26 407.22 181.66 415 190.37 425.73 194.73 439.42 194.73Z" stroke-width="0" fill="#3D4647"/><path d="M564.72 90.17C582.14 90.17 596.3 96 607.19 107.67 617.46 118.87 622.59 133.11 622.59 150.37 622.59 167.63 617.46 181.87 607.19 193.07 596.3 204.74 582.15 210.57 564.72 210.57 547.29 210.57 533.14 204.74 522.25 193.07 511.98 181.87 506.85 167.63 506.85 150.37 506.85 133.11 511.98 118.87 522.25 107.67 533.14 96 547.29 90.17 564.72 90.17ZM564.72 194.71C577.32 194.71 587.27 190.36 594.59 181.64 601.59 173.4 605.09 162.97 605.09 150.37 605.09 137.77 601.59 127.35 594.59 119.1 587.28 110.39 577.32 106.03 564.72 106.03 552.12 106.03 542.16 110.39 534.85 119.1 527.85 127.35 524.35 137.77 524.35 150.37 524.35 162.97 527.85 173.39 534.85 181.64 542.16 190.35 552.12 194.71 564.72 194.71Z" stroke-width="0" fill="#3D4647"/><path d="M738.33 190.04C729 203.73 715.07 210.57 696.56 210.57 679.76 210.57 666.07 204.74 655.49 193.07 645.22 181.56 640.09 167.33 640.09 150.37 640.09 133.41 645.22 119.18 655.49 107.67 666.07 96 680.15 90.17 697.73 90.17 715.31 90.17 728.84 97.09 738.33 110.94L738.33 45.36 755.83 45.36 755.83 208.7 738.33 208.7 738.33 190.03ZM698.9 194.71C711.5 194.71 721.45 190.36 728.77 181.64 735.77 173.4 739.27 162.97 739.27 150.37 739.27 137.77 735.77 127.35 728.77 119.1 721.46 110.39 711.5 106.03 698.9 106.03 686.3 106.03 676.34 110.39 668.56 119.1 661.25 127.35 657.6 137.77 657.6 150.37 657.6 162.97 661.25 173.39 668.56 181.64 676.34 190.35 686.45 194.71 698.9 194.71Z" stroke-width="0" fill="#3D4647"/><path d="M839.83 194.71C855.54 194.71 866.82 188.18 873.67 175.11L892.8 175.11C888.75 185.69 882.34 194.24 873.55 200.78 864.76 207.32 853.44 210.58 839.6 210.58 822.02 210.58 807.71 204.75 796.67 193.08 785.94 181.73 780.57 167.49 780.57 150.38 780.57 133.27 785.7 118.88 795.97 107.68 806.86 96.01 821.01 90.18 838.44 90.18 855.87 90.18 870.02 96.01 880.91 107.68 891.18 118.88 896.31 133.12 896.31 150.38L896.31 157.38 798.54 157.38C799.78 168.11 804.06 176.98 811.37 183.98 818.84 191.14 828.33 194.71 839.84 194.71ZM838.43 106.04C827.7 106.04 818.67 109.39 811.36 116.07 804.52 122.45 800.31 130.77 798.76 141.04L878.1 141.04C876.54 130.77 872.34 122.45 865.5 116.07 858.18 109.38 849.16 106.04 838.43 106.04Z" stroke-width="0" fill="#3D4647"/><path d="M936.9 110.94C946.39 97.09 960.31 90.17 978.67 90.17 995.47 90.17 1009.08 96 1019.5 107.67 1029.92 119.18 1035.14 133.42 1035.14 150.37 1035.14 167.32 1029.93 181.56 1019.5 193.07 1009.08 204.74 995.04 210.57 977.38 210.57 959.72 210.57 946.23 203.73 936.89 190.04L936.89 208.71 919.39 208.71 919.39 45.36 936.89 45.36 936.89 110.93ZM976.34 194.71C988.78 194.71 998.89 190.36 1006.67 181.64 1013.98 173.4 1017.64 162.97 1017.64 150.37 1017.64 137.77 1013.98 127.35 1006.67 119.1 998.89 110.39 988.78 106.03 976.34 106.03 963.9 106.03 953.78 110.39 946.47 119.1 939.47 127.35 935.97 137.77 935.97 150.37 935.97 162.97 939.47 173.39 946.47 181.64 953.78 190.35 963.74 194.71 976.34 194.71Z" stroke-width="0" fill="#3D4647"/><path d="M1111.68 194.71C1127.39 194.71 1138.67 188.18 1145.52 175.11L1164.65 175.11C1160.6 185.69 1154.19 194.24 1145.4 200.78 1136.61 207.32 1125.29 210.58 1111.45 210.58 1093.87 210.58 1079.56 204.75 1068.52 193.08 1057.79 181.73 1052.42 167.49 1052.42 150.38 1052.42 133.27 1057.55 118.88 1067.82 107.68 1078.71 96.01 1092.87 90.18 1110.29 90.18 1127.71 90.18 1141.87 96.01 1152.76 107.68 1163.03 118.88 1168.16 133.12 1168.16 150.38L1168.16 157.38 1070.39 157.38C1071.63 168.11 1075.91 176.98 1083.23 183.98 1090.7 191.14 1100.19 194.71 1111.7 194.71ZM1110.28 106.04C1099.55 106.04 1090.52 109.39 1083.21 116.07 1076.37 122.45 1072.16 130.77 1070.61 141.04L1149.95 141.04C1148.39 130.77 1144.19 122.45 1137.35 116.07 1130.03 109.38 1121.01 106.04 1110.28 106.04Z" stroke-width="0" fill="#3D4647"/><path d="M1282.25 190.04C1272.92 203.73 1258.99 210.57 1240.48 210.57 1223.68 210.57 1209.99 204.74 1199.41 193.07 1189.14 181.56 1184.01 167.33 1184.01 150.37 1184.01 133.41 1189.14 119.18 1199.41 107.67 1209.99 96 1224.07 90.17 1241.65 90.17 1259.23 90.17 1272.76 97.09 1282.25 110.94L1282.25 92.04 1299.75 92.04 1299.75 208.71 1282.25 208.71 1282.25 190.04ZM1242.82 194.71C1255.42 194.71 1265.37 190.36 1272.69 181.64 1279.69 173.4 1283.19 162.97 1283.19 150.37 1283.19 137.77 1279.69 127.35 1272.69 119.1 1265.38 110.39 1255.42 106.03 1242.82 106.03 1230.22 106.03 1220.26 110.39 1212.48 119.1 1205.17 127.35 1201.52 137.77 1201.52 150.37 1201.52 162.97 1205.17 173.39 1212.48 181.64 1220.26 190.35 1230.37 194.71 1242.82 194.71Z" stroke-width="0" fill="#3D4647"/><path d="M1349.22 109.77C1357 96.7 1368.82 90.17 1384.69 90.17 1392.47 90.17 1399.66 92.23 1406.28 96.35 1412.89 100.47 1418.06 106.27 1421.79 113.73 1427.08 103.93 1435.33 96.93 1446.53 92.73 1451.04 91.02 1456.13 90.17 1461.81 90.17 1467.49 90.17 1472.93 91.3 1478.15 93.55 1483.36 95.81 1487.99 99.03 1492.03 103.24 1500.74 112.57 1505.1 124.24 1505.1 138.24L1505.1 208.71 1487.6 208.71 1487.6 138.7C1487.6 129.06 1484.88 121.12 1479.43 114.9 1473.98 108.99 1467.06 106.03 1458.66 106.03 1449.79 106.03 1442.4 108.91 1436.49 114.66 1430.27 120.57 1427.16 128.66 1427.16 138.93L1427.16 208.7 1409.66 208.7 1409.66 138.69C1409.66 129.05 1406.94 121.11 1401.49 114.89 1396.04 108.98 1389.12 106.02 1380.72 106.02 1371.85 106.02 1364.46 108.9 1358.55 114.65 1352.33 120.56 1349.22 128.65 1349.22 138.92L1349.22 208.69 1331.72 208.69 1331.72 92.02 1349.22 92.02 1349.22 109.75Z" stroke-width="0" fill="#3D4647"/><path d="M1587.93 194.71C1603.64 194.71 1614.92 188.18 1621.77 175.11L1640.9 175.11C1636.85 185.69 1630.44 194.24 1621.65 200.78 1612.86 207.32 1601.54 210.58 1587.7 210.58 1570.12 210.58 1555.81 204.75 1544.77 193.08 1534.04 181.73 1528.67 167.49 1528.67 150.38 1528.67 133.27 1533.8 118.88 1544.07 107.68 1554.96 96.01 1569.11 90.18 1586.54 90.18 1603.97 90.18 1618.12 96.01 1629.01 107.68 1639.28 118.88 1644.41 133.12 1644.41 150.38L1644.41 157.38 1546.64 157.38C1547.88 168.11 1552.16 176.98 1559.47 183.98 1566.94 191.14 1576.43 194.71 1587.94 194.71ZM1586.54 106.04C1575.81 106.04 1566.78 109.39 1559.47 116.07 1552.63 122.45 1548.42 130.77 1546.87 141.04L1626.21 141.04C1624.65 130.77 1620.45 122.45 1613.61 116.07 1606.29 109.38 1597.27 106.04 1586.54 106.04Z" stroke-width="0" fill="#3D4647"/><path d="M1729.11 90.17 1729.11 107.67 1727.01 107.67C1714.41 107.67 1704.14 112.73 1696.21 122.84 1688.74 132.49 1685.01 144 1685.01 157.38L1685.01 208.72 1667.51 208.72 1667.51 92.05 1685.01 92.05 1685.01 120.75C1688.74 108.62 1696.83 99.67 1709.28 93.91 1714.41 91.42 1720.63 90.18 1727.95 90.18L1729.12 90.18Z" stroke-width="0" fill="#3D4647"/></g><path d="M0.09 75.16 130.61 0 168.27 21.27 37.21 96.74 37.21 203.92 130.61 257.85 130.61 258.05 130.78 257.95 261.71 182.62 261.71 225.33 130.61 300.76 0 225.33 0.09 75.16Z" stroke-width="0" fill="#3D4647" fill-rule="evenodd"/><path d="M130.61 85.94 205.59 42.77 242.91 64.27 130.61 128.92 130.61 85.94Z" stroke-width="0" fill="#40AA1D" fill-rule="evenodd"/><path d="M130.61 171.91 261.63 96.48 261.71 139.43 130.61 214.9 130.61 171.91Z" stroke-width="0" fill="#40AA1D" fill-rule="evenodd"/></symbol>
+  <symbol id="logo-windchill-mark" viewBox="0.00 0.00 259.46 299.60"><path d="M109.81 77.67 52.54 44.57 0 74.9 0 141.13 109.81 77.67Z" fill="#3D4647"/><path d="M57.38 130.9 0 164.06 0 224.7 57.38 257.83 57.38 130.9Z" fill="#3D4647"/><path d="M182.22 96.58 182.22 30.31 129.73 0 72.39 33.11 182.22 96.58Z" fill="#3D4647"/><path d="M77.23 203.19 77.23 269.29 129.73 299.6 186.92 266.58 77.23 203.19Z" fill="#3D4647"/><path d="M182.23 180.11 129.73 210.43 77.23 180.11 77.23 119.49 129.73 89.18 182.23 119.49 182.23 180.11Z" fill="#40AA1D"/><path d="M149.49 222.02 206.77 255.12 259.46 224.7 259.46 158.47 149.49 222.02Z" fill="#3D4647"/><path d="M202.08 168.7 259.46 135.54 259.46 74.9 202.08 41.77 202.08 168.7Z" fill="#3D4647"/></symbol>
+  <symbol id="logo-creo-mark" viewBox="0.00 0.00 397.21 449.90"><path d="M183.44 237.95 0 132.2 0 343.99 183.44 449.9 183.44 237.95Z" fill="#3D4647"/><path d="M198.6 211.68 381.89 105.82 198.6 0 15.14 105.92 198.6 211.68Z" fill="#3D4647"/><path d="M213.77 237.95 213.77 449.9 397.21 343.99 397.21 131.99 213.77 237.95Z" fill="#40AA1D"/></symbol>
+  <symbol id="logo-servicemax-mark" viewBox="0.00 0.00 71.14 82.15"><path d="M35.57 10.46 71.14 30.99 71.14 20.53 35.57 0 35.57 0 0 20.54 9.06 25.77 35.57 10.46" stroke-width="0" fill="#40AA1D"/><path d="M35.57 71.68 0 51.15 0 61.61 35.57 82.15 35.57 82.15 71.14 61.61 62.08 56.38 35.57 71.69" stroke-width="0" fill="#3D4647"/><path d="M35.57 50.76 0 30.22 0 40.68 35.57 61.22 35.57 61.22 53.02 51.15 43.96 45.92 35.57 50.76" stroke-width="0" fill="#3D4647"/><path d="M35.57 31.38 71.14 51.92 71.14 41.46 35.57 20.92 35.57 20.92 18.12 30.99 27.18 36.22 35.57 31.38" stroke-width="0" fill="#40AA1D"/></symbol>
+  <symbol id="logo-codebeamer-mark" viewBox="0.00 0.00 261.71 300.76"><path d="M0.09 75.16 130.61 0 168.27 21.27 37.21 96.74 37.21 203.92 130.61 257.85 130.61 258.05 130.78 257.95 261.71 182.62 261.71 225.33 130.61 300.76 0 225.33 0.09 75.16Z" stroke-width="0" fill="#3D4647" fill-rule="evenodd"/><path d="M130.61 85.94 205.59 42.77 242.91 64.27 130.61 128.92 130.61 85.94Z" stroke-width="0" fill="#40AA1D" fill-rule="evenodd"/><path d="M130.61 171.91 261.63 96.48 261.71 139.43 130.61 214.9 130.61 171.91Z" stroke-width="0" fill="#40AA1D" fill-rule="evenodd"/></symbol>
+  <symbol id="logo-seismic" viewBox="0 0 300 300"><polygon points="104,78 233,52 230,153 104,126" fill="#FF5000"/><polygon points="69,146 195,173 195,221 66,247" fill="#FF5000"/></symbol>
+
+</svg>
+
+<div class="orion-app">
+  <aside class="orion-side">
+    <div class="orion-side__brand">
+      <span class="lockup">
+        <svg class="orion-spark" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M14.6 1 C14.8 7.3 17.3 9.4 23 9.7 C17.3 10 14.8 12.1 14.6 18.4 C14.4 12.1 11.9 10 6.2 9.7 C11.9 9.4 14.4 7.3 14.6 1 Z"/>
+          <path d="M6 12.2 C6.1 15.2 7.7 16.2 10.6 16.4 C7.7 16.6 6.1 17.6 6 20.6 C5.9 17.6 4.3 16.6 1.4 16.4 C4.3 16.2 5.9 15.2 6 12.2 Z"/>
+        </svg>
+        Technical Marketing Hub
+      </span>
+      <svg class="orion-ico ico-muted"><use href="#i-panel"/></svg>
+    </div>
+    <div class="orion-side__body">
+      <div class="orion-group">Discover</div>
+      <div class="orion-navitem orion-navitem--active"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-grid"/></svg> Home</span></div>
+      <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-clock"/></svg> Latest Uploads</span></div>
+      <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-trend"/></svg> Most Viewed</span></div>
+      <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-star"/></svg> Favorites</span> <span class="count">12</span></div>
+
+      <div class="orion-group">Browse by Product</div>
+      <div class="orion-navitem"><span class="label"><svg class="nav-mark" viewBox="0.00 0.00 259.46 299.60"><use href="#logo-windchill-mark"/></svg> Windchill</span> <span class="count">38</span></div>
+      <div class="orion-navitem"><span class="label"><svg class="nav-mark" viewBox="0.00 0.00 397.21 449.90"><use href="#logo-creo-mark"/></svg> Creo</span> <span class="count">24</span></div>
+      <div class="orion-navitem"><span class="label"><svg class="nav-mark" viewBox="0.00 0.00 71.14 82.15"><use href="#logo-servicemax-mark"/></svg> ServiceMax</span> <span class="count">19</span></div>
+      <div class="orion-navitem"><span class="label"><svg class="nav-mark" viewBox="0.00 0.00 261.71 300.76"><use href="#logo-codebeamer-mark"/></svg> Codebeamer</span> <span class="count">11</span></div>
+
+      <div class="orion-group">Browse by Type</div>
+      <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-video"/></svg> Videos</span> <span class="count">86</span></div>
+      <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-box"/></svg> LDKs <span class="orion-subtle" style="font-size:11px;">Live Demo Kits</span></span> <span class="count">22</span></div>
+      <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-monitor"/></svg> VDKs <span class="orion-subtle" style="font-size:11px;">Virtual Demo Kits</span></span> <span class="count">9</span></div>
+      <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-monitor"/></svg> Virtual Machines</span> <span class="count">14</span></div>
+
+      <div class="orion-group">Funnel Stage</div>
+      <div class="orion-navitem"><span class="label">Awareness</span></div>
+      <div class="orion-navitem"><span class="label">Consideration</span></div>
+      <div class="orion-navitem"><span class="label">Decision</span></div>
+      <div class="orion-navitem"><span class="label">Post-Sale</span></div>
+    </div>
+    <div class="orion-side__foot">
+      <div class="orion-logo">
+        <svg viewBox="0 0 76 28.06" fill="none" aria-label="PTC">
+          <path d="M0 7.0818V13.2489L12.1976 6.23116L19.067 10.1181L17.7051 10.9096L12.1976 7.77884L7.41894 10.508L18.3502 16.7696L24.4072 13.2607V7.0818L12.1976 0.111328L0 7.0818Z" fill="#3D4647"/>
+          <path d="M0 14.8078V20.9985L12.2096 27.9572L24.4072 20.9985V14.8196L12.2096 21.8373L5.3402 17.9504L6.70213 17.1588L12.1976 20.2896L16.9763 17.5487L6.04506 11.2871L0 14.8078Z" fill="#40AA1D"/>
+          <path d="M40.4173 7.64383C38.6908 7.64383 37.3262 8.24257 36.3237 9.44003C35.3629 10.5679 34.8895 12.0021 34.8895 13.7286C34.8895 15.4552 35.3768 16.8894 36.3237 18.0173C37.3262 19.2147 38.6908 19.8135 40.4173 19.8135C42.13 19.8135 43.5085 19.2147 44.5806 18.0173C45.5832 16.8894 46.0844 15.4552 46.0844 13.7286C46.0844 12.0021 45.5832 10.5679 44.5806 9.44003C43.5085 8.24257 42.13 7.64383 40.4173 7.64383ZM35.0148 8.28434C36.2958 6.40459 38.2034 5.47168 40.7376 5.47168C43.0351 5.47168 44.9148 6.26535 46.3351 7.86661C47.7693 9.44003 48.4794 11.3894 48.4794 13.7147C48.4794 16.04 47.7693 17.9894 46.3351 19.5767C44.9009 21.178 42.9794 21.9856 40.5705 21.9856C38.1617 21.9856 36.2958 21.0388 35.0009 19.1312V28.0565H32.606V5.72231H35.0009V8.28434H35.0148Z" fill="#3D4647"/>
+          <path d="M53.0605 21.7215V7.83924H49.8022V5.72278H53.0605V0H55.4554V5.72278H59.1453V7.83924H55.4554V21.7215H53.0605Z" fill="#3D4647"/>
+          <path d="M68.8364 19.8134C69.8668 19.8134 70.7718 19.521 71.5516 18.9502C72.3453 18.3793 72.9161 17.6274 73.2782 16.7084H75.882C75.3946 18.2818 74.4896 19.5489 73.1946 20.5097C71.8301 21.4983 70.2009 21.9856 68.3351 21.9856C65.9819 21.9856 64.0744 21.1919 62.5984 19.5907C61.1642 18.0312 60.4541 16.0818 60.4541 13.7286C60.4541 11.3755 61.1642 9.42611 62.5984 7.86661C64.0744 6.26535 65.9819 5.47168 68.3351 5.47168C70.2149 5.47168 71.8301 5.95902 73.1946 6.94763C74.4896 7.90839 75.3946 9.17548 75.882 10.7628H73.2921C72.9301 9.84383 72.3592 9.09193 71.5655 8.52105C70.7718 7.95016 69.8668 7.65775 68.8503 7.65775C67.8199 7.65775 66.9566 7.82484 66.2465 8.14509C65.5364 8.46535 64.9237 8.897 64.4364 9.45396C63.3921 10.6097 62.863 12.0299 62.863 13.7426C62.863 15.4552 63.3782 16.8755 64.4364 18.0312C65.4946 19.2147 66.9566 19.8134 68.8364 19.8134Z" fill="#3D4647"/>
+        </svg>
+      </div>
+    </div>
+  </aside>
+
+  <div class="orion-workarea">
+    <div class="orion-topbar" id="mainTopbar">
+      <div class="orion-breadcrumb">Sales Enablement / <a>Technical Demo Development</a></div>
+      <h1 class="orion-title">Technical Marketing Hub</h1>
+      <div class="orion-subtle">One home for Videos, LDKs, VDKs, and Virtual Machines — replacing the separate Demo Library, Demo Video Gallery, and VM pages.</div>
+      <div class="hero-search">
+        <div class="hero-search__field">
+          <svg class="orion-ico ico-muted"><use href="#i-search"/></svg>
+          <input type="text" placeholder="Search by product, keyword, persona, or funnel stage…" value="AI parts classification">
+        </div>
+        <div class="filter-pill">Type: All <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg></div>
+        <div class="filter-pill">Product: All <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg></div>
+        <div class="filter-pill">Segment: All <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg></div>
+        <div class="filter-pill">Stage: All <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg></div>
+      </div>
+    </div>
+
+    <div class="orion-thread" id="mainThread">
+
+      <!-- Continue where you left off -->
+      <div class="section">
+        <div class="section-head">
+          <div class="section-head__title"><svg class="orion-ico ico-muted"><use href="#i-clock"/></svg> Continue where you left off</div>
+        </div>
+        <div class="compact-list">
+          <div class="compact-row">
+            <div class="compact-row__thumb"><svg><use href="#i-video"/></svg></div>
+            <div>
+              <div class="compact-row__title">Windchill AI Parts Rationalization — Overview (Voiceover)</div>
+              <div class="compact-row__meta"><span class="meta-logo-chip"><svg class="meta-logo" viewBox="0 0 1299.67 299.6"><use href="#logo-windchill"/></svg></span> Viewed yesterday</div>
+            </div>
+            <div class="compact-row__progress"><span style="width:64%"></span></div>
+          </div>
+          <div class="compact-row">
+            <div class="compact-row__thumb"><svg><use href="#i-box"/></svg></div>
+            <div>
+              <div class="compact-row__title">Codebeamer Hill Demo — Kit</div>
+              <div class="compact-row__meta"><span class="meta-logo-chip"><svg class="meta-logo" viewBox="0 0 1785 300.76"><use href="#logo-codebeamer"/></svg></span> Viewed 3 days ago</div>
+            </div>
+            <div class="compact-row__progress"><span style="width:100%"></span></div>
+          </div>
+          <div class="compact-row">
+            <div class="compact-row__thumb"><svg><use href="#i-monitor"/></svg></div>
+            <div>
+              <div class="compact-row__title">PTC Cloud Portal — VDK v.1</div>
+              <div class="compact-row__meta">All Products · Viewed last week</div>
+            </div>
+            <div class="compact-row__progress"><span style="width:30%"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Latest Uploads -->
+      <div class="section">
+        <div class="section-head">
+          <div class="section-head__title"><svg class="orion-ico ico-green"><use href="#i-clock"/></svg> Latest Uploads <span class="section-head__sub">new this month</span></div>
+          <a class="section-head__link" href="#">View all <svg class="orion-ico orion-ico--sm"><use href="#i-chevron-right"/></svg></a>
+        </div>
+        <div class="asset-row">
+          <div class="asset-card">
+            <div class="asset-card__thumb">
+              <span class="new-dot" title="New"></span>
+              <span class="type-chip"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg>Video</span>
+              <button class="play-btn" onclick="openVideoPreview('dup-parts')"><svg><use href="#i-play"/></svg></button>
+              <span class="duration-chip">4:12</span>
+            </div>
+            <div class="asset-card__body">
+              <div class="asset-card__title">Eliminate Duplicate Parts with Windchill AI Parts Classification</div>
+              <div class="asset-card__meta"><span class="meta-logo-chip"><svg class="meta-logo" viewBox="0 0 1299.67 299.6"><use href="#logo-windchill"/></svg></span> Consideration · EN</div>
+              <div class="asset-card__stats"><svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg> 214 views · Uploaded Jul 21</div>
+              <div class="asset-card__uuid">Consensus UUID <span class="orion-mono">7a19-3c02</span></div>
+              <div class="asset-card__actions asset-card__actions--3">
+                <button class="btn-ghost" onclick="openVideoPreview('dup-parts')">Preview</button>
+                <button class="btn-primary-sm" onclick="openShareModal('Eliminate Duplicate Parts with Windchill AI Parts Classification','Windchill · Consideration · EN','7a19-3c02')"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share</button>
+                <button class="btn-ghost" title="Add to PTC Velocity" onclick="openDsrModal('Eliminate Duplicate Parts with Windchill AI Parts Classification','Windchill · Consideration · EN')"><svg class="orion-ico--sm orion-ico"><use href="#logo-seismic"/></svg>Velocity</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="asset-card">
+            <div class="asset-card__thumb">
+              <svg class="watermark"><use href="#i-box"/></svg>
+              <span class="new-dot" title="New"></span>
+              <span class="type-chip"><svg class="orion-ico--sm orion-ico"><use href="#i-box"/></svg>LDK</span>
+            </div>
+            <div class="asset-card__body">
+              <div class="asset-card__title">Windchill AI – Parts Rationalization LDK</div>
+              <div class="asset-card__meta"><span class="meta-logo-chip"><svg class="meta-logo" viewBox="0 0 1299.67 299.6"><use href="#logo-windchill"/></svg></span> Script + Talk Track + Video</div>
+              <div class="asset-card__stats"><svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg> 58 downloads · Uploaded Jul 18</div>
+              <div class="asset-card__actions">
+                <button class="btn-ghost">Open Kit</button>
+                <button class="btn-ghost">Download</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="asset-card">
+            <div class="asset-card__thumb">
+              <span class="type-chip"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg>Video</span>
+              <button class="play-btn" onclick="openVideoPreview('creo-composites')"><svg><use href="#i-play"/></svg></button>
+              <span class="duration-chip">6:47</span>
+            </div>
+            <div class="asset-card__body">
+              <div class="asset-card__title">Creo Chapters S1E4 — Composites Deep Dive (Replay)</div>
+              <div class="asset-card__meta"><span class="meta-logo-chip"><svg class="meta-logo" viewBox="0 0 1334.88 449.9"><use href="#logo-creo"/></svg></span> Awareness · EN</div>
+              <div class="asset-card__stats"><svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg> 402 views · Uploaded Jul 14</div>
+              <div class="asset-card__uuid">Consensus UUID <span class="orion-mono">4f61-88ab</span></div>
+              <div class="asset-card__actions asset-card__actions--3">
+                <button class="btn-ghost" onclick="openVideoPreview('creo-composites')">Preview</button>
+                <button class="btn-primary-sm" onclick="openShareModal('Creo Chapters S1E4 — Composites Deep Dive (Replay)','Creo · Awareness · EN','4f61-88ab')"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share</button>
+                <button class="btn-ghost" title="Add to PTC Velocity" onclick="openDsrModal('Creo Chapters S1E4 — Composites Deep Dive (Replay)','Creo · Awareness · EN')"><svg class="orion-ico--sm orion-ico"><use href="#logo-seismic"/></svg>Velocity</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="asset-card">
+            <div class="asset-card__thumb">
+              <svg class="watermark"><use href="#i-monitor"/></svg>
+              <span class="type-chip"><svg class="orion-ico--sm orion-ico"><use href="#i-monitor"/></svg>VDK</span>
+            </div>
+            <div class="asset-card__body">
+              <div class="asset-card__title">Windchill ProjectLink — VDK v.2</div>
+              <div class="asset-card__meta"><span class="meta-logo-chip"><svg class="meta-logo" viewBox="0 0 1299.67 299.6"><use href="#logo-windchill"/></svg></span> Decision</div>
+              <div class="asset-card__stats"><svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg> 31 launches · Uploaded Jul 9</div>
+              <div class="asset-card__actions">
+                <button class="btn-ghost">Details</button>
+                <button class="btn-primary-sm">Launch</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Most Viewed -->
+      <div class="section">
+        <div class="section-head">
+          <div class="section-head__title"><svg class="orion-ico"><use href="#i-trend"/></svg> Most Viewed <span class="section-head__sub">last 90 days</span></div>
+          <a class="section-head__link" href="#">View all <svg class="orion-ico orion-ico--sm"><use href="#i-chevron-right"/></svg></a>
+        </div>
+        <div class="asset-row">
+          <div class="asset-card">
+            <div class="asset-card__thumb">
+              <span class="rank-chip">#1</span>
+              <span class="type-chip" style="left:auto;right:8px;"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg>Video</span>
+              <button class="play-btn" onclick="openVideoPreview('walkthrough-audio')"><svg><use href="#i-play"/></svg></button>
+            </div>
+            <div class="asset-card__body">
+              <div class="asset-card__title">Windchill AI Parts Rationalization — Walkthrough with Audio</div>
+              <div class="asset-card__meta"><span class="meta-logo-chip"><svg class="meta-logo" viewBox="0 0 1299.67 299.6"><use href="#logo-windchill"/></svg></span> Consideration · EN</div>
+              <div class="asset-card__stats"><svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg> 1,204 views · 38 shares</div>
+              <div class="asset-card__uuid">Consensus UUID <span class="orion-mono">8f3c-19ea</span></div>
+              <div class="asset-card__actions asset-card__actions--3">
+                <button class="btn-ghost" onclick="openVideoPreview('walkthrough-audio')">Preview</button>
+                <button class="btn-primary-sm" onclick="openShareModal('Windchill AI Parts Rationalization — Walkthrough with Audio','Windchill · Consideration · EN','8f3c-19ea')"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share</button>
+                <button class="btn-ghost" title="Add to PTC Velocity" onclick="openDsrModal('Windchill AI Parts Rationalization — Walkthrough with Audio','Windchill · Consideration · EN')"><svg class="orion-ico--sm orion-ico"><use href="#logo-seismic"/></svg>Velocity</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="asset-card">
+            <div class="asset-card__thumb">
+              <span class="rank-chip">#2</span>
+              <span class="type-chip" style="left:auto;right:8px;"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg>Video</span>
+              <button class="play-btn" onclick="openVideoPreview('exec-overview')"><svg><use href="#i-play"/></svg></button>
+            </div>
+            <div class="asset-card__body">
+              <div class="asset-card__title">The Intelligent Product Lifecycle — Executive Overview</div>
+              <div class="asset-card__meta"><span class="meta-logo-chip"><svg class="meta-logo" viewBox="0 0 1299.67 299.6"><use href="#logo-windchill"/></svg></span> Awareness · EN</div>
+              <div class="asset-card__stats"><svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg> 967 views · 51 shares</div>
+              <div class="asset-card__uuid">Consensus UUID <span class="orion-mono">c015-6b7d</span></div>
+              <div class="asset-card__actions asset-card__actions--3">
+                <button class="btn-ghost" onclick="openVideoPreview('exec-overview')">Preview</button>
+                <button class="btn-primary-sm" onclick="openShareModal('The Intelligent Product Lifecycle — Executive Overview','Windchill · Awareness · EN','c015-6b7d')"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share</button>
+                <button class="btn-ghost" title="Add to PTC Velocity" onclick="openDsrModal('The Intelligent Product Lifecycle — Executive Overview','Windchill · Awareness · EN')"><svg class="orion-ico--sm orion-ico"><use href="#logo-seismic"/></svg>Velocity</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="asset-card">
+            <div class="asset-card__thumb">
+              <svg class="watermark"><use href="#i-box"/></svg>
+              <span class="rank-chip">#3</span>
+              <span class="type-chip" style="left:auto;right:8px;"><svg class="orion-ico--sm orion-ico"><use href="#i-box"/></svg>Wiki</span>
+            </div>
+            <div class="asset-card__body">
+              <div class="asset-card__title">Demo Recording Best Practices — Kit</div>
+              <div class="asset-card__meta">All Products · Internal Enablement</div>
+              <div class="asset-card__stats"><svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg> 812 downloads</div>
+              <div class="asset-card__actions">
+                <button class="btn-ghost">Open Kit</button>
+                <button class="btn-ghost">Download</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="asset-card">
+            <div class="asset-card__thumb">
+              <span class="rank-chip">#4</span>
+              <span class="type-chip" style="left:auto;right:8px;"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg>Video</span>
+              <button class="play-btn" onclick="openVideoPreview('cad-illustrations')"><svg><use href="#i-play"/></svg></button>
+            </div>
+            <div class="asset-card__body">
+              <div class="asset-card__title">Rapid CAD-Based Illustrations — Demo Script</div>
+              <div class="asset-card__meta"><span class="meta-logo-chip"><svg class="meta-logo" viewBox="0 0 1334.88 449.9"><use href="#logo-creo"/></svg></span> Decision · EN</div>
+              <div class="asset-card__stats"><svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg> 640 views · 22 shares</div>
+              <div class="asset-card__uuid">Consensus UUID <span class="orion-mono">a207-f453</span></div>
+              <div class="asset-card__actions asset-card__actions--3">
+                <button class="btn-ghost" onclick="openVideoPreview('cad-illustrations')">Preview</button>
+                <button class="btn-primary-sm" onclick="openShareModal('Rapid CAD-Based Illustrations — Demo Script','Creo · Decision · EN','a207-f453')"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share</button>
+                <button class="btn-ghost" title="Add to PTC Velocity" onclick="openDsrModal('Rapid CAD-Based Illustrations — Demo Script','Creo · Decision · EN')"><svg class="orion-ico--sm orion-ico"><use href="#logo-seismic"/></svg>Velocity</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="asset-card">
+            <div class="asset-card__thumb">
+              <span class="rank-chip">#5</span>
+              <span class="type-chip" style="left:auto;right:8px;"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg>Video</span>
+              <button class="play-btn" onclick="openVideoPreview('zh-overview')"><svg><use href="#i-play"/></svg></button>
+            </div>
+            <div class="asset-card__body">
+              <div class="asset-card__title">Windchill AI Parts Rationalization Overview — Chinese</div>
+              <div class="asset-card__meta"><span class="meta-logo-chip"><svg class="meta-logo" viewBox="0 0 1299.67 299.6"><use href="#logo-windchill"/></svg></span> Awareness · ZH</div>
+              <div class="asset-card__stats"><svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg> 588 views · 14 shares</div>
+              <div class="asset-card__actions">
+                <button class="btn-ghost" onclick="openVideoPreview('zh-overview')">Preview</button>
+                <span class="orion-badge orion-badge--open" title="Not reviewed since Q1">Review overdue</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Browse by Product -->
+      <div class="section">
+        <div class="section-head">
+          <div class="section-head__title"><svg class="orion-ico"><use href="#i-grid"/></svg> Browse by Product</div>
+        </div>
+        <div class="product-grid">
+          <div class="product-tile">
+            <div class="product-logo-chip"><svg class="product-logo" viewBox="0 0 1299.67 299.6"><use href="#logo-windchill"/></svg></div>
+            <div><div class="product-tile__count">24 videos · 9 kits · 1 VDE</div></div>
+          </div>
+          <div class="product-tile">
+            <div class="product-logo-chip"><svg class="product-logo" viewBox="0 0 1334.88 449.9"><use href="#logo-creo"/></svg></div>
+            <div><div class="product-tile__count">19 videos · 5 kits</div></div>
+          </div>
+          <div class="product-tile">
+            <div class="product-logo-chip"><svg class="product-logo" viewBox="0 0 447.91 82.14"><use href="#logo-servicemax"/></svg></div>
+            <div><div class="product-tile__count">14 videos · 3 kits · 2 VDEs</div></div>
+          </div>
+          <div class="product-tile">
+            <div class="product-logo-chip"><svg class="product-logo" viewBox="0 0 1785 300.76"><use href="#logo-codebeamer"/></svg></div>
+            <div><div class="product-tile__count">8 videos · 3 kits</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Featured / Evangelize -->
+      <div class="section" style="margin-bottom: 8px;">
+        <div class="section-head">
+          <div class="section-head__title"><svg class="orion-ico ico-green"><use href="#i-star"/></svg> Editor's Picks <span class="section-head__sub">curated by TDD</span></div>
+        </div>
+        <div class="featured-grid">
+          <div class="featured-card">
+            <div class="featured-card__thumb"><svg class="orion-ico orion-ico--lg"><use href="#i-video"/></svg></div>
+            <div>
+              <div class="featured-card__eyebrow"><svg class="orion-ico--sm orion-ico"><use href="#i-flag"/></svg> Best for exec conversations</div>
+              <div class="featured-card__title">The Intelligent Product Lifecycle Presentation</div>
+              <div class="featured-card__body">A single narrative arc across Windchill, Creo, and ServiceMax — built for first-call, cross-portfolio pitches.</div>
+              <div class="featured-card__foot"><svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg> 967 views <span>·</span> All Products <span>·</span> EN</div>
+            </div>
+          </div>
+          <div class="featured-card">
+            <div class="featured-card__thumb"><svg class="orion-ico orion-ico--lg"><use href="#i-box"/></svg></div>
+            <div>
+              <div class="featured-card__eyebrow"><svg class="orion-ico--sm orion-ico"><use href="#i-flag"/></svg> Model LDK — try this format</div>
+              <div class="featured-card__title">Windchill AI – Parts Rationalization LDK</div>
+              <div class="featured-card__body">Bundles script, talk track, and localized assets in one folder — the reference structure for every LDK upload going forward.</div>
+              <div class="featured-card__foot"><svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg> 58 downloads <span>·</span> <span class="meta-logo-chip"><svg class="meta-logo" viewBox="0 0 1299.67 299.6"><use href="#logo-windchill"/></svg></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- VIDEO PREVIEW PAGE -->
+    <div class="video-preview-page" id="videoPreviewPage">
+      <button class="vp-back" onclick="closeVideoPreview()"><svg class="orion-ico orion-ico--sm"><use href="#i-chevron-left"/></svg>Back to Technical Marketing Hub</button>
+
+      <div class="vp-player">
+        <button class="vp-player__play"><svg><use href="#i-play"/></svg></button>
+        <span class="vp-player__duration" id="vpDuration"></span>
+      </div>
+
+      <div class="vp-head">
+        <div>
+          <div class="vp-title" id="vpTitle"></div>
+          <div class="vp-meta-row" id="vpMeta"></div>
+          <div class="vp-stats-row" id="vpStats"></div>
+        </div>
+        <div class="vp-actions">
+          <button class="btn-primary-sm" id="vpShareBtn"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share</button>
+          <button class="btn-ghost" id="vpDsrBtn" title="Add to PTC Velocity"><svg class="orion-ico--sm orion-ico"><use href="#logo-seismic"/></svg>Velocity</button>
+        </div>
+      </div>
+
+      <div class="vp-card">
+        <div class="vp-card__head">
+          <div class="vp-card__head-title"><svg class="orion-ico"><use href="#i-target"/></svg>Value Roadmap index</div>
+          <button class="vp-reindex"><svg class="orion-ico--sm orion-ico"><use href="#i-clock"/></svg>Re-index</button>
+        </div>
+        <div class="vp-desc" id="vpDesc"></div>
+        <div class="vp-label">Value Drivers</div>
+        <div class="vp-value-drivers" id="vpValueDrivers"></div>
+        <div class="vp-label">Processes &amp; Capabilities</div>
+        <div id="vpCapabilities"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ============================================================
+     DEMOBOARD SHARE MODAL
+     ============================================================ -->
+<div class="modal-backdrop" id="shareBackdrop" onclick="if(event.target===this) closeShareModal()">
+  <div class="modal">
+    <div class="modal__head">
+      <div class="modal__head-title"><svg class="orion-ico ico-indigo"><use href="#i-send"/></svg> Share to DemoBoard</div>
+      <button class="modal__close" onclick="closeShareModal()"><svg class="orion-ico"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="modal__body">
+      <div class="modal__asset">
+        <div class="modal__asset-thumb"><svg class="orion-ico"><use href="#i-video"/></svg></div>
+        <div>
+          <div class="modal__asset-title" id="shareAssetTitle">—</div>
+          <div class="modal__asset-meta" id="shareAssetMeta">—</div>
+        </div>
+      </div>
+
+      <div class="modal__note">
+        <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-info"/></svg>
+        <span>Already registered in Consensus (<span class="orion-mono" id="shareAssetUuid">—</span>) — this generates a live DemoBoard link via the Consensus API. No re-upload needed.</span>
+      </div>
+
+      <div class="form-row">
+        <label for="shareOrg">Account / Organization</label>
+        <input type="text" id="shareOrg" value="Bobcat">
+      </div>
+      <div class="form-row">
+        <label for="shareOpp">Opportunity</label>
+        <input type="text" id="shareOpp" value="Bobcat – Windchill AI Expansion FY26Q3">
+      </div>
+      <div class="form-row">
+        <label>Recipients</label>
+        <div class="chip-input">
+          <span class="chip">j.render@bobcat.com</span>
+          <span class="chip">m.alvarez@bobcat.com</span>
+          <input type="text" placeholder="Add email…">
+        </div>
+      </div>
+
+      <div class="share-result" id="shareResult" style="display:none;">
+        <div class="share-result__label"><svg class="orion-ico orion-ico--sm"><use href="#i-check"/></svg> DemoBoard link ready</div>
+        <div class="share-result__link">
+          <span id="shareLinkText">play.goconsensus.com/9f3ab2e1</span>
+          <button onclick="copyShareLink()" id="copyBtn">Copy</button>
+        </div>
+        <div class="share-result__meta">Sent to 2 recipients · view engagement anytime in Consensus Reports</div>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn-ghost" onclick="closeShareModal()">Cancel</button>
+      <button class="btn-primary-sm" id="generateBtn" onclick="generateShareLink()"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Generate &amp; Send DemoBoard</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     ADD TO SEISMIC DSR MODAL
+     ============================================================ -->
+<div class="modal-backdrop" id="dsrBackdrop" onclick="if(event.target===this) closeDsrModal()">
+  <div class="modal">
+    <div class="modal__head">
+      <div class="modal__head-title"><svg class="orion-ico"><use href="#logo-seismic"/></svg> Add to PTC Velocity</div>
+      <button class="modal__close" onclick="closeDsrModal()"><svg class="orion-ico"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="modal__body">
+      <div class="modal__asset">
+        <div class="modal__asset-thumb"><svg class="orion-ico"><use href="#i-video"/></svg></div>
+        <div>
+          <div class="modal__asset-title" id="dsrAssetTitle">—</div>
+          <div class="modal__asset-meta" id="dsrAssetMeta">—</div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label>Choose a Digital Sales Room</label>
+        <div class="dsr-room-list" id="dsrRoomList"></div>
+      </div>
+
+      <div class="share-result" id="dsrConfirm" style="display:none;">
+        <div class="share-result__label"><svg class="orion-ico orion-ico--sm"><use href="#i-check"/></svg> <span id="dsrConfirmText">Added</span></div>
+        <div class="share-result__meta">This asset is now available in the room's content block — visible to the buyer the next time they open it.</div>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn-ghost" onclick="closeDsrModal()">Cancel</button>
+      <button class="btn-primary-sm" onclick="addToDsr()"><svg class="orion-ico--sm orion-ico"><use href="#i-plus"/></svg>Add to Room</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openShareModal(title, meta, uuid) {
+  document.getElementById('shareAssetTitle').textContent = title;
+  document.getElementById('shareAssetMeta').textContent = meta;
+  document.getElementById('shareAssetUuid').textContent = 'demo_uuid: ' + uuid;
+  document.getElementById('shareResult').style.display = 'none';
+  document.getElementById('generateBtn').innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Generate &amp; Send DemoBoard';
+  document.getElementById('shareBackdrop').classList.add('open');
+}
+function closeShareModal() {
+  document.getElementById('shareBackdrop').classList.remove('open');
+}
+function generateShareLink() {
+  document.getElementById('shareResult').style.display = 'block';
+  document.getElementById('generateBtn').innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Regenerate link';
+}
+function copyShareLink() {
+  var text = 'https://' + document.getElementById('shareLinkText').textContent;
+  navigator.clipboard.writeText(text);
+  var btn = document.getElementById('copyBtn');
+  var original = btn.textContent;
+  btn.textContent = 'Copied';
+  setTimeout(function(){ btn.textContent = original; }, 1500);
+}
+
+var dsrRooms = [
+  { name: 'Bobcat – Windchill AI Expansion FY26Q3', meta: '3 assets · updated yesterday' },
+  { name: 'Acme Robotics – PLM Modernization', meta: '7 assets · updated Jul 20' }
+];
+var dsrSelected = null;
+function openDsrModal(title, meta) {
+  document.getElementById('dsrAssetTitle').textContent = title;
+  document.getElementById('dsrAssetMeta').textContent = meta;
+  document.getElementById('dsrConfirm').style.display = 'none';
+  dsrSelected = null;
+  renderDsrRooms();
+  document.getElementById('dsrBackdrop').classList.add('open');
+}
+function closeDsrModal() {
+  document.getElementById('dsrBackdrop').classList.remove('open');
+}
+function renderDsrRooms() {
+  var list = document.getElementById('dsrRoomList');
+  list.innerHTML = '';
+  dsrRooms.forEach(function(r, i) {
+    var row = document.createElement('div');
+    row.className = 'dsr-room-row' + (dsrSelected === i ? ' dsr-room-row--selected' : '');
+    row.onclick = function() { dsrSelected = i; renderDsrRooms(); };
+    row.innerHTML = '<span class="dsr-room-row__radio"></span><div><div class="dsr-room-row__name">' + r.name + '</div><div class="dsr-room-row__meta">' + r.meta + '</div></div>';
+    list.appendChild(row);
+  });
+  var newRow = document.createElement('div');
+  newRow.className = 'dsr-room-row dsr-room-row--new' + (dsrSelected === 'new' ? ' dsr-room-row--selected' : '');
+  newRow.onclick = function() { dsrSelected = 'new'; renderDsrRooms(); };
+  newRow.innerHTML = '<span class="dsr-room-row__radio"></span><div><div class="dsr-room-row__name">+ Create a new Digital Sales Room</div></div>';
+  list.appendChild(newRow);
+}
+function addToDsr() {
+  if (dsrSelected === null) return;
+  var label = dsrSelected === 'new' ? 'a new Digital Sales Room' : dsrRooms[dsrSelected].name;
+  document.getElementById('dsrConfirmText').textContent = 'Added to ' + label;
+  document.getElementById('dsrConfirm').style.display = 'block';
+}
+
+var videoData = {
+  'dup-parts': {
+    title: 'Eliminate Duplicate Parts with Windchill AI Parts Classification',
+    logo: 'windchill', logoViewBox: '0 0 1299.67 299.6', metaText: 'Consideration · EN',
+    stats: '214 views · Uploaded Jul 21', uuid: '7a19-3c02', duration: '4:12',
+    desc: 'Walks through detecting and eliminating duplicate parts with Windchill AI Parts Classification — searching the part library, reviewing AI-ranked similarity candidates, and consolidating matches into a single canonical part.',
+    drivers: ['Efficiency', 'Quality & Regulatory'],
+    capabilities: [
+      { phase: 'DEFINE', title: 'Parts Classification & Reuse', chips: ['AI Similarity Search', 'Attribute-Based Classification', 'Reuse Recommendations'], narration: 'Narration runs the AI classifier against the part library and reviews similarity-ranked candidates.' },
+      { phase: 'DESIGN', title: 'Duplicate Resolution & Consolidation', chips: ['Part Merge', 'Where-Used Impact Check'], narration: 'Demo merges the duplicate into the canonical part and checks where-used impact across active assemblies.' }
+    ]
+  },
+  'creo-composites': {
+    title: 'Creo Chapters S1E4 — Composites Deep Dive (Replay)',
+    logo: 'creo', logoViewBox: '0 0 1334.88 449.9', metaText: 'Awareness · EN',
+    stats: '402 views · Uploaded Jul 14', uuid: '4f61-88ab', duration: '6:47',
+    desc: 'Fourth episode of the Creo Chapters series — a deep dive into composite layup design, core-zone modeling, and a generative pass to trim laminate mass.',
+    drivers: ['Innovation', 'Efficiency'],
+    capabilities: [
+      { phase: 'DESIGN', title: 'Composite Layup Design', chips: ['Ply Definition', 'Core Zone Modeling', 'Flat Pattern Output'], narration: 'Episode builds up composite plies and core zones directly on the bracket model.' },
+      { phase: 'IMPROVE', title: 'Structural Optimization', chips: ['Generative Design', 'Topology Study'], narration: 'Replay covers a generative design pass to trim laminate mass while holding the load case.' }
+    ]
+  },
+  'walkthrough-audio': {
+    title: 'Windchill AI Parts Rationalization — Walkthrough with Audio',
+    logo: 'windchill', logoViewBox: '0 0 1299.67 299.6', metaText: 'Consideration · EN',
+    stats: '1,204 views · 38 shares', uuid: '8f3c-19ea', duration: '6:58',
+    desc: 'Narrated walkthrough of the Windchill AI Parts Rationalization flow — searching, classifying, and consolidating duplicate parts, then routing the change for review.',
+    drivers: ['Efficiency', 'Quality & Regulatory'],
+    capabilities: [
+      { phase: 'DEFINE', title: 'Parts Classification & Reuse', chips: ['AI Similarity Search', 'Attribute-Based Classification', 'Reuse Recommendations'], narration: 'Narration runs the AI classifier against the part library and reviews similarity-ranked candidates.' },
+      { phase: 'VALIDATE', title: 'Rationalization Review & Sign-off', chips: ['Review Queue', 'Approval Workflow'], narration: 'Walkthrough finishes by routing the consolidated part through review and capturing sign-off.' }
+    ]
+  },
+  'exec-overview': {
+    title: 'The Intelligent Product Lifecycle — Executive Overview',
+    logo: 'windchill', logoViewBox: '0 0 1299.67 299.6', metaText: 'Awareness · EN',
+    stats: '967 views · 51 shares', uuid: 'c015-6b7d', duration: '3:35',
+    desc: 'A single narrative arc across Windchill, CodeBeamer, and Creo — built for first-call, cross-portfolio pitches on the intelligent product lifecycle.',
+    drivers: ['Efficiency', 'Innovation', 'Quality & Regulatory'],
+    capabilities: [
+      { phase: 'PLAN', title: 'Enterprise Change Management', chips: ['Closed-Loop Change Management', 'Change Impact Analysis', 'Release Management'], narration: 'Frames show the Windchill Change Request workflow — reviewing and approving the ECR, then creating a change notice with an implementation plan.' },
+      { phase: 'DEFINE', title: 'Requirements Management & Review', chips: ['Requirements Definition & Governance', 'Compliance-Driven Requirements'], narration: 'CodeBeamer frames show updating requirements and validating them with the AI requirements assistant against customer and industry rules.' },
+      { phase: 'DESIGN', title: 'Detailed Design in Creo', chips: ['Generative Design', 'MBD', 'GD&T Advisor'], narration: 'Creo frames cover generative design, model-based definition, and the GD&T advisor on the updated part.' },
+      { phase: 'VALIDATE', title: 'Verification & Validation', chips: ['Test Management', 'Product Verification'], narration: 'Closes with the CodeBeamer test coverage report and a traceability view linking requirements to tests and changes.' }
+    ]
+  },
+  'cad-illustrations': {
+    title: 'Rapid CAD-Based Illustrations — Demo Script',
+    logo: 'creo', logoViewBox: '0 0 1334.88 449.9', metaText: 'Decision · EN',
+    stats: '640 views · 22 shares', uuid: 'a207-f453', duration: '2:48',
+    desc: 'Demo script for generating exploded, callout-annotated illustrations directly from the Creo model for sales and support collateral.',
+    drivers: ['Efficiency'],
+    capabilities: [
+      { phase: 'DESIGN', title: '3D PDF & Illustration Export', chips: ['3D PDF Export', 'Exploded Views', 'Auto-Callouts'], narration: 'Script covers generating an exploded, callout-annotated illustration straight from the Creo model.' }
+    ]
+  },
+  'zh-overview': {
+    title: 'Windchill AI Parts Rationalization Overview — Chinese',
+    logo: 'windchill', logoViewBox: '0 0 1299.67 299.6', metaText: 'Awareness · ZH',
+    stats: '588 views · 14 shares', uuid: '', duration: '3:50',
+    desc: 'Localized (Chinese) overview cut of the Windchill AI Parts Rationalization story, covering search, classification, and consolidation.',
+    drivers: ['Efficiency', 'Quality & Regulatory'],
+    capabilities: [
+      { phase: 'DEFINE', title: 'Parts Classification & Reuse', chips: ['AI Similarity Search', 'Attribute-Based Classification'], narration: 'Overview reuses the same classification and consolidation flow as the English walkthrough, translated for the ZH region.' }
+    ]
+  }
+};
+
+function openVideoPreview(id) {
+  var v = videoData[id];
+  if (!v) return;
+  document.getElementById('vpTitle').textContent = v.title;
+  document.getElementById('vpDuration').textContent = v.duration;
+  document.getElementById('vpMeta').innerHTML = '<span class="meta-logo-chip"><svg class="meta-logo" viewBox="' + v.logoViewBox + '"><use href="#logo-' + v.logo + '"/></svg></span> ' + v.metaText;
+  document.getElementById('vpStats').innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg> ' + v.stats +
+    (v.uuid ? ' <span>·</span> Consensus UUID <span class="orion-mono">' + v.uuid + '</span>' : '');
+  document.getElementById('vpDesc').textContent = v.desc;
+  var vpShareBtn = document.getElementById('vpShareBtn');
+  var vpDsrBtn = document.getElementById('vpDsrBtn');
+  vpShareBtn.style.display = v.uuid ? '' : 'none';
+  vpDsrBtn.style.display = v.uuid ? '' : 'none';
+  vpShareBtn.onclick = function() { openShareModal(v.title, v.metaText, v.uuid); };
+  vpDsrBtn.onclick = function() { openDsrModal(v.title, v.metaText); };
+
+  document.getElementById('vpValueDrivers').innerHTML = v.drivers.map(function(d) {
+    return '<span class="value-driver-chip">' + d + '</span>';
+  }).join('');
+
+  document.getElementById('vpCapabilities').innerHTML = v.capabilities.map(function(c) {
+    var chips = c.chips.map(function(ch) { return '<span class="capability-chip">' + ch + '</span>'; }).join('');
+    return '<div class="capability-card"><div class="capability-card__head"><span class="phase-tag">' + c.phase + '</span>' +
+      '<span class="capability-card__title">' + c.title + '</span></div>' +
+      '<div class="capability-chips">' + chips + '</div>' +
+      '<div class="capability-narration">' + c.narration + '</div></div>';
+  }).join('');
+
+  document.getElementById('mainTopbar').style.display = 'none';
+  document.getElementById('mainThread').style.display = 'none';
+  document.getElementById('videoPreviewPage').classList.add('active');
+  document.getElementById('videoPreviewPage').scrollTop = 0;
+}
+function closeVideoPreview() {
+  document.getElementById('videoPreviewPage').classList.remove('active');
+  document.getElementById('mainTopbar').style.display = '';
+  document.getElementById('mainThread').style.display = '';
+}
+</script>

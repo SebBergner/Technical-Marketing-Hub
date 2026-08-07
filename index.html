@@ -863,6 +863,34 @@ a:hover { text-decoration: underline; }
           </div>
         </div>
 
+        <div class="section" style="margin-bottom:0;">
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-layers"/></svg> Product scope <span class="section-head__sub">select all products involved</span></div>
+          <div class="form-section">
+            <div class="stage-row" id="productScopeRow">
+              <span class="stage-pill stage-pill--active" data-value="Windchill" onclick="pillToggle(this); computeProductScope()">Windchill</span>
+              <span class="stage-pill" data-value="Creo" onclick="pillToggle(this); computeProductScope()">Creo</span>
+              <span class="stage-pill" data-value="ServiceMax" onclick="pillToggle(this); computeProductScope()">ServiceMax</span>
+              <span class="stage-pill" data-value="Codebeamer" onclick="pillToggle(this); computeProductScope()">Codebeamer</span>
+              <span class="stage-pill" data-value="Other" onclick="pillToggle(this); computeProductScope()">Other</span>
+            </div>
+            <div class="derived-output" id="productScopeResult">
+              <div class="derived-output__label">Scope</div>
+              <div class="derived-output__value" id="productScopeValue">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" style="margin-bottom:0;">
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-message-square"/></svg> Narrative angle</div>
+          <div class="form-section">
+            <div class="stage-row">
+              <span class="stage-pill stage-pill--active" onclick="pillSelect(this)">Value proposition-led</span>
+              <span class="stage-pill" onclick="pillSelect(this)">Features &amp; functions-led</span>
+              <span class="stage-pill" onclick="pillSelect(this)">Mix of both</span>
+            </div>
+          </div>
+        </div>
+
         <div class="section" id="videoDetailsSection" style="margin-bottom:0;">
           <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-play"/></svg> Video details</div>
           <div class="form-section">
@@ -918,34 +946,6 @@ a:hover { text-decoration: underline; }
           <div class="form-section">
             <div class="field-hint">Different destinations usually call for different cuts — a short teaser for social isn't the same asset as a longer one for a prospect send. Here's what your picks above suggest, from quick hook to full walkthrough.</div>
             <div id="kindOfDemoList" style="display:flex; flex-direction:column; gap:10px;"></div>
-          </div>
-        </div>
-
-        <div class="section" style="margin-bottom:0;">
-          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-layers"/></svg> Product scope <span class="section-head__sub">select all products involved</span></div>
-          <div class="form-section">
-            <div class="stage-row" id="productScopeRow">
-              <span class="stage-pill stage-pill--active" data-value="Windchill" onclick="pillToggle(this); computeProductScope()">Windchill</span>
-              <span class="stage-pill" data-value="Creo" onclick="pillToggle(this); computeProductScope()">Creo</span>
-              <span class="stage-pill" data-value="ServiceMax" onclick="pillToggle(this); computeProductScope()">ServiceMax</span>
-              <span class="stage-pill" data-value="Codebeamer" onclick="pillToggle(this); computeProductScope()">Codebeamer</span>
-              <span class="stage-pill" data-value="Other" onclick="pillToggle(this); computeProductScope()">Other</span>
-            </div>
-            <div class="derived-output" id="productScopeResult">
-              <div class="derived-output__label">Scope</div>
-              <div class="derived-output__value" id="productScopeValue">—</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="section" style="margin-bottom:0;">
-          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-message-square"/></svg> Narrative angle</div>
-          <div class="form-section">
-            <div class="stage-row">
-              <span class="stage-pill stage-pill--active" onclick="pillSelect(this)">Value proposition-led</span>
-              <span class="stage-pill" onclick="pillSelect(this)">Features &amp; functions-led</span>
-              <span class="stage-pill" onclick="pillSelect(this)">Mix of both</span>
-            </div>
           </div>
         </div>
 

@@ -259,6 +259,31 @@ a:hover { text-decoration: underline; }
 .stage-pill--active { background: var(--orion-text); color: #fff; border-color: var(--orion-text); font-weight: 600; }
 
 /* ============================================================
+   REQUEST ASSET FORM
+   ============================================================ */
+.form-section { border: 1px solid var(--orion-border); border-radius: var(--orion-radius); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-row select, .form-row textarea {
+  padding: 8px 10px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm);
+  font: inherit; font-size: 13px; width: 100%; background: var(--orion-surface); color: var(--orion-text);
+}
+.form-row textarea { resize: vertical; min-height: 64px; }
+.field-hint { font-size: 12px; color: var(--orion-text-3); }
+.upload-drop {
+  border: 1px dashed var(--orion-border-md); border-radius: var(--orion-radius-sm); padding: 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; cursor: pointer; color: var(--orion-text-2);
+}
+.upload-drop:hover { background: var(--orion-surface-2); border-color: var(--orion-text-3); }
+.upload-drop input[type="file"] { display: none; }
+.upload-drop__title { font-size: 13px; font-weight: 600; color: var(--orion-text); }
+.upload-drop__sub { font-size: 12px; color: var(--orion-text-3); }
+.attachment-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.attachment-list:empty { display: none; }
+.derived-output { border: 1px solid var(--orion-indigo); background: var(--orion-indigo-soft); border-radius: var(--orion-radius-sm); padding: 10px 14px; }
+.derived-output__label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--orion-indigo-strong); margin-bottom: 3px; }
+.derived-output__value { font-size: 14px; font-weight: 600; color: var(--orion-text); }
+
+/* ============================================================
    DEMOBOARD SHARE MODAL
    ============================================================ */
 .modal-backdrop {
@@ -413,6 +438,12 @@ a:hover { text-decoration: underline; }
   <symbol id="i-plus"    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
   <symbol id="i-target"  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></symbol>
   <symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></symbol>
+  <symbol id="i-upload"  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></symbol>
+  <symbol id="i-layers"   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></symbol>
+  <symbol id="i-users"    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-message-square" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-file-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></symbol>
 
   <!-- Official PTC product logos, extracted from PTC Corporate Template.potx -->
   <symbol id="logo-creo" viewBox="0 0 1334.88 449.9"><path d="M660.03 295.29C671.49 295.29 681.65 292.06 690.49 285.61 699.33 279.16 705.78 270.8 709.84 260.52L738.88 260.52C733.38 278.21 723.34 292.42 708.77 303.17 693.47 314.16 675.31 319.66 654.29 319.66 628 319.66 606.62 310.7 590.13 292.78 574.12 275.34 566.12 253.48 566.12 227.19 566.12 200.9 574.12 179.04 590.13 161.6 606.62 143.68 628 134.72 654.29 134.72 675.31 134.72 693.47 140.22 708.77 151.21 723.34 161.96 733.37 176.19 738.88 193.86L709.84 193.86C705.77 183.59 699.32 175.22 690.49 168.77 681.65 162.32 671.49 159.09 660.03 159.09 648.57 159.09 638.82 160.89 630.82 164.47 622.81 168.05 616.06 172.95 610.57 179.17 598.86 192.07 593.01 208.09 593.01 227.2 593.01 246.31 598.86 262.33 610.57 275.23 622.52 288.62 639 295.3 660.04 295.3Z" fill="#3D4647"/><path d="M865.4 134.71 865.4 161.59 862.17 161.59C842.82 161.59 827.04 169.36 814.86 184.89 803.39 199.71 797.66 217.39 797.66 237.94L797.66 316.79 770.78 316.79 770.78 137.58 797.66 137.58 797.66 181.67C803.39 163.03 815.82 149.3 834.93 140.45 842.82 136.63 852.37 134.71 863.6 134.71L865.39 134.71Z" fill="#3D4647"/><path d="M967.51 295.29C991.64 295.29 1008.96 285.25 1019.48 265.18L1048.87 265.18C1042.66 281.43 1032.8 294.57 1019.3 304.61 1005.8 314.65 988.41 319.67 967.15 319.67 940.15 319.67 918.17 310.71 901.2 292.79 884.72 275.35 876.47 253.49 876.47 227.2 876.47 200.91 884.35 178.82 900.13 161.61 916.85 143.69 938.6 134.73 965.36 134.73 992.12 134.73 1013.86 143.69 1030.59 161.61 1046.36 178.82 1054.25 200.68 1054.25 227.2L1054.25 237.95 904.07 237.95C905.98 254.44 912.55 268.06 923.78 278.81 935.25 289.8 949.82 295.3 967.51 295.3ZM965.36 159.08C948.87 159.08 935.01 164.23 923.78 174.49 913.26 184.29 906.81 197.07 904.42 212.84L1026.29 212.84C1023.9 197.07 1017.45 184.29 1006.94 174.49 995.7 164.23 981.85 159.08 965.36 159.08Z" fill="#3D4647"/><path d="M1166.54 134.71C1193.3 134.71 1215.05 143.67 1231.77 161.59 1247.54 178.8 1255.43 200.66 1255.43 227.18 1255.43 253.7 1247.55 275.56 1231.77 292.77 1215.04 310.69 1193.29 319.65 1166.54 319.65 1139.79 319.65 1118.03 310.69 1101.31 292.77 1085.54 275.56 1077.65 253.7 1077.65 227.18 1077.65 200.66 1085.54 178.8 1101.31 161.59 1118.04 143.67 1139.78 134.71 1166.54 134.71ZM1166.54 295.29C1185.89 295.29 1201.19 288.6 1212.42 275.22 1223.17 262.55 1228.55 246.55 1228.55 227.19 1228.55 207.83 1223.18 191.83 1212.42 179.16 1201.19 165.78 1185.89 159.09 1166.54 159.09 1147.19 159.09 1131.89 165.79 1120.66 179.16 1109.91 191.83 1104.53 207.83 1104.53 227.19 1104.53 246.55 1109.91 262.55 1120.66 275.22 1131.89 288.61 1147.19 295.29 1166.54 295.29Z" fill="#3D4647"/><path d="M1306.21 141.2C1310.17 141.2 1313.89 141.95 1317.37 143.46 1320.85 144.96 1323.89 147.01 1326.48 149.6 1329.07 152.2 1331.12 155.23 1332.62 158.71 1334.13 162.19 1334.88 165.91 1334.88 169.87 1334.88 173.83 1334.13 177.53 1332.62 180.98 1331.12 184.44 1329.07 187.46 1326.48 190.05 1323.89 192.64 1320.85 194.69 1317.37 196.19 1313.89 197.69 1310.17 198.45 1306.21 198.45 1302.25 198.45 1298.55 197.7 1295.1 196.19 1291.64 194.68 1288.62 192.64 1286.03 190.05 1283.44 187.46 1281.39 184.43 1279.89 180.98 1278.38 177.53 1277.63 173.82 1277.63 169.87 1277.63 165.92 1278.38 162.2 1279.89 158.71 1281.39 155.23 1283.44 152.19 1286.03 149.6 1288.62 147.01 1291.64 144.96 1295.1 143.46 1298.55 141.95 1302.26 141.2 1306.21 141.2ZM1306.21 194.36C1313.01 194.36 1318.81 191.97 1323.6 187.18 1325.83 184.95 1327.58 182.34 1328.87 179.36 1330.15 176.38 1330.79 173.21 1330.79 169.83 1330.79 166.45 1330.15 163.29 1328.87 160.3 1327.58 157.32 1325.83 154.72 1323.6 152.49 1318.81 147.7 1313.01 145.3 1306.21 145.3 1299.41 145.3 1293.59 147.7 1288.91 152.49 1284.12 157.34 1281.72 163.13 1281.72 169.87 1281.72 173.21 1282.36 176.37 1283.64 179.36 1284.92 182.34 1286.68 184.95 1288.91 187.18 1293.59 191.97 1299.36 194.36 1306.21 194.36ZM1320.33 163.35C1320.33 165.25 1319.78 166.93 1318.66 168.4 1317.55 169.88 1316.01 170.93 1314.06 171.54 1317.12 172.43 1318.99 174.94 1319.66 179.06 1319.83 180.12 1319.91 181.06 1319.91 181.9L1319.91 185.83 1314.14 185.83 1314.14 182.65C1314.14 180.25 1313.89 178.53 1313.39 177.47 1312.33 175.24 1310.44 174.13 1307.71 174.13L1299.6 174.13 1299.6 185.83 1293.75 185.83 1293.75 153.9 1307.29 153.9C1311.8 153.9 1315.1 154.76 1317.19 156.49 1319.28 158.22 1320.32 160.5 1320.32 163.34ZM1306.87 169.11C1309.21 169.11 1311.08 168.67 1312.47 167.77 1313.86 166.88 1314.56 165.63 1314.56 164.01 1314.56 162.39 1314.01 161.12 1312.89 160.21 1311.78 159.29 1309.71 158.83 1306.7 158.83L1299.6 158.83 1299.6 169.1 1306.87 169.1Z" fill="#3D4647"/><path d="M198.6 211.68 381.89 105.82 198.6 0 15.14 105.92 198.6 211.68Z" fill="#3D4647"/><path d="M183.44 237.95 0 132.2 0 343.99 183.44 449.9 183.44 237.95Z" fill="#3D4647"/><path d="M213.77 237.95 213.77 449.9 397.21 343.99 397.21 131.99 213.77 237.95Z" fill="#40AA1D"/></symbol>
@@ -444,8 +475,12 @@ a:hover { text-decoration: underline; }
       <svg class="orion-ico ico-muted"><use href="#i-panel"/></svg>
     </div>
     <div class="orion-side__body">
+      <div class="orion-group">Contribute</div>
+      <div class="orion-navitem" id="navRequestAsset" onclick="openRequestView()"><span class="label"><svg class="orion-ico orion-ico--sm ico-indigo"><use href="#i-plus"/></svg> Request New Asset</span></div>
+      <div class="orion-divider"></div>
+
       <div class="orion-group">Discover</div>
-      <div class="orion-navitem orion-navitem--active"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-grid"/></svg> Home</span></div>
+      <div class="orion-navitem orion-navitem--active" id="navHome" onclick="closeRequestView()"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-grid"/></svg> Home</span></div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-clock"/></svg> Latest Uploads</span></div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-trend"/></svg> Most Viewed</span></div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-star"/></svg> Favorites</span> <span class="count">12</span></div>
@@ -459,7 +494,7 @@ a:hover { text-decoration: underline; }
       <div class="orion-group">Browse by Type</div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-video"/></svg> Videos</span> <span class="count">86</span></div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-box"/></svg> LDKs <span class="orion-subtle" style="font-size:11px;">Live Demo Kits</span></span> <span class="count">22</span></div>
-      <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-monitor"/></svg> VDKs <span class="orion-subtle" style="font-size:11px;">Virtual Demo Kits</span></span> <span class="count">9</span></div>
+      <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-monitor"/></svg> VDKs <span class="orion-subtle" style="font-size:11px;">Video Demo Kits</span></span> <span class="count">9</span></div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-monitor"/></svg> Virtual Machines</span> <span class="count">14</span></div>
 
       <div class="orion-group">Funnel Stage</div>
@@ -803,6 +838,186 @@ a:hover { text-decoration: underline; }
       </div>
     </div>
 
+    <!-- ============================================================
+         REQUEST NEW ASSET
+         ============================================================ -->
+    <div class="video-preview-page" id="requestViewPage">
+      <button class="vp-back" onclick="closeRequestView()"><svg class="orion-ico orion-ico--sm"><use href="#i-chevron-left"/></svg>Back to Technical Marketing Hub</button>
+
+      <div class="vp-head">
+        <div>
+          <div class="vp-title">Request a New Asset</div>
+          <div class="orion-subtle">Tell us what you need — a video or an LDK — and the team will scope, produce, and route it to the right distribution channel.</div>
+        </div>
+      </div>
+
+      <div id="requestFormCard" style="display:flex; flex-direction:column; gap:22px; margin-top:18px;">
+
+        <div class="section" style="margin-bottom:0;">
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-hex"/></svg> Asset type</div>
+          <div class="form-section">
+            <div class="stage-row" id="assetTypeRow">
+              <span class="stage-pill stage-pill--active" data-value="video" onclick="pillSelect(this); onAssetTypeChange(this)"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg> Video</span>
+              <span class="stage-pill" data-value="ldk" onclick="pillSelect(this); onAssetTypeChange(this)"><svg class="orion-ico--sm orion-ico"><use href="#i-box"/></svg> LDK <span class="orion-subtle" style="font-size:11px;">Live Demo Kit</span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" id="videoDetailsSection" style="margin-bottom:0;">
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-play"/></svg> Video details</div>
+          <div class="form-section">
+            <div class="form-row">
+              <label>Desired length</label>
+              <div class="stage-row">
+                <span class="stage-pill" onclick="pillSelect(this)">&lt; 1 min</span>
+                <span class="stage-pill stage-pill--active" onclick="pillSelect(this)">1–3 min</span>
+                <span class="stage-pill" onclick="pillSelect(this)">3–5 min</span>
+                <span class="stage-pill" onclick="pillSelect(this)">5–10 min</span>
+                <span class="stage-pill" onclick="pillSelect(this)">10+ min</span>
+                <span class="stage-pill" onclick="pillSelect(this)">Not sure</span>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label>Is a specific customer involved?</label>
+              <div class="stage-row" id="customerRow">
+                <span class="stage-pill stage-pill--active" data-value="none" onclick="pillSelect(this); onCustomerChange(this)">No — generic / product only</span>
+                <span class="stage-pill" data-value="footage" onclick="pillSelect(this); onCustomerChange(this)">Yes — uses a customer's footage or dataset</span>
+                <span class="stage-pill" data-value="story" onclick="pillSelect(this); onCustomerChange(this)">Yes — tells a specific customer's story or value prop</span>
+              </div>
+              <div class="modal__note" id="customerDataNote" style="display:none;">
+                <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-info"/></svg>
+                <span>Using a specific customer's data, footage, or name may require sign-off — check the Customer Data Approval Form with the content team.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" style="margin-bottom:0;">
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-send"/></svg> Distribution plan <span class="section-head__sub">select all that apply</span></div>
+          <div class="form-section">
+            <div class="form-row">
+              <label>Where do you want to use this video?</label>
+              <div class="stage-row" id="distributionRow">
+                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Social (LinkedIn / YouTube)</span>
+                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Web (PTC.com)</span>
+                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">eStore</span>
+                <span class="stage-pill stage-pill--active" onclick="pillToggle(this); computeKindOfDemo()">Share with a prospect</span>
+                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Share with an existing customer</span>
+                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Internal sales enablement</span>
+                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Event / trade show</span>
+                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Internal Hub only</span>
+                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()"><svg class="orion-ico--sm orion-ico"><use href="#logo-seismic"/></svg> Push to PTC Velocity</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" style="margin-bottom:0;">
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-target"/></svg> Video types needed <span class="section-head__sub">based on your distribution plan</span></div>
+          <div class="form-section">
+            <div class="field-hint">Different destinations usually call for different cuts — a short teaser for social isn't the same asset as a longer one for a prospect send. Here's what your picks above suggest, from quick hook to full walkthrough.</div>
+            <div id="kindOfDemoList" style="display:flex; flex-direction:column; gap:10px;"></div>
+          </div>
+        </div>
+
+        <div class="section" style="margin-bottom:0;">
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-layers"/></svg> Product scope <span class="section-head__sub">select all products involved</span></div>
+          <div class="form-section">
+            <div class="stage-row" id="productScopeRow">
+              <span class="stage-pill stage-pill--active" data-value="Windchill" onclick="pillToggle(this); computeProductScope()">Windchill</span>
+              <span class="stage-pill" data-value="Creo" onclick="pillToggle(this); computeProductScope()">Creo</span>
+              <span class="stage-pill" data-value="ServiceMax" onclick="pillToggle(this); computeProductScope()">ServiceMax</span>
+              <span class="stage-pill" data-value="Codebeamer" onclick="pillToggle(this); computeProductScope()">Codebeamer</span>
+              <span class="stage-pill" data-value="Other" onclick="pillToggle(this); computeProductScope()">Other</span>
+            </div>
+            <div class="derived-output" id="productScopeResult">
+              <div class="derived-output__label">Scope</div>
+              <div class="derived-output__value" id="productScopeValue">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" style="margin-bottom:0;">
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-message-square"/></svg> Narrative angle</div>
+          <div class="form-section">
+            <div class="stage-row">
+              <span class="stage-pill stage-pill--active" onclick="pillSelect(this)">Value proposition-led</span>
+              <span class="stage-pill" onclick="pillSelect(this)">Features &amp; functions-led</span>
+              <span class="stage-pill" onclick="pillSelect(this)">Mix of both</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" style="margin-bottom:0;">
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-calendar"/></svg> Timeline</div>
+          <div class="form-section">
+            <div class="form-grid">
+              <div class="form-row">
+                <label for="reqTargetDate">Target completion date</label>
+                <input type="date" id="reqTargetDate">
+              </div>
+              <div class="form-row">
+                <label for="reqCompellingEvent">Compelling event (optional)</label>
+                <input type="text" id="reqCompellingEvent" placeholder="e.g. product launch, trade show, exec review">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" style="margin-bottom:0;">
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-upload"/></svg> Starting materials</div>
+          <div class="form-section">
+            <div class="stage-row" id="startingMaterialsRow">
+              <span class="stage-pill stage-pill--active" data-value="have" onclick="pillSelect(this); onStartingMaterialsChange(this)">I have starting materials</span>
+              <span class="stage-pill" data-value="liberty" onclick="pillSelect(this); onStartingMaterialsChange(this)">Creative liberty — no starting materials</span>
+            </div>
+            <div id="attachmentsSection">
+              <div class="field-hint">Product brief, messaging document, screen grabs, or existing video snippets — whatever you've got.</div>
+              <label class="upload-drop">
+                <input type="file" multiple onchange="handleAttachmentFiles(this)">
+                <svg class="orion-ico ico-muted"><use href="#i-upload"/></svg>
+                <span class="upload-drop__title">Click to attach files</span>
+                <span class="upload-drop__sub">or drag &amp; drop</span>
+              </label>
+              <div class="attachment-list" id="attachmentList"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" style="margin-bottom:0;">
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-file-text"/></svg> Your details</div>
+          <div class="form-section">
+            <div class="form-grid">
+              <div class="form-row">
+                <label for="reqName">Name</label>
+                <input type="text" id="reqName" placeholder="Your name">
+              </div>
+              <div class="form-row">
+                <label for="reqEmail">Email</label>
+                <input type="email" id="reqEmail" placeholder="you@ptc.com">
+              </div>
+            </div>
+            <div class="form-row">
+              <label for="reqNotes">Anything else we should know?</label>
+              <textarea id="reqNotes" placeholder="Additional context, links, or notes for the content team…"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button class="btn-ghost" style="flex:none;" onclick="closeRequestView()">Cancel</button>
+          <button class="btn-primary-sm" style="flex:none;" onclick="submitAssetRequest(event)"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Submit Request</button>
+        </div>
+      </div>
+
+      <div class="share-result" id="requestSuccessCard" style="display:none; margin-top:18px;">
+        <div class="share-result__label"><svg class="orion-ico orion-ico--sm"><use href="#i-check"/></svg> Request submitted</div>
+        <div class="share-result__meta">The Technical Marketing team will review your request and follow up by email.</div>
+        <div style="margin-top:12px;"><button class="btn-ghost" style="flex:none;" onclick="closeRequestView()">Back to Technical Marketing Hub</button></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1058,6 +1273,7 @@ function openVideoPreview(id) {
       '<div class="capability-narration">' + c.narration + '</div></div>';
   }).join('');
 
+  document.getElementById('requestViewPage').classList.remove('active');
   document.getElementById('mainTopbar').style.display = 'none';
   document.getElementById('mainThread').style.display = 'none';
   document.getElementById('videoPreviewPage').classList.add('active');
@@ -1067,5 +1283,111 @@ function closeVideoPreview() {
   document.getElementById('videoPreviewPage').classList.remove('active');
   document.getElementById('mainTopbar').style.display = '';
   document.getElementById('mainThread').style.display = '';
+}
+
+/* ============================================================
+   REQUEST NEW ASSET
+   ============================================================ */
+function setActiveNav(id) {
+  document.querySelectorAll('.orion-side .orion-navitem').forEach(function(n) { n.classList.remove('orion-navitem--active'); });
+  document.getElementById(id).classList.add('orion-navitem--active');
+}
+function openRequestView() {
+  document.getElementById('videoPreviewPage').classList.remove('active');
+  document.getElementById('mainTopbar').style.display = 'none';
+  document.getElementById('mainThread').style.display = 'none';
+  document.getElementById('requestViewPage').classList.add('active');
+  document.getElementById('requestViewPage').scrollTop = 0;
+  setActiveNav('navRequestAsset');
+  computeKindOfDemo();
+  computeProductScope();
+}
+function closeRequestView() {
+  document.getElementById('requestViewPage').classList.remove('active');
+  document.getElementById('mainTopbar').style.display = '';
+  document.getElementById('mainThread').style.display = '';
+  setActiveNav('navHome');
+  document.getElementById('requestFormCard').style.display = 'flex';
+  document.getElementById('requestSuccessCard').style.display = 'none';
+}
+function pillSelect(el) {
+  Array.from(el.parentElement.children).forEach(function(p) { p.classList.remove('stage-pill--active'); });
+  el.classList.add('stage-pill--active');
+}
+function pillToggle(el) {
+  el.classList.toggle('stage-pill--active');
+}
+function onAssetTypeChange(el) {
+  document.getElementById('videoDetailsSection').style.display = el.dataset.value === 'video' ? '' : 'none';
+}
+function onCustomerChange(el) {
+  document.getElementById('customerDataNote').style.display = el.dataset.value === 'none' ? 'none' : '';
+}
+var VIDEO_LEVELS = ['Teaser', 'Overview', 'Explainer', 'Walkthrough'];
+var VIDEO_LEVEL_HINT = {
+  Teaser: 'Hook them fast — usually under 3 min',
+  Overview: 'What it is & why it matters — usually 3–5 min',
+  Explainer: 'A bit more depth for an active conversation — usually 5–10 min',
+  Walkthrough: 'Full step-by-step detail — usually 10+ min'
+};
+var CHANNEL_TO_LEVEL = {
+  'Social (LinkedIn / YouTube)': 'Teaser',
+  'Event / trade show': 'Teaser',
+  'Web (PTC.com)': 'Overview',
+  'eStore': 'Overview',
+  'Share with a prospect': 'Explainer',
+  'Share with an existing customer': 'Explainer',
+  'Push to PTC Velocity': 'Explainer',
+  'Internal sales enablement': 'Walkthrough',
+  'Internal Hub only': 'Walkthrough'
+};
+function computeKindOfDemo() {
+  var activePills = Array.from(document.querySelectorAll('#distributionRow .stage-pill--active'));
+  var listEl = document.getElementById('kindOfDemoList');
+  if (!activePills.length) {
+    listEl.innerHTML = '<div class="field-hint">Pick where you\'ll use this video above to see what you\'ll need.</div>';
+    return;
+  }
+  var groups = {};
+  activePills.forEach(function(p) {
+    var channel = p.textContent.trim();
+    var level = CHANNEL_TO_LEVEL[channel] || 'Overview';
+    if (!groups[level]) groups[level] = [];
+    groups[level].push(channel);
+  });
+  var levelsPresent = VIDEO_LEVELS.filter(function(l) { return groups[l]; });
+  listEl.innerHTML = levelsPresent.map(function(level, i) {
+    return '<div class="derived-output">' +
+      '<div class="derived-output__label">Asset ' + (i + 1) + ' of ' + levelsPresent.length + ' — ' + level + '</div>' +
+      '<div class="derived-output__value">For: ' + groups[level].join(', ') + '</div>' +
+      '<div class="field-hint" style="margin-top:4px;">' + VIDEO_LEVEL_HINT[level] + '</div>' +
+      '</div>';
+  }).join('');
+}
+function computeProductScope() {
+  var active = Array.from(document.querySelectorAll('#productScopeRow .stage-pill--active')).map(function(p) { return p.dataset.value; });
+  var valueEl = document.getElementById('productScopeValue');
+  if (active.length === 0) valueEl.textContent = 'Select at least one product.';
+  else if (active.length === 1) valueEl.textContent = 'Single product — ' + active[0];
+  else valueEl.textContent = 'Multiple products (solution) — ' + active.join(', ');
+}
+function onStartingMaterialsChange(el) {
+  document.getElementById('attachmentsSection').style.display = el.dataset.value === 'have' ? '' : 'none';
+}
+function handleAttachmentFiles(input) {
+  var list = document.getElementById('attachmentList');
+  Array.from(input.files).forEach(function(f) {
+    var chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.innerHTML = '<svg class="orion-ico orion-ico--sm"><use href="#i-file-text"/></svg> ' + f.name;
+    list.appendChild(chip);
+  });
+  input.value = '';
+}
+function submitAssetRequest(e) {
+  e.preventDefault();
+  document.getElementById('requestFormCard').style.display = 'none';
+  document.getElementById('requestSuccessCard').style.display = '';
+  document.getElementById('requestViewPage').scrollTop = 0;
 }
 </script>

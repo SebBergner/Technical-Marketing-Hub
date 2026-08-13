@@ -154,6 +154,8 @@ a:hover { text-decoration: underline; }
    ASSET CARDS
    ============================================================ */
 .asset-row { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 6px; margin: 0 -2px; }
+.asset-grid { display: flex; flex-wrap: wrap; gap: 16px; }
+.asset-grid .asset-card { width: 260px; }
 .asset-row::-webkit-scrollbar { height: 6px; }
 .asset-row::-webkit-scrollbar-thumb { background: var(--orion-border-md); border-radius: 3px; }
 
@@ -674,8 +676,16 @@ a:hover { text-decoration: underline; }
 
     <div class="orion-thread" id="mainThread">
 
+      <!-- All Assets (filtered results) -->
+      <div class="section" id="allAssetsSection" style="display:none;">
+        <div class="section-head">
+          <div class="section-head__title"><svg class="orion-ico ico-muted"><use href="#i-grid"/></svg> All Assets <span class="section-head__sub" id="allAssetsCount"></span></div>
+        </div>
+        <div class="asset-grid" id="allAssetsGrid"></div>
+      </div>
+
       <!-- Continue where you left off -->
-      <div class="section">
+      <div class="section" id="continueSection">
         <div class="section-head">
           <div class="section-head__title"><svg class="orion-ico ico-muted"><use href="#i-clock"/></svg> Continue where you left off</div>
         </div>
@@ -708,7 +718,7 @@ a:hover { text-decoration: underline; }
       </div>
 
       <!-- Latest Uploads -->
-      <div class="section">
+      <div class="section" id="latestUploadsSection">
         <div class="section-head">
           <div class="section-head__title"><svg class="orion-ico ico-green"><use href="#i-clock"/></svg> Latest Uploads <span class="section-head__sub">new this month</span></div>
           <a class="section-head__link" href="#">View all <svg class="orion-ico orion-ico--sm"><use href="#i-chevron-right"/></svg></a>
@@ -790,7 +800,7 @@ a:hover { text-decoration: underline; }
       </div>
 
       <!-- Most Viewed -->
-      <div class="section">
+      <div class="section" id="mostViewedSection">
         <div class="section-head">
           <div class="section-head__title"><svg class="orion-ico"><use href="#i-trend"/></svg> Most Viewed <span class="section-head__sub">last 90 days</span></div>
           <a class="section-head__link" href="#">View all <svg class="orion-ico orion-ico--sm"><use href="#i-chevron-right"/></svg></a>
@@ -890,7 +900,7 @@ a:hover { text-decoration: underline; }
       </div>
 
       <!-- Browse by Product -->
-      <div class="section">
+      <div class="section" id="browseByProductSection">
         <div class="section-head">
           <div class="section-head__title"><svg class="orion-ico"><use href="#i-grid"/></svg> Browse by Product</div>
         </div>
@@ -915,7 +925,7 @@ a:hover { text-decoration: underline; }
       </div>
 
       <!-- Featured / Evangelize -->
-      <div class="section" style="margin-bottom: 8px;">
+      <div class="section" id="editorsPicksSection" style="margin-bottom: 8px;">
         <div class="section-head">
           <div class="section-head__title"><svg class="orion-ico ico-green"><use href="#i-star"/></svg> Editor's Picks <span class="section-head__sub">curated by TDD</span></div>
         </div>
@@ -2119,6 +2129,74 @@ document.getElementById('dvgSearchInput').addEventListener('input', dvgApplyFilt
 });
 document.getElementById('dvgResetBtn').addEventListener('click', dvgResetFilters);
 
+function escAttr(s) { return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
+
+function dvgCardToAssetCard(dvgCard) {
+  var titleText = dvgCard.querySelector('.dvg-card__title').textContent;
+  var descEl = dvgCard.querySelector('.dvg-card__desc');
+  var descText = descEl ? descEl.textContent : '';
+  var srcThumb = dvgCard.querySelector('.dvg-card__thumb');
+  var durationEl = dvgCard.querySelector('.dvg-card__duration');
+  var durationText = durationEl ? durationEl.textContent : '';
+  var product = dvgCard.dataset.product || '';
+  var segment = dvgCard.dataset.segment || '';
+  var funnel = dvgCard.dataset.funnel || '';
+  var cf = dvgCard.dataset.cf || '';
+  var shareBtn = dvgCard.querySelector('.js-dvg-share');
+
+  var card = document.createElement('div');
+  card.className = 'asset-card';
+  card.dataset.type = 'video';
+  card.dataset.product = product;
+  card.dataset.segment = segment;
+  card.dataset.stage = funnel;
+  card.dataset.cf = cf;
+
+  var logoMap = { Windchill: ['logo-windchill', '0 0 1299.67 299.6'], Creo: ['logo-creo', '0 0 1334.88 449.9'] };
+  var logo = logoMap[product];
+  var metaHtml = logo
+    ? '<span class="meta-logo-chip"><svg class="meta-logo" viewBox="' + logo[1] + '"><use href="#' + logo[0] + '"/></svg></span> ' + escAttr(funnel)
+    : escAttr(product || 'Cross-Portfolio') + (funnel ? ' · ' + escAttr(funnel) : '');
+
+  var actionsHtml = shareBtn
+    ? '<button class="btn-ghost" onclick="openDemoGalleryView()">Preview</button>' +
+      '<button class="btn-primary-sm" data-share-title="' + escAttr(shareBtn.dataset.shareTitle) + '" data-share-meta="' + escAttr(shareBtn.dataset.shareMeta) + '" data-share-uuid="' + escAttr(shareBtn.dataset.shareUuid) + '" onclick="openShareModal(this.dataset.shareTitle, this.dataset.shareMeta, this.dataset.shareUuid)"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share</button>'
+    : '<button class="btn-ghost" onclick="openDemoGalleryView()">Preview</button>' +
+      '<span class="orion-badge orion-badge--open" title="Silent cut — no narration">No audio track</span>';
+
+  card.innerHTML =
+    '<div class="asset-card__thumb">' +
+      '<span class="type-chip"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg>Video</span>' +
+      '<button class="play-btn" onclick="openDemoGalleryView()"><svg><use href="#i-play"/></svg></button>' +
+      (durationText ? '<span class="duration-chip">' + escAttr(durationText) + '</span>' : '') +
+    '</div>' +
+    '<div class="asset-card__body">' +
+      '<div class="asset-card__title">' + titleText + '</div>' +
+      '<div class="asset-card__meta">' + metaHtml + '</div>' +
+      '<div class="asset-card__stats">' + descText + '</div>' +
+      '<div class="asset-card__actions asset-card__actions--3">' + actionsHtml + '</div>' +
+    '</div>';
+
+  var thumbEl = card.querySelector('.asset-card__thumb');
+  thumbEl.style.backgroundImage = srcThumb.style.backgroundImage;
+  thumbEl.style.backgroundSize = 'cover';
+  thumbEl.style.backgroundPosition = 'center';
+
+  return card;
+}
+
+var HUB_ASSET_POOL = null;
+function buildAssetPool() {
+  var pool = [];
+  document.querySelectorAll('#latestUploadsSection .asset-card, #mostViewedSection .asset-card').forEach(function(card) {
+    pool.push(card.cloneNode(true));
+  });
+  document.querySelectorAll('.dvg-card').forEach(function(dvgCard) {
+    pool.push(dvgCardToAssetCard(dvgCard));
+  });
+  HUB_ASSET_POOL = pool;
+}
+
 function hubApplyFilters() {
   var q = document.getElementById('hubSearchInput').value.trim().toLowerCase();
   var type = document.getElementById('hubFilterType').value;
@@ -2126,31 +2204,41 @@ function hubApplyFilters() {
   var segment = document.getElementById('hubFilterSegment').value;
   var stage = document.getElementById('hubFilterStage').value;
   var cf = document.getElementById('hubFilterCf').value;
+  var anyActive = !!(q || type || product || segment || stage || cf);
 
-  var cards = document.querySelectorAll('#mainThread .asset-card');
-  var visibleCount = 0;
-  cards.forEach(function(card) {
-    var titleEl = card.querySelector('.asset-card__title');
-    var title = titleEl ? titleEl.textContent.toLowerCase() : '';
-    var matchesText = !q || title.indexOf(q) !== -1;
-    var matchesType = !type || card.dataset.type === type;
-    var matchesProduct = !product || card.dataset.product === product;
-    var matchesSegment = !segment || card.dataset.segment === segment;
-    var matchesStage = !stage || card.dataset.stage === stage;
-    var matchesCf = !cf || card.dataset.cf === cf;
-    var visible = matchesText && matchesType && matchesProduct && matchesSegment && matchesStage && matchesCf;
-    card.style.display = visible ? '' : 'none';
-    if (visible) visibleCount++;
+  ['continueSection', 'latestUploadsSection', 'mostViewedSection', 'browseByProductSection', 'editorsPicksSection'].forEach(function(id) {
+    document.getElementById(id).style.display = anyActive ? 'none' : '';
   });
+  document.getElementById('allAssetsSection').style.display = anyActive ? '' : 'none';
 
-  document.querySelectorAll('#mainThread .asset-row').forEach(function(row) {
-    var anyVisible = Array.prototype.some.call(row.querySelectorAll('.asset-card'), function(c) { return c.style.display !== 'none'; });
-    row.style.display = anyVisible ? '' : 'none';
-    var section = row.closest('.section');
-    if (section) section.style.display = anyVisible ? '' : 'none';
-  });
+  if (!HUB_ASSET_POOL) buildAssetPool();
 
-  document.getElementById('hubNoResults').classList.toggle('show', visibleCount === 0);
+  if (anyActive) {
+    var grid = document.getElementById('allAssetsGrid');
+    grid.innerHTML = '';
+    var visibleCount = 0;
+    HUB_ASSET_POOL.forEach(function(sourceCard) {
+      var titleEl = sourceCard.querySelector('.asset-card__title');
+      var title = titleEl ? titleEl.textContent.toLowerCase() : '';
+      var matchesText = !q || title.indexOf(q) !== -1;
+      var matchesType = !type || sourceCard.dataset.type === type;
+      var matchesProduct = !product || sourceCard.dataset.product === product;
+      var matchesSegment = !segment || sourceCard.dataset.segment === segment;
+      var matchesStage = !stage || sourceCard.dataset.stage === stage;
+      var matchesCf = !cf || sourceCard.dataset.cf === cf;
+      if (matchesText && matchesType && matchesProduct && matchesSegment && matchesStage && matchesCf) {
+        var clone = sourceCard.cloneNode(true);
+        clone.style.display = '';
+        grid.appendChild(clone);
+        visibleCount++;
+      }
+    });
+    document.getElementById('allAssetsCount').textContent = '(' + visibleCount + ' of ' + HUB_ASSET_POOL.length + ')';
+    document.getElementById('hubNoResults').classList.toggle('show', visibleCount === 0);
+  } else {
+    document.getElementById('hubNoResults').classList.remove('show');
+  }
+
   document.getElementById('hubGalleryCta').classList.toggle('show', type === '' || type === 'video');
 }
 

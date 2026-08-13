@@ -111,7 +111,8 @@ a:hover { text-decoration: underline; }
 /* ============================================================
    HERO SEARCH
    ============================================================ */
-.hero-search { margin-top: 16px; display: flex; gap: 10px; align-items: center; }
+.hero-search { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.hero-search__field { min-width: 220px; }
 .hero-search__field {
   flex: 1; display: flex; align-items: center; gap: 10px;
   border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm);
@@ -124,6 +125,21 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm);
   background: var(--orion-surface); font-size: 13px; color: var(--orion-text-2); cursor: pointer; white-space: nowrap;
 }
+.filter-pill select {
+  border: none; background: transparent; font: inherit; font-size: 13px; color: var(--orion-text-2);
+  appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 2px;
+}
+.filter-pill select:focus { outline: none; }
+.hub-gallery-cta {
+  display: none; align-items: center; gap: 6px; padding: 10px 14px; margin-left: auto;
+  border: 1px solid var(--orion-indigo); border-radius: var(--orion-radius-sm);
+  background: var(--orion-indigo-soft); color: var(--orion-indigo-strong); font-size: 13px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+}
+.hub-gallery-cta.show { display: inline-flex; }
+.hub-gallery-cta:hover { background: var(--orion-indigo); color: #fff; }
+.hub-noresults { display: none; padding: 30px 10px; text-align: center; color: var(--orion-text-3); font-size: 13.5px; }
+.hub-noresults.show { display: block; }
 
 /* ============================================================
    SECTION HEADERS
@@ -598,13 +614,62 @@ a:hover { text-decoration: underline; }
       <div class="hero-search">
         <div class="hero-search__field">
           <svg class="orion-ico ico-muted"><use href="#i-search"/></svg>
-          <input type="text" placeholder="Search by product, keyword, persona, or funnel stage…" value="AI parts classification">
+          <input type="text" id="hubSearchInput" placeholder="Search by product, keyword, persona, or funnel stage…">
         </div>
-        <div class="filter-pill">Type: All <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg></div>
-        <div class="filter-pill">Product: All <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg></div>
-        <div class="filter-pill">Segment: All <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg></div>
-        <div class="filter-pill">Stage: All <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg></div>
+        <label class="filter-pill">Type:
+          <select id="hubFilterType">
+            <option value="">All</option>
+            <option value="video">Video</option>
+            <option value="ldk">LDK</option>
+            <option value="vdk">VDK</option>
+            <option value="vm">Virtual Machine</option>
+          </select>
+          <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
+        </label>
+        <label class="filter-pill">Product:
+          <select id="hubFilterProduct">
+            <option value="">All</option>
+            <option value="Windchill">Windchill</option>
+            <option value="Creo">Creo</option>
+            <option value="ServiceMax">ServiceMax</option>
+            <option value="Codebeamer">Codebeamer</option>
+          </select>
+          <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
+        </label>
+        <label class="filter-pill">Segment:
+          <select id="hubFilterSegment">
+            <option value="">All</option>
+            <option value="CAD">CAD</option>
+            <option value="PLM">PLM</option>
+            <option value="ALM">ALM</option>
+            <option value="SLM">SLM</option>
+            <option value="IPL">IPL</option>
+          </select>
+          <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
+        </label>
+        <label class="filter-pill">Stage:
+          <select id="hubFilterStage">
+            <option value="">All</option>
+            <option value="Awareness">Awareness</option>
+            <option value="Consideration">Consideration</option>
+            <option value="Decision">Decision</option>
+            <option value="Post-Sale">Post-Sale</option>
+          </select>
+          <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
+        </label>
+        <label class="filter-pill">Customer-Facing:
+          <select id="hubFilterCf">
+            <option value="">Any</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+          <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
+        </label>
+        <button class="hub-gallery-cta" id="hubGalleryCta" onclick="viewFilteredAsGallery()">
+          <svg class="orion-ico orion-ico--sm"><use href="#i-video"/></svg>View as Gallery
+        </button>
       </div>
+      <div class="hub-noresults" id="hubNoResults">No assets match these filters. Try clearing one — or <a onclick="viewFilteredAsGallery()" style="cursor:pointer;">view what does match as a Gallery</a> if you're looking for video.</div>
     </div>
 
     <div class="orion-thread" id="mainThread">
@@ -649,7 +714,7 @@ a:hover { text-decoration: underline; }
           <a class="section-head__link" href="#">View all <svg class="orion-ico orion-ico--sm"><use href="#i-chevron-right"/></svg></a>
         </div>
         <div class="asset-row">
-          <div class="asset-card">
+          <div class="asset-card" data-type="video" data-product="Windchill" data-segment="PLM" data-stage="Consideration" data-cf="yes">
             <div class="asset-card__thumb">
               <span class="new-dot" title="New"></span>
               <span class="type-chip"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg>Video</span>
@@ -669,7 +734,7 @@ a:hover { text-decoration: underline; }
             </div>
           </div>
 
-          <div class="asset-card">
+          <div class="asset-card" data-type="ldk" data-product="Windchill" data-segment="PLM">
             <div class="asset-card__thumb">
               <svg class="watermark"><use href="#i-box"/></svg>
               <span class="new-dot" title="New"></span>
@@ -686,7 +751,7 @@ a:hover { text-decoration: underline; }
             </div>
           </div>
 
-          <div class="asset-card">
+          <div class="asset-card" data-type="video" data-product="Creo" data-segment="CAD" data-stage="Awareness" data-cf="yes">
             <div class="asset-card__thumb">
               <span class="type-chip"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg>Video</span>
               <button class="play-btn" onclick="openVideoPreview('creo-composites')"><svg><use href="#i-play"/></svg></button>
@@ -705,7 +770,7 @@ a:hover { text-decoration: underline; }
             </div>
           </div>
 
-          <div class="asset-card">
+          <div class="asset-card" data-type="vdk" data-product="Windchill" data-segment="PLM" data-stage="Decision">
             <div class="asset-card__thumb">
               <svg class="watermark"><use href="#i-monitor"/></svg>
               <span class="type-chip"><svg class="orion-ico--sm orion-ico"><use href="#i-monitor"/></svg>VDK</span>
@@ -731,7 +796,7 @@ a:hover { text-decoration: underline; }
           <a class="section-head__link" href="#">View all <svg class="orion-ico orion-ico--sm"><use href="#i-chevron-right"/></svg></a>
         </div>
         <div class="asset-row">
-          <div class="asset-card">
+          <div class="asset-card" data-type="video" data-product="Windchill" data-segment="PLM" data-stage="Consideration" data-cf="yes">
             <div class="asset-card__thumb">
               <span class="rank-chip">#1</span>
               <span class="type-chip" style="left:auto;right:8px;"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg>Video</span>
@@ -750,7 +815,7 @@ a:hover { text-decoration: underline; }
             </div>
           </div>
 
-          <div class="asset-card">
+          <div class="asset-card" data-type="video" data-product="Windchill" data-segment="PLM" data-stage="Awareness" data-cf="yes">
             <div class="asset-card__thumb">
               <span class="rank-chip">#2</span>
               <span class="type-chip" style="left:auto;right:8px;"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg>Video</span>
@@ -769,7 +834,7 @@ a:hover { text-decoration: underline; }
             </div>
           </div>
 
-          <div class="asset-card">
+          <div class="asset-card" data-type="wiki">
             <div class="asset-card__thumb">
               <svg class="watermark"><use href="#i-box"/></svg>
               <span class="rank-chip">#3</span>
@@ -786,7 +851,7 @@ a:hover { text-decoration: underline; }
             </div>
           </div>
 
-          <div class="asset-card">
+          <div class="asset-card" data-type="video" data-product="Creo" data-segment="CAD" data-stage="Decision" data-cf="yes">
             <div class="asset-card__thumb">
               <span class="rank-chip">#4</span>
               <span class="type-chip" style="left:auto;right:8px;"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg>Video</span>
@@ -805,7 +870,7 @@ a:hover { text-decoration: underline; }
             </div>
           </div>
 
-          <div class="asset-card">
+          <div class="asset-card" data-type="video" data-product="Windchill" data-segment="PLM" data-stage="Awareness" data-cf="yes">
             <div class="asset-card__thumb">
               <span class="rank-chip">#5</span>
               <span class="type-chip" style="left:auto;right:8px;"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg>Video</span>
@@ -2053,6 +2118,71 @@ document.getElementById('dvgSearchInput').addEventListener('input', dvgApplyFilt
   document.getElementById(id).addEventListener('change', dvgApplyFilters);
 });
 document.getElementById('dvgResetBtn').addEventListener('click', dvgResetFilters);
+
+function hubApplyFilters() {
+  var q = document.getElementById('hubSearchInput').value.trim().toLowerCase();
+  var type = document.getElementById('hubFilterType').value;
+  var product = document.getElementById('hubFilterProduct').value;
+  var segment = document.getElementById('hubFilterSegment').value;
+  var stage = document.getElementById('hubFilterStage').value;
+  var cf = document.getElementById('hubFilterCf').value;
+
+  var cards = document.querySelectorAll('#mainThread .asset-card');
+  var visibleCount = 0;
+  cards.forEach(function(card) {
+    var titleEl = card.querySelector('.asset-card__title');
+    var title = titleEl ? titleEl.textContent.toLowerCase() : '';
+    var matchesText = !q || title.indexOf(q) !== -1;
+    var matchesType = !type || card.dataset.type === type;
+    var matchesProduct = !product || card.dataset.product === product;
+    var matchesSegment = !segment || card.dataset.segment === segment;
+    var matchesStage = !stage || card.dataset.stage === stage;
+    var matchesCf = !cf || card.dataset.cf === cf;
+    var visible = matchesText && matchesType && matchesProduct && matchesSegment && matchesStage && matchesCf;
+    card.style.display = visible ? '' : 'none';
+    if (visible) visibleCount++;
+  });
+
+  document.querySelectorAll('#mainThread .asset-row').forEach(function(row) {
+    var anyVisible = Array.prototype.some.call(row.querySelectorAll('.asset-card'), function(c) { return c.style.display !== 'none'; });
+    row.style.display = anyVisible ? '' : 'none';
+    var section = row.closest('.section');
+    if (section) section.style.display = anyVisible ? '' : 'none';
+  });
+
+  document.getElementById('hubNoResults').classList.toggle('show', visibleCount === 0);
+  document.getElementById('hubGalleryCta').classList.toggle('show', type === '' || type === 'video');
+}
+
+function viewFilteredAsGallery() {
+  var product = document.getElementById('hubFilterProduct').value;
+  var segment = document.getElementById('hubFilterSegment').value;
+  var stage = document.getElementById('hubFilterStage').value;
+  var cf = document.getElementById('hubFilterCf').value;
+  var q = document.getElementById('hubSearchInput').value;
+
+  openDemoGalleryView();
+
+  var dvgProductSelect = document.getElementById('dvgFilterProduct');
+  var galleryProducts = Array.prototype.map.call(dvgProductSelect.options, function(o) { return o.value; });
+  dvgProductSelect.value = galleryProducts.indexOf(product) !== -1 ? product : '';
+
+  var dvgFunnelSelect = document.getElementById('dvgFilterFunnel');
+  var galleryFunnels = Array.prototype.map.call(dvgFunnelSelect.options, function(o) { return o.value; });
+  dvgFunnelSelect.value = galleryFunnels.indexOf(stage) !== -1 ? stage : '';
+
+  document.getElementById('dvgFilterSegment').value = segment;
+  document.getElementById('dvgFilterCf').value = cf;
+  document.getElementById('dvgSearchInput').value = q;
+
+  dvgApplyFilters();
+}
+
+document.getElementById('hubSearchInput').addEventListener('input', hubApplyFilters);
+['hubFilterType','hubFilterProduct','hubFilterSegment','hubFilterStage','hubFilterCf'].forEach(function(id) {
+  document.getElementById(id).addEventListener('change', hubApplyFilters);
+});
+hubApplyFilters();
 
 document.querySelectorAll('.js-dvg-share').forEach(function(btn) {
   btn.addEventListener('click', function() {

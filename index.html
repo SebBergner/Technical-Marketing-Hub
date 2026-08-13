@@ -131,6 +131,8 @@ a:hover { text-decoration: underline; }
 }
 .filter-pill select:focus { outline: none; }.hub-noresults { display: none; padding: 30px 10px; text-align: center; color: var(--orion-text-3); font-size: 13.5px; }
 .hub-noresults.show { display: block; }
+.hub-reset-cta { font-size: 13px; font-weight: 700; color: var(--orion-indigo); cursor: pointer; background: none; border: none; padding: 6px 2px; white-space: nowrap; }
+.hub-reset-cta:hover { text-decoration: underline; }
 
 /* ============================================================
    SECTION HEADERS
@@ -586,7 +588,9 @@ a:hover { text-decoration: underline; }
             <option value="no">No</option>
           </select>
           <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
-        </label>      </div>
+        </label>
+        <button class="hub-reset-cta" id="hubResetBtn" onclick="hubResetFilters()" style="display:none;">Reset filters</button>
+      </div>
       <div class="hub-noresults" id="hubNoResults">No assets match these filters. Try clearing one.</div>
     </div>
 
@@ -1081,6 +1085,7 @@ a:hover { text-decoration: underline; }
         </div>
 
         <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button class="btn-ghost" style="flex:none; margin-right:auto;" onclick="resetRequestForm()">Reset all</button>
           <button class="btn-ghost" style="flex:none;" onclick="closeRequestView()">Cancel</button>
           <button class="btn-primary-sm" style="flex:none;" onclick="submitAssetRequest(event)"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Submit Request</button>
         </div>
@@ -1402,6 +1407,37 @@ function setActiveNav(id) {
   document.querySelectorAll('.orion-side .orion-navitem').forEach(function(n) { n.classList.remove('orion-navitem--active'); });
   document.getElementById(id).classList.add('orion-navitem--active');
 }
+var REQUEST_FORM_DEFAULTS = null;
+function snapshotRequestFormDefaults() {
+  if (REQUEST_FORM_DEFAULTS) return;
+  REQUEST_FORM_DEFAULTS = {
+    pillRows: Array.from(document.querySelectorAll('#requestFormCard .stage-row')).map(function(row) {
+      return Array.from(row.children).map(function(p) { return p.classList.contains('stage-pill--active'); });
+    })
+  };
+}
+function resetRequestForm() {
+  if (!REQUEST_FORM_DEFAULTS) return;
+  var rows = document.querySelectorAll('#requestFormCard .stage-row');
+  rows.forEach(function(row, ri) {
+    Array.from(row.children).forEach(function(p, pi) {
+      p.classList.toggle('stage-pill--active', !!REQUEST_FORM_DEFAULTS.pillRows[ri][pi]);
+    });
+  });
+  document.getElementById('reqBrief').value = '';
+  document.getElementById('reqTargetDate').value = '';
+  document.getElementById('reqCompellingEvent').value = '';
+  document.getElementById('reqName').value = '';
+  document.getElementById('reqEmail').value = '';
+  document.getElementById('reqNotes').value = '';
+  document.getElementById('attachmentList').innerHTML = '';
+
+  onAssetTypeChange(document.querySelector('#assetTypeRow .stage-pill--active'));
+  onCustomerChange(document.querySelector('#customerRow .stage-pill--active'));
+  onStartingMaterialsChange(document.querySelector('#startingMaterialsRow .stage-pill--active'));
+  computeProductScope();
+  computeKindOfDemo();
+}
 function openRequestView() {
   document.getElementById('videoPreviewPage').classList.remove('active');
   document.getElementById('mainTopbar').style.display = 'none';
@@ -1409,6 +1445,7 @@ function openRequestView() {
   document.getElementById('requestViewPage').classList.add('active');
   document.getElementById('requestViewPage').scrollTop = 0;
   setActiveNav('navRequestAsset');
+  snapshotRequestFormDefaults();
   computeKindOfDemo();
   computeProductScope();
 }
@@ -1705,6 +1742,7 @@ function hubApplyFilters() {
   var stage = document.getElementById('hubFilterStage').value;
   var cf = document.getElementById('hubFilterCf').value;
   var anyActive = !!(q || type || product || segment || stage || cf);
+  document.getElementById('hubResetBtn').style.display = anyActive ? 'inline-flex' : 'none';
 
   ['continueSection', 'latestUploadsSection', 'mostViewedSection', 'browseByProductSection', 'editorsPicksSection'].forEach(function(id) {
     document.getElementById(id).style.display = anyActive ? 'none' : '';
@@ -1738,6 +1776,14 @@ function hubApplyFilters() {
   } else {
     document.getElementById('hubNoResults').classList.remove('show');
   }
+}
+
+function hubResetFilters() {
+  document.getElementById('hubSearchInput').value = '';
+  ['hubFilterType', 'hubFilterProduct', 'hubFilterSegment', 'hubFilterStage', 'hubFilterCf'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+  hubApplyFilters();
 }
 
 document.getElementById('hubSearchInput').addEventListener('input', hubApplyFilters);

@@ -1,0 +1,344 @@
+"""File-backed implementation of AssetRepository.
+
+Chosen over Azure SQL so that SharePoint stays the centre of gravity and the
+Portal keeps only a server-side index. At this catalogue's size (hundreds to a
+few thousand assets) loading into memory and filtering in Python is faster than
+a round trip to a database, so nothing is lost on performance.
+
+The mirror/owned split is physically visible here, which is an improvement on
+the SQL version where it was only a convention:
+
+    <DATA_DIR>/
+      mirror/<source_system>.json   rebuildable cache — sync replaces wholesale
+      owned/identity.json           stable slug <-> source id   ← irreplaceable
+      owned/curation.json           editor's picks, rails
+      owned/roadmap.json            AI-derived index
+      owned/stats.json              view / share counters
+      owned/requests.jsonl          intake submissions          ← irreplaceable
+
+Anything under `owned/` cannot be reconstructed from SharePoint. Two operational
+consequences follow, and neither is hypothetical:
+
+1. **Azure App Service local disk is ephemeral.** It does not survive a restart,
+   a redeploy, or scale-out. Point `DATA_DIR` at an Azure Files mount before
+   real users submit anything, or those submissions are lost on the next
+   `git push`.
+2. **Writes assume a single instance.** `os.replace` makes each write atomic, so
+   a file can never be left corrupt, but two processes doing read-modify-write
+   can still lose an update. Fine for one instance; scale-out needs a real store.
+"""
+from __future__ import annotations
+
+import json
+import os
+import threading
+from collections import Counter
+from datetime import date
+from typing import Any
+
+from backend.models import (
+    Asset, AssetStats, AssetSummary, Capability, Facets, FacetValue, Page, ValueRoadmap,
+)
+from backend.repositories.base import AssetQuery, AssetRepository
+from backend.tables import utcnow
+
+_MIRROR_FIELDS = (
+    "id", "type", "title", "description", "products", "funnel_stage", "content_depth",
+    "language", "segment", "industry", "value_drivers", "customer_facing",
+    "has_narrated_audio", "named_customer", "uploaded_at", "duration_seconds",
+    "thumbnail_url", "source_item_id", "brightcove_id", "consensus_uuid",
+)
+
+
+def _atomic_write(path: str, payload: Any) -> None:
+    """Write via a temp file and rename, so a crash mid-write cannot corrupt."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(payload, fh, indent=2, ensure_ascii=False, default=str)
+    os.replace(tmp, path)
+
+
+def _read(path: str, default: Any) -> Any:
+    if not os.path.exists(path):
+        return default
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (ValueError, OSError):
+        return default
+
+
+def _as_date(value: Any) -> date | None:
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str) and value:
+        try:
+            return date.fromisoformat(value[:10])
+        except ValueError:
+            return None
+    return None
+
+
+class JsonAssetRepository(AssetRepository):
+    #: Guards read-modify-write within the process. See the module docstring on
+    #: why this is not sufficient across processes.
+    _lock = threading.RLock()
+
+    def __init__(self, data_dir: str):
+        self.dir = data_dir
+        self.mirror_dir = os.path.join(data_dir, "mirror")
+        self.owned_dir = os.path.join(data_dir, "owned")
+
+    # ------------------------------------------------------------ file paths
+    def _mirror_path(self, source_system: str) -> str:
+        return os.path.join(self.mirror_dir, f"{source_system}.json")
+
+    def _owned_path(self, name: str) -> str:
+        return os.path.join(self.owned_dir, f"{name}.json")
+
+    # ---------------------------------------------------------------- loading
+    def _load_mirror(self) -> list[dict]:
+        records: list[dict] = []
+        if os.path.isdir(self.mirror_dir):
+            for name in sorted(os.listdir(self.mirror_dir)):
+                if name.endswith(".json"):
+                    records.extend(_read(os.path.join(self.mirror_dir, name), []))
+        identity = self._load("identity")
+        # Retired items keep their identity row but leave the catalogue.
+        return [r for r in records
+                if not (identity.get(r["id"], {}) or {}).get("retired_at")]
+
+    def _load(self, name: str) -> dict[str, dict]:
+        return _read(self._owned_path(name), {})
+
+    def _save(self, name: str, payload: dict) -> None:
+        _atomic_write(self._owned_path(name), payload)
+
+    # ------------------------------------------------------------------- read
+    def _rows(self, query: AssetQuery) -> list[dict]:
+        curation = self._load("curation")
+        rows = self._load_mirror()
+
+        def keep(record: dict) -> bool:
+            if query.text:
+                needle = query.text.lower()
+                haystack = f"{record.get('title', '')} {record.get('description') or ''}".lower()
+                if needle not in haystack:
+                    return False
+
+            for field, wanted in (("type", query.types),
+                                  ("funnel_stage", query.funnel_stages),
+                                  ("segment", query.segments),
+                                  ("industry", query.industries),
+                                  ("language", query.languages),
+                                  ("content_depth", query.content_depths)):
+                if wanted and record.get(field) not in wanted:
+                    return False
+
+            for field, wanted in (("products", query.products),
+                                  ("value_drivers", query.value_drivers)):
+                if wanted and not (set(record.get(field) or []) & set(wanted)):
+                    return False
+
+            if query.customer_facing is not None \
+                    and bool(record.get("customer_facing", True)) != query.customer_facing:
+                return False
+            if query.has_narrated_audio is not None \
+                    and record.get("has_narrated_audio") != query.has_narrated_audio:
+                return False
+            if query.has_consensus_uuid is True and not record.get("consensus_uuid"):
+                return False
+            if query.has_consensus_uuid is False and record.get("consensus_uuid"):
+                return False
+
+            own = curation.get(record["id"]) or {}
+            if query.editor_picks_only and not own.get("is_editor_pick"):
+                return False
+            if query.rail and query.rail not in (own.get("rails") or []):
+                return False
+            return True
+
+        return [r for r in rows if keep(r)]
+
+    def list(self, query: AssetQuery) -> Page[AssetSummary]:
+        rows = self._rows(query)
+        stats = self._load("stats")
+        indexed = set(self._load("roadmap"))
+
+        if query.sort == "most_viewed":
+            rows.sort(key=lambda r: (stats.get(r["id"], {}) or {}).get("views", 0), reverse=True)
+        elif query.sort == "title":
+            rows.sort(key=lambda r: r.get("title", "").lower())
+        else:
+            rows.sort(key=lambda r: (_as_date(r.get("uploaded_at")) or date.min), reverse=True)
+
+        window = rows[query.offset: query.offset + query.limit]
+        return Page[AssetSummary](
+            items=[AssetSummary(**self._common(r, stats),
+                                has_roadmap=r["id"] in indexed) for r in window],
+            total=len(rows), limit=query.limit, offset=query.offset,
+        )
+
+    def get(self, asset_id: str) -> Asset | None:
+        record = next((r for r in self._load_mirror() if r["id"] == asset_id), None)
+        if record is None:
+            return None
+
+        own = self._load("curation").get(asset_id) or {}
+        roadmap = self._load("roadmap").get(asset_id)
+
+        data = self._common(record, self._load("stats"))
+        data.update(
+            has_roadmap=roadmap is not None,
+            web_url=record.get("web_url"),
+            rails=own.get("rails") or [],
+            is_editor_pick=bool(own.get("is_editor_pick")),
+            value_roadmap=self._to_roadmap(roadmap),
+        )
+        return Asset(**data)
+
+    def facets(self) -> Facets:
+        rows = self._load_mirror()
+
+        def scalar(field: str) -> list[FacetValue]:
+            counts = Counter(r.get(field) for r in rows if r.get(field))
+            return [FacetValue(value=v, count=n) for v, n in sorted(counts.items())]
+
+        def multi(field: str) -> list[FacetValue]:
+            counts = Counter(v for r in rows for v in (r.get(field) or []))
+            return [FacetValue(value=v, count=n) for v, n in sorted(counts.items())]
+
+        return Facets(
+            types=scalar("type"), products=multi("products"),
+            funnel_stages=scalar("funnel_stage"), segments=scalar("segment"),
+            industries=scalar("industry"), value_drivers=multi("value_drivers"),
+            languages=scalar("language"), content_depths=scalar("content_depth"),
+            total=len(rows),
+        )
+
+    def rails(self) -> dict[str, list[str]]:
+        out: dict[str, list[tuple[int, str]]] = {}
+        for asset_id, own in self._load("curation").items():
+            for rail in (own or {}).get("rails") or []:
+                out.setdefault(rail, []).append(((own or {}).get("rail_order") or 0, asset_id))
+        return {rail: [aid for _, aid in sorted(items)] for rail, items in out.items()}
+
+    # ------------------------------------------------------------------ write
+    def increment_stat(self, asset_id: str, stat: str, amount: int = 1) -> None:
+        if stat not in {"views", "downloads", "launches", "shares"}:
+            raise ValueError(f"unknown stat: {stat}")
+        with self._lock:
+            stats = self._load("stats")
+            row = stats.setdefault(asset_id, {})
+            row[stat] = (row.get(stat) or 0) + amount
+            self._save("stats", stats)
+
+    def replace_source_rows(self, assets: list[Asset], source_system: str) -> int:
+        """The ONLY sanctioned writer of mirror data.
+
+        Rewrites one source's mirror file and maintains identity. Everything
+        under owned/ is left completely alone — that is the whole point.
+        """
+        with self._lock:
+            identity = self._load("identity")
+            now = utcnow().isoformat(timespec="seconds")
+            seen: set[str] = set()
+            records: list[dict] = []
+
+            for asset in assets:
+                payload = asset.model_dump(mode="json")
+                records.append({k: payload[k] for k in _MIRROR_FIELDS if k in payload})
+                seen.add(asset.id)
+
+                row = identity.setdefault(asset.id, {
+                    "source_system": source_system,
+                    "source_item_id": asset.source_item_id or asset.id,
+                    "first_seen_at": now,
+                })
+                row["retired_at"] = None
+
+            # Items this source no longer provides are retired, never deleted —
+            # the slug must never be reused or old shared links would resolve
+            # to the wrong content.
+            for asset_id, row in identity.items():
+                if row.get("source_system") == source_system and asset_id not in seen:
+                    row.setdefault("retired_at", now)
+                    row["retired_at"] = row["retired_at"] or now
+
+            _atomic_write(self._mirror_path(source_system), records)
+            self._save("identity", identity)
+            return len(seen)
+
+    # ------------------------------------------------- owned-data write paths
+    def set_curation(self, asset_id: str, **fields: Any) -> None:
+        with self._lock:
+            curation = self._load("curation")
+            curation.setdefault(asset_id, {}).update(fields)
+            self._save("curation", curation)
+
+    def set_roadmap(self, asset_id: str, roadmap: dict) -> None:
+        with self._lock:
+            roadmaps = self._load("roadmap")
+            roadmaps[asset_id] = roadmap
+            self._save("roadmap", roadmaps)
+
+    def set_stats(self, asset_id: str, stats: dict) -> None:
+        with self._lock:
+            all_stats = self._load("stats")
+            all_stats[asset_id] = stats
+            self._save("stats", all_stats)
+
+    def record_share_event(self, asset_id: str, channel: str,
+                           target_ref: str | None, shared_by: str | None) -> None:
+        """Append one JSON line.
+
+        JSONL rather than a rewritten array: appends are far safer under
+        concurrency than read-modify-write, and a truncated final line loses one
+        event instead of the whole log.
+        """
+        path = os.path.join(self.owned_dir, "share_events.jsonl")
+        os.makedirs(self.owned_dir, exist_ok=True)
+        entry = {"asset_id": asset_id, "channel": channel, "target_ref": target_ref,
+                 "shared_by": shared_by, "created_at": utcnow().isoformat(timespec="seconds")}
+        with self._lock, open(path, "a", encoding="utf-8", newline="\n") as fh:
+            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    # --------------------------------------------------------------- mapping
+    @staticmethod
+    def _common(record: dict, stats: dict) -> dict:
+        counters = stats.get(record["id"]) or {}
+        return dict(
+            id=record["id"], type=record["type"], title=record["title"],
+            description=record.get("description"),
+            products=record.get("products") or [],
+            funnel_stage=record.get("funnel_stage"),
+            content_depth=record.get("content_depth"),
+            language=record.get("language") or "en",
+            segment=record.get("segment"), industry=record.get("industry"),
+            value_drivers=record.get("value_drivers") or [],
+            customer_facing=bool(record.get("customer_facing", True)),
+            has_narrated_audio=record.get("has_narrated_audio"),
+            named_customer=record.get("named_customer"),
+            uploaded_at=_as_date(record.get("uploaded_at")),
+            duration_seconds=record.get("duration_seconds"),
+            thumbnail_url=record.get("thumbnail_url"),
+            source_item_id=record.get("source_item_id"),
+            brightcove_id=record.get("brightcove_id"),
+            consensus_uuid=record.get("consensus_uuid"),
+            stats=AssetStats(
+                views=counters.get("views", 0), downloads=counters.get("downloads", 0),
+                launches=counters.get("launches", 0), shares=counters.get("shares", 0),
+            ),
+        )
+
+    @staticmethod
+    def _to_roadmap(payload: dict | None) -> ValueRoadmap | None:
+        if not payload:
+            return None
+        return ValueRoadmap(
+            description=payload.get("description"),
+            value_drivers=payload.get("value_drivers") or [],
+            capabilities=[Capability(**c) for c in (payload.get("capabilities") or [])],
+            indexed_at=payload.get("indexed_at"), model=payload.get("model"),
+        )

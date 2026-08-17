@@ -1,0 +1,1198 @@
+[
+  {
+    "id": "attract-loop-audio-introduction",
+    "type": "video",
+    "title": "Attract Loop Audio — Introduction",
+    "description": "A short narrated intro loop used to open flagship sessions and set up the digital thread story in under a minute, before the deeper walkthroughs begin.",
+    "products": [
+      "Cross-Portfolio"
+    ],
+    "funnel_stage": "Awareness",
+    "content_depth": null,
+    "language": "en",
+    "segment": "IPL",
+    "industry": "Cross-Industry",
+    "value_drivers": [
+      "Brand Overview"
+    ],
+    "customer_facing": true,
+    "has_narrated_audio": true,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/attract-loop-audio-introduction.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "9f04-2216",
+    "web_url": null,
+    "rails": [
+      "Intelligent Product Lifecycle"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "attract-loop-subway-roadmap",
+    "type": "video",
+    "title": "Attract Loop — Subway Roadmap",
+    "description": "A silent ambient loop built for booth displays and waiting-room screens, cycling through the Subway fictitious-dataset roadmap visuals on a continuous run.",
+    "products": [
+      "Cross-Portfolio"
+    ],
+    "funnel_stage": "Awareness",
+    "content_depth": null,
+    "language": "en",
+    "segment": "IPL",
+    "industry": "Cross-Industry",
+    "value_drivers": [
+      "Brand Overview"
+    ],
+    "customer_facing": false,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/attract-loop-subway-roadmap.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": null,
+    "web_url": null,
+    "rails": [
+      "Intelligent Product Lifecycle"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "change-management-walkthrough",
+    "type": "video",
+    "title": "Change Management Walkthrough",
+    "description": "See how PTC Windchill offers a systematic approach to managing engineering change, narrated for internal training — change requests, change notices, and downstream impact analysis.",
+    "products": [
+      "Windchill"
+    ],
+    "funnel_stage": "Consideration",
+    "content_depth": null,
+    "language": "en",
+    "segment": "PLM",
+    "industry": "Discrete Manufacturing",
+    "value_drivers": [
+      "Quality & Compliance"
+    ],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/change-management-walkthrough.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "4477-e0c1",
+    "web_url": null,
+    "rails": [
+      "PLM"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "creo-11-top-enhancements",
+    "type": "video",
+    "title": "Creo 11 Top Enhancements",
+    "description": "Manufacturers rely on Creo to get the most value from their CAD system. This overview walks through the top enhancements shipped in Creo 11, from usability to new modeling capabilities.",
+    "products": [
+      "Creo"
+    ],
+    "funnel_stage": "Awareness",
+    "content_depth": null,
+    "language": "en",
+    "segment": "CAD",
+    "industry": "Cross-Industry",
+    "value_drivers": [
+      "Engineering Productivity"
+    ],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/creo-11-top-enhancements.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "2d88-c519",
+    "web_url": null,
+    "rails": [
+      "CAD"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "creo-13-top-enhancements",
+    "type": "video",
+    "title": "Creo 13 Top Enhancements",
+    "description": "PTC's Creo is a parametric 3D CAD system built for speed without sacrificing design freedom. This overview covers what's new in Creo 13 — fully integrated design, simulation, and manufacturing in one system.",
+    "products": [
+      "Creo"
+    ],
+    "funnel_stage": "Awareness",
+    "content_depth": null,
+    "language": "en",
+    "segment": "CAD",
+    "industry": "Cross-Industry",
+    "value_drivers": [
+      "Engineering Productivity"
+    ],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/creo-13-top-enhancements.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "5c1e-40a2",
+    "web_url": null,
+    "rails": [
+      "CAD"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "creo-6-vision-video",
+    "type": "video",
+    "title": "Creo 6: Vision Video",
+    "description": "Creo 6.0 brings you more with cloud-based augmented reality — a vision piece setting up where the Creo product line was headed.",
+    "products": [
+      "Creo"
+    ],
+    "funnel_stage": "Awareness",
+    "content_depth": null,
+    "language": "en",
+    "segment": "CAD",
+    "industry": "Cross-Industry",
+    "value_drivers": [
+      "Innovation Vision"
+    ],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/creo-6-vision-video.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "1a4f-6e77",
+    "web_url": null,
+    "rails": [
+      "CAD"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "creo-chapters-s1e4-composites-deep-dive-replay",
+    "type": "video",
+    "title": "Creo Chapters S1E4 — Composites Deep Dive (Replay)",
+    "description": "Fourth episode of the Creo Chapters series — a deep dive into composite layup design, core-zone modeling, and a generative pass to trim laminate mass.",
+    "products": [
+      "Creo"
+    ],
+    "funnel_stage": "Awareness",
+    "content_depth": null,
+    "language": "en",
+    "segment": null,
+    "industry": null,
+    "value_drivers": [],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": "2025-07-14",
+    "duration_seconds": 407,
+    "thumbnail_url": null,
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "4f61-88ab",
+    "web_url": null,
+    "rails": [],
+    "is_editor_pick": false,
+    "value_roadmap": {
+      "description": "Fourth episode of the Creo Chapters series — a deep dive into composite layup design, core-zone modeling, and a generative pass to trim laminate mass.",
+      "value_drivers": [
+        "Innovation",
+        "Efficiency"
+      ],
+      "capabilities": [
+        {
+          "phase": "DESIGN",
+          "title": "Composite Layup Design",
+          "chips": [
+            "Ply Definition",
+            "Core Zone Modeling",
+            "Flat Pattern Output"
+          ],
+          "narration": "Episode builds up composite plies and core zones directly on the bracket model."
+        },
+        {
+          "phase": "IMPROVE",
+          "title": "Structural Optimization",
+          "chips": [
+            "Generative Design",
+            "Topology Study"
+          ],
+          "narration": "Replay covers a generative design pass to trim laminate mass while holding the load case."
+        }
+      ],
+      "indexed_at": null,
+      "model": null
+    },
+    "stats": {
+      "views": 402,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "creo-design-exploration-extension-synopsis-dex",
+    "type": "video",
+    "title": "Creo Design Exploration Extension Synopsis (DEX)",
+    "description": "The Creo Design Exploration Extension helps engineers explore alternative designs faster, comparing structural and manufacturing tradeoffs before committing to a final geometry.",
+    "products": [
+      "Creo"
+    ],
+    "funnel_stage": "Consideration",
+    "content_depth": null,
+    "language": "en",
+    "segment": "CAD",
+    "industry": "Cross-Industry",
+    "value_drivers": [
+      "Engineering Productivity"
+    ],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/creo-design-exploration-extension-synopsis-dex.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "76e2-9b0d",
+    "web_url": null,
+    "rails": [
+      "CAD"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "demo-recording-best-practices-kit",
+    "type": "wiki",
+    "title": "Demo Recording Best Practices — Kit",
+    "description": null,
+    "products": [],
+    "funnel_stage": null,
+    "content_depth": null,
+    "language": "en",
+    "segment": null,
+    "industry": null,
+    "value_drivers": [],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": null,
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": null,
+    "web_url": null,
+    "rails": [],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 812,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "eliminate-duplicate-parts-with-windchill-ai-parts-classifica",
+    "type": "video",
+    "title": "Eliminate Duplicate Parts with Windchill AI Parts Classification",
+    "description": "Walks through detecting and eliminating duplicate parts with Windchill AI Parts Classification — searching the part library, reviewing AI-ranked similarity candidates, and consolidating matches into a single canonical part.",
+    "products": [
+      "Windchill"
+    ],
+    "funnel_stage": "Consideration",
+    "content_depth": null,
+    "language": "en",
+    "segment": null,
+    "industry": null,
+    "value_drivers": [],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": "2025-07-21",
+    "duration_seconds": 252,
+    "thumbnail_url": null,
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "7a19-3c02",
+    "web_url": null,
+    "rails": [],
+    "is_editor_pick": false,
+    "value_roadmap": {
+      "description": "Walks through detecting and eliminating duplicate parts with Windchill AI Parts Classification — searching the part library, reviewing AI-ranked similarity candidates, and consolidating matches into a single canonical part.",
+      "value_drivers": [
+        "Efficiency",
+        "Quality & Regulatory"
+      ],
+      "capabilities": [
+        {
+          "phase": "DEFINE",
+          "title": "Parts Classification & Reuse",
+          "chips": [
+            "AI Similarity Search",
+            "Attribute-Based Classification",
+            "Reuse Recommendations"
+          ],
+          "narration": "Narration runs the AI classifier against the part library and reviews similarity-ranked candidates."
+        },
+        {
+          "phase": "DESIGN",
+          "title": "Duplicate Resolution & Consolidation",
+          "chips": [
+            "Part Merge",
+            "Where-Used Impact Check"
+          ],
+          "narration": "Demo merges the duplicate into the canonical part and checks where-used impact across active assemblies."
+        }
+      ],
+      "indexed_at": null,
+      "model": null
+    },
+    "stats": {
+      "views": 214,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "hill-helicopters-creo-composite-design",
+    "type": "video",
+    "title": "Hill Helicopters: Creo Composite Design",
+    "description": "How Hill Helicopters uses Creo to design composite structures for next-generation aircraft — a real customer story in a weight-critical aerospace application.",
+    "products": [
+      "Creo"
+    ],
+    "funnel_stage": "Decision",
+    "content_depth": null,
+    "language": "en",
+    "segment": "CAD",
+    "industry": "Aerospace & Defense",
+    "value_drivers": [
+      "Advanced Manufacturing"
+    ],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/hill-helicopters-creo-composite-design.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "a615-3f90",
+    "web_url": null,
+    "rails": [
+      "CAD"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "rapid-cad-based-illustrations-demo-script",
+    "type": "video",
+    "title": "Rapid CAD-Based Illustrations — Demo Script",
+    "description": "Demo script for generating exploded, callout-annotated illustrations directly from the Creo model for sales and support collateral.",
+    "products": [
+      "Creo"
+    ],
+    "funnel_stage": "Decision",
+    "content_depth": null,
+    "language": "en",
+    "segment": null,
+    "industry": null,
+    "value_drivers": [],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": 168,
+    "thumbnail_url": null,
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "a207-f453",
+    "web_url": null,
+    "rails": [],
+    "is_editor_pick": false,
+    "value_roadmap": {
+      "description": "Demo script for generating exploded, callout-annotated illustrations directly from the Creo model for sales and support collateral.",
+      "value_drivers": [
+        "Efficiency"
+      ],
+      "capabilities": [
+        {
+          "phase": "DESIGN",
+          "title": "3D PDF & Illustration Export",
+          "chips": [
+            "3D PDF Export",
+            "Exploded Views",
+            "Auto-Callouts"
+          ],
+          "narration": "Script covers generating an exploded, callout-annotated illustration straight from the Creo model."
+        }
+      ],
+      "indexed_at": null,
+      "model": null
+    },
+    "stats": {
+      "views": 640,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 22
+    }
+  },
+  {
+    "id": "tech-walkthrough-audio-engineering",
+    "type": "video",
+    "title": "Tech Walkthrough Audio — Engineering",
+    "description": "An engineering-focused walkthrough of the digital thread, narrated end to end — tracing a requirement from concept through design, simulation, and release.",
+    "products": [
+      "Cross-Portfolio"
+    ],
+    "funnel_stage": "Consideration",
+    "content_depth": null,
+    "language": "en",
+    "segment": "IPL",
+    "industry": "Discrete Manufacturing",
+    "value_drivers": [
+      "Engineering Productivity"
+    ],
+    "customer_facing": true,
+    "has_narrated_audio": true,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/tech-walkthrough-audio-engineering.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "61ac-7d3e",
+    "web_url": null,
+    "rails": [
+      "Intelligent Product Lifecycle"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "tech-walkthrough-audio-manufacturing",
+    "type": "video",
+    "title": "Tech Walkthrough Audio — Manufacturing",
+    "description": "A guided walkthrough of the manufacturing value chain, narrated for internal enablement. Covers how work instructions, quality records, and shop-floor feedback stay tied back to the engineering record — the version reps use to prep before a customer call.",
+    "products": [
+      "Cross-Portfolio"
+    ],
+    "funnel_stage": "Consideration",
+    "content_depth": null,
+    "language": "en",
+    "segment": "IPL",
+    "industry": "Discrete Manufacturing",
+    "value_drivers": [
+      "Digital Thread Continuity"
+    ],
+    "customer_facing": true,
+    "has_narrated_audio": true,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/tech-walkthrough-audio-manufacturing.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "3b7a-91cd",
+    "web_url": null,
+    "rails": [
+      "Intelligent Product Lifecycle"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "tech-walkthrough-no-audio-engineering-part-1",
+    "type": "video",
+    "title": "Tech Walkthrough No Audio — Engineering Part 1",
+    "description": "An extended engineering walkthrough of the digital thread, delivered silent for narrated live demos — first in a longer engineering deep-dive series.",
+    "products": [
+      "Creo"
+    ],
+    "funnel_stage": "Consideration",
+    "content_depth": null,
+    "language": "en",
+    "segment": "CAD",
+    "industry": "Discrete Manufacturing",
+    "value_drivers": [
+      "Engineering Productivity"
+    ],
+    "customer_facing": false,
+    "has_narrated_audio": false,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/tech-walkthrough-no-audio-engineering-part-1.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": null,
+    "web_url": null,
+    "rails": [
+      "CAD"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "tech-walkthrough-no-audio-manufacturing-part-3",
+    "type": "video",
+    "title": "Tech Walkthrough No Audio — Manufacturing Part 3",
+    "description": "The same manufacturing walkthrough, delivered silent so a presenter can narrate live. Covers the same ground — work instructions, quality records, shop-floor feedback — without a baked-in voiceover.",
+    "products": [
+      "Cross-Portfolio"
+    ],
+    "funnel_stage": "Consideration",
+    "content_depth": null,
+    "language": "en",
+    "segment": "IPL",
+    "industry": "Discrete Manufacturing",
+    "value_drivers": [
+      "Digital Thread Continuity"
+    ],
+    "customer_facing": false,
+    "has_narrated_audio": false,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/tech-walkthrough-no-audio-manufacturing-part-3.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": null,
+    "web_url": null,
+    "rails": [
+      "Intelligent Product Lifecycle"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "tech-walkthrough-no-audio-service-part-4",
+    "type": "video",
+    "title": "Tech Walkthrough No Audio — Service Part 4",
+    "description": "A service walkthrough covering parts, entitlements, and field execution, delivered silent for live voice-over — fourth in the Tech Walkthrough Service series.",
+    "products": [
+      "Cross-Portfolio"
+    ],
+    "funnel_stage": "Consideration",
+    "content_depth": null,
+    "language": "en",
+    "segment": "IPL",
+    "industry": "Discrete Manufacturing",
+    "value_drivers": [
+      "Service Optimization"
+    ],
+    "customer_facing": false,
+    "has_narrated_audio": false,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/tech-walkthrough-no-audio-service-part-4.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": null,
+    "web_url": null,
+    "rails": [
+      "Intelligent Product Lifecycle"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "tech-walkthrough-no-audio-sustainability",
+    "type": "video",
+    "title": "Tech Walkthrough No Audio — Sustainability",
+    "description": "A silent walkthrough of Windchill's sustainability tooling, built for narrated live demos — how product carbon footprint and material compliance data roll up into the digital thread.",
+    "products": [
+      "Windchill"
+    ],
+    "funnel_stage": "Consideration",
+    "content_depth": null,
+    "language": "en",
+    "segment": "PLM",
+    "industry": "Energy",
+    "value_drivers": [
+      "Sustainability"
+    ],
+    "customer_facing": false,
+    "has_narrated_audio": false,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/tech-walkthrough-no-audio-sustainability.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": null,
+    "web_url": null,
+    "rails": [
+      "PLM"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "the-intelligent-product-lifecycle-presentation",
+    "type": "video",
+    "title": "The Intelligent Product Lifecycle Presentation",
+    "description": "A single narrative arc across Windchill, Creo, and ServiceMax — built for first-call, cross-portfolio pitches.",
+    "products": [
+      "Cross-Portfolio"
+    ],
+    "funnel_stage": null,
+    "content_depth": null,
+    "language": "en",
+    "segment": null,
+    "industry": null,
+    "value_drivers": [],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": null,
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": null,
+    "web_url": null,
+    "rails": [],
+    "is_editor_pick": true,
+    "value_roadmap": null,
+    "stats": {
+      "views": 967,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "the-intelligent-product-lifecycle-executive-overview",
+    "type": "video",
+    "title": "The Intelligent Product Lifecycle — Executive Overview",
+    "description": "A single narrative arc across Windchill, CodeBeamer, and Creo — built for first-call, cross-portfolio pitches on the intelligent product lifecycle.",
+    "products": [
+      "Windchill"
+    ],
+    "funnel_stage": "Awareness",
+    "content_depth": null,
+    "language": "en",
+    "segment": null,
+    "industry": null,
+    "value_drivers": [],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": 215,
+    "thumbnail_url": null,
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "c015-6b7d",
+    "web_url": null,
+    "rails": [],
+    "is_editor_pick": false,
+    "value_roadmap": {
+      "description": "A single narrative arc across Windchill, CodeBeamer, and Creo — built for first-call, cross-portfolio pitches on the intelligent product lifecycle.",
+      "value_drivers": [
+        "Efficiency",
+        "Innovation",
+        "Quality & Regulatory"
+      ],
+      "capabilities": [
+        {
+          "phase": "PLAN",
+          "title": "Enterprise Change Management",
+          "chips": [
+            "Closed-Loop Change Management",
+            "Change Impact Analysis",
+            "Release Management"
+          ],
+          "narration": "Frames show the Windchill Change Request workflow — reviewing and approving the ECR, then creating a change notice with an implementation plan."
+        },
+        {
+          "phase": "DEFINE",
+          "title": "Requirements Management & Review",
+          "chips": [
+            "Requirements Definition & Governance",
+            "Compliance-Driven Requirements"
+          ],
+          "narration": "CodeBeamer frames show updating requirements and validating them with the AI requirements assistant against customer and industry rules."
+        },
+        {
+          "phase": "DESIGN",
+          "title": "Detailed Design in Creo",
+          "chips": [
+            "Generative Design",
+            "MBD",
+            "GD&T Advisor"
+          ],
+          "narration": "Creo frames cover generative design, model-based definition, and the GD&T advisor on the updated part."
+        },
+        {
+          "phase": "VALIDATE",
+          "title": "Verification & Validation",
+          "chips": [
+            "Test Management",
+            "Product Verification"
+          ],
+          "narration": "Closes with the CodeBeamer test coverage report and a traceability view linking requirements to tests and changes."
+        }
+      ],
+      "indexed_at": null,
+      "model": null
+    },
+    "stats": {
+      "views": 967,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 51
+    }
+  },
+  {
+    "id": "vestas-windchill-smart-platform-strategy",
+    "type": "video",
+    "title": "Vestas Windchill Smart Platform Strategy",
+    "description": "Powering the world with sustainable energy at scale takes a platform strategy that scales with it — Vestas shares how Windchill anchors their smart-platform approach to product data.",
+    "products": [
+      "Windchill"
+    ],
+    "funnel_stage": "Decision",
+    "content_depth": null,
+    "language": "en",
+    "segment": "PLM",
+    "industry": "Energy",
+    "value_drivers": [
+      "Digital Thread Continuity"
+    ],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/vestas-windchill-smart-platform-strategy.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "30bf-8c92",
+    "web_url": null,
+    "rails": [
+      "PLM"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "windchill-ai-parts-rationalization-overview-chinese",
+    "type": "video",
+    "title": "Windchill AI Parts Rationalization Overview — Chinese",
+    "description": "Localized (Chinese) overview cut of the Windchill AI Parts Rationalization story, covering search, classification, and consolidation.",
+    "products": [
+      "Windchill"
+    ],
+    "funnel_stage": "Awareness",
+    "content_depth": null,
+    "language": "zh",
+    "segment": null,
+    "industry": null,
+    "value_drivers": [],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": 230,
+    "thumbnail_url": null,
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": null,
+    "web_url": null,
+    "rails": [],
+    "is_editor_pick": false,
+    "value_roadmap": {
+      "description": "Localized (Chinese) overview cut of the Windchill AI Parts Rationalization story, covering search, classification, and consolidation.",
+      "value_drivers": [
+        "Efficiency",
+        "Quality & Regulatory"
+      ],
+      "capabilities": [
+        {
+          "phase": "DEFINE",
+          "title": "Parts Classification & Reuse",
+          "chips": [
+            "AI Similarity Search",
+            "Attribute-Based Classification"
+          ],
+          "narration": "Overview reuses the same classification and consolidation flow as the English walkthrough, translated for the ZH region."
+        }
+      ],
+      "indexed_at": null,
+      "model": null
+    },
+    "stats": {
+      "views": 588,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 14
+    }
+  },
+  {
+    "id": "windchill-ai-parts-rationalization-walkthrough-with-audio",
+    "type": "video",
+    "title": "Windchill AI Parts Rationalization — Walkthrough with Audio",
+    "description": "Narrated walkthrough of the Windchill AI Parts Rationalization flow — searching, classifying, and consolidating duplicate parts, then routing the change for review.",
+    "products": [
+      "Windchill"
+    ],
+    "funnel_stage": "Consideration",
+    "content_depth": null,
+    "language": "en",
+    "segment": null,
+    "industry": null,
+    "value_drivers": [],
+    "customer_facing": true,
+    "has_narrated_audio": true,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": 418,
+    "thumbnail_url": null,
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "8f3c-19ea",
+    "web_url": null,
+    "rails": [],
+    "is_editor_pick": false,
+    "value_roadmap": {
+      "description": "Narrated walkthrough of the Windchill AI Parts Rationalization flow — searching, classifying, and consolidating duplicate parts, then routing the change for review.",
+      "value_drivers": [
+        "Efficiency",
+        "Quality & Regulatory"
+      ],
+      "capabilities": [
+        {
+          "phase": "DEFINE",
+          "title": "Parts Classification & Reuse",
+          "chips": [
+            "AI Similarity Search",
+            "Attribute-Based Classification",
+            "Reuse Recommendations"
+          ],
+          "narration": "Narration runs the AI classifier against the part library and reviews similarity-ranked candidates."
+        },
+        {
+          "phase": "VALIDATE",
+          "title": "Rationalization Review & Sign-off",
+          "chips": [
+            "Review Queue",
+            "Approval Workflow"
+          ],
+          "narration": "Walkthrough finishes by routing the consolidated part through review and capturing sign-off."
+        }
+      ],
+      "indexed_at": null,
+      "model": null
+    },
+    "stats": {
+      "views": 1204,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 38
+    }
+  },
+  {
+    "id": "windchill-ai-parts-rationalization-ldk",
+    "type": "ldk",
+    "title": "Windchill AI – Parts Rationalization LDK",
+    "description": null,
+    "products": [
+      "Windchill"
+    ],
+    "funnel_stage": null,
+    "content_depth": null,
+    "language": "en",
+    "segment": null,
+    "industry": null,
+    "value_drivers": [],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": "2025-07-18",
+    "duration_seconds": null,
+    "thumbnail_url": null,
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": null,
+    "web_url": null,
+    "rails": [],
+    "is_editor_pick": true,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 58,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "windchill-next-gen-ui-home-screen",
+    "type": "video",
+    "title": "Windchill Next Gen UI — Home Screen",
+    "description": "A first look at the next-generation Windchill home screen, narrated by the product team. Set to ship in Windchill 13.1.2.0 — pre-release roadmap content, not yet cleared for customer sharing.",
+    "products": [
+      "Windchill"
+    ],
+    "funnel_stage": "Awareness",
+    "content_depth": null,
+    "language": "en",
+    "segment": "PLM",
+    "industry": "Cross-Industry",
+    "value_drivers": [
+      "Engineering Productivity"
+    ],
+    "customer_facing": false,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/windchill-next-gen-ui-home-screen.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": null,
+    "web_url": null,
+    "rails": [
+      "PLM"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "windchill-projectlink-vdk-v-2",
+    "type": "vdk",
+    "title": "Windchill ProjectLink — VDK v.2",
+    "description": null,
+    "products": [
+      "Windchill"
+    ],
+    "funnel_stage": "Decision",
+    "content_depth": null,
+    "language": "en",
+    "segment": null,
+    "industry": null,
+    "value_drivers": [],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": "2025-07-09",
+    "duration_seconds": null,
+    "thumbnail_url": null,
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": null,
+    "web_url": null,
+    "rails": [],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 31,
+      "shares": 0
+    }
+  },
+  {
+    "id": "windchill-systems-and-software-engineering",
+    "type": "video",
+    "title": "Windchill Systems and Software Engineering",
+    "description": "Turbocharge your enterprise with PTC's Model-Based Systems Engineering — how systems and software data stays connected to the broader Windchill digital thread.",
+    "products": [
+      "Windchill"
+    ],
+    "funnel_stage": "Consideration",
+    "content_depth": null,
+    "language": "en",
+    "segment": "PLM",
+    "industry": "Aerospace & Defense",
+    "value_drivers": [
+      "Digital Thread Continuity"
+    ],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/windchill-systems-and-software-engineering.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "8834-1fa2",
+    "web_url": null,
+    "rails": [
+      "PLM"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  },
+  {
+    "id": "windchill-volvo-trucks",
+    "type": "video",
+    "title": "Windchill — Volvo Trucks",
+    "description": "Allowing information to flow between engineering and manufacturing — a real customer story showing how Volvo Trucks keeps production and design in sync with Windchill.",
+    "products": [
+      "Windchill"
+    ],
+    "funnel_stage": "Decision",
+    "content_depth": null,
+    "language": "en",
+    "segment": "PLM",
+    "industry": "Automotive",
+    "value_drivers": [
+      "Digital Thread Continuity"
+    ],
+    "customer_facing": true,
+    "has_narrated_audio": null,
+    "named_customer": null,
+    "uploaded_at": null,
+    "duration_seconds": null,
+    "thumbnail_url": "/static/img/thumbs/windchill-volvo-trucks.jpg",
+    "source_item_id": null,
+    "brightcove_id": null,
+    "consensus_uuid": "ef21-5a4d",
+    "web_url": null,
+    "rails": [
+      "PLM"
+    ],
+    "is_editor_pick": false,
+    "value_roadmap": null,
+    "stats": {
+      "views": 0,
+      "downloads": 0,
+      "launches": 0,
+      "shares": 0
+    }
+  }
+]

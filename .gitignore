@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+antenv/
+
+# Environment / secrets — never commit Graph or Consensus credentials
+.env
+.env.*
+!.env.example
+
+# Local database (dev uses SQLite; Azure SQL in production)
+*.db
+*.sqlite3
+data/runtime/
+
+# Pre-split mockup, kept locally for reference only.
+# Git already has it: `git show 706891a:index.html`
+index.mockup.original.html
+
+# Machine-local Claude Code permissions (launch.json is shared, this is not)
+.claude/settings.local.json
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

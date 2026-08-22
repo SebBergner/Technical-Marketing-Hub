@@ -9,7 +9,7 @@ import os
 
 from fastapi import APIRouter
 
-from backend.config import settings
+from backend.config import BASE_DIR, settings
 
 router = APIRouter(prefix="/api/debug", tags=["debug"])
 
@@ -30,9 +30,11 @@ def backend_info():
         "consensus_configured": settings.consensus_configured,
         "graph_configured": settings.graph_configured,
         "seed_path_exists": os.path.exists(settings.seed_path),
-        #: App Service local disk does not survive a redeploy. Anything under
-        #: owned/ is irreplaceable, so this flag matters operationally.
-        "storage_is_durable": not data_dir.startswith(
-            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+        #: App Service local disk does not survive a redeploy, and anything
+        #: under owned/ is irreplaceable. Data living inside the repo is
+        #: therefore NOT durable — it must be moved to a mounted volume before
+        #: real users submit anything.
+        "storage_is_durable": not os.path.abspath(data_dir).startswith(
+            os.path.abspath(BASE_DIR)
         ),
     }

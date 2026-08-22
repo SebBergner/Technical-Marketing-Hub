@@ -47,6 +47,7 @@ _MIRROR_FIELDS = (
     "language", "segment", "industry", "value_drivers", "customer_facing",
     "has_narrated_audio", "named_customer", "uploaded_at", "duration_seconds",
     "thumbnail_url", "source_item_id", "brightcove_id", "consensus_uuid",
+    "resources", "resource_counts", "resource_count", "video_count", "main_video",
 )
 
 
@@ -86,6 +87,7 @@ class JsonAssetRepository(AssetRepository):
     _lock = threading.RLock()
 
     def __init__(self, data_dir: str):
+        self._mirror_cache: dict[str, tuple[float, list]] = {}
         self.dir = data_dir
         self.mirror_dir = os.path.join(data_dir, "mirror")
         self.owned_dir = os.path.join(data_dir, "owned")
@@ -99,11 +101,29 @@ class JsonAssetRepository(AssetRepository):
 
     # ---------------------------------------------------------------- loading
     def _load_mirror(self) -> list[dict]:
+        """Cached per file.
+
+        Without a cache, `get()` re-parsed the whole catalogue on every call —
+        at 452 assets and a 1.2 MB file, a loop over the catalogue became
+        hundreds of full parses.
+
+        The cache key includes mtime, but mtime ALONE is not enough: filesystem
+        timestamp resolution is coarse enough that two writes in the same tick
+        look identical, so a sync could serve stale rows. Writers therefore
+        invalidate explicitly via `_invalidate`.
+        """
         records: list[dict] = []
         if os.path.isdir(self.mirror_dir):
             for name in sorted(os.listdir(self.mirror_dir)):
-                if name.endswith(".json"):
-                    records.extend(_read(os.path.join(self.mirror_dir, name), []))
+                if not name.endswith(".json"):
+                    continue
+                path = os.path.join(self.mirror_dir, name)
+                stamp = os.path.getmtime(path)
+                cached = self._mirror_cache.get(path)
+                if cached is None or cached[0] != stamp:
+                    cached = (stamp, _read(path, []))
+                    self._mirror_cache[path] = cached
+                records.extend(cached[1])
         identity = self._load("identity")
         # Retired items keep their identity row but leave the catalogue.
         return [r for r in records
@@ -114,6 +134,13 @@ class JsonAssetRepository(AssetRepository):
 
     def _save(self, name: str, payload: dict) -> None:
         _atomic_write(self._owned_path(name), payload)
+
+    def _invalidate(self, path: str | None = None) -> None:
+        """Drop cached mirror data. Never rely on mtime alone to notice a write."""
+        if path is None:
+            self._mirror_cache.clear()
+        else:
+            self._mirror_cache.pop(path, None)
 
     # ------------------------------------------------------------------- read
     def _rows(self, query: AssetQuery) -> list[dict]:
@@ -192,6 +219,8 @@ class JsonAssetRepository(AssetRepository):
         data.update(
             has_roadmap=roadmap is not None,
             web_url=record.get("web_url"),
+            resources=record.get("resources") or [],
+            main_video=record.get("main_video"),
             rails=own.get("rails") or [],
             is_editor_pick=bool(own.get("is_editor_pick")),
             value_roadmap=self._to_roadmap(roadmap),
@@ -266,7 +295,9 @@ class JsonAssetRepository(AssetRepository):
                     row.setdefault("retired_at", now)
                     row["retired_at"] = row["retired_at"] or now
 
-            _atomic_write(self._mirror_path(source_system), records)
+            path = self._mirror_path(source_system)
+            _atomic_write(path, records)
+            self._invalidate(path)
             self._save("identity", identity)
             return len(seen)
 
@@ -326,6 +357,9 @@ class JsonAssetRepository(AssetRepository):
             source_item_id=record.get("source_item_id"),
             brightcove_id=record.get("brightcove_id"),
             consensus_uuid=record.get("consensus_uuid"),
+            resource_count=record.get("resource_count") or 0,
+            video_count=record.get("video_count") or 0,
+            resource_counts=record.get("resource_counts") or {},
             stats=AssetStats(
                 views=counters.get("views", 0), downloads=counters.get("downloads", 0),
                 launches=counters.get("launches", 0), shares=counters.get("shares", 0),

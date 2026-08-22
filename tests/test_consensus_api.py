@@ -11,17 +11,50 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import app
-from backend.integrations.consensus import ConsensusError, ShareLink, StubConsensusClient
+from backend.deps import get_repo
+from backend.integrations.consensus import (
+    ConsensusDemo, ConsensusError, ShareLink, StubConsensusClient,
+)
+from backend.models import Asset, AssetType
+from backend.repositories.json_repo import JsonAssetRepository
 from backend.routers.consensus import get_client
 from backend.tables import utcnow
 
-# An asset that carries a Consensus UUID in the seed, and one that does not.
-SHAREABLE = "eliminate-duplicate-parts-with-windchill-ai-parts-classifica"
-NO_UUID = "attract-loop-subway-roadmap"
+SHAREABLE = "shareable-asset"
+NO_UUID = "no-uuid-asset"
+INTERNAL = "internal-asset"
+
+#: Deliberately hermetic. These tests used to run against the app's real
+#: catalogue, so regenerating the seed broke them for reasons unrelated to the
+#: endpoints. The fixture below builds its own three-asset world instead.
+FIXTURE_ASSETS = [
+    Asset(id=SHAREABLE, type=AssetType.LDK, title="Windchill Overview",
+          consensus_uuid="7a19-3c02", customer_facing=True),
+    Asset(id=NO_UUID, type=AssetType.VDK, title="Attract Loop Subway Roadmap",
+          consensus_uuid=None, customer_facing=True),
+    Asset(id=INTERNAL, type=AssetType.LDK, title="Internal Only Kit",
+          consensus_uuid="beef-0001", customer_facing=False),
+]
+
+FIXTURE_DEMOS = [
+    ConsensusDemo(uuid="7a19-3c02", title="Windchill Overview", is_published=True,
+                  preview_link="https://play.goconsensus.com/7a19-3c02"),
+    ConsensusDemo(uuid="beef-0001", title="Internal Only Kit", is_published=True,
+                  preview_link="https://play.goconsensus.com/beef-0001"),
+    ConsensusDemo(uuid="c0de-1111", title="Registered In Consensus Only",
+                  is_published=True),
+]
 
 
 @pytest.fixture()
-def client():
+def repo(tmp_path):
+    r = JsonAssetRepository(str(tmp_path))
+    r.replace_source_rows(FIXTURE_ASSETS, "test")
+    return r
+
+
+@pytest.fixture()
+def client(repo):
     """Always pins the stub.
 
     Without this, a developer's .env makes `get_consensus_client()` resolve to
@@ -29,10 +62,11 @@ def client():
     flaky, and it silently invalidates the fixed expectations below. Tests must
     never depend on ambient credentials.
     """
-    # Must be a zero-arg lambda, not the class: FastAPI introspects the
-    # callable's signature, and StubConsensusClient(demos=...) would be read
-    # as a request parameter.
-    app.dependency_overrides[get_client] = lambda: StubConsensusClient()
+    # Must be zero-arg lambdas, not the classes: FastAPI introspects the
+    # callable signature, and StubConsensusClient(demos=...) would be read as a
+    # request parameter.
+    app.dependency_overrides[get_client] = lambda: StubConsensusClient(list(FIXTURE_DEMOS))
+    app.dependency_overrides[get_repo] = lambda: repo
     try:
         with TestClient(app) as c:
             yield c
@@ -87,12 +121,16 @@ def test_search_surfaces_upstream_failure_as_502(client):
 # ──────────────────────────────────────────────────────────────── reconcile
 def test_reconcile_returns_both_gap_directions(client):
     body = client.get("/api/consensus/reconcile").json()
+    summary = body["summary"]
 
-    assert body["summary"] == {"matched": 17, "proposals": 0, "conflicts": 0,
-                               "ambiguous": 0, "portal_only": 11, "consensus_only": 2}
-    # 17 matched + 11 portal-only accounts for all 28 seed assets.
-    assert body["summary"]["matched"] + body["summary"]["portal_only"] == 28
-    assert {d["uuid"] for d in body["consensus_only"]} == {"c0de-1111", "c0de-2222"}
+    # Two fixture assets carry a UUID present in Consensus; one carries none.
+    assert summary["matched"] == 2
+    assert summary["portal_only"] == 1
+    assert summary["matched"] + summary["portal_only"] == len(FIXTURE_ASSETS)
+
+    # The demo nothing points at is orphaned externally.
+    assert {d["uuid"] for d in body["consensus_only"]} == {"c0de-1111"}
+    assert [e["asset_id"] for e in body["portal_only"]] == [NO_UUID]
     for entry in body["portal_only"]:
         assert set(entry) == {"asset_id", "title", "type"}
 
@@ -101,6 +139,13 @@ def test_reconcile_threshold_is_honoured(client):
     loose = client.get("/api/consensus/reconcile?threshold=0.1").json()
     strict = client.get("/api/consensus/reconcile?threshold=0.99").json()
     assert loose["summary"]["portal_only"] <= strict["summary"]["portal_only"]
+
+
+def test_share_is_blocked_for_an_internal_only_asset(client):
+    response = client.post("/api/share/consensus",
+                           json={"asset_id": INTERNAL, "organization": "Acme"})
+    assert response.status_code == 409
+    assert "internal-only" in response.json()["detail"]
 
 
 def test_reconcile_rejects_out_of_range_threshold(client):

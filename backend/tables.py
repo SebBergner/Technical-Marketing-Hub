@@ -96,6 +96,13 @@ class AssetSource(Base):
     status: Mapped[str | None] = mapped_column(String(20))          # draft|published|retired
     synced_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
+    # An asset is a SharePoint folder; these describe the files inside it.
+    resources: Mapped[list | None] = mapped_column(JSON, default=list)
+    resource_counts: Mapped[dict | None] = mapped_column(JSON, default=dict)
+    resource_count: Mapped[int] = mapped_column(Integer, default=0)
+    video_count: Mapped[int] = mapped_column(Integer, default=0)
+    main_video: Mapped[str | None] = mapped_column(String(400))
+
 
 # ══════════════════════════════════════════════════════════ OWNED — the rest
 class AssetCuration(Base):

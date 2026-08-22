@@ -41,6 +41,34 @@ class ContentDepth(str, Enum):
     WALKTHROUGH = "Walkthrough"
 
 
+class ResourceKind(str, Enum):
+    """What a file inside an asset folder is.
+
+    Derived from the extension. The Demo Catalog holds ~3,400 files ending
+    `.1` `.2` `.3` — Creo's versioned CAD format (`part.prt.1`), which is why
+    a plain extension lookup is not enough.
+    """
+    VIDEO = "video"
+    DOCUMENT = "document"      # docx, pptx, pdf
+    DATASET = "dataset"        # zip, rar, 7z
+    CAD = "cad"                # .creo, .xpr, .prt.N, .asm.N, .drw.N
+    IMAGE = "image"
+    OTHER = "other"
+
+
+class Audience(str, Enum):
+    """Who a resource may be shown to.
+
+    PTC's own file naming carries this: 54% of the 1,219 catalogue videos are
+    marked `Customer Facing`/`CF` or `Internal Only`/`Training`. It is a
+    property of the individual file, not of the asset — one demo kit routinely
+    ships both cuts.
+    """
+    CUSTOMER_FACING = "customer_facing"
+    INTERNAL = "internal"
+    UNKNOWN = "unknown"
+
+
 class LifecyclePhase(str, Enum):
     PLAN = "PLAN"
     DEFINE = "DEFINE"
@@ -65,6 +93,16 @@ class ValueRoadmap(BaseModel):
     capabilities: list[Capability] = Field(default_factory=list)
     indexed_at: datetime | None = None
     model: str | None = None
+
+
+class AssetResource(BaseModel):
+    """One file inside an asset folder."""
+    name: str
+    kind: ResourceKind
+    audience: Audience = Audience.UNKNOWN
+    subfolder: str | None = None       # path below the asset folder, None = root
+    extension: str | None = None
+    has_audio: bool | None = None      # only when the filename says so
 
 
 class AssetStats(BaseModel):
@@ -110,6 +148,13 @@ class AssetBase(BaseModel):
     #: responses. Lets the UI show an honest "not indexed yet" state in a grid.
     has_roadmap: bool = False
 
+    #: Resource counts, cheap enough for list responses. The resources
+    #: themselves only travel on the detail endpoint.
+    resource_count: int = 0
+    video_count: int = 0
+    #: Complete count per ResourceKind, including kinds not listed individually.
+    resource_counts: dict[str, int] = Field(default_factory=dict)
+
     @property
     def can_share_externally(self) -> bool:
         """Consensus can only send content already registered there. Without a
@@ -127,6 +172,18 @@ class Asset(AssetBase):
     web_url: str | None = None
     rails: list[str] = Field(default_factory=list)
     is_editor_pick: bool = False
+
+    #: Only the kinds a person would browse. CAD is excluded — 42% of the
+    #: catalogue's files are Creo version files (`part.prt.1`) that nobody picks
+    #: from a list; `resource_counts` still reports them.
+    resources: list[AssetResource] = Field(default_factory=list)
+    #: Filename of the video that represents this asset.
+    #:
+    #: Resolved automatically when the folder holds exactly one video, or
+    #: exactly one marked Customer Facing — together that covers 281 of the 396
+    #: assets that have any video. The remaining 122 need a human to choose, so
+    #: this stays None rather than guessing.
+    main_video: str | None = None
 
 
 # ------------------------------------------------------------------ facets

@@ -1,7 +1,7 @@
 # TDD Portal — Architecture
 
-Revision 2, 2026-08-13. Supersedes the push-based design, following confirmation that a site-scoped
-Graph app registration is obtainable.
+Revision 4, 2026-08-14. Records what the SharePoint site actually contains (section 2a), which
+superseded two earlier premises. Storage is file-backed, not Azure SQL.
 
 ---
 
@@ -36,8 +36,9 @@ rebuild path. Only Portal-owned data is genuinely irreplaceable.
 
 Be clear-eyed about this, because it is easy to over-read the win:
 
-1. **The metadata still does not exist.** Graph gives faster, cleaner access to a library that still has
-   no columns. The volume of human labelling work is exactly the same. It remains the critical path.
+1. ~~The metadata still does not exist.~~ **SUPERSEDED — see section 2a.** Measured 2026-08-14:
+   the Demo Catalog has managed columns at 100% coverage on all 452 assets. The real gap is
+   `consensus_uuid`, absent entirely — 98% of the catalogue cannot be shared externally.
 2. **The Portal is still an index, not a content store.** Nothing here justifies copying content in.
 3. **Mirror and owned data must still never share a row.** Sync still overwrites the mirror wholesale.
 4. **Consensus is still the fastest path to real data** — its credentials are already in hand, while
@@ -172,6 +173,130 @@ SharePoint before sync ever runs.
 
 When populating the curated library, **move** items rather than copying them. Copies diverge, double
 storage, and create ambiguity about which one is authoritative. Retire the old location instead.
+
+---
+
+## 2a. What the SharePoint site actually contains
+
+Measured 2026-08-14 from Site Contents plus a full 9,166-row item export. This section exists
+because two earlier design decisions rested on guesses that turned out to be wrong.
+
+**Host is `ptccloud.sharepoint.com`, not `ptc.sharepoint.com`.** Site: `/sites/EXT-TDD`.
+
+### Correction 1 — the metadata already exists
+
+It was previously recorded that SharePoint had "essentially no structured metadata — files in
+folders plus naming conventions", which made human labelling the project's critical path. That is
+**wrong**. The Demo Catalog carries managed columns, and coverage on the asset folders is complete:
+
+| Column | Coverage on the 452 asset folders |
+|---|---|
+| Name, Demo Type, Segment, Language, Product, Owned By | **100%** |
+| Product Version | 98% |
+| Description | 81–93% |
+
+So no filename parser is needed for product / type / segment / language — they are real columns.
+The backfill effort is far smaller than assumed, and it is no longer the critical path.
+
+### Correction 2 — the real gap is the Consensus join key
+
+A live cross-match of all 452 catalogue folders against 636 published Consensus demos:
+
+```
+matched            6
+portal_only      446      ← 98% cannot be shared externally
+consensus_only   632
+```
+
+`consensus_uuid` is absent from SharePoint entirely. **That** is the gap worth automating, not
+the taxonomy.
+
+### Libraries and lists on the site
+
+| Name | Type | Items | Relevance |
+|---|---|---|---|
+| **Demo Catalog** | Document library | 9,166 | Primary source — 452 assets |
+| **Virtual Machine Catalog** | Document library | 139 | **Second asset source.** The mockup claimed 14 VMs; there are 139 |
+| Seismic | Document library | 148 | Relates to PTC Velocity — role unconfirmed |
+| Site Assets / Documents / Style Library / Form Templates | Document library | 2,244 / 87 / 0 / 0 | Site plumbing, not content |
+| Product Filter | List | 5 | Only 5 rows, but Product has 20+ values — so not the Product lookup. Purpose unconfirmed |
+| VM/Demo Issue Tracking | List | 187 | Existing tracker; may overlap with the intake form |
+| VM - Related Demos | List | 1 | VM↔demo link table, effectively empty |
+| Site Pages / Wiki | Page library | 549 / 16 | The current portal pages |
+
+**There is no Video library.** Videos live as files inside demo folders.
+
+### The structural rule that defines an asset
+
+Demo Catalog = 1,367 folders + 7,799 files. Only **452 folders carry Demo Type**, and **all 452 sit
+at depth 0**, directly under Demo Catalog. The other 915 folders are internal structure (Dataset,
+Video, Documentation, Models…), nesting up to 6 levels deep.
+
+> **An asset is a top-level folder in Demo Catalog. Everything beneath it is a resource.**
+
+Clean, unambiguous, and it needs no heuristics.
+
+Column values on *files* must be ignored: files show Language 98% and Product 65%, but those are
+inherited column defaults, not authored metadata.
+
+### Contents of an asset folder
+
+| | Value |
+|---|---|
+| Assets containing ≥1 video | **396 / 452 (87%)** |
+| Videos per asset | min 1, median 2, **max 94** |
+| Files per asset | min 1, median 4, **max 1440** |
+| Video files total | 1,319 (`.mp4` 1,279, `.m4v` 40) |
+
+Other extensions: `.docx` 638, `.zip` 522, `.pptx` 485, `.rar` 314, plus ~3,400 files ending
+`.1` `.2` `.3` — Creo's versioned CAD format (`part.prt.1`), not user-facing.
+
+**110 videos sit under no asset folder** — they live in top-level folders that carry no Demo Type,
+such as `Creo+ 12.0 Technical PM Videos`. Those are invisible to the rule above; needs a decision.
+
+### Consequence for the data model
+
+`Asset` needs a `resources[]` layer, and `playback_url` resolves to a chosen video resource:
+
+```
+Asset (= top-level folder)
+  └── resources[]   video · guide (.docx/.pptx) · dataset (.zip) · CAD (.creo/.prt.N)
+```
+
+With a median of 2 videos and a maximum of 94, **"which video represents this asset" is a real
+question**, not an implementation detail. 142 assets have exactly one; the rest need a rule or a
+human choice.
+
+### Video filenames carry far weaker signals than the mockup suggested
+
+Across all 1,219 videos inside asset folders:
+
+| Signal | Hits |
+|---|---|
+| `overview` | 140 |
+| `audio` | 52 |
+| `facing` | 44 |
+| `customer` | 25 |
+| `no audio` | 18 |
+| `teaser`, `narrat` | **0** |
+
+The mockup's tidy titles (`Tech Walkthrough No Audio — Manufacturing Part 3`) are **not
+representative** of real filenames. An earlier plan to derive `content_depth`,
+`has_narrated_audio` and `customer_facing` from filenames was based on that curated sample and
+would not have worked at this hit rate.
+
+### Data quality issues to fix at ingest
+
+1. **Segment delimiters are inconsistent** — `IoT,PLM` (comma) and `CAD;#SLM` (SharePoint
+   multi-value) both appear. 11 rows affected; naive filtering would silently miss them.
+2. **Full-width ampersands** — `Windchill Aerospace ＆ Defense` uses U+FF06, not `&`. Three
+   product names affected. Breaks exact matching and looks wrong in the UI.
+3. **Product is a lookup**, serialised `30;#Creo Parametric`. Must be parsed. 14 rows multi-product.
+4. **Description exists three times** — `Description` strips newlines; `Description2` keeps them and
+   has the best coverage (93%). Use `Description2`, discard the others.
+5. **407 / 452 names carry a `v.N` suffix**, many also repeating the Demo Type (`… LDK v.1`).
+   Strip both for display titles.
+
 
 ---
 

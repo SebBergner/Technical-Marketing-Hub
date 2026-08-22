@@ -181,22 +181,37 @@ class StubConsensusClient:
 
     @staticmethod
     def _from_seed() -> list[ConsensusDemo]:
+        """Synthesise demos from the seed catalogue.
+
+        SharePoint holds no Consensus UUID, so there is nothing real to mirror.
+        Instead a slice of seed titles is given synthetic UUIDs, a few are
+        deliberately reworded, and two exist only here. That produces gaps in
+        BOTH directions plus some near-misses, which is what the reconciliation
+        UI has to be built against — an empty stub would prove nothing.
+        """
         import json
         import os
 
         demos: list[ConsensusDemo] = []
-        if os.path.exists(settings.seed_path):
-            with open(settings.seed_path, encoding="utf-8") as fh:
-                for record in json.load(fh):
-                    if record.get("consensus_uuid"):
-                        uuid = record["consensus_uuid"]
-                        demos.append(ConsensusDemo(
-                            uuid=uuid,
-                            title=record["title"],
-                            description=record.get("description"),
-                            is_published=True,
-                            preview_link=f"https://play.goconsensus.com/{uuid}",
-                        ))
+        if not os.path.exists(settings.seed_path):
+            return list(_STUB_EXTRA)
+
+        with open(settings.seed_path, encoding="utf-8") as fh:
+            records = json.load(fh)
+
+        # Every 5th asset, so roughly a fifth of the catalogue is "registered".
+        for i, record in enumerate(records[::5]):
+            title = record["title"]
+            if i % 7 == 3:
+                title = f"{title} Demo"        # near-miss, should still match
+            uuid = f"stub-{record['id'][:28]}"
+            demos.append(ConsensusDemo(
+                uuid=uuid,
+                title=title,
+                description=record.get("description"),
+                is_published=True,
+                preview_link=f"https://play.goconsensus.com/{uuid}",
+            ))
         return demos + _STUB_EXTRA
 
     def is_configured(self) -> bool:

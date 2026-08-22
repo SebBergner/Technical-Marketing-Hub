@@ -118,6 +118,8 @@ class SqlAssetRepository(AssetRepository):
         data.update(
             has_roadmap=roadmap is not None,
             web_url=src.web_url,
+            resources=src.resources or [],
+            main_video=src.main_video,
             rails=(curation.rails if curation else None) or [],
             is_editor_pick=bool(curation.is_editor_pick) if curation else False,
             value_roadmap=self._to_roadmap(roadmap),
@@ -243,6 +245,11 @@ class SqlAssetRepository(AssetRepository):
             row.web_url = asset.web_url
             row.brightcove_id = asset.brightcove_id
             row.consensus_uuid = asset.consensus_uuid
+            row.resources = [r.model_dump(mode="json") for r in asset.resources]
+            row.resource_counts = asset.resource_counts
+            row.resource_count = asset.resource_count
+            row.video_count = asset.video_count
+            row.main_video = asset.main_video
             row.synced_at = utcnow()
             self.s.add(row)
 
@@ -274,6 +281,8 @@ class SqlAssetRepository(AssetRepository):
             duration_seconds=src.duration_seconds, thumbnail_url=src.thumbnail_url,
             source_item_id=src.drive_item_id, brightcove_id=src.brightcove_id,
             consensus_uuid=src.consensus_uuid,
+            resource_count=src.resource_count or 0, video_count=src.video_count or 0,
+            resource_counts=src.resource_counts or {},
             stats=AssetStats(
                 views=stats.views if stats else 0,
                 downloads=stats.downloads if stats else 0,

@@ -127,6 +127,19 @@
     </fieldset>
 
     <fieldset>
+      <legend>Metadata proposals</legend>
+      <div class="row">
+        <button id="bPropose">generate proposals</button>
+        <button id="bLoadProps">refresh</button>
+        <span class="count" id="propSummary"></span>
+      </div>
+      <div id="proposals" style="margin-top:8px" class="muted">
+        Nothing generated yet. Proposals are suggestions only &mdash; accepting one
+        queues it for SharePoint, it does not change the asset.
+      </div>
+    </fieldset>
+
+    <fieldset>
       <legend>Consensus</legend>
       <div class="row">
         <button id="bReconcile">run reconciliation</button>
@@ -294,7 +307,63 @@ async function boot() {
     }
   };
 
+  $("#bPropose").onclick = async () => {
+    $("#proposals").innerHTML = '<span class="muted">matching against Consensus…</span>';
+    try {
+      const r = await fetch("/api/curation/propose", { method: "POST" });
+      if (!r.ok) throw new Error(`${r.status}`);
+      await loadProposals();
+    } catch (e) {
+      $("#proposals").innerHTML = `<span class="bad">${esc(e.message)}</span>`;
+    }
+  };
+  $("#bLoadProps").onclick = loadProposals;
+  await loadProposals();
+
   await load();
+}
+
+async function loadProposals() {
+  const [summary, page] = await Promise.all([
+    api("/api/curation/summary"),
+    api("/api/curation/proposals?limit=40"),
+  ]);
+  $("#propSummary").textContent =
+    `${summary.total} total · ${summary.pending_writeback} awaiting write-back to SharePoint`;
+
+  if (!page.total) {
+    $("#proposals").innerHTML = '<span class="muted">No proposals. Click generate.</span>';
+    return;
+  }
+
+  $("#proposals").innerHTML = page.items.map(p => {
+    const warn = /SHARED UUID|CONFLICT|AMBIGUOUS/.test(p.evidence || "");
+    const decided = p.state !== "pending";
+    return `<div class="cap">
+      <div class="row" style="justify-content:space-between">
+        <b>${esc(p.asset_title || p.asset_id)}</b>
+        <span class="tag">${(p.confidence ?? 0).toFixed(2)}</span>
+      </div>
+      <div class="muted" style="font-size:11px">${esc(p.field)} &rarr;
+        <span style="color:var(--ink)">${esc(p.proposed_value || "—")}</span></div>
+      <div class="${warn ? "bad" : "muted"}" style="font-size:11px;margin-top:3px">
+        ${esc(p.evidence || "")}</div>
+      <div class="row" style="margin-top:6px">
+        ${decided
+          ? `<span class="${p.state === "accepted" ? "yes" : "no"}">${esc(p.state)}${
+              p.decided_by ? " by " + esc(p.decided_by) : ""}</span>`
+          : `<button data-a="${esc(p.asset_id)}" data-f="${esc(p.field)}" data-d="accept">accept</button>
+             <button data-a="${esc(p.asset_id)}" data-f="${esc(p.field)}" data-d="reject">reject</button>`}
+      </div></div>`;
+  }).join("");
+
+  document.querySelectorAll("#proposals button[data-d]").forEach(b => {
+    b.onclick = async () => {
+      await fetch(`/api/curation/proposals/${encodeURIComponent(b.dataset.a)}/`
+                  + `${encodeURIComponent(b.dataset.f)}/${b.dataset.d}`, { method: "POST" });
+      await loadProposals();
+    };
+  });
 }
 
 boot().catch(e => document.body.insertAdjacentHTML("afterbegin",

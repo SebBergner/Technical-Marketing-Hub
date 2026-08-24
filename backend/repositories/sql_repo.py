@@ -17,11 +17,13 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.models import (
-    Asset, AssetStats, AssetSummary, Capability, Facets, FacetValue, Page, ValueRoadmap,
+    Asset, AssetStats, AssetSummary, Capability, Facets, FacetValue, MetadataProposal,
+    Page, ProposalState, ProposalSummary, ValueRoadmap,
 )
 from backend.repositories.base import AssetQuery, AssetRepository
 from backend.tables import (
-    AssetCuration, AssetIdentity, AssetSource, AssetStatsRow, AssetValueRoadmap, utcnow,
+    AssetCuration, AssetIdentity, AssetSource, AssetStatsRow, AssetValueRoadmap,
+    MetadataProposal as ProposalRow, ShareEvent, utcnow,
 )
 
 _JSON_LIST_FIELDS = ("products", "value_drivers")
@@ -267,6 +269,83 @@ class SqlAssetRepository(AssetRepository):
 
         self.s.commit()
         return len(seen)
+
+    # ---------------------------------------------------- metadata proposals
+    @staticmethod
+    def _proposal_out(row: ProposalRow, title: str | None = None) -> MetadataProposal:
+        return MetadataProposal(
+            asset_id=row.asset_id, asset_title=title, field=row.field,
+            proposed_value=row.proposed_value, confidence=row.confidence,
+            origin=row.origin, state=row.state,
+            decided_by=row.decided_by, decided_at=row.decided_at,
+        )
+
+    def save_proposals(self, proposals: list[MetadataProposal]) -> int:
+        written = 0
+        for proposal in proposals:
+            row = self.s.get(ProposalRow, (proposal.asset_id, proposal.field))
+            # A human decision outranks a regenerated suggestion.
+            if row is not None and row.state != ProposalState.PENDING.value:
+                continue
+            if row is None:
+                row = ProposalRow(asset_id=proposal.asset_id, field=proposal.field)
+            row.proposed_value = proposal.proposed_value
+            row.confidence = proposal.confidence
+            row.origin = proposal.origin.value
+            row.state = proposal.state.value
+            self.s.add(row)
+            written += 1
+        self.s.commit()
+        return written
+
+    def list_proposals(self, state: str | None = None, field: str | None = None,
+                       limit: int = 100, offset: int = 0) -> Page[MetadataProposal]:
+        stmt = select(ProposalRow)
+        if state:
+            stmt = stmt.where(ProposalRow.state == state)
+        if field:
+            stmt = stmt.where(ProposalRow.field == field)
+        rows = self.s.execute(stmt).scalars().all()
+        # Lowest confidence first: the uncertain ones need the human.
+        rows = sorted(rows, key=lambda r: (1.0 if r.confidence is None else r.confidence))
+        window = rows[offset: offset + limit]
+
+        titles = {}
+        if window:
+            found = self.s.execute(
+                select(AssetSource.asset_id, AssetSource.title)
+                .where(AssetSource.asset_id.in_([r.asset_id for r in window]))
+            ).all()
+            titles = dict(found)
+
+        return Page[MetadataProposal](
+            items=[self._proposal_out(r, titles.get(r.asset_id)) for r in window],
+            total=len(rows), limit=limit, offset=offset,
+        )
+
+    def decide_proposal(self, asset_id: str, field: str, state: str,
+                        decided_by: str | None) -> MetadataProposal | None:
+        row = self.s.get(ProposalRow, (asset_id, field))
+        if row is None:
+            return None
+        row.state = state
+        row.decided_by = decided_by
+        row.decided_at = utcnow()
+        self.s.add(row)
+        self.s.commit()
+        src = self.s.get(AssetSource, asset_id)
+        return self._proposal_out(row, src.title if src else None)
+
+    def proposal_summary(self) -> ProposalSummary:
+        rows = self.s.execute(select(ProposalRow)).scalars().all()
+        return ProposalSummary(
+            total=len(rows),
+            by_state=dict(Counter(r.state for r in rows)),
+            by_field=dict(Counter(r.field for r in rows)),
+            by_origin=dict(Counter(r.origin for r in rows)),
+            pending_writeback=sum(
+                1 for r in rows if r.state == ProposalState.ACCEPTED.value),
+        )
 
     # --------------------------------------------------------------- mapping
     @staticmethod

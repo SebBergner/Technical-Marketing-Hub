@@ -169,6 +169,29 @@ So: **SharePoint is the single source of truth; Azure SQL is the local read inde
 mirror table already specified — it simply carries more columns now, because the enriched values are in
 SharePoint before sync ever runs.
 
+### Decision — asset requests go to a SharePoint list
+
+*Liwei Chen, 2026-08-20. Closes an open question carried since the requirements doc.*
+
+The requirements doc left "where should submitted requests be stored — SharePoint list,
+Smartsheet, a database?" explicitly undecided. Answer: **a dedicated SharePoint list or form**,
+built once Entra ID / Graph write access lands.
+
+This is consistent with SharePoint as the centre of gravity, and it removes a durability risk
+rather than adding one:
+
+- `owned/requests.jsonl` is no longer needed. Requests are governed, retained and backed up by
+  IT like any other corporate list, instead of living on an ephemeral App Service disk.
+- The remaining genuinely irreplaceable Portal-owned data shrinks to `owned/identity.json`
+  (stable slugs) and `owned/roadmap.json` (AI index). Both are small, and the roadmap is
+  recomputable at a cost.
+- `DATA_DIR` should still point at durable storage before production, but losing it would no
+  longer destroy anyone's submitted request.
+
+`POST /api/requests` is therefore **deferred** until Graph write exists, rather than built now
+against a store we would immediately migrate away from. The `AssetRequest` model and
+`asset_request` table stay as the shape the SharePoint list should mirror.
+
 ### Move, don't copy
 
 When populating the curated library, **move** items rather than copying them. Copies diverge, double

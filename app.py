@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.config import settings
 from backend.db import SessionLocal, create_all
-from backend.routers import assets, consensus, debug, taxonomy
+from backend.routers import assets, consensus, curation, debug, taxonomy
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -45,6 +45,7 @@ app = FastAPI(
 app.include_router(assets.router)
 app.include_router(taxonomy.router)
 app.include_router(consensus.router)
+app.include_router(curation.router)
 app.include_router(debug.router)
 
 

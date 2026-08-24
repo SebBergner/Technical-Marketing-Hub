@@ -37,7 +37,8 @@ from datetime import date
 from typing import Any
 
 from backend.models import (
-    Asset, AssetStats, AssetSummary, Capability, Facets, FacetValue, Page, ValueRoadmap,
+    Asset, AssetStats, AssetSummary, Capability, Facets, FacetValue, MetadataProposal,
+    Page, ProposalState, ProposalSummary, ValueRoadmap,
 )
 from backend.repositories.base import AssetQuery, AssetRepository
 from backend.tables import utcnow
@@ -334,6 +335,69 @@ class JsonAssetRepository(AssetRepository):
                  "shared_by": shared_by, "created_at": utcnow().isoformat(timespec="seconds")}
         with self._lock, open(path, "a", encoding="utf-8", newline="\n") as fh:
             fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    # ---------------------------------------------------- metadata proposals
+    @staticmethod
+    def _key(asset_id: str, field: str) -> str:
+        """Asset ids are slugs ([a-z0-9-]) and field names are identifiers, so
+        `::` cannot occur inside either half."""
+        return f"{asset_id}::{field}"
+
+    def save_proposals(self, proposals: list[MetadataProposal]) -> int:
+        with self._lock:
+            stored = self._load("proposals")
+            written = 0
+            for proposal in proposals:
+                key = self._key(proposal.asset_id, proposal.field)
+                existing = stored.get(key)
+                # A human decision outranks a regenerated suggestion.
+                if existing and existing.get("state") != ProposalState.PENDING.value:
+                    continue
+                stored[key] = proposal.model_dump(mode="json")
+                written += 1
+            self._save("proposals", stored)
+            return written
+
+    def list_proposals(self, state: str | None = None, field: str | None = None,
+                       limit: int = 100, offset: int = 0) -> Page[MetadataProposal]:
+        rows = list(self._load("proposals").values())
+        if state:
+            rows = [r for r in rows if r.get("state") == state]
+        if field:
+            rows = [r for r in rows if r.get("field") == field]
+        # Lowest confidence first: the uncertain ones need the human.
+        rows.sort(key=lambda r: (r.get("confidence") if r.get("confidence") is not None else 1.0))
+        window = rows[offset: offset + limit]
+        return Page[MetadataProposal](
+            items=[MetadataProposal.model_validate(r) for r in window],
+            total=len(rows), limit=limit, offset=offset,
+        )
+
+    def decide_proposal(self, asset_id: str, field: str, state: str,
+                        decided_by: str | None) -> MetadataProposal | None:
+        with self._lock:
+            stored = self._load("proposals")
+            key = self._key(asset_id, field)
+            row = stored.get(key)
+            if row is None:
+                return None
+            row["state"] = state
+            row["decided_by"] = decided_by
+            row["decided_at"] = utcnow().isoformat(timespec="seconds")
+            stored[key] = row
+            self._save("proposals", stored)
+            return MetadataProposal.model_validate(row)
+
+    def proposal_summary(self) -> ProposalSummary:
+        rows = list(self._load("proposals").values())
+        return ProposalSummary(
+            total=len(rows),
+            by_state=dict(Counter(r.get("state") for r in rows)),
+            by_field=dict(Counter(r.get("field") for r in rows)),
+            by_origin=dict(Counter(r.get("origin") for r in rows)),
+            pending_writeback=sum(
+                1 for r in rows if r.get("state") == ProposalState.ACCEPTED.value),
+        )
 
     # --------------------------------------------------------------- mapping
     @staticmethod

@@ -11,7 +11,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Literal
 
-from backend.models import Asset, AssetSummary, Facets, Page
+from backend.models import (
+    Asset, AssetSummary, Facets, MetadataProposal, Page, ProposalSummary,
+)
 
 SortKey = Literal["recent", "most_viewed", "title"]
 
@@ -89,3 +91,27 @@ class AssetRepository(ABC):
     def record_share_event(self, asset_id: str, channel: str,
                            target_ref: str | None, shared_by: str | None) -> None:
         """Append to the distribution log. Append-only — never rewritten."""
+
+    # ---- Metadata proposals: suggested values awaiting human confirmation.
+    # ---- Portal-owned, and never applied to an asset automatically.
+    @abstractmethod
+    def save_proposals(self, proposals: list[MetadataProposal]) -> int:
+        """Upsert by (asset_id, field).
+
+        A decision a human already made outranks a freshly generated
+        suggestion, so rows not in `pending` are left alone.
+        """
+
+    @abstractmethod
+    def list_proposals(self, state: str | None = None, field: str | None = None,
+                       limit: int = 100, offset: int = 0) -> Page[MetadataProposal]:
+        """Lowest confidence first — reviewers should spend time on the
+        uncertain ones, not confirm the obvious."""
+
+    @abstractmethod
+    def decide_proposal(self, asset_id: str, field: str, state: str,
+                        decided_by: str | None) -> MetadataProposal | None:
+        """Record accept/reject. Returns None if there is no such proposal."""
+
+    @abstractmethod
+    def proposal_summary(self) -> ProposalSummary: ...

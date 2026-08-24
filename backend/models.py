@@ -186,6 +186,57 @@ class Asset(AssetBase):
     main_video: str | None = None
 
 
+# ------------------------------------------------------- metadata proposals
+class ProposalState(str, Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    #: Confirmed by a human AND written back to SharePoint. Only reachable once
+    #: Graph write access exists.
+    WRITTEN = "written"
+
+
+class ProposalOrigin(str, Enum):
+    CONSENSUS = "consensus"
+    BRIGHTCOVE = "brightcove"
+    FILENAME = "filename"
+    MANUAL = "manual"
+
+
+class MetadataProposal(BaseModel):
+    """A suggested value for one field of one asset, awaiting confirmation.
+
+    Never applied automatically. Matching against the live Consensus tenant
+    produced confident-looking false positives before the matcher was
+    tightened, and the same class of error will recur — so a human decides,
+    and the confidence exists to let them triage lowest-first.
+    """
+    model_config = ConfigDict(from_attributes=True)
+
+    asset_id: str
+    asset_title: str | None = None
+    field: str
+    proposed_value: str | None = None
+    #: What the asset currently holds, so a reviewer sees the actual change.
+    current_value: str | None = None
+    confidence: float | None = None
+    origin: ProposalOrigin
+    state: ProposalState = ProposalState.PENDING
+    #: Human-readable justification, e.g. the matched Consensus demo title.
+    evidence: str | None = None
+    decided_by: str | None = None
+    decided_at: datetime | None = None
+
+
+class ProposalSummary(BaseModel):
+    total: int = 0
+    by_state: dict[str, int] = Field(default_factory=dict)
+    by_field: dict[str, int] = Field(default_factory=dict)
+    by_origin: dict[str, int] = Field(default_factory=dict)
+    #: Accepted but not yet pushed to SharePoint — the Graph write backlog.
+    pending_writeback: int = 0
+
+
 # ------------------------------------------------------------------ facets
 class FacetValue(BaseModel):
     value: str

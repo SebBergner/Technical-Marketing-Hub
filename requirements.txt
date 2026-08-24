@@ -4,3 +4,4 @@ gunicorn
 sqlalchemy>=2.0
 pydantic-settings
 httpx
+msal

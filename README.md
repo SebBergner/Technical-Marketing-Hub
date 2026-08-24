@@ -36,13 +36,16 @@ backend/
   models.py                Pydantic — the shape of data at the API edges
   tables.py                SQLAlchemy — storage, split mirror / Portal-owned
   db.py  deps.py           engine, session, get_current_user stub
-  repositories/            AssetRepository interface + SQL implementation
+  repositories/            AssetRepository interface + JSON and SQL implementations
   routers/                 REST endpoints
-data/seed/assets.json      28 assets extracted from the original mockup
+data/seed/assets.json      452 assets imported from the real SharePoint Demo Catalog
 static/                    css, js, and the 19 extracted thumbnails
 scripts/
   split_mockup.py          one-off: single-file mockup -> static assets
   extract_seed.py          one-off: mockup markup -> seed JSON
+  import_sharepoint.py     SharePoint export -> seed JSON (re-runnable)
+  check_consensus.py       read-only Consensus connectivity check
+  check_graph.py           read-only Graph access check — RUN THIS FIRST
 tests/
 ```
 
@@ -78,7 +81,8 @@ the same parametrised tests, so switching is a config change.
 | Data inspector | `/debug` — plain page for viewing the data. Not the product UI. |
 | API | Catalogue, facets, rails and Consensus over the seed data. |
 | Storage | JSON files behind the repository interface. No Azure SQL. `DATA_DIR` must point at an Azure Files mount before real users submit anything — App Service local disk is ephemeral. |
-| SharePoint / Graph | Waiting on IT — `Sites.Selected`, app-only. |
+| SharePoint / Graph | **Client built and fully tested against mocks.** Waiting only on IT for credentials. |
+| Metadata proposals | Consensus UUID suggestions with human review at `/api/curation/*`. |
 | Consensus | Client, matching and reconciliation built. Running on the stub until credentials are set. |
 | Auth | Stub. Must be real before any SharePoint write path ships. |
 
@@ -117,3 +121,25 @@ test sends deliberately do not increment share counts.
 
 Engagement metrics are **not available** from `demo/search` or `demosDetails`.
 `view_count` stays null rather than being faked; it would need `trackDemoBoards`.
+
+### Wiring up SharePoint (Graph)
+
+`Sites.Selected` is a **two-step** grant: admin consent for the permission, and
+then a per-site grant via `POST /v1.0/sites/{siteId}/permissions`. Step 1 alone
+grants nothing. When step 2 is missed you get a valid token and `403` on every
+call — indistinguishable from a code bug unless you know.
+
+So when IT delivers the credentials, run this before anything else:
+
+```bash
+python scripts/check_graph.py --columns
+```
+
+It separates "bad credentials" from "missing site grant", and `--columns` dumps
+the **real internal column names**. Graph returns internal names
+(`Demo_x0020_Type`), not display names, and they vary with how each column was
+created — `backend/integrations/graph/sync.py` accepts several plausible
+spellings until the real ones are confirmed.
+
+Then `POST /api/graph/sync` replaces the mirror. Portal-owned data — stable
+slugs, curation, the Value Roadmap index, counters — is never touched.

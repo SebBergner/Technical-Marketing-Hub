@@ -23,7 +23,7 @@ from backend.models import (
 from backend.repositories.base import AssetQuery, AssetRepository
 from backend.tables import (
     AssetCuration, AssetIdentity, AssetSource, AssetStatsRow, AssetValueRoadmap,
-    MetadataProposal as ProposalRow, ShareEvent, utcnow,
+    MetadataProposal as ProposalRow, ShareEvent, SyncState, utcnow,
 )
 
 _JSON_LIST_FIELDS = ("products", "value_drivers")
@@ -269,6 +269,18 @@ class SqlAssetRepository(AssetRepository):
 
         self.s.commit()
         return len(seen)
+
+    # ------------------------------------------------------------ sync state
+    def get_sync_token(self, source_system: str) -> str | None:
+        row = self.s.get(SyncState, source_system)
+        return row.delta_token if row else None
+
+    def set_sync_token(self, source_system: str, token: str | None) -> None:
+        row = self.s.get(SyncState, source_system) or SyncState(source_system=source_system)
+        row.delta_token = token
+        row.last_success_at = utcnow()
+        self.s.add(row)
+        self.s.commit()
 
     # ---------------------------------------------------- metadata proposals
     @staticmethod

@@ -336,6 +336,18 @@ class JsonAssetRepository(AssetRepository):
         with self._lock, open(path, "a", encoding="utf-8", newline="\n") as fh:
             fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
+    # ------------------------------------------------------------ sync state
+    def get_sync_token(self, source_system: str) -> str | None:
+        return (self._load("sync_state").get(source_system) or {}).get("delta_token")
+
+    def set_sync_token(self, source_system: str, token: str | None) -> None:
+        with self._lock:
+            state = self._load("sync_state")
+            row = state.setdefault(source_system, {})
+            row["delta_token"] = token
+            row["last_success_at"] = utcnow().isoformat(timespec="seconds")
+            self._save("sync_state", state)
+
     # ---------------------------------------------------- metadata proposals
     @staticmethod
     def _key(asset_id: str, field: str) -> str:

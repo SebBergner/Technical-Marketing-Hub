@@ -209,3 +209,53 @@ def test_client_has_no_create_method():
     """Absence is the design: the Consensus API cannot create or upload demos."""
     for name in ("create_demo", "upload", "create"):
         assert not hasattr(StubConsensusClient(), name)
+
+
+# ─────────────────────────── cross-script false positives, measured live
+# normalise() keeps only [a-z0-9], so a Japanese or Korean title survives as
+# whatever Latin fragment it happens to contain. Every pair below scored 1.000
+# against the production Consensus tenant on 2026-08-26, and every one is a
+# different-language recording that must not be shared in place of the English
+# one. Threshold is 0.72.
+CROSS_SCRIPT_FALSE_POSITIVES = [
+    ("MBD - Demo Video - CF", "모델 기반 정의 (MBD)"),
+    ("AAX - Demo Video - CF", "고급 어셈블리 확장 모듈 (AAX)"),
+    ("Codebeamer Demo Video CF", "Codebeamer ご紹介"),
+    ("Codebeamer_CF", "Codebeamer 概要"),
+]
+
+
+@pytest.mark.parametrize("asset_title,demo_title", CROSS_SCRIPT_FALSE_POSITIVES)
+def test_a_localised_demo_is_not_matched_to_an_english_asset(asset_title, demo_title):
+    score = similarity(asset_title, demo_title)
+    assert score < 0.72, (
+        f"{asset_title!r} matched the non-English {demo_title!r} at {score:.3f}. "
+        f"Sharing that asset would send the wrong language to the customer.")
+
+
+def test_two_titles_reduced_to_the_same_remnant_do_not_match():
+    """Both of these Korean titles normalise to '10 0' -- same script, so the
+    mismatch rule cannot see it. Nothing survived to compare, and scoring that
+    1.000 made two different demos identical."""
+    a, b = "크레오 10.0 업그레이드 - 기본기능편", "크레오 10.0 업그레이드 - 특화기능편"
+    assert normalise(a) == normalise(b), "premise: normalisation destroys both"
+    assert similarity(a, b) < 0.72
+
+
+def test_the_identical_token_shortcut_does_not_skip_the_disqualifiers():
+    """`if ta == tb: return 1.0` ran before every penalty, which is precisely
+    how the cross-script pairs reached exactly 1.000 -- both sides had been
+    reduced to the same single token."""
+    english, korean = "MBD Demo Video", "모델 기반 정의 (MBD)"
+    assert normalise(english) == normalise(korean) == "mbd",         "premise: both sides reduce to the same single token"
+    assert similarity(english, korean) < 0.72
+
+
+@pytest.mark.parametrize("asset_title,demo_title,floor", [
+    ("Windchill BOM Management_Demo Video_CF", "Windchill BOM Management", 0.72),
+    ("Windchill Overview VDK v.2", "Windchill Overview VDK v.2 Demo", 0.95),
+    ("Model Based Definition MBD Demo Video", "Creo Model Based Definition (MBD)", 0.72),
+])
+def test_genuine_matches_survive_the_new_disqualifiers(asset_title, demo_title, floor):
+    """Tightening must not cost real matches -- these are live pairs."""
+    assert similarity(asset_title, demo_title) >= floor

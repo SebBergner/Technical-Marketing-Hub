@@ -47,6 +47,24 @@ _NEGATIONS = {"no", "not", "without", "silent", "mute", "muted"}
 #: Multipliers applied when a discriminating signal disagrees.
 _NUMBER_MISMATCH_PENALTY = 0.55
 _NEGATION_MISMATCH_PENALTY = 0.45
+#: Applied when one title is written in a non-Latin script and the other is not.
+#: normalise() discards everything outside [a-z0-9], so a Japanese or Korean
+#: title survives only as whatever Latin fragment it happens to contain —
+#: usually a product name or a parenthesised acronym. Matching on that remnant
+#: compares a fragment against a whole title. Measured on the live tenant
+#: 2026-08-26: 'MBD - Demo Video - CF.mp4' scored 1.000 against
+#: '모델 기반 정의 (MBD)', and 'Codebeamer Demo Video' scored 1.000 against
+#: 'Codebeamer ご紹介'. Language is not cosmetic here either — sharing an
+#: English kit must not send the Japanese recording.
+_SCRIPT_MISMATCH_PENALTY = 0.35
+#: Applied when normalisation destroyed most of a title, so what is being
+#: compared is a remnant rather than a title. Two different Korean demos,
+#: '크레오 10.0 업그레이드 - 기본기능편' and '...특화기능편', both reduce to
+#: '10 0' and scored 1.000 against each other. Same script, so the mismatch
+#: rule above cannot see it — the problem is that nothing survived to compare.
+_UNINFORMATIVE_PENALTY = 0.30
+#: A title must keep at least this share of its letters through normalise().
+_MIN_RETAINED_LETTERS = 0.5
 #: Sequence similarity is a weak signal here — two titles sharing a long prefix
 #: score high even when the distinguishing tail is completely different — so it
 #: is discounted and can only win where token overlap is already respectable.
@@ -68,6 +86,30 @@ def _numeric_tokens(tokens: set[str]) -> set[str]:
     return {t for t in tokens if any(ch.isdigit() for ch in t)}
 
 
+def _has_non_latin(title: str) -> bool:
+    """Does this title contain any non-Latin letters at all?
+
+    Presence, not proportion. 'Codebeamer ご紹介' is 77% Latin by character
+    count, yet it is unambiguously the Japanese edition — a proportion test
+    waves it through, which is how it scored 1.000 against an English asset.
+    Any CJK or Hangul present means this is a localised variant.
+    """
+    return any(c.isalpha() and not c.isascii() for c in title or "")
+
+
+def _retained_letters(title: str, normalised: str) -> float:
+    """What share of a title's letters survive normalisation.
+
+    normalise() keeps only [a-z0-9], so a title written in another script can
+    emerge as a bare fragment — or as nothing but digits. Comparing those is
+    not comparing titles.
+    """
+    original = sum(1 for c in (title or "") if c.isalpha())
+    if not original:
+        return 1.0
+    return sum(1 for c in normalised if c.isalpha()) / original
+
+
 def similarity(a: str, b: str) -> float:
     """0.0–1.0 confidence that two titles name the same asset.
 
@@ -87,21 +129,31 @@ def similarity(a: str, b: str) -> float:
         return 0.0
 
     ta, tb = set(na.split()), set(nb.split())
-    if ta == tb:
-        return 1.0
 
-    jaccard = len(ta & tb) / len(ta | tb)
-    sequence = SequenceMatcher(None, na, nb).ratio() * _SEQUENCE_WEIGHT
-    score = max(jaccard, sequence)
+    # Disqualifiers are computed BEFORE the identical-tokens shortcut. Letting
+    # that shortcut return early was how the cross-script matches reached
+    # exactly 1.000: after normalisation both sides were the bare token {"mbd"}.
+    penalty = 1.0
 
     num_a, num_b = _numeric_tokens(ta), _numeric_tokens(tb)
     if (num_a or num_b) and num_a != num_b:
-        score *= _NUMBER_MISMATCH_PENALTY
+        penalty *= _NUMBER_MISMATCH_PENALTY
 
     if (ta & _NEGATIONS) != (tb & _NEGATIONS):
-        score *= _NEGATION_MISMATCH_PENALTY
+        penalty *= _NEGATION_MISMATCH_PENALTY
 
-    return score
+    if _has_non_latin(a) != _has_non_latin(b):
+        penalty *= _SCRIPT_MISMATCH_PENALTY
+
+    if min(_retained_letters(a, na), _retained_letters(b, nb)) < _MIN_RETAINED_LETTERS:
+        penalty *= _UNINFORMATIVE_PENALTY
+
+    if ta == tb:
+        return penalty
+
+    jaccard = len(ta & tb) / len(ta | tb)
+    sequence = SequenceMatcher(None, na, nb).ratio() * _SEQUENCE_WEIGHT
+    return max(jaccard, sequence) * penalty
 
 
 @dataclass

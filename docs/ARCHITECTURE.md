@@ -1,6 +1,6 @@
 # TDD Portal — Architecture
 
-Revision 6, 2026-08-26. Write-back closes the enrichment loop: accepted proposals now push to
+Revision 7, 2026-08-26. Write-back closes the enrichment loop: accepted proposals now push to
 SharePoint columns. Easy Auth (revision 5) shipped ahead of it, as section 1 required. Section
 2a records what the SharePoint site actually contains.
 
@@ -239,6 +239,73 @@ Default is a dry run. The matcher feeding these values produced five
 confident-looking false positives against the real catalogue before it was
 tightened, and this is the only operation in the Portal that a user cannot undo
 from inside the app.
+
+### Measured 2026-08-26 — Consensus does not hold the same catalogue
+
+*First run against the live Consensus tenant. It contradicts a premise this
+document has carried since revision 4, so it is recorded before anything is
+built on top of it.*
+
+Section 1 records the `consensus_uuid` gap: 0 of 455 assets carry one, so
+almost nothing can be shared externally. The implied remedy was the proposal
+pipeline — match by title, confirm by hand, write back. Built, and it works.
+
+**It can fill about 6 of them, not 450.** Not because matching is weak, but
+because the two systems hold different things:
+
+| | SharePoint Demo Catalog | Consensus |
+|---|---|---|
+| Count | 455 | 637 |
+| Unit | a **demo kit** — video + picks + CAD, for an SE to run | a **single recorded video**, for a buyer to watch |
+| Titles | `Additive Manufacturing - LDK v.1` | `Creo Composite Design and Manufacturing Overview` |
+| Contains LDK/VDK | 455 (by definition) | **4 of 637** |
+
+59% of Consensus titles name a PTC product, so it is the same subject matter —
+but at a different granularity, and much of it is customer-specific boards
+(`Schneider Electric : Knowledge Management…`), event content
+(`PTC NEXT - Spring 2026 - …`) and localised recordings.
+
+**What this means.** The gap is not a data-entry problem that automation can
+close. Most demo kits have no Consensus counterpart because nobody has recorded
+one. Whether they should is a content decision for TDD, not a technical one.
+
+Three options, in the order they should be considered:
+
+1. **Accept the 6 and stop.** The pipeline stays useful for the trickle of kits
+   that do get recorded; `can_share_externally` stays honest for the rest.
+2. **Match at video level, not kit level.** A kit's main video may exist in
+   Consensus under its own name. Measured: 16 assets match this way against 6
+   by kit title. Better, but it changes what the UUID *means* — the kit would
+   claim a UUID that belongs to one video inside it.
+3. **Record the missing demos.** The only option that actually closes the gap,
+   and it is weeks of human work, not code.
+
+Option 2 was measured rather than adopted, because it also surfaced a real
+matcher defect (below) and because the semantic change deserves a decision
+rather than a default.
+
+#### The defect it surfaced
+
+`normalise()` keeps only `[a-z0-9]`, so a Japanese or Korean title survives as
+whatever Latin fragment it contains — usually a product name or a parenthesised
+acronym. Four live pairs scored **exactly 1.000**:
+
+```
+MBD - Demo Video - CF.mp4      ->  모델 기반 정의 (MBD)
+AAX - Demo Video - CF.mp4      ->  고급 어셈블리 확장 모듈 (AAX)
+Codebeamer Demo Video CF.mp4   ->  Codebeamer ご紹介
+```
+
+Exactly 1.000 because `if ta == tb: return 1.0` ran *before* every disqualifier,
+and after normalisation both sides were the same single token. Two different
+Korean demos also collided, both reducing to `10 0`.
+
+Language is not cosmetic here: sharing an English kit must not send the
+Japanese recording. Two disqualifiers were added — script mismatch, and
+"normalisation destroyed most of the title" — and the four pairs are pinned as
+regression tests. This is the second time this matcher has produced
+confident-looking nonsense against real data, which is the standing argument
+for a human confirming every proposal.
 
 ### Refinement 2 — SharePoint is the authority, not the query engine
 

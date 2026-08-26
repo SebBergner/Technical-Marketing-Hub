@@ -140,7 +140,7 @@ class GraphClient:
         )
 
     # ------------------------------------------------------------------ auth
-    def _token(self) -> str:
+    def _token(self, scope: str = SCOPE) -> str:
         if self._token_provider is not None:
             return self._token_provider()
 
@@ -153,18 +153,26 @@ class GraphClient:
                 authority=f"https://login.microsoftonline.com/{self._tenant_id}",
             )
         # MSAL caches and refreshes internally; asking every call is correct.
-        result = self._msal_app.acquire_token_for_client(scopes=[SCOPE])
+        result = self._msal_app.acquire_token_for_client(scopes=[scope])
         if "access_token" not in result:
             raise GraphAuthError(
                 f"{result.get('error', 'unknown')}: "
                 f"{result.get('error_description', 'no token returned')}")
         return result["access_token"]
 
-    def granted_roles(self) -> list[str]:
-        """Application permissions actually present in our own token.
+    @staticmethod
+    def _roles_in(token: str) -> list[str]:
+        """The `roles` claim of a JWT. No signature check — this is not
+        authentication, it is introspection of a token we just acquired."""
+        try:
+            payload = token.split(".")[1]
+            payload += "=" * (-len(payload) % 4)
+            return list(json.loads(base64.urlsafe_b64decode(payload)).get("roles") or [])
+        except (ValueError, IndexError, binascii.Error, AttributeError):
+            return []
 
-        Read straight off the `roles` claim. No signature check — this is not
-        authentication, it is introspection of a token we just acquired.
+    def granted_roles(self) -> list[str]:
+        """Application permissions actually present in our own Graph token.
 
         Worth the trouble because an app with NO consented permission still
         receives a perfectly valid token, and every Graph call then fails with
@@ -173,12 +181,37 @@ class GraphClient:
         2026-08-26, where it was exactly this.
         """
         try:
-            payload = self._token().split(".")[1]
-            payload += "=" * (-len(payload) % 4)
-            claims = json.loads(base64.urlsafe_b64decode(payload))
-        except (GraphError, ValueError, IndexError, binascii.Error):
+            return self._roles_in(self._token())
+        except GraphError:
             return []
-        return list(claims.get("roles") or [])
+
+    def roles_on_legacy_sharepoint(self) -> list[str]:
+        """Permissions granted on the *SharePoint* API rather than on Graph.
+
+        Azure lists two separate APIs that each expose a permission literally
+        named `Sites.Selected`:
+
+            Microsoft Graph      00000003-0000-0000-c000-000000000000  ← we need this
+            SharePoint (legacy)  00000003-0000-0ff1-ce00-000000000000
+
+        Picking the wrong one is easy — the names are identical and they sit
+        next to each other in the picker. The portal then shows a reassuring
+        green "Granted for PTC", while every Graph call still 401s with an
+        empty roles claim, because the grant is on a different resource
+        entirely. Observed on the real tenant 2026-08-26.
+
+        Returns [] on any failure: this is a diagnostic aid, never a gate.
+        """
+        if not self.site_url:
+            return []
+        parsed = urlparse(self.site_url if "://" in self.site_url
+                          else f"https://{self.site_url}")
+        if not parsed.netloc:
+            return []
+        try:
+            return self._roles_in(self._token(f"https://{parsed.netloc}/.default"))
+        except Exception:                      # noqa: BLE001 — never let a hint raise
+            return []
 
     # -------------------------------------------------------------- plumbing
     def _request(self, method: str, url: str, **kwargs) -> Any:
@@ -289,13 +322,26 @@ class GraphClient:
         result["granted_permissions"] = roles
         if not roles:
             result["site"] = {"ok": False, "error": "not attempted"}
-            result["diagnosis"] = (
-                "The token is valid but carries NO application permissions — its "
-                "'roles' claim is empty. The app registration exists, but step 1 of "
-                "the Sites.Selected grant was never done. Ask IT to add the "
-                "Sites.Selected APPLICATION permission under API permissions > "
-                "Microsoft Graph, then click 'Grant admin consent'. Step 2, the "
-                "per-site grant, is still needed after that.")
+            misplaced = self.roles_on_legacy_sharepoint()
+            result["legacy_sharepoint_permissions"] = misplaced
+            if misplaced:
+                result["diagnosis"] = (
+                    f"The permission was granted on the WRONG API. Our Graph token "
+                    f"carries no roles, but the same app holds {misplaced} on the "
+                    f"legacy SharePoint API. Azure lists two different APIs that each "
+                    f"expose a permission named 'Sites.Selected', and the portal shows "
+                    f"a green 'Granted' either way. Ask IT to add Sites.Selected under "
+                    f"API permissions > Microsoft Graph > Application permissions and "
+                    f"grant admin consent. Step 2, the per-site grant, is still needed "
+                    f"after that.")
+            else:
+                result["diagnosis"] = (
+                    "The token is valid but carries NO application permissions — its "
+                    "'roles' claim is empty. The app registration exists, but step 1 of "
+                    "the Sites.Selected grant was never done. Ask IT to add the "
+                    "Sites.Selected APPLICATION permission under API permissions > "
+                    "Microsoft Graph, then click 'Grant admin consent'. Step 2, the "
+                    "per-site grant, is still needed after that.")
             return result
 
         try:

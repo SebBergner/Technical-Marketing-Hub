@@ -116,6 +116,37 @@ if ($claims.PSObject.Properties.Name -contains "roles") { $roles = @($claims.rol
 
 if ($roles.Count -eq 0) {
     Write-Host "  roles      ABSENT" -ForegroundColor Red
+
+    # Azure lists TWO APIs each exposing a permission named Sites.Selected.
+    # Granting the SharePoint one looks identical in the portal but does
+    # nothing for Graph, so name that case rather than reporting "none".
+    $spRoles = @()
+    try {
+        $spTok = (Invoke-RestMethod -Method POST `
+            -Uri "https://login.microsoftonline.com/$TenantId/oauth2/v2.0/token" `
+            -Body @{
+                client_id = $ClientId; client_secret = $ClientSecret
+                scope = "https://$(([Uri]$SiteUrl).Host)/.default"
+                grant_type = "client_credentials"
+            }).access_token
+        $sp = $spTok.Split(".")[1].Replace("-", "+").Replace("_", "/")
+        while ($sp.Length % 4) { $sp += "=" }
+        $spClaims = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($sp)) | ConvertFrom-Json
+        if ($spClaims.PSObject.Properties.Name -contains "roles") { $spRoles = @($spClaims.roles) }
+    } catch { }
+
+    if ($spRoles.Count -gt 0) {
+        Write-Host ("  legacy API {0}   <-- granted on the WRONG API" -f ($spRoles -join ", ")) -ForegroundColor Yellow
+        Write-Host "`n  >>> The permission exists, but on the legacy SharePoint API rather"
+        Write-Host "      than on Microsoft Graph. Azure lists two APIs that each expose a"
+        Write-Host "      permission named Sites.Selected, and the portal shows a green"
+        Write-Host "      'Granted' either way. This app calls Graph, so it gets nothing."
+        Write-Host "`n      Ask IT: API permissions > Add a permission > MICROSOFT GRAPH >"
+        Write-Host "      Application permissions > Sites.Selected > Grant admin consent."
+        Write-Host "      The per-site grant is a separate step and is also still needed."
+        exit 1
+    }
+
     Write-Host "`n  >>> The token is valid but carries NO application permissions."
     Write-Host "      The app registration exists and the secret is correct, but nobody"
     Write-Host "      has consented to a Graph permission for it. Every call will 401,"

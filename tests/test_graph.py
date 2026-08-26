@@ -130,6 +130,41 @@ def test_verify_access_names_the_missing_consent_when_the_token_has_no_roles():
     assert result["site"]["error"] == "not attempted",         "no point calling the site — it cannot succeed"
 
 
+def test_verify_access_spots_a_permission_granted_on_the_wrong_api(monkeypatch):
+    """The real failure on 2026-08-26, and the nastiest of the three.
+
+    Azure lists TWO APIs that each expose a permission named 'Sites.Selected'
+    -- Microsoft Graph and the legacy SharePoint API. IT picked the SharePoint
+    one. The portal then shows a green "Granted for PTC", so it looks finished,
+    while every Graph call still 401s with an empty roles claim.
+
+    Reporting that as "no permission consented" would send IT to add a
+    permission they can plainly see is already there.
+    """
+    client = client_for(lambda r: httpx.Response(401, json={}), roles=())
+    monkeypatch.setattr(client, "roles_on_legacy_sharepoint",
+                        lambda: ["Sites.Selected"])
+
+    result = client.verify_access()
+
+    assert result["granted_permissions"] == []
+    assert result["legacy_sharepoint_permissions"] == ["Sites.Selected"]
+    assert "WRONG API" in result["diagnosis"]
+    assert "Microsoft Graph" in result["diagnosis"]
+
+
+def test_the_legacy_api_probe_never_raises():
+    """It is a hint, not a gate -- it must not be able to break verify_access."""
+    def explode():
+        raise GraphAuthError("nope")
+
+    client = GraphClient("t", "c", "s", site_url=SITE_URL, token_provider=explode)
+    assert client.roles_on_legacy_sharepoint() == []
+
+    no_site = GraphClient("t", "c", "s", token_provider=lambda: fake_token())
+    assert no_site.roles_on_legacy_sharepoint() == []
+
+
 def test_granted_roles_survives_a_token_it_cannot_parse():
     """Never let introspection break a run; an unreadable token just reports
     nothing rather than raising."""

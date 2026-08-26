@@ -244,3 +244,62 @@ def test_seed_file_matches_the_asset_model():
     """The seed is committed data; a schema change must not silently break it."""
     for record in SEED_RECORDS:
         Asset.model_validate(record)
+
+
+# ─────────────────────────────────────────── write-back state and audit trail
+def test_marking_written_does_not_overwrite_who_accepted_it(repo):
+    """Two different facts: who authorised a value, and who ran the job that
+    pushed it. Collapsing them loses the one that matters for accountability."""
+    from backend.models import MetadataProposal, ProposalOrigin, ProposalState
+
+    repo.save_proposals([MetadataProposal(
+        asset_id="a1", field="consensus_uuid", proposed_value="uuid-1",
+        origin=ProposalOrigin.CONSENSUS)])
+    repo.decide_proposal("a1", "consensus_uuid",
+                         ProposalState.ACCEPTED.value, "elio@ptc.com")
+
+    written = repo.mark_proposal_written("a1", "consensus_uuid")
+
+    assert written.state == ProposalState.WRITTEN
+    assert written.decided_by == "elio@ptc.com"
+    assert written.written_at is not None
+
+
+def test_written_proposals_leave_the_writeback_backlog(repo):
+    from backend.models import MetadataProposal, ProposalOrigin, ProposalState
+
+    repo.save_proposals([MetadataProposal(
+        asset_id="a1", field="consensus_uuid", proposed_value="uuid-1",
+        origin=ProposalOrigin.CONSENSUS)])
+    repo.decide_proposal("a1", "consensus_uuid", ProposalState.ACCEPTED.value, "x")
+    assert repo.proposal_summary().pending_writeback == 1
+
+    repo.mark_proposal_written("a1", "consensus_uuid")
+    assert repo.proposal_summary().pending_writeback == 0
+
+
+def test_mark_written_on_a_missing_proposal_returns_none(repo):
+    assert repo.mark_proposal_written("nope", "consensus_uuid") is None
+
+
+def test_the_metadata_edit_log_survives_as_the_only_record_of_authorship(repo):
+    """App-only Graph writes are attributed to the application in SharePoint's
+    own history, so if this log does not hold the person, nothing does."""
+    repo.record_metadata_edit("a1", "consensus_uuid", None, "uuid-1",
+                              changed_by="elio@ptc.com")
+    repo.record_metadata_edit("a1", "consensus_uuid", "uuid-1", "uuid-2",
+                              changed_by="liwchen@ptc.com",
+                              write_status="failed", error="403")
+
+    entries = repo.metadata_edits("a1")
+    assert [e["changed_by"] for e in entries] == ["elio@ptc.com", "liwchen@ptc.com"]
+    assert entries[0]["old_value"] is None and entries[0]["new_value"] == "uuid-1"
+    assert entries[1]["write_status"] == "failed" and entries[1]["error"] == "403"
+
+
+def test_the_edit_log_is_append_only(repo):
+    """An audit trail that can lose earlier entries is not an audit trail."""
+    for n in range(3):
+        repo.record_metadata_edit("a1", "consensus_uuid", None, f"uuid-{n}",
+                                  changed_by="elio@ptc.com")
+    assert len(repo.metadata_edits("a1")) == 3

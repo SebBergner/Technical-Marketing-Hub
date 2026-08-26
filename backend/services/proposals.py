@@ -10,9 +10,9 @@ and a stated reason; a human decides. That is not caution for its own sake —
 an earlier, looser matcher produced five confident-looking false positives
 against the real catalogue, and the same class of error will recur.
 
-Once Graph write access exists, accepted proposals are pushed to the SharePoint
-column and arrive back through normal sync. Until then they queue as
-`pending_writeback`.
+Accepted proposals are pushed to the SharePoint column by
+`backend.integrations.graph.writeback` and arrive back through normal sync.
+Until Graph credentials exist they queue as `pending_writeback`.
 """
 from __future__ import annotations
 

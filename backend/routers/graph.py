@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.config import settings
 from backend.deps import CurrentUser, get_repo, require_authenticated, require_curator
@@ -11,6 +11,7 @@ from backend.integrations.graph.client import (
     GraphClient, GraphError, GraphPermissionError, get_graph_client,
 )
 from backend.integrations.graph.sync import SOURCE_SYSTEM, sync_catalogue
+from backend.integrations.graph.writeback import DEFAULT_LIMIT, backlog, write_back
 from backend.repositories.base import AssetRepository
 
 log = logging.getLogger(__name__)
@@ -76,6 +77,51 @@ def sync(full: bool = False, repo: AssetRepository = Depends(get_repo),
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     _save_token(repo, result.delta_token)
+    return result.as_dict()
+
+
+@router.get("/writeback/backlog")
+def writeback_backlog(repo: AssetRepository = Depends(get_repo)):
+    """What write-back would push, without calling Graph. Credential-free."""
+    return backlog(repo)
+
+
+@router.post("/writeback")
+def writeback(dry_run: bool = True,
+              limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=500),
+              repo: AssetRepository = Depends(get_repo),
+              client: GraphClient = Depends(require_client),
+              user: CurrentUser = Depends(require_curator)):
+    """Push accepted proposals into SharePoint columns. Requires curator.
+
+    **Dry run by default.** Pass `dry_run=false` to actually write. This is the
+    only endpoint that modifies a system of record, and the values it writes
+    come from a matcher that produced confident false positives before it was
+    tightened — so seeing the plan first is worth one extra call per item.
+
+    Never overwrites an existing value: an item whose column already holds
+    something different is reported as a conflict and left alone.
+    """
+    try:
+        result = write_back(client, repo, changed_by=user.email,
+                            dry_run=dry_run, limit=limit)
+    except GraphPermissionError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail=(f"{exc} If reads work and only writes fail, the per-site grant "
+                    f"is read-only and IT must raise it to 'write'.")) from exc
+    except GraphError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    if result.aborted:
+        # A missing column is a setup problem that would fail identically for
+        # every item, so it is an error rather than a run with 50 failures.
+        raise HTTPException(status_code=409, detail=result.aborted)
+
+    if not dry_run and result.items:
+        log.info("write-back by %s: %s", user.email, result.counts())
     return result.as_dict()
 
 

@@ -226,6 +226,9 @@ class MetadataProposal(BaseModel):
     evidence: str | None = None
     decided_by: str | None = None
     decided_at: datetime | None = None
+    #: When the accepted value reached SharePoint. Distinct from decided_at:
+    #: acceptance and write-back are separate steps that can be days apart.
+    written_at: datetime | None = None
 
 
 class ProposalSummary(BaseModel):

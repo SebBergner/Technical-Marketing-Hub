@@ -1,7 +1,8 @@
 # TDD Portal — Architecture
 
-Revision 5, 2026-08-20. Easy Auth with viewer/curator roles is in place ahead of any write
-path. Section 2a records what the SharePoint site actually contains.
+Revision 6, 2026-08-26. Write-back closes the enrichment loop: accepted proposals now push to
+SharePoint columns. Easy Auth (revision 5) shipped ahead of it, as section 1 required. Section
+2a records what the SharePoint site actually contains.
 
 ---
 
@@ -128,6 +129,7 @@ The mirror/owned split is now *physically visible*, an improvement on SQL where 
   owned/roadmap.json            AI-derived index
   owned/stats.json              view / share counters
   owned/share_events.jsonl      distribution log (append-only)
+  owned/metadata_edits.jsonl    write-back audit trail           ← irreplaceable
   owned/requests.jsonl          intake submissions               ← irreplaceable
 ```
 
@@ -140,6 +142,7 @@ under `owned/` **cannot be reconstructed from SharePoint**:
 | Lost | Consequence |
 |---|---|
 | `owned/requests.jsonl` | Submitted asset requests gone permanently |
+| `owned/metadata_edits.jsonl` | Who authored each SharePoint value becomes unrecoverable — app-only writes are attributed to the application, so SharePoint cannot answer it either |
 | `owned/identity.json` | Every previously shared link stops resolving |
 | `owned/roadmap.json` | Re-index cost paid again |
 | `owned/stats.json` | View counts reset; "Most Viewed" empties |
@@ -187,6 +190,55 @@ not allowed to be quiet.
 Curator comes from an Entra ID group listed in `AUTH_CURATOR_GROUPS`, or an app
 role named `curator`. With neither configured **nobody** can curate — failing
 closed, so a half-finished setup cannot accidentally grant write access.
+
+### Decision — write-back never overwrites, and says so out loud
+
+*Implemented 2026-08-26. Completes the loop described in refinement 1.*
+
+Refinement 1 said enrichment must write its findings into SharePoint rather than
+into our own database, so enriched values arrive back through normal sync and
+land in the mirror legitimately. This is that writer.
+
+    Consensus match -> proposal -> human accepts -> write-back -> sync
+
+**The obligation this creates.** Section 1 listed three costs of write access.
+All three land here:
+
+| Cost named in section 1 | How it is paid |
+|---|---|
+| Authentication becomes mandatory | curator role required; shipped first |
+| Concurrency must be handled | re-read + `If-Match` ETag on every write |
+| Attribution is lost unless rebuilt | `owned/metadata_edits.jsonl` |
+
+**Why it re-reads before every write.** An accepted proposal records what was
+true when a human looked at it, which may be days old, and SharePoint's own UI
+is a second writer. So three outcomes are distinguished that a blind PATCH would
+collapse into one: already correct (done), empty (write), and **holds something
+different (stop)**.
+
+That third case is the whole design. Overwriting it would destroy a hand-typed
+value silently — and because app-only writes are attributed to the application,
+SharePoint's version history would not even name a person who could explain what
+was lost. A conflict is reported and the proposal stays in the backlog for a
+human, which is the same principle as the CONFLICT proposal kind.
+
+**Reading and writing are not symmetric.** Sync tolerates several plausible
+internal column names because Graph returns internal names that vary with how a
+column was created. A write must send exactly one, and the wrong one fails on
+every item — so the real name is resolved from the list's own column
+definitions first. Same reasoning makes two failures abort the entire run rather
+than repeating: a missing column and a read-only grant. Both fail identically
+for all 450 items, so one instruction beats 450 identical errors.
+
+**What it deliberately does not do.** It does not write the value into the
+mirror. SharePoint owns it now; it returns through sync. Writing it locally
+would put a value in the mirror that no sync produced — precisely the drift the
+mirror/owned split exists to prevent.
+
+Default is a dry run. The matcher feeding these values produced five
+confident-looking false positives against the real catalogue before it was
+tightened, and this is the only operation in the Portal that a user cannot undo
+from inside the app.
 
 ### Refinement 2 — SharePoint is the authority, not the query engine
 

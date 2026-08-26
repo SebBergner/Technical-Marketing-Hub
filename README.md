@@ -36,6 +36,7 @@ backend/
   models.py                Pydantic — the shape of data at the API edges
   tables.py                SQLAlchemy — storage, split mirror / Portal-owned
   auth.py                  Easy Auth identity + viewer/curator roles
+  integrations/graph/      client, sync (pull) and writeback (push)
   db.py  deps.py           engine, session, dependency wiring
   repositories/            AssetRepository interface + JSON and SQL implementations
   routers/                 REST endpoints
@@ -47,6 +48,7 @@ scripts/
   import_sharepoint.py     SharePoint export -> seed JSON (re-runnable)
   check_consensus.py       read-only Consensus connectivity check
   check_graph.py           read-only Graph access check — RUN THIS FIRST
+                           --writeback also checks write readiness
 tests/
 ```
 
@@ -82,8 +84,9 @@ the same parametrised tests, so switching is a config change.
 | Data inspector | `/debug` — plain page for viewing the data. Not the product UI. |
 | API | Catalogue, facets, rails and Consensus over the seed data. |
 | Storage | JSON files behind the repository interface. No Azure SQL. `DATA_DIR` must point at an Azure Files mount before real users submit anything — App Service local disk is ephemeral. |
-| SharePoint / Graph | **Client built and fully tested against mocks.** Waiting only on IT for credentials. |
+| SharePoint / Graph | **Client, sync and write-back built and fully tested against mocks.** Waiting only on IT for credentials. |
 | Metadata proposals | Consensus UUID suggestions with human review at `/api/curation/*`. |
+| Write-back | Accepted proposals push to SharePoint columns. Dry run by default; never overwrites an existing value. |
 | Consensus | Client, matching and reconciliation built. Running on the stub until credentials are set. |
 | Auth | App Service Easy Auth (Entra ID), with viewer / curator roles. Off locally by default. |
 
@@ -173,3 +176,51 @@ spellings until the real ones are confirmed.
 
 Then `POST /api/graph/sync` replaces the mirror. Portal-owned data — stable
 slugs, curation, the Value Roadmap index, counters — is never touched.
+
+### Write-back: pushing accepted proposals into SharePoint
+
+This is the **only** code that changes a system of record, so it is deliberately
+awkward to do by accident.
+
+```bash
+python scripts/check_graph.py --writeback
+```
+
+That checks the two preconditions — the grant includes `write`, and the
+`ConsensusUUID` column exists — without writing anything. Then:
+
+| | |
+|---|---|
+| `GET /api/graph/writeback/backlog` | how much is queued. Needs no credentials |
+| `POST /api/graph/writeback` | **dry run** — reports what would change |
+| `POST /api/graph/writeback?dry_run=false` | actually writes |
+
+`dry_run` defaults to true. The values being written come from a matcher that
+produced five confident-looking false positives against the real catalogue
+before it was tightened, so looking first is worth one extra call per item.
+
+**It never overwrites an existing value.** Each item is re-read immediately
+before writing, and there are three outcomes a blind PATCH would collapse into
+one:
+
+- column already holds the proposed value → nothing to do, leaves the backlog
+- column is empty → written
+- column holds something **different** → `conflict`, nothing written
+
+That last case is the point. An accepted proposal reflects what was true when a
+human reviewed it, possibly days ago, and SharePoint's own UI is a second
+writer. The ETag closes the remaining gap, so even an edit landing between our
+read and our write fails loudly instead of being lost.
+
+Two failures abort the whole run rather than repeating 450 times: a **missing
+column** and a **read-only grant**. Both fail identically for every item, so
+one clear instruction beats fifty identical errors.
+
+**Attribution.** App-only Graph writes appear in SharePoint as the application,
+not the person — so SharePoint's version history cannot tell you who did this.
+`owned/metadata_edits.jsonl` records both the curator who accepted the value and
+the one who ran the job. It is the only place that survives.
+
+Assets still carrying the spreadsheet importer's path instead of a Graph item id
+report `not_synced`; run a sync first. Written values are **not** copied into the
+mirror — SharePoint owns them, and they return through normal sync.

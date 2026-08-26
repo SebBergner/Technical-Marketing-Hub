@@ -114,4 +114,25 @@ class AssetRepository(ABC):
         """Record accept/reject. Returns None if there is no such proposal."""
 
     @abstractmethod
+    def mark_proposal_written(self, asset_id: str, field: str) -> MetadataProposal | None:
+        """Record that an accepted value reached SharePoint.
+
+        Separate from `decide_proposal` because it must NOT overwrite
+        `decided_by` — who authorised a value and who ran the job that pushed
+        it are different facts, and the first is the one worth keeping.
+        """
+
+    @abstractmethod
+    def record_metadata_edit(self, asset_id: str, field: str, old_value: str | None,
+                             new_value: str | None, changed_by: str,
+                             write_status: str = "written",
+                             error: str | None = None) -> None:
+        """Append to the write-back audit trail.
+
+        App-only Graph writes appear in SharePoint as the *application*, not the
+        person, so SharePoint's own version history cannot answer "who did
+        this". If we do not record it here, the answer is unrecoverable.
+        """
+
+    @abstractmethod
     def proposal_summary(self) -> ProposalSummary: ...

@@ -68,6 +68,23 @@ class DeltaTokenExpired(GraphError):
     """Graph returned 410 Gone. Discard the token and do a full pass."""
 
 
+class GraphFieldUnknown(GraphError):
+    """SharePoint does not have the column we tried to write.
+
+    A setup problem, not a data problem — it fails identically for every item,
+    so a caller writing in bulk should abort rather than repeat it 450 times.
+    """
+
+
+class GraphConcurrentEdit(GraphError):
+    """412: the item changed in SharePoint since we read it.
+
+    Its own class because it is the one write failure that is a legitimate
+    outcome rather than a fault — someone edited the item first, and their
+    value must not be silently overwritten.
+    """
+
+
 @dataclass(frozen=True)
 class SiteRef:
     site_id: str
@@ -79,6 +96,19 @@ class SiteRef:
 class DriveRef:
     drive_id: str
     name: str | None = None
+
+
+#: Phrases SharePoint uses when a column name is not recognised. It has no
+#: dedicated error code for this, so the message is all there is to go on.
+_UNKNOWN_COLUMN_HINTS = (
+    "is not recognized", "is not recognised", "does not exist",
+    "invalid field name", "column does not exist", "unknown field",
+)
+
+
+def _looks_like_unknown_column(detail: str) -> bool:
+    lowered = (detail or "").lower()
+    return any(hint in lowered for hint in _UNKNOWN_COLUMN_HINTS)
 
 
 @dataclass
@@ -171,6 +201,10 @@ class GraphClient:
                 f"authorised for this site. This is almost always the missing "
                 f"second step of the Sites.Selected grant — ask IT to run "
                 f"POST /v1.0/sites/{{siteId}}/permissions. Check with verify_access().")
+        if response.status_code == 412:
+            raise GraphConcurrentEdit(
+                f"412 precondition failed for {url}: it changed in SharePoint since we "
+                f"read it. Re-read and confirm before overwriting.")
         if response.status_code == 404:
             return None
         if response.status_code >= 400:
@@ -179,6 +213,13 @@ class GraphClient:
                 detail = (response.json().get("error") or {}).get("message", "")
             except ValueError:
                 detail = response.text[:200]
+            if response.status_code == 400 and _looks_like_unknown_column(detail):
+                raise GraphFieldUnknown(
+                    f"SharePoint rejected a column name: {detail}. The column does not "
+                    f"exist in the library, so this will fail for every item — create "
+                    f"it in SharePoint, then re-run "
+                    f"`python scripts/check_graph.py --columns` to confirm its internal "
+                    f"name.")
             raise GraphError(f"HTTP {response.status_code} from Graph for {url}: {detail}")
         if not response.content:
             return None
@@ -349,29 +390,63 @@ class GraphClient:
         payload = self._request("GET", f"/drives/{drive_id}/items/{item_id}/thumbnails")
         return (payload or {}).get("value", [])
 
+    def list_columns(self, drive_id: str) -> list[dict]:
+        """Column definitions of the list behind a document library.
+
+        Needed because reading and writing are not symmetric. Reading can
+        accept any of several plausible internal names; writing has to pick
+        exactly one, and picking wrong fails on every item. So the write path
+        asks SharePoint what the column is actually called instead of guessing.
+        """
+        payload = self._request("GET", f"/drives/{drive_id}/list",
+                                params={"$expand": "columns"})
+        return (payload or {}).get("columns", [])
+
+    def get_list_item(self, drive_id: str, item_id: str) -> dict | None:
+        """The listItem behind a driveItem, with its columns and ETag.
+
+        Addressing through the drive matters: sync records the *driveItem* id,
+        so going via `/sites/{id}/lists/{id}/items/{id}` would need a second
+        identifier we never stored.
+        """
+        return self._request("GET", f"/drives/{drive_id}/items/{item_id}/listItem",
+                             params={"$expand": "fields"})
+
     # ----------------------------------------------------------------- write
-    def update_fields(self, site_id: str, list_id: str, item_id: str,
-                      fields: dict[str, Any], etag: str | None = None) -> dict:
-        """Write metadata columns back, with optimistic concurrency.
+    def update_list_item_fields(self, drive_id: str, item_id: str,
+                                fields: dict[str, Any],
+                                etag: str | None = None) -> dict:
+        """Write columns back on the item sync already identified.
 
         `If-Match` is not optional. SharePoint's own UI is a second writer, and
         without the ETag a stale Portal value would silently overwrite an edit
-        someone made a minute ago. A 412 means re-read and ask the user again.
+        someone made a minute ago — raising GraphConcurrentEdit instead.
         """
+        url = f"/drives/{drive_id}/items/{item_id}/listItem/fields"
+        result = self._request("PATCH", url, json=fields,
+                               headers=self._write_headers(etag))
+        if result is None:
+            raise GraphError(
+                f"item {item_id} was not found when writing fields — it was probably "
+                f"deleted or moved in SharePoint. Re-sync and try again.")
+        return result
+
+    def update_fields(self, site_id: str, list_id: str, item_id: str,
+                      fields: dict[str, Any], etag: str | None = None) -> dict:
+        """Same write, addressed by site and list rather than by drive.
+
+        Kept for callers that hold list coordinates instead of a driveItem id.
+        """
+        url = f"/sites/{site_id}/lists/{list_id}/items/{item_id}/fields"
+        return self._request("PATCH", url, json=fields,
+                             headers=self._write_headers(etag)) or {}
+
+    @staticmethod
+    def _write_headers(etag: str | None) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
         if etag:
             headers["If-Match"] = etag
-
-        url = f"/sites/{site_id}/lists/{list_id}/items/{item_id}/fields"
-        response = self._client.patch(
-            url, json=fields,
-            headers={**headers, "Authorization": f"Bearer {self._token()}"})
-
-        if response.status_code == 412:
-            raise GraphError(
-                f"412 precondition failed for item {item_id}: it changed in SharePoint "
-                f"since we read it. Re-read and confirm before overwriting.")
-        return self._interpret(response, url) or {}
+        return headers
 
 
 # ------------------------------------------------------------------ factory

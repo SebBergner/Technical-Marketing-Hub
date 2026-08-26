@@ -140,6 +140,21 @@
     </fieldset>
 
     <fieldset>
+      <legend>Write-back to SharePoint</legend>
+      <div class="row">
+        <button id="bDryRun">dry run</button>
+        <button id="bWrite">write for real</button>
+        <span class="count" id="wbBacklog"></span>
+      </div>
+      <div id="writeback" style="margin-top:8px" class="muted">
+        Pushes <b>accepted</b> proposals into the SharePoint column. Dry run first
+        &mdash; it reports exactly what would change without writing. An item whose
+        column already holds a different value is reported as a conflict and left
+        alone; it is never overwritten.
+      </div>
+    </fieldset>
+
+    <fieldset>
       <legend>Consensus</legend>
       <div class="row">
         <button id="bReconcile">run reconciliation</button>
@@ -320,7 +335,54 @@ async function boot() {
   $("#bLoadProps").onclick = loadProposals;
   await loadProposals();
 
+  $("#bDryRun").onclick = () => runWriteback(true);
+  $("#bWrite").onclick = () => {
+    // The one irreversible action on this page. SharePoint has no undo for it,
+    // so it does not happen on a single stray click.
+    if (confirm("This writes to the real SharePoint library. Run the dry run "
+                + "first and read it.\n\nProceed?")) runWriteback(false);
+  };
+  await loadBacklog();
+
   await load();
+}
+
+async function loadBacklog() {
+  try {
+    const b = await api("/api/graph/writeback/backlog");
+    $("#wbBacklog").textContent =
+      `${b.writable_now} ready · ${b.blocked_until_synced} waiting on a sync`;
+  } catch (e) { $("#wbBacklog").textContent = ""; }
+}
+
+const WB_CLASS = { written: "yes", would_write: "yes", already_correct: "muted",
+                   conflict: "bad", failed: "bad", missing: "bad", not_synced: "muted" };
+
+async function runWriteback(dry) {
+  $("#writeback").innerHTML = `<span class="muted">${dry ? "checking" : "writing"}…</span>`;
+  const r = await fetch(`/api/graph/writeback?dry_run=${dry}`, { method: "POST" });
+  const body = await r.json();
+
+  if (!r.ok) {
+    // 503 not configured, 409 setup problem, 403 not a curator — all of these
+    // carry an instruction, so show it rather than just the status code.
+    $("#writeback").innerHTML = `<span class="bad">${esc(body.detail || r.status)}</span>`;
+    return;
+  }
+
+  const counts = Object.entries(body.counts || {})
+    .map(([k, v]) => `${v} ${k.replace(/_/g, " ")}`).join(" · ") || "nothing to do";
+  $("#writeback").innerHTML =
+    `<div class="row"><b>${dry ? "Dry run" : "Written"}</b>
+       <span class="tag">${esc(counts)}</span></div>`
+    + (body.items || []).map(i => `<div class="cap" style="margin-top:6px">
+        <div class="row" style="justify-content:space-between">
+          <b>${esc(i.asset_title || i.asset_id)}</b>
+          <span class="${WB_CLASS[i.outcome] || "muted"}">${esc(i.outcome)}</span></div>
+        <div class="muted" style="font-size:11px;margin-top:3px">${esc(i.detail || "")}</div>
+      </div>`).join("");
+
+  await Promise.all([loadProposals(), loadBacklog()]);
 }
 
 async function loadProposals() {

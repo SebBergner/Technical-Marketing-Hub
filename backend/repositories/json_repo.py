@@ -400,6 +400,56 @@ class JsonAssetRepository(AssetRepository):
             self._save("proposals", stored)
             return MetadataProposal.model_validate(row)
 
+    def mark_proposal_written(self, asset_id: str, field: str) -> MetadataProposal | None:
+        with self._lock:
+            stored = self._load("proposals")
+            key = self._key(asset_id, field)
+            row = stored.get(key)
+            if row is None:
+                return None
+            # decided_by is deliberately left alone: it names who authorised the
+            # value, which is not who ran the job that pushed it.
+            row["state"] = ProposalState.WRITTEN.value
+            row["written_at"] = utcnow().isoformat(timespec="seconds")
+            stored[key] = row
+            self._save("proposals", stored)
+            return MetadataProposal.model_validate(row)
+
+    def record_metadata_edit(self, asset_id: str, field: str, old_value: str | None,
+                             new_value: str | None, changed_by: str,
+                             write_status: str = "written",
+                             error: str | None = None) -> None:
+        """Append one JSON line, same reasoning as the share log: an append
+        cannot lose earlier entries the way a rewritten array can."""
+        path = os.path.join(self.owned_dir, "metadata_edits.jsonl")
+        os.makedirs(self.owned_dir, exist_ok=True)
+        entry = {
+            "asset_id": asset_id, "field": field,
+            "old_value": old_value, "new_value": new_value,
+            "changed_by": changed_by, "write_status": write_status, "error": error,
+            "changed_at": utcnow().isoformat(timespec="seconds"),
+        }
+        with self._lock, open(path, "a", encoding="utf-8", newline="\n") as fh:
+            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    def metadata_edits(self, asset_id: str | None = None) -> list[dict]:
+        path = os.path.join(self.owned_dir, "metadata_edits.jsonl")
+        if not os.path.exists(path):
+            return []
+        rows = []
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue      # a torn final line loses one entry, not the log
+                if asset_id is None or entry.get("asset_id") == asset_id:
+                    rows.append(entry)
+        return rows
+
     def proposal_summary(self) -> ProposalSummary:
         rows = list(self._load("proposals").values())
         return ProposalSummary(

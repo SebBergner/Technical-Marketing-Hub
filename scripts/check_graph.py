@@ -13,6 +13,7 @@ Usage, from the repo root:
     python scripts/check_graph.py --drives       # also list document libraries
     python scripts/check_graph.py --sample 10    # also inspect top-level folders
     python scripts/check_graph.py --columns      # dump the real column names
+    python scripts/check_graph.py --writeback    # can write-back run? (still read-only)
 """
 from __future__ import annotations
 
@@ -26,7 +27,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 from backend.config import settings                                    # noqa: E402
-from backend.integrations.graph.client import GraphError, get_graph_client   # noqa: E402
+from backend.integrations.graph.client import (                        # noqa: E402
+    GraphError, GraphFieldUnknown, get_graph_client,
+)
+from backend.integrations.graph.writeback import (                     # noqa: E402
+    WRITABLE_FIELDS, resolve_column,
+)
 
 RULE = "─" * 76
 
@@ -67,6 +73,8 @@ def main() -> int:
                         help="inspect the first N top-level folders")
     parser.add_argument("--columns", action="store_true",
                         help="dump the real column internal names (fixes the mapping)")
+    parser.add_argument("--writeback", action="store_true",
+                        help="check write-back readiness — still writes nothing")
     args = parser.parse_args()
 
     if not show_config():
@@ -109,7 +117,7 @@ def main() -> int:
     site_id = site["site_id"]
 
     # ------------------------------------------------------------- drives
-    if args.drives or args.sample or args.columns:
+    if args.drives or args.sample or args.columns or args.writeback:
         head("DOCUMENT LIBRARIES")
         try:
             drives = client.list_drives(site_id)
@@ -125,6 +133,37 @@ def main() -> int:
             print(f"\n  '{settings.graph_list_name}' not found. "
                   f"Set GRAPH_LIST_NAME to one of the names above.")
             return 1
+
+        # ------------------------------------------------------- writeback
+        if args.writeback:
+            head("WRITE-BACK READINESS  (nothing is written by this check)")
+            roles = (result.get("permissions") or {}).get("roles") or []
+            if roles and "write" not in roles:
+                print(f"  grant        roles={roles} — READ-ONLY. Write-back will fail;")
+                print( "               ask IT to raise the per-site grant to 'write'.")
+            elif roles:
+                print(f"  grant        roles={roles}  ok")
+            else:
+                print( "  grant        could not be listed (needs Sites.FullControl.All)")
+                print( "               — inconclusive, not necessarily a problem")
+
+            ready = True
+            for portal_field in WRITABLE_FIELDS:
+                try:
+                    column = resolve_column(client, target.drive_id, portal_field)
+                    print(f"  {portal_field:<12} column {column!r} exists  ok")
+                except GraphFieldUnknown as exc:
+                    ready = False
+                    print(f"  {portal_field:<12} MISSING — {exc}")
+
+            print("\n  Then, in this order:")
+            print("      POST /api/graph/sync                    (real item ids)")
+            print("      POST /api/curation/propose              (generate)")
+            print("      ...review and accept in /debug...")
+            print("      POST /api/graph/writeback               (dry run — read it)")
+            print("      POST /api/graph/writeback?dry_run=false (writes)")
+            if not ready:
+                print("\n  Create the missing column(s) in SharePoint first.")
 
         # ---------------------------------------------------------- sample
         if args.sample or args.columns:

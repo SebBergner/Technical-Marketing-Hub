@@ -8,12 +8,12 @@ Backs the human half of the enrichment loop:
                     human accepts / rejects
                           |
                           v
-                 written back to SharePoint  [needs Graph write]
+                 written back to SharePoint
 
 No proposal is ever applied to an asset by this module. SharePoint stays the
 system of record, so an accepted proposal queues as `pending_writeback` until
-Graph write access exists and a job pushes it to the column — after which it
-returns through normal sync.
+`POST /api/graph/writeback` pushes it to the column — after which it returns
+through normal sync. See `backend/integrations/graph/writeback.py`.
 """
 from __future__ import annotations
 
@@ -105,9 +105,12 @@ def decide(
 ):
     """Accept or reject one proposal. Requires the curator role.
 
-    Accepting does NOT modify the asset. SharePoint owns the value, so the
-    decision is recorded and queued; the Portal would otherwise hold a value
-    that the next sync silently overwrites.
+    Accepting does NOT modify the asset, and does not write to SharePoint
+    either. SharePoint owns the value, so the decision is only recorded and
+    queued; the Portal would otherwise hold a value that the next sync silently
+    overwrites. `POST /api/graph/writeback` is the separate, explicit step that
+    pushes it — and it re-checks the value before doing so, because acceptance
+    and write-back can be days apart.
     """
     if decision not in {"accept", "reject"}:
         raise HTTPException(status_code=422, detail="decision must be accept or reject")

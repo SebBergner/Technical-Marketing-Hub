@@ -23,7 +23,7 @@ from backend.models import (
 from backend.repositories.base import AssetQuery, AssetRepository
 from backend.tables import (
     AssetCuration, AssetIdentity, AssetSource, AssetStatsRow, AssetValueRoadmap,
-    MetadataProposal as ProposalRow, ShareEvent, SyncState, utcnow,
+    MetadataEdit, MetadataProposal as ProposalRow, ShareEvent, SyncState, utcnow,
 )
 
 _JSON_LIST_FIELDS = ("products", "value_drivers")
@@ -290,6 +290,7 @@ class SqlAssetRepository(AssetRepository):
             proposed_value=row.proposed_value, confidence=row.confidence,
             origin=row.origin, state=row.state,
             decided_by=row.decided_by, decided_at=row.decided_at,
+            written_at=row.written_at,
         )
 
     def save_proposals(self, proposals: list[MetadataProposal]) -> int:
@@ -347,6 +348,42 @@ class SqlAssetRepository(AssetRepository):
         self.s.commit()
         src = self.s.get(AssetSource, asset_id)
         return self._proposal_out(row, src.title if src else None)
+
+    def mark_proposal_written(self, asset_id: str, field: str) -> MetadataProposal | None:
+        row = self.s.get(ProposalRow, (asset_id, field))
+        if row is None:
+            return None
+        # decided_by is deliberately left alone: it names who authorised the
+        # value, which is not who ran the job that pushed it.
+        row.state = ProposalState.WRITTEN.value
+        row.written_at = utcnow()
+        self.s.add(row)
+        self.s.commit()
+        src = self.s.get(AssetSource, asset_id)
+        return self._proposal_out(row, src.title if src else None)
+
+    def record_metadata_edit(self, asset_id: str, field: str, old_value: str | None,
+                             new_value: str | None, changed_by: str,
+                             write_status: str = "written",
+                             error: str | None = None) -> None:
+        self.s.add(MetadataEdit(
+            asset_id=asset_id, field=field, old_value=old_value, new_value=new_value,
+            changed_by=changed_by, write_status=write_status, error=error,
+            written_to_source_at=utcnow() if write_status == "written" else None,
+        ))
+        self.s.commit()
+
+    def metadata_edits(self, asset_id: str | None = None) -> list[dict]:
+        stmt = select(MetadataEdit).order_by(MetadataEdit.changed_at)
+        if asset_id:
+            stmt = stmt.where(MetadataEdit.asset_id == asset_id)
+        return [{
+            "asset_id": r.asset_id, "field": r.field,
+            "old_value": r.old_value, "new_value": r.new_value,
+            "changed_by": r.changed_by, "write_status": r.write_status,
+            "error": r.error,
+            "changed_at": r.changed_at.isoformat(timespec="seconds") if r.changed_at else None,
+        } for r in self.s.execute(stmt).scalars()]
 
     def proposal_summary(self) -> ProposalSummary:
         rows = self.s.execute(select(ProposalRow)).scalars().all()

@@ -197,6 +197,9 @@ class MetadataProposal(Base):
     state: Mapped[str] = mapped_column(String(20), default="pending")
     decided_by: Mapped[str | None] = mapped_column(String(200))
     decided_at: Mapped[datetime | None] = mapped_column(DateTime)
+    #: Set when write-back pushed the accepted value to SharePoint. Separate
+    #: from decided_at: acceptance and write-back can be days apart.
+    written_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class MetadataEdit(Base):

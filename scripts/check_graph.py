@@ -96,6 +96,10 @@ def main() -> int:
         print(f"\n  {result.get('diagnosis')}")
         return 1
 
+    granted = result.get("granted_permissions")
+    if granted is not None:
+        print(f"  app perms    {granted if granted else 'NONE — no permission has been consented'}")
+
     site = result.get("site", {})
     if not site.get("ok"):
         print(f"  site         FAILED — {site.get('error')}")

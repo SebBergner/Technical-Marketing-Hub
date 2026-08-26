@@ -26,6 +26,9 @@ both are handled here so callers never have to think about them.
 """
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 import logging
 import time
 from dataclasses import dataclass, field
@@ -157,6 +160,26 @@ class GraphClient:
                 f"{result.get('error_description', 'no token returned')}")
         return result["access_token"]
 
+    def granted_roles(self) -> list[str]:
+        """Application permissions actually present in our own token.
+
+        Read straight off the `roles` claim. No signature check — this is not
+        authentication, it is introspection of a token we just acquired.
+
+        Worth the trouble because an app with NO consented permission still
+        receives a perfectly valid token, and every Graph call then fails with
+        401. That looks like a bad secret and is not; the empty roles claim is
+        the only thing that says so plainly. Measured on the real tenant
+        2026-08-26, where it was exactly this.
+        """
+        try:
+            payload = self._token().split(".")[1]
+            payload += "=" * (-len(payload) % 4)
+            claims = json.loads(base64.urlsafe_b64decode(payload))
+        except (GraphError, ValueError, IndexError, binascii.Error):
+            return []
+        return list(claims.get("roles") or [])
+
     # -------------------------------------------------------------- plumbing
     def _request(self, method: str, url: str, **kwargs) -> Any:
         """One Graph call, with throttling and transient-failure retries.
@@ -256,6 +279,23 @@ class GraphClient:
             result["token"] = {"ok": False, "error": str(exc)}
             result["diagnosis"] = ("Could not get a token. Check tenant id, client id "
                                    "and secret — this is step 0, before any permission.")
+            return result
+
+        # Check what the token actually carries before making a call whose
+        # failure we would otherwise misread. An app with no consented
+        # permission gets a valid token and a 401 on everything, which is
+        # indistinguishable from a bad site URL from the outside.
+        roles = self.granted_roles()
+        result["granted_permissions"] = roles
+        if not roles:
+            result["site"] = {"ok": False, "error": "not attempted"}
+            result["diagnosis"] = (
+                "The token is valid but carries NO application permissions — its "
+                "'roles' claim is empty. The app registration exists, but step 1 of "
+                "the Sites.Selected grant was never done. Ask IT to add the "
+                "Sites.Selected APPLICATION permission under API permissions > "
+                "Microsoft Graph, then click 'Grant admin consent'. Step 2, the "
+                "per-site grant, is still needed after that.")
             return result
 
         try:

@@ -10,6 +10,7 @@ Payload shapes follow the Graph v1.0 reference for driveItem and listItem.
 """
 from __future__ import annotations
 
+import base64
 import json
 
 import httpx
@@ -25,11 +26,24 @@ SITE_ID = "ptccloud.sharepoint.com,guid-1,guid-2"
 DRIVE_ID = "drive-abc"
 
 
-def client_for(handler) -> GraphClient:
+def fake_token(roles=("Sites.Selected",)) -> str:
+    """A JWT-shaped token carrying a roles claim.
+
+    Shaped like the real thing because the client reads `roles` off it to tell
+    "no permission consented" apart from "wrong site URL" — the two look
+    identical from outside, and a shapeless token would skip that path.
+    """
+    def seg(obj):
+        raw = base64.urlsafe_b64encode(json.dumps(obj).encode()).decode()
+        return raw.rstrip("=")
+    return f'{seg({"alg": "RS256"})}.{seg({"aud": "https://graph.microsoft.com", "roles": list(roles)})}.sig'
+
+
+def client_for(handler, roles=("Sites.Selected",)) -> GraphClient:
     return GraphClient(
         tenant_id="t", client_id="c", client_secret="s", site_url=SITE_URL,
         transport=httpx.MockTransport(handler),
-        token_provider=lambda: "fake-token",
+        token_provider=lambda: fake_token(roles),
     )
 
 
@@ -68,7 +82,7 @@ def test_bearer_token_is_attached():
         return httpx.Response(200, json={"id": SITE_ID, "displayName": "TDD"})
 
     client_for(handler).resolve_site()
-    assert seen["auth"] == "Bearer fake-token"
+    assert seen["auth"] == f"Bearer {fake_token()}"
 
 
 def test_401_is_reported_as_an_auth_problem():
@@ -100,6 +114,27 @@ def test_verify_access_separates_bad_credentials_from_missing_grant():
     assert result["token"]["ok"] is False
     assert "tenant id" in result["diagnosis"]
     assert "site" not in result, "must not continue past a token failure"
+
+
+def test_verify_access_names_the_missing_consent_when_the_token_has_no_roles():
+    """Measured on the real tenant 2026-08-26: IT created the app and issued a
+    secret, but never added the Sites.Selected permission. The token is valid
+    and every call 401s, which reads as a bad secret. Only the empty roles
+    claim says otherwise, so the check must not blame the site URL."""
+    result = client_for(lambda r: httpx.Response(401, json={}), roles=()).verify_access()
+
+    assert result["token"]["ok"] is True
+    assert result["granted_permissions"] == []
+    assert "NO application permissions" in result["diagnosis"]
+    assert "Grant admin consent" in result["diagnosis"]
+    assert result["site"]["error"] == "not attempted",         "no point calling the site — it cannot succeed"
+
+
+def test_granted_roles_survives_a_token_it_cannot_parse():
+    """Never let introspection break a run; an unreadable token just reports
+    nothing rather than raising."""
+    client = GraphClient("t", "c", "s", token_provider=lambda: "not-a-jwt")
+    assert client.granted_roles() == []
 
 
 def test_verify_access_diagnoses_a_forbidden_site():

@@ -30,6 +30,7 @@ consequences follow, and neither is hypothetical:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
 from collections import Counter
@@ -43,11 +44,18 @@ from backend.models import (
 from backend.repositories.base import AssetQuery, AssetRepository
 from backend.tables import utcnow
 
+log = logging.getLogger(__name__)
+
+#: Lowest precedence when two sources claim one asset id. The spreadsheet seed
+#: is a stand-in for SharePoint until Graph access exists, so real data always
+#: beats it -- see _dedupe_by_id.
+_FALLBACK_SOURCE = "seed"
+
 _MIRROR_FIELDS = (
     "id", "type", "title", "description", "products", "funnel_stage", "content_depth",
     "language", "segment", "industry", "value_drivers", "customer_facing",
     "has_narrated_audio", "named_customer", "uploaded_at", "duration_seconds",
-    "thumbnail_url", "source_item_id", "brightcove_id", "consensus_uuid",
+    "thumbnail_url", "web_url", "source_item_id", "brightcove_id", "consensus_uuid",
     "resources", "resource_counts", "resource_count", "video_count", "main_video",
 )
 
@@ -82,6 +90,41 @@ def _as_date(value: Any) -> date | None:
     return None
 
 
+def _dedupe_by_id(tagged: list[tuple[str, dict]]) -> list[dict]:
+    """One asset id must appear once, whatever the mirror holds.
+
+    Sources are separate files, so nothing stops two of them describing the
+    same asset -- and identity resolution deliberately gives them the SAME
+    slug, because they are the same thing. The result is a catalogue that
+    lists it twice: doubled facet counts, and get() returning whichever row it
+    reaches first. Seen on the first real Graph sync, 2026-08-26, when the
+    spreadsheet seed and the live sync both stayed: 907 rows for 455 assets.
+
+    The sync now retires the seed, so this should not trigger. It is kept
+    because emitting a duplicate id is never a correct answer, and a future
+    source could reintroduce the collision. Real data always beats the seed,
+    and anything unexpected is logged rather than silently resolved.
+    """
+    seen: dict[str, tuple[str, dict]] = {}
+    collisions = 0
+    for source, record in tagged:
+        key = record.get("id")
+        current = seen.get(key)
+        if current is None:
+            seen[key] = (source, record)
+            continue
+        collisions += 1
+        # Real data beats the stand-in; anything else keeps what it had.
+        if current[0] == _FALLBACK_SOURCE and source != _FALLBACK_SOURCE:
+            seen[key] = (source, record)
+    if collisions:
+        log.warning(
+            "mirror holds %d duplicate asset id(s); the catalogue is showing one row "
+            "each. Two sources are describing the same assets -- run a Graph sync, "
+            "which retires the spreadsheet seed.", collisions)
+    return [record for _, record in seen.values()]
+
+
 class JsonAssetRepository(AssetRepository):
     #: Guards read-modify-write within the process. See the module docstring on
     #: why this is not sufficient across processes.
@@ -113,7 +156,7 @@ class JsonAssetRepository(AssetRepository):
         look identical, so a sync could serve stale rows. Writers therefore
         invalidate explicitly via `_invalidate`.
         """
-        records: list[dict] = []
+        tagged: list[tuple[str, dict]] = []
         if os.path.isdir(self.mirror_dir):
             for name in sorted(os.listdir(self.mirror_dir)):
                 if not name.endswith(".json"):
@@ -124,11 +167,15 @@ class JsonAssetRepository(AssetRepository):
                 if cached is None or cached[0] != stamp:
                     cached = (stamp, _read(path, []))
                     self._mirror_cache[path] = cached
-                records.extend(cached[1])
+                # The filename IS the source system, which is what lets a
+                # collision be resolved rather than merely detected.
+                source = name[:-len(".json")]
+                tagged.extend((source, record) for record in cached[1])
         identity = self._load("identity")
         # Retired items keep their identity row but leave the catalogue.
-        return [r for r in records
+        live = [(src, r) for src, r in tagged
                 if not (identity.get(r["id"], {}) or {}).get("retired_at")]
+        return _dedupe_by_id(live)
 
     def _load(self, name: str) -> dict[str, dict]:
         return _read(self._owned_path(name), {})
@@ -281,11 +328,15 @@ class JsonAssetRepository(AssetRepository):
                 records.append({k: payload[k] for k in _MIRROR_FIELDS if k in payload})
                 seen.add(asset.id)
 
-                row = identity.setdefault(asset.id, {
-                    "source_system": source_system,
-                    "source_item_id": asset.source_item_id or asset.id,
-                    "first_seen_at": now,
-                })
+                row = identity.setdefault(asset.id, {"first_seen_at": now})
+                # source_system means "who provides this NOW", not "who first
+                # saw it". setdefault alone left assets that moved between
+                # sources -- seed -> sharepoint -- still labelled with the old
+                # one, so retiring that source retired assets it no longer
+                # owned. 288 of 455 vanished from the catalogue this way on
+                # 2026-08-26. first_seen_at is what must never move.
+                row["source_system"] = source_system
+                row["source_item_id"] = asset.source_item_id or asset.id
                 row["retired_at"] = None
 
             # Items this source no longer provides are retired, never deleted —
@@ -335,6 +386,10 @@ class JsonAssetRepository(AssetRepository):
                  "shared_by": shared_by, "created_at": utcnow().isoformat(timespec="seconds")}
         with self._lock, open(path, "a", encoding="utf-8", newline="\n") as fh:
             fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    def count_source_rows(self, source_system: str) -> int:
+        """How many mirror rows one source currently contributes."""
+        return len(_read(os.path.join(self.mirror_dir, f"{source_system}.json"), []))
 
     # ------------------------------------------------------------ sync state
     def get_sync_token(self, source_system: str) -> str | None:

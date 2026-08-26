@@ -223,6 +223,11 @@ class SqlAssetRepository(AssetRepository):
                     source_item_id=asset.source_item_id or asset.id,
                 )
                 self.s.add(identity)
+            # Keep ownership current: source_system means "who provides this
+            # now". Leaving it at whoever created the row makes an asset that
+            # moved between sources look like it still belongs to the old one.
+            identity.source_system = source_system
+            identity.source_item_id = asset.source_item_id or asset.id
             identity.retired_at = None
             seen.add(asset.id)
 
@@ -271,6 +276,12 @@ class SqlAssetRepository(AssetRepository):
         return len(seen)
 
     # ------------------------------------------------------------ sync state
+    def count_source_rows(self, source_system: str) -> int:
+        """How many mirror rows one source currently contributes."""
+        return int(self.s.execute(
+            select(func.count()).select_from(AssetSource)
+            .where(AssetSource.source_system == source_system)).scalar() or 0)
+
     def get_sync_token(self, source_system: str) -> str | None:
         row = self.s.get(SyncState, source_system)
         return row.delta_token if row else None

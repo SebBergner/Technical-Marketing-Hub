@@ -68,13 +68,25 @@ def clean_text(value) -> str | None:
 def parse_lookup(value) -> list[str]:
     """SharePoint serialises lookup columns as `30;#Creo Parametric`.
 
-    Graph returns the same column as a list of dicts, so both shapes are
-    accepted here rather than in two places.
+    Graph returns the same column as a list of dicts, and the key depends on
+    the column TYPE, which is not visible from the value alone:
+
+        lookup            {"LookupValue": "Creo Parametric", "LookupId": 30}
+        managed metadata  {"Label": "Creo Parametric", "TermGuid": "0f90..."}
+
+    Measured on the live tenant 2026-08-26: Product is managed metadata, so
+    reading only LookupValue yielded the raw dict and produced garbage
+    products on every one of the 455 assets.
     """
     if not value:
         return []
     if isinstance(value, list):
-        raw = [v.get("LookupValue", v) if isinstance(v, dict) else v for v in value]
+        raw = []
+        for v in value:
+            if isinstance(v, dict):
+                raw.append(v.get("LookupValue") or v.get("Label") or v.get("Title") or "")
+            else:
+                raw.append(v)
     else:
         raw = re.findall(r"\d+;#([^;]+)", str(value)) or [str(value)]
     out: list[str] = []
@@ -95,6 +107,18 @@ def parse_segment(value) -> tuple[str | None, list[str]]:
         parts = [p.strip() for p in re.split(r";#|,", str(value))]
     parts = [p for p in parts if p]
     return (parts[0] if parts else None), parts
+
+
+def parse_url(value) -> str | None:
+    """A SharePoint hyperlink column is a dict, not a string.
+
+    Graph returns `{"Url": "https://...", "Description": "/sites/..."}`, so
+    passing it straight to clean_text yields a stringified dict. Measured on
+    the live tenant 2026-08-26 against Preview Image URL.
+    """
+    if isinstance(value, dict):
+        value = value.get("Url") or value.get("url") or ""
+    return clean_text(value)
 
 
 def parse_language(value) -> str:

@@ -30,15 +30,28 @@ SOURCE_SYSTEM = "sharepoint"
 #: Column display names as they appear in the Demo Catalog. Graph returns
 #: fields under internal names, which differ — resolved by `_field`.
 COLUMNS = {
-    "demo_type": ("DemoType", "Demo_x0020_Type", "Demo Type"),
+    # NOTE: the library also has a `Demo_x0020_Type0` twin with the same display
+    # name. Do NOT add it. Measured 2026-08-26: the two disagree on 11 assets,
+    # and the twin is the stale one — it calls 11 folders whose own names end in
+    # "VDK" a Live Demo Kit. First match wins, so order matters here.
+    "demo_type": ("Demo_x0020_Type", "DemoType", "Demo Type"),
     "segment": ("Segment",),
     "language": ("Language", "Language0"),
     "product": ("Product", "Product0"),
     "product_version": ("ProductVersion", "Product_x0020_Version"),
-    "description": ("Description", "Description0"),
+    # DocumentSetDescription first: it is the field the library actually uses
+    # (426/455 populated) while `Description` is read-only and thinner (369),
+    # and `_ExtendedDescription` carries HTML entities (`&#58;` for a colon).
+    "description": ("DocumentSetDescription", "Description", "_ExtendedDescription"),
     "owner": ("OwnedBy", "Owned_x0020_By"),
     "consensus_uuid": ("ConsensusUUID", "Consensus_x0020_UUID", "ConsensusDemoUUID"),
     "brightcove_id": ("BrightcoveID", "Brightcove_x0020_ID"),
+    # Measured 2026-08-26: populated on 167 folders, and ZERO of them are
+    # assets — they are CAD model folders (Cryogenic Tank, Deadbolt Lock) that
+    # share the library. So this yields nothing today. Kept because the mapping
+    # is correct and costs nothing; demo assets simply have no thumbnail in
+    # SharePoint, which is why thumbnail_url is null across the catalogue.
+    "thumbnail_url": ("Preview_x0020_Image_x0020_URL", "Icon_x0020_URL"),
 }
 
 
@@ -65,6 +78,8 @@ class SyncResult:
     orphan_files: int = 0
     delta_token: str | None = None
     full_resync: bool = False
+    #: Spreadsheet-seed rows dropped because real data now supersedes them.
+    retired_seed: int = 0
     errors: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
@@ -73,6 +88,7 @@ class SyncResult:
             "skipped_no_demo_type": self.skipped_no_demo_type,
             "orphan_files": self.orphan_files,
             "full_resync": self.full_resync,
+            "retired_seed": self.retired_seed,
             "has_delta_token": bool(self.delta_token),
             "errors": self.errors,
         }
@@ -123,6 +139,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
             content_depth=m.content_depth(name),
             consensus_uuid=m.clean_text(_field(fields, "consensus_uuid")),
             brightcove_id=m.clean_text(_field(fields, "brightcove_id")),
+            thumbnail_url=m.parse_url(_field(fields, "thumbnail_url")),
             uploaded_at=m.as_date(item.get("lastModifiedDateTime")),
             web_url=item.get("webUrl"),
             source_item_id=item.get("id"),
@@ -191,7 +208,33 @@ def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
     result.full_resync = full
 
     repo.replace_source_rows(assets, source_system=SOURCE_SYSTEM)
+    result.retired_seed = _retire_seed(repo)
     return result
+
+
+def _retire_seed(repo) -> int:
+    """Drop the spreadsheet seed once real Graph data has landed.
+
+    The seed and this sync are the SAME source measured two ways -- the xlsx
+    export was only ever a stand-in until Graph access existed. The mirror is
+    partitioned by source system, so without this the two coexist and every
+    asset appears twice, under one shared id: 452 + 455 = 907 rows for 455
+    assets, with doubled facet counts and get() returning whichever it hits
+    first. Measured on the first real sync, 2026-08-26.
+
+    Only the runtime mirror is cleared. data/seed/assets.json is untouched, so
+    a fresh clone with no credentials still seeds and runs.
+    """
+    from backend.seed import SEED_SOURCE
+
+    if SEED_SOURCE == SOURCE_SYSTEM:
+        return 0
+    existing = getattr(repo, "count_source_rows", None)
+    before = existing(SEED_SOURCE) if existing else 0
+    repo.replace_source_rows([], source_system=SEED_SOURCE)
+    if before:
+        log.info("graph sync: retired %d seed rows -- real data supersedes them", before)
+    return before
 
 
 def _with_fields(client: GraphClient, drive: DriveRef, items: list[dict]) -> list[dict]:

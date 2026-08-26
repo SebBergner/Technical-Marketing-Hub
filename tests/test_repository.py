@@ -303,3 +303,109 @@ def test_the_edit_log_is_append_only(repo):
         repo.record_metadata_edit("a1", "consensus_uuid", None, f"uuid-{n}",
                                   changed_by="elio@ptc.com")
     assert len(repo.metadata_edits("a1")) == 3
+
+
+# ──────────────────────────────────────────── one asset, one row, one id
+def test_no_asset_id_appears_twice_across_source_systems(repo):
+    """The invariant the first real Graph sync broke.
+
+    The seed and the Graph sync are the same SharePoint library measured two
+    ways, and the mirror partitions by source system -- so both survived and
+    every asset appeared twice under one shared id. 452 + 455 = 907 rows for
+    455 assets: doubled facet counts, and get() returning whichever it reached
+    first.
+    """
+    from backend.models import Asset, AssetType
+
+    same = [Asset(id="a1", type=AssetType.LDK, title="A Kit",
+                  source_item_id="sites/x/A Kit")]
+    repo.replace_source_rows(same, "seed")
+    repo.replace_source_rows(
+        [Asset(id="a1", type=AssetType.LDK, title="A Kit", source_item_id="01GRAPHID")],
+        "sharepoint")
+
+    ids = [a.id for a in repo.list(AssetQuery(limit=500)).items]
+    assert len(ids) == len(set(ids)), f"duplicate asset ids in the catalogue: {ids}"
+
+
+def test_count_source_rows_reports_each_source_separately(repo):
+    from backend.models import Asset, AssetType
+
+    repo.replace_source_rows(
+        [Asset(id=f"s{n}", type=AssetType.LDK, title=f"S{n}") for n in range(3)], "seed")
+    repo.replace_source_rows(
+        [Asset(id=f"g{n}", type=AssetType.VDK, title=f"G{n}") for n in range(5)],
+        "sharepoint")
+
+    assert repo.count_source_rows("seed") == 3
+    assert repo.count_source_rows("sharepoint") == 5
+    assert repo.count_source_rows("nothing-here") == 0
+
+
+def test_replacing_a_source_with_nothing_empties_only_that_source(repo):
+    """How the seed is retired: it must not touch the other source."""
+    from backend.models import Asset, AssetType
+
+    repo.replace_source_rows([Asset(id="s1", type=AssetType.LDK, title="S")], "seed")
+    repo.replace_source_rows([Asset(id="g1", type=AssetType.VDK, title="G")], "sharepoint")
+
+    repo.replace_source_rows([], "seed")
+
+    assert repo.count_source_rows("seed") == 0
+    assert repo.count_source_rows("sharepoint") == 1
+    assert [a.id for a in repo.list(AssetQuery(limit=10)).items] == ["g1"]
+
+
+def test_an_asset_that_moves_between_sources_is_not_retired_with_the_old_one(repo):
+    """The bug that deleted 288 of 455 assets on the first real Graph sync.
+
+    Identity recorded whoever created the row, and creation used setdefault --
+    so an asset first seen in the spreadsheet seed and later provided by the
+    Graph sync was still labelled "seed". Retiring the seed then retired an
+    asset the seed no longer owned, and it silently left the catalogue.
+    """
+    from backend.models import Asset, AssetType
+
+    repo.replace_source_rows(
+        [Asset(id="a1", type=AssetType.LDK, title="A Kit",
+               source_item_id="sites/x/A Kit")], "seed")
+    # The same asset, now coming from Graph with a real item id.
+    repo.replace_source_rows(
+        [Asset(id="a1", type=AssetType.LDK, title="A Kit",
+               source_item_id="01GRAPHID")], "sharepoint")
+
+    repo.replace_source_rows([], "seed")        # retire the stand-in
+
+    surviving = [a.id for a in repo.list(AssetQuery(limit=10)).items]
+    assert surviving == ["a1"], "the asset is still provided by sharepoint"
+    assert repo.get("a1") is not None
+
+
+def test_the_stable_slug_survives_the_move(repo):
+    """Identity exists so a link shared in March still resolves in December.
+    Changing source must not change the slug."""
+    from backend.models import Asset, AssetType
+
+    repo.replace_source_rows(
+        [Asset(id="a1", type=AssetType.LDK, title="A Kit", source_item_id="old/path")],
+        "seed")
+    repo.replace_source_rows(
+        [Asset(id="a1", type=AssetType.LDK, title="A Kit", source_item_id="01NEWID")],
+        "sharepoint")
+
+    assert repo.get("a1").title == "A Kit"
+
+
+def test_web_url_survives_a_round_trip(repo):
+    """It is the only way a user opens the asset in SharePoint. It was missing
+    from the JSON backend's field list, so it silently vanished on every sync
+    while the SQL backend kept it -- exactly the drift the shared test suite
+    exists to catch."""
+    from backend.models import Asset, AssetType
+
+    repo.replace_source_rows([Asset(
+        id="a1", type=AssetType.LDK, title="A Kit",
+        web_url="https://ptccloud.sharepoint.com/sites/EXT-TDD/Demo%20Catalog/A%20Kit",
+    )], "sharepoint")
+
+    assert repo.get("a1").web_url.endswith("/A%20Kit")

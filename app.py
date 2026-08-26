@@ -7,7 +7,9 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.config import settings
 from backend.db import SessionLocal, create_all
-from backend.routers import assets, consensus, curation, debug, graph, taxonomy
+from backend.routers import (
+    assets, auth, consensus, curation, debug, graph, taxonomy,
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -19,7 +21,10 @@ async def lifespan(app: FastAPI):
     Seeding only happens when the catalogue is empty, so it never overwrites
     real data once Graph sync is populating it.
     """
+    from backend.auth import log_security_warnings
     from backend.deps import build_repo
+
+    log_security_warnings()
     from backend.repositories.base import AssetQuery
     from backend.seed import load_seed
 
@@ -42,6 +47,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(auth.router)
 app.include_router(assets.router)
 app.include_router(taxonomy.router)
 app.include_router(consensus.router)

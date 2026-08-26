@@ -20,7 +20,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from backend.deps import CurrentUser, get_current_user, get_repo
+from backend.deps import CurrentUser, get_repo, require_curator
 from backend.integrations.consensus import (
     ConsensusClient, ConsensusError, get_consensus_client,
 )
@@ -61,6 +61,7 @@ def propose(
     threshold: float = Query(default=0.72, ge=0.0, le=1.0),
     repo: AssetRepository = Depends(get_repo),
     client: ConsensusClient = Depends(get_client),
+    user: CurrentUser = Depends(require_curator),
 ):
     """Regenerate proposals from the integrations.
 
@@ -100,9 +101,9 @@ def decide(
     field: str,
     decision: str,
     repo: AssetRepository = Depends(get_repo),
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(require_curator),
 ):
-    """Accept or reject one proposal.
+    """Accept or reject one proposal. Requires the curator role.
 
     Accepting does NOT modify the asset. SharePoint owns the value, so the
     decision is recorded and queued; the Portal would otherwise hold a value

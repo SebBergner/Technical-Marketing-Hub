@@ -63,6 +63,18 @@ class Settings(BaseSettings):
     brightcove_client_id: str | None = None
     brightcove_client_secret: str | None = None
 
+    # --------------------------------------------------------------------- auth
+    #: "disabled" ignores the Easy Auth headers entirely — correct for local
+    #: development, and safe because a forged header must never grant access.
+    #: "easyauth" trusts them, and is only correct behind App Service
+    #: Authentication with "Require authentication" turned on.
+    auth_mode: str = "disabled"
+
+    #: Entra ID group object ids (or app role names) whose members may curate —
+    #: decide metadata proposals and trigger a sync. Comma-separated.
+    #: Empty means nobody, which fails closed rather than open.
+    auth_curator_groups: str = ""
+
     # ---------------------------------------------------------------- behaviour
     seed_path: str = os.path.join(BASE_DIR, "data", "seed", "assets.json")
     #: Keep the mockup's aspirational sidebar numbers instead of real counts.

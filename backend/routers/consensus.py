@@ -6,7 +6,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from backend.deps import CurrentUser, get_current_user, get_repo
+from backend.deps import CurrentUser, get_repo, require_authenticated
 from backend.integrations.consensus import (
     ConsensusClient, ConsensusError, ConsensusSchemaUnknown, ShareRecipient,
     get_consensus_client,
@@ -177,7 +177,7 @@ def share_to_consensus(
     body: ShareRequest,
     repo: AssetRepository = Depends(get_repo),
     client: ConsensusClient = Depends(get_client),
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(require_authenticated),
 ):
     """Generate a trackable DemoBoard link for an asset.
 

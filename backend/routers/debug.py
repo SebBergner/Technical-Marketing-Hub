@@ -9,6 +9,7 @@ import os
 
 from fastapi import APIRouter
 
+from backend.auth import AuthMode, security_warnings
 from backend.config import BASE_DIR, settings
 
 router = APIRouter(prefix="/api/debug", tags=["debug"])
@@ -37,4 +38,8 @@ def backend_info():
         "storage_is_durable": not os.path.abspath(data_dir).startswith(
             os.path.abspath(BASE_DIR)
         ),
+        "auth_mode": settings.auth_mode,
+        "auth_enforcing": settings.auth_mode == AuthMode.EASYAUTH.value,
+        #: Non-empty means access control is weaker than it looks.
+        "security_warnings": security_warnings(),
     }

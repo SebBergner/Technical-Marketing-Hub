@@ -1,9 +1,7 @@
 """FastAPI dependencies."""
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-from fastapi import Depends, Header
+from fastapi import Depends
 
 from backend.config import settings
 from backend.repositories.base import AssetRepository
@@ -28,36 +26,10 @@ def get_repo() -> AssetRepository:
     return build_repo()
 
 
-@dataclass
-class CurrentUser:
-    email: str | None
-    name: str | None
-    is_authenticated: bool
-
-    @property
-    def can_curate(self) -> bool:
-        """Placeholder. Becomes an Entra ID group check when roles are defined."""
-        return self.is_authenticated
-
-
-async def get_current_user(
-    x_ms_client_principal_name: str | None = Header(default=None),
-    x_ms_client_principal_id: str | None = Header(default=None),
-) -> CurrentUser:
-    """Stub, shaped for App Service Easy Auth.
-
-    Easy Auth injects `X-MS-CLIENT-PRINCIPAL-*` headers once Entra ID sign-in is
-    switched on, so enabling authentication becomes configuration rather than a
-    refactor — every endpoint already depends on this.
-
-    Until then it resolves to an anonymous user. Note the ordering constraint
-    from the architecture doc: this must be real *before* any SharePoint
-    write-back path ships.
-    """
-    if x_ms_client_principal_name:
-        return CurrentUser(
-            email=x_ms_client_principal_name,
-            name=x_ms_client_principal_name,
-            is_authenticated=True,
-        )
-    return CurrentUser(email=None, name=None, is_authenticated=False)
+# Identity lives in backend.auth so there is exactly one place that decides
+# whether a request is authenticated and what it may do. Re-exported here
+# because every router already imports its dependencies from this module.
+from backend.auth import (            # noqa: E402,F401
+    ANONYMOUS, CurrentUser, Role, get_current_user, require_authenticated,
+    require_curator, security_warnings,
+)

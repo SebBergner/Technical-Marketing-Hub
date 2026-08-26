@@ -35,7 +35,8 @@ backend/
   config.py                env-driven settings (see .env.example)
   models.py                Pydantic — the shape of data at the API edges
   tables.py                SQLAlchemy — storage, split mirror / Portal-owned
-  db.py  deps.py           engine, session, get_current_user stub
+  auth.py                  Easy Auth identity + viewer/curator roles
+  db.py  deps.py           engine, session, dependency wiring
   repositories/            AssetRepository interface + JSON and SQL implementations
   routers/                 REST endpoints
 data/seed/assets.json      452 assets imported from the real SharePoint Demo Catalog
@@ -84,7 +85,7 @@ the same parametrised tests, so switching is a config change.
 | SharePoint / Graph | **Client built and fully tested against mocks.** Waiting only on IT for credentials. |
 | Metadata proposals | Consensus UUID suggestions with human review at `/api/curation/*`. |
 | Consensus | Client, matching and reconciliation built. Running on the stub until credentials are set. |
-| Auth | Stub. Must be real before any SharePoint write path ships. |
+| Auth | App Service Easy Auth (Entra ID), with viewer / curator roles. Off locally by default. |
 
 ### Wiring up Consensus
 
@@ -121,6 +122,35 @@ test sends deliberately do not increment share counts.
 
 Engagement metrics are **not available** from `demo/search` or `demosDetails`.
 `view_count` stays null rather than being faked; it would need `trackDemoBoards`.
+
+### Turning on authentication
+
+Identity arrives as **HTTP headers** that App Service Easy Auth injects. Headers
+can be forged by anything able to reach the app without passing the auth gate,
+so they are trusted **only** when `AUTH_MODE=easyauth` is set explicitly. The
+default, `disabled`, ignores them outright — a forged header on a laptop grants
+nothing.
+
+The opposite mistake is the dangerous one: deploying and forgetting to set
+`AUTH_MODE`, which would make every caller a curator. `GET /api/auth/me` and
+`GET /api/debug/backend` both return a `warnings` list that says so, and it is
+logged at startup. **Check that list after any deploy.**
+
+In Azure, on the `Technical-Marketing-Hub` App Service:
+
+1. **Authentication** → Add identity provider → Microsoft → your Entra ID tenant.
+2. Set unauthenticated requests to **"Require authentication"** (HTTP 302). If
+   this is left on "Allow anonymous", the header trust becomes a bypass.
+3. Add app settings: `AUTH_MODE=easyauth` and `AUTH_CURATOR_GROUPS=<group id>`.
+4. To emit group claims, add the **groups** optional claim to the app
+   registration's token configuration — or define an app role named `curator`
+   and assign it, which needs no group ids.
+5. Confirm with `GET /api/auth/me`: `enforcing: true`, `warnings: []`.
+
+**Roles.** `viewer` (any signed-in user) can read and share externally.
+`curator` can additionally decide metadata proposals and trigger a sync — the
+actions that will write to SharePoint. Being signed in does not make you a
+curator; that fails closed on purpose.
 
 ### Wiring up SharePoint (Graph)
 

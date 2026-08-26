@@ -6,7 +6,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.config import settings
-from backend.deps import get_repo
+from backend.deps import CurrentUser, get_repo, require_authenticated, require_curator
 from backend.integrations.graph.client import (
     GraphClient, GraphError, GraphPermissionError, get_graph_client,
 )
@@ -41,7 +41,8 @@ def status():
 
 
 @router.get("/verify")
-def verify(client: GraphClient = Depends(require_client)):
+def verify(client: GraphClient = Depends(require_client),
+           user: CurrentUser = Depends(require_authenticated)):
     """Run this FIRST when IT delivers credentials.
 
     Separates "bad credentials" from "missing per-site grant". Those two fail
@@ -57,8 +58,9 @@ def verify(client: GraphClient = Depends(require_client)):
 
 @router.post("/sync")
 def sync(full: bool = False, repo: AssetRepository = Depends(get_repo),
-         client: GraphClient = Depends(require_client)):
-    """Pull the Demo Catalog and replace the mirror.
+         client: GraphClient = Depends(require_client),
+         user: CurrentUser = Depends(require_curator)):
+    """Pull the Demo Catalog and replace the mirror. Requires the curator role.
 
     Portal-owned data — stable slugs, curation, the Value Roadmap index,
     counters — is untouched.

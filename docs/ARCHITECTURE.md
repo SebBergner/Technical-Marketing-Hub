@@ -1,7 +1,7 @@
 # TDD Portal — Architecture
 
-Revision 4, 2026-08-14. Records what the SharePoint site actually contains (section 2a), which
-superseded two earlier premises. Storage is file-backed, not Azure SQL.
+Revision 5, 2026-08-20. Easy Auth with viewer/curator roles is in place ahead of any write
+path. Section 2a records what the SharePoint site actually contains.
 
 ---
 
@@ -155,6 +155,38 @@ under `owned/` **cannot be reconstructed from SharePoint**:
 Second constraint, documented rather than solved: writes assume **one instance**. `os.replace` makes
 each write atomic so a file is never left corrupt, but two processes doing read-modify-write can lose
 an update. Fine for a single instance; scale-out needs a real store.
+
+### Decision — authentication is App Service Easy Auth, with two roles
+
+*Implemented 2026-08-20, ahead of any write path, as section 1 requires.*
+
+Entra ID sign-in is handled by the platform; the app receives identity as
+`X-MS-CLIENT-PRINCIPAL-*` headers.
+
+**Those headers are only as trustworthy as the gate in front of them.** Anything
+that can reach the app without passing through Easy Auth can set them itself.
+That is not theoretical: it happens when Easy Auth is left on "allow
+unauthenticated", when a container port is exposed directly, or when a proxy in
+front forgets to strip inbound `X-MS-*`.
+
+So the headers are honoured **only** when `AUTH_MODE=easyauth` is set
+explicitly. The default ignores them, which means a forged header on an
+unconfigured machine grants nothing.
+
+The residual risk is the inverse — deploying to App Service and never setting
+`AUTH_MODE`, silently making every caller a curator. `security_warnings()`
+detects exactly that (App Service always sets `WEBSITE_SITE_NAME`) and it
+surfaces in `/api/auth/me`, `/api/debug/backend` and a startup log line. It is
+not allowed to be quiet.
+
+| Role | May |
+|---|---|
+| `viewer` | read the catalogue, share externally |
+| `curator` | additionally decide metadata proposals and trigger a Graph sync |
+
+Curator comes from an Entra ID group listed in `AUTH_CURATOR_GROUPS`, or an app
+role named `curator`. With neither configured **nobody** can curate — failing
+closed, so a half-finished setup cannot accidentally grant write access.
 
 ### Refinement 2 — SharePoint is the authority, not the query engine
 

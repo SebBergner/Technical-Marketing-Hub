@@ -595,3 +595,28 @@ def test_multi_word_search_ignores_word_order(empty_repo):
 
     assert [a.id for a in empty_repo.list(AssetQuery(text="overview creo")).items] \
         == ["para"]
+
+
+# ─────────────────────────────────── every source reports the same way
+def test_both_syncs_emit_the_identical_report_shape():
+    """They drifted once already: one said `assets`, the other `indexed`; one
+    said `skipped_no_demo_type`, the other `skipped_private`. Neither said
+    whether a number was a total or a change count, so "indexed 491" after a
+    Consensus sync was unreadable — 491 updated, or 491 in total?
+
+    This test is the thing that keeps them together.
+    """
+    from backend.integrations.consensus_sync import ConsensusSyncResult
+    from backend.integrations.graph.sync import SyncResult
+    from backend.integrations.sync_report import KEYS
+
+    graph = SyncResult(assets=455, skipped_no_demo_type=295).as_dict()
+    consensus = ConsensusSyncResult(demos_seen=637, indexed=491,
+                                    skipped_private=146).as_dict()
+
+    assert set(graph) == set(consensus) == set(KEYS)
+    assert graph["source"] == "sharepoint" and consensus["source"] == "consensus"
+    assert graph["indexed"] == 455 and consensus["indexed"] == 491
+    assert graph["examined"] == 750, "assets plus those rejected for no Demo Type"
+    assert consensus["examined"] == 637
+    assert graph["skipped_total"] == 295 and consensus["skipped_total"] == 146

@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
+from backend.integrations.sync_report import report
 from backend.integrations.graph.client import (
     DeltaTokenExpired, DriveRef, GraphClient, SiteRef,
 )
@@ -88,16 +89,25 @@ class SyncResult:
     errors: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
-        return {
-            "assets": self.assets, "resources": self.resources,
-            "skipped_no_demo_type": self.skipped_no_demo_type,
-            "orphan_files": self.orphan_files,
-            "full_resync": self.full_resync,
-            "unchanged": self.unchanged,
-            "retired_seed": self.retired_seed,
-            "has_delta_token": bool(self.delta_token),
-            "errors": self.errors,
-        }
+        return report(
+            SOURCE_SYSTEM,
+            unchanged=self.unchanged,
+            indexed=self.assets,
+            # Top-level folders considered: the ones that became assets plus the
+            # ones rejected for having no Demo Type. Reconciles with the library.
+            # Zero on an unchanged run, because nothing WAS examined — only
+            # `indexed` is a standing total.
+            examined=0 if self.unchanged else self.assets + self.skipped_no_demo_type,
+            skipped={"no_demo_type": self.skipped_no_demo_type},
+            details={
+                "resources": self.resources,
+                "orphan_files": self.orphan_files,
+                "full_resync": self.full_resync,
+                "retired_seed": self.retired_seed,
+                "has_delta_token": bool(self.delta_token),
+                "errors": self.errors,
+            },
+        )
 
 
 def _relative_path(item: dict, drive_root_marker: str = "/root:") -> str:
@@ -108,6 +118,25 @@ def _relative_path(item: dict, drive_root_marker: str = "/root:") -> str:
     return raw.strip("/")
 
 
+def _latest_per_item(items: list[dict]) -> list[dict]:
+    """One entry per item id, keeping the last — delta repeats things.
+
+    Measured on the live drive 2026-08-27: 10,481 entries contained 1,522
+    top-level folder rows for ~750 actual folders, and the drive root appeared
+    46 times. Assets survived it because they are keyed by name and files
+    happened to be distinct, but the COUNTERS were per-entry, so
+    skipped_no_demo_type read 849 for 295 folders. A number nobody can reconcile
+    with the library is worse than no number.
+
+    Last wins: within a delta the later entry is the more recent state.
+    """
+    latest: dict[str, dict] = {}
+    for item in items:
+        if item_id := item.get("id"):
+            latest[item_id] = item
+    return list(latest.values())
+
+
 def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
     """Partition drive items into assets and their resources.
 
@@ -115,6 +144,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
     page and attribution would otherwise depend on ordering.
     """
     result = SyncResult()
+    items = _latest_per_item(items)
     assets: dict[str, dict] = {}
     taken: set[str] = set()
 
@@ -124,6 +154,8 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
             continue
         if _relative_path(item):        # depth > 0, so it is internal structure
             continue
+        if (item.get("parentReference") or {}).get("path") is None:
+            continue                    # the drive root itself, not an asset
 
         name = m.clean_text(item.get("name"))
         fields = ((item.get("listItem") or {}).get("fields") or {})
@@ -205,8 +237,15 @@ def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
                 log.info("graph sync: no changes since the last run")
                 if stamp := getattr(repo, "record_sync", None):
                     stamp(SOURCE_SYSTEM)      # we did check; the check is news
-                return SyncResult(unchanged=True,
-                                  delta_token=page.delta_token or delta_token)
+                # `indexed` promises a TOTAL, so read it from the index rather
+                # than reporting the zero work this run did. Otherwise an
+                # unchanged run claims the catalogue is empty, which is the
+                # exact confusion the unified report exists to remove.
+                counter = getattr(repo, "count_source_rows", None)
+                return SyncResult(
+                    unchanged=True,
+                    assets=counter(SOURCE_SYSTEM) if counter else 0,
+                    delta_token=page.delta_token or delta_token)
         except DeltaTokenExpired:
             log.warning("graph delta token expired — full resync")
             full = True

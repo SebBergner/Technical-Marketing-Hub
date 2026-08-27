@@ -440,3 +440,31 @@ def test_a_real_sync_is_not_marked_unchanged():
     assets, result = build_assets([folder("A Kit")])
     assert result.unchanged is False
     assert result.assets == 1
+
+
+def test_an_unchanged_run_still_reports_the_standing_total():
+    """`indexed` promises "how many are in the index now", so an unchanged run
+    must read it from the index. Reporting the zero work it did made the
+    catalogue look empty — the very confusion the unified report removes."""
+    class Repo:
+        def count_source_rows(self, source): return 455
+        def record_sync(self, source, fingerprint=None): pass
+        def replace_source_rows(self, assets, source_system):
+            raise AssertionError("an unchanged delta must not rewrite the mirror")
+
+    def handler(request):
+        path = request.url.path
+        if ":/sites/" in path:
+            return httpx.Response(200, json={"id": SITE_ID, "webUrl": SITE_URL})
+        if path.endswith("/drives"):
+            return httpx.Response(200, json={
+                "value": [{"id": DRIVE_ID, "name": "Demo Catalog"}]})
+        return httpx.Response(200, json={
+            "value": [], "@odata.deltaLink": "https://x/delta?token=fresh"})
+
+    body = sync_catalogue(client_for(handler), Repo(), drive_name="Demo Catalog",
+                          delta_token="previous").as_dict()
+
+    assert body["unchanged"] is True
+    assert body["indexed"] == 455, "a total, read from the index"
+    assert body["examined"] == 0, "nothing was examined, and that is honest"

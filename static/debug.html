@@ -436,19 +436,28 @@ async function runSync(which, label) {
     $("#syncOut").innerHTML = `<span class="bad">${esc(body.detail || r.status)}</span>`;
     return;
   }
-  if (body.unchanged) {
-    // A row of zeros here means "delta found nothing to do", which looks
-    // exactly like "enumerated the library and found no assets". Say which.
-    $("#syncOut").innerHTML = `<b>${esc(label)}</b> &mdash; `
-      + `<span class="yes">no changes since the last sync</span>. Nothing was `
-      + `re-read, and the index is untouched. Tick <b>full re-read</b> to pull `
-      + `everything regardless.`;
-  } else {
-    $("#syncOut").innerHTML = `<b>${esc(label)} synced</b><div class="cap">`
-      + Object.entries(body).filter(([, v]) => typeof v !== "object")
-          .map(([k, v]) => `<span class="tag">${esc(k)} ${esc(String(v))}</span>`).join(" ")
-      + "</div>";
-  }
+  const skipped = Object.entries(body.skipped || {})
+    .filter(([, n]) => n)
+    .map(([why, n]) => `${n} ${esc(why.replace(/_/g, " "))}`).join(", ");
+  const details = Object.entries(body.details || {})
+    .filter(([, v]) => v !== null && v !== "" && !(Array.isArray(v) && !v.length))
+    .map(([k, v]) => `<span class="tag">${esc(k.replace(/_/g, " "))} ${esc(String(v))}</span>`)
+    .join(" ");
+
+  // "indexed" is a TOTAL, not a delta -- that ambiguity is what made the old
+  // report unreadable -- so the wording says so outright.
+  $("#syncOut").innerHTML = `
+    <div class="row" style="justify-content:space-between">
+      <b>${esc(label)}</b>
+      ${body.unchanged
+        ? '<span class="yes">nothing changed</span>'
+        : '<span class="warn">updated</span>'}
+    </div>
+    <div style="margin-top:4px"><b>${body.indexed}</b> now in the index
+      <span class="muted">&mdash; a total, not a change count</span></div>
+    <div class="muted" style="font-size:11px;margin-top:2px">
+      looked at ${body.examined} upstream${skipped ? `, skipped ${skipped}` : ""}</div>
+    <div class="cap" style="margin-top:6px">${details}</div>`;
   await Promise.all([loadSources(), load(), loadBacklog()]);
 }
 

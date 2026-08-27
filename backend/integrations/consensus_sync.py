@@ -38,11 +38,14 @@ structured field at 100% coverage, better than SharePoint's own.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import re
 from dataclasses import dataclass, field
 
 from backend.integrations.consensus import ConsensusClient, ConsensusDemo
+from backend.integrations.sync_report import report
 from backend.models import Asset, AssetType
 from backend.services import taxonomy
 
@@ -65,17 +68,27 @@ class ConsensusSyncResult:
     skipped_private: int = 0
     with_segment: int = 0
     with_product: int = 0
+    #: True when this pull produced byte-identical content to the last one.
+    #: Consensus has no delta API, so it always re-reads everything -- without
+    #: this the report is the same numbers every time and cannot be told apart
+    #: from "nothing happened".
+    unchanged: bool = False
     errors: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
-        return {
-            "demos_seen": self.demos_seen,
-            "indexed": self.indexed,
-            "skipped_private": self.skipped_private,
-            "with_segment": self.with_segment,
-            "with_product": self.with_product,
-            "errors": self.errors,
-        }
+        return report(
+            SOURCE_SYSTEM,
+            unchanged=self.unchanged,
+            indexed=self.indexed,
+            examined=self.demos_seen,
+            skipped={"not_public": self.skipped_private},
+            details={
+                "with_segment": self.with_segment,
+                "with_product": self.with_product,
+                "no_convention": self.indexed - self.with_segment,
+                "errors": self.errors,
+            },
+        )
 
 
 def parse_internal_title(internal_title: str | None) -> dict:
@@ -169,6 +182,20 @@ def _description(demo: ConsensusDemo) -> str | None:
     return None if text.lower() == (demo.title or "").strip().lower() else text
 
 
+def fingerprint(assets: list[Asset]) -> str:
+    """A stable digest of everything this sync would store.
+
+    Consensus offers no delta, so the only way to answer "did anything actually
+    change?" is to compare the result with the last one. Without it the report
+    shows identical numbers on every run and a reader cannot tell a no-op from
+    a full refresh — which is exactly the confusion the numbers are meant to
+    remove.
+    """
+    payload = json.dumps([a.model_dump(mode="json") for a in assets],
+                         sort_keys=True, default=str)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
 def sync_demos(client: ConsensusClient, repo, limit: int = 2000) -> ConsensusSyncResult:
     """Pull public Consensus demos and replace that source's mirror.
 
@@ -178,8 +205,15 @@ def sync_demos(client: ConsensusClient, repo, limit: int = 2000) -> ConsensusSyn
     """
     demos = client.list_demos(limit=limit)
     assets, result = build_assets(demos)
+
+    digest = fingerprint(assets)
+    previous = (getattr(repo, "sync_state", lambda _: {})(SOURCE_SYSTEM) or {})
+    result.unchanged = bool(previous.get("fingerprint"))         and previous["fingerprint"] == digest
+
+    # Still written even when unchanged: the mirror is cheap to rewrite, and
+    # skipping it would leave a gap if the mirror had been cleared by hand.
     repo.replace_source_rows(assets, source_system=SOURCE_SYSTEM)
     if stamp := getattr(repo, "record_sync", None):
-        stamp(SOURCE_SYSTEM)
+        stamp(SOURCE_SYSTEM, digest)
     log.info("consensus sync: %s", result.as_dict())
     return result

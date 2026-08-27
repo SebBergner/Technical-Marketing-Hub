@@ -328,10 +328,16 @@ class SqlAssetRepository(AssetRepository):
         self.s.add(row)
         self.s.commit()
 
-    def record_sync(self, source_system: str) -> None:
-        """Stamp a successful sync for a source with no delta cursor."""
+    def record_sync(self, source_system: str, fingerprint: str | None = None) -> None:
+        """Stamp a successful sync for a source with no delta cursor.
+
+        The fingerprint rides in the delta_token column: for a source without a
+        delta API it serves the same purpose — "have we already seen this?".
+        """
         row = self.s.get(SyncState, source_system) or SyncState(source_system=source_system)
         row.last_success_at = utcnow()
+        if fingerprint is not None:
+            row.delta_token = fingerprint
         self.s.add(row)
         self.s.commit()
 
@@ -339,7 +345,7 @@ class SqlAssetRepository(AssetRepository):
         row = self.s.get(SyncState, source_system)
         if row is None:
             return {}
-        return {"delta_token": row.delta_token,
+        return {"delta_token": row.delta_token, "fingerprint": row.delta_token,
                 "last_success_at": row.last_success_at.isoformat(timespec="seconds")
                                    if row.last_success_at else None}
 

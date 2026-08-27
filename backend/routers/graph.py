@@ -31,13 +31,21 @@ def require_client() -> GraphClient:
 
 
 @router.get("/status")
-def status():
-    """Cheap, credential-free: is Graph wired up at all?"""
+def status(repo: AssetRepository = Depends(get_repo)):
+    """Cheap, credential-free: is Graph wired up, and how old is the mirror?
+
+    `last_sync` matters because nothing refreshes it automatically yet -- the
+    catalogue can be arbitrarily stale and look perfectly healthy.
+    """
+    state = getattr(repo, "sync_state", None)
     return {
         "configured": settings.graph_configured,
         "site_url": settings.graph_site_url,
         "library": settings.graph_list_name,
         "source_system": SOURCE_SYSTEM,
+        "indexed": repo.count_source_rows(SOURCE_SYSTEM)
+                   if hasattr(repo, "count_source_rows") else None,
+        "last_sync": (state(SOURCE_SYSTEM) or {}).get("last_success_at") if state else None,
     }
 
 

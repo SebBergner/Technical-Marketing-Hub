@@ -179,5 +179,7 @@ def sync_demos(client: ConsensusClient, repo, limit: int = 2000) -> ConsensusSyn
     demos = client.list_demos(limit=limit)
     assets, result = build_assets(demos)
     repo.replace_source_rows(assets, source_system=SOURCE_SYSTEM)
+    if stamp := getattr(repo, "record_sync", None):
+        stamp(SOURCE_SYSTEM)
     log.info("consensus sync: %s", result.as_dict())
     return result

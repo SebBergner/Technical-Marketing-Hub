@@ -425,6 +425,22 @@ class JsonAssetRepository(AssetRepository):
             row["last_success_at"] = utcnow().isoformat(timespec="seconds")
             self._save("sync_state", state)
 
+    def record_sync(self, source_system: str) -> None:
+        """Stamp a successful sync for a source with no delta cursor.
+
+        Consensus has no delta, so it never called set_sync_token and its
+        freshness was simply unknown. Nothing refreshes the mirror
+        automatically, so "when was this last pulled" is the one question a
+        stale catalogue cannot answer about itself.
+        """
+        with self._lock:
+            state = self._load("sync_state")
+            state.setdefault(source_system, {})["last_success_at"] =                 utcnow().isoformat(timespec="seconds")
+            self._save("sync_state", state)
+
+    def sync_state(self, source_system: str) -> dict:
+        return self._load("sync_state").get(source_system) or {}
+
     # ---------------------------------------------------- metadata proposals
     @staticmethod
     def _key(asset_id: str, field: str) -> str:

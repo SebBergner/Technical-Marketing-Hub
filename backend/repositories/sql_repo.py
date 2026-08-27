@@ -328,6 +328,21 @@ class SqlAssetRepository(AssetRepository):
         self.s.add(row)
         self.s.commit()
 
+    def record_sync(self, source_system: str) -> None:
+        """Stamp a successful sync for a source with no delta cursor."""
+        row = self.s.get(SyncState, source_system) or SyncState(source_system=source_system)
+        row.last_success_at = utcnow()
+        self.s.add(row)
+        self.s.commit()
+
+    def sync_state(self, source_system: str) -> dict:
+        row = self.s.get(SyncState, source_system)
+        if row is None:
+            return {}
+        return {"delta_token": row.delta_token,
+                "last_success_at": row.last_success_at.isoformat(timespec="seconds")
+                                   if row.last_success_at else None}
+
     # ---------------------------------------------------- metadata proposals
     @staticmethod
     def _proposal_out(row: ProposalRow, title: str | None = None) -> MetadataProposal:

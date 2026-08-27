@@ -133,6 +133,19 @@
     </fieldset>
 
     <fieldset>
+      <legend>Sources</legend>
+      <div id="sources" class="muted">…</div>
+      <div class="row" style="margin-top:8px">
+        <button id="bSyncGraph">sync SharePoint</button>
+        <button id="bSyncConsensus">sync Consensus</button>
+      </div>
+      <div id="syncOut" style="margin-top:8px" class="muted">
+        Nothing refreshes the mirror on its own yet &mdash; the catalogue is a
+        snapshot from the last sync, and searching never calls either API.
+      </div>
+    </fieldset>
+
+    <fieldset>
       <legend>Metadata proposals</legend>
       <div class="row">
         <button id="bPropose">generate proposals</button>
@@ -367,6 +380,10 @@ async function boot() {
   $("#bLoadProps").onclick = loadProposals;
   await loadProposals();
 
+  await loadSources();
+  $("#bSyncGraph").onclick = () => runSync("graph", "SharePoint");
+  $("#bSyncConsensus").onclick = () => runSync("consensus", "Consensus");
+
   $("#bDryRun").onclick = () => runWriteback(true);
   $("#bWrite").onclick = () => {
     // The one irreversible action on this page. SharePoint has no undo for it,
@@ -377,6 +394,49 @@ async function boot() {
   await loadBacklog();
 
   await load();
+}
+
+function ago(stamp) {
+  if (!stamp) return '<span class="bad">never synced</span>';
+  const mins = Math.round((Date.now() - new Date(stamp + "Z")) / 60000);
+  const text = mins < 1 ? "just now"
+             : mins < 60 ? `${mins}m ago`
+             : mins < 1440 ? `${Math.round(mins / 60)}h ago`
+             : `${Math.round(mins / 1440)}d ago`;
+  // Staleness is the failure mode here, so it is called out rather than shown
+  // as a neutral timestamp.
+  return mins > 1440 ? `<span class="warn">${text}</span>` : text;
+}
+
+async function loadSources() {
+  const [g, c] = await Promise.all([
+    api("/api/graph/status"), api("/api/consensus/status"),
+  ]);
+  const line = (name, colour, st, extra) => `
+    <div class="row" style="justify-content:space-between;margin-bottom:3px">
+      <span><span class="tag" style="color:${colour};border:1px solid ${colour}">${name}</span>
+        ${st.indexed ?? 0} indexed</span>
+      <span class="muted">${st.configured ? ago(st.last_sync) : `<span class="bad">${extra}</span>`}</span>
+    </div>`;
+  $("#sources").innerHTML =
+      line("SharePoint", "var(--sharepoint)", g, "no credentials")
+    + line("Consensus", "var(--consensus)", c, "stub mode");
+}
+
+async function runSync(which, label) {
+  $("#syncOut").innerHTML = `<span class="muted">syncing ${esc(label)}… `
+                          + `this calls the live API and may take a while</span>`;
+  const r = await fetch(`/api/${which}/sync`, { method: "POST" });
+  const body = await r.json();
+  if (!r.ok) {
+    $("#syncOut").innerHTML = `<span class="bad">${esc(body.detail || r.status)}</span>`;
+    return;
+  }
+  $("#syncOut").innerHTML = `<b>${esc(label)} synced</b><div class="cap">`
+    + Object.entries(body).filter(([, v]) => typeof v !== "object")
+        .map(([k, v]) => `<span class="tag">${esc(k)} ${esc(String(v))}</span>`).join(" ")
+    + "</div>";
+  await Promise.all([loadSources(), load(), loadBacklog()]);
 }
 
 async function loadBacklog() {

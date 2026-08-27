@@ -90,6 +90,35 @@ the same parametrised tests, so switching is a config change.
 | Consensus | Client, matching and reconciliation built. Running on the stub until credentials are set. |
 | Auth | App Service Easy Auth (Entra ID), with viewer / curator roles. Off locally by default. |
 
+### Keeping the index fresh
+
+**Nothing syncs automatically.** There is no scheduler, so the catalogue is a
+snapshot from whenever someone last pulled — and searching never calls either
+API, it reads `mirror/*.json` in memory (~19 ms). That is deliberate: it means
+Consensus being down cannot take the Portal with it. It also means the data can
+be arbitrarily stale and look perfectly healthy, so both status endpoints report
+`last_sync`, and `/debug` shows it in red when a source has never been pulled
+and amber past a day.
+
+Two buttons on `/debug`, or:
+
+```bash
+curl -X POST localhost:8000/api/graph/sync
+curl -X POST localhost:8000/api/consensus/sync
+```
+
+Each replaces **only its own** source's mirror, wholesale. Portal-owned data is
+never touched. Before production this needs an Azure timer; the two sources
+want different frequencies, because SharePoint has a delta token that makes an
+unchanged check nearly free while Consensus re-pulls all 637 demos every time.
+
+**The seed only loads when neither source is configured.** It is a 452-asset
+xlsx snapshot that exists so a fresh clone runs without credentials. It used to
+load whenever the catalogue was empty, which meant deleting `data/runtime`
+silently resurrected stale data — and cost two real bugs when it coexisted with
+a live sync. With credentials set you get an empty catalogue and a startup line
+telling you to sync, which is more honest than a stale full one.
+
 ### Search
 
 One index over every platform. `GET /api/assets` filters and ranks SharePoint

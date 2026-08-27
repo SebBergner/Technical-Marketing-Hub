@@ -209,6 +209,8 @@ def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
 
     repo.replace_source_rows(assets, source_system=SOURCE_SYSTEM)
     result.retired_seed = _retire_seed(repo)
+    if stamp := getattr(repo, "record_sync", None):
+        stamp(SOURCE_SYSTEM)
     return result
 
 

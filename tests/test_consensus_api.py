@@ -81,7 +81,17 @@ def override(fake):
 # ─────────────────────────────────────────────────────────────────── status
 def test_status_reports_stub_mode(client):
     body = client.get("/api/consensus/status").json()
-    assert body == {"configured": False, "mode": "stub"}
+    assert body["configured"] is False and body["mode"] == "stub"
+
+
+def test_status_reports_how_stale_the_index_is(client):
+    """Nothing refreshes the mirror automatically, so "when was this last
+    pulled" is the one question a stale catalogue cannot answer about itself.
+    Never synced reads as null rather than being absent."""
+    body = client.get("/api/consensus/status").json()
+    assert body["source_system"] == "consensus"
+    assert body["indexed"] == 0
+    assert body["last_sync"] is None
 
 
 def test_probe_works_without_credentials(client):
@@ -241,3 +251,15 @@ def test_test_sends_are_not_recorded_as_real_distribution(client):
 
     assert response.json()["is_test"] is True
     assert after == before, "a test send must not inflate real share counts"
+
+
+def test_the_sync_endpoint_is_where_the_ui_expects_it(client):
+    """It was registered at /api/sync for a while, because this router carries
+    a bare /api prefix and every other route spells out /consensus/ itself. The
+    debug page's button 404'd and nothing in the suite noticed."""
+    response = client.post("/api/consensus/sync")
+
+    assert response.status_code != 404, "the route must exist at this path"
+    # 503 on the stub is the correct answer: reachable, but no credentials.
+    assert response.status_code == 503
+    assert "CONSENSUS_API_KEY" in response.json()["detail"]

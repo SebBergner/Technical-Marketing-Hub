@@ -95,10 +95,17 @@ def _match_out(match) -> MatchOut:
 
 # ------------------------------------------------------------------ status
 @router.get("/consensus/status")
-def status(client: ConsensusClient = Depends(get_client)):
-    """Is the real client active, or are we still on the stub?"""
+def status(client: ConsensusClient = Depends(get_client),
+           repo: AssetRepository = Depends(get_repo)):
+    """Is the real client active, and how old is the indexed copy?"""
+    state = getattr(repo, "sync_state", None)
     return {"configured": client.is_configured(),
-            "mode": "http" if client.is_configured() else "stub"}
+            "mode": "http" if client.is_configured() else "stub",
+            "source_system": SOURCE_SYSTEM,
+            "indexed": repo.count_source_rows(SOURCE_SYSTEM)
+                       if hasattr(repo, "count_source_rows") else None,
+            "last_sync": (state(SOURCE_SYSTEM) or {}).get("last_success_at")
+                         if state else None}
 
 
 @router.get("/consensus/probe")
@@ -239,7 +246,7 @@ def share_to_consensus(
     )
 
 
-@router.post("/sync")
+@router.post("/consensus/sync")
 def sync(repo: AssetRepository = Depends(get_repo),
          client: ConsensusClient = Depends(get_client),
          user: CurrentUser = Depends(require_curator)):

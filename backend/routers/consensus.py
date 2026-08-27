@@ -7,6 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from backend.deps import CurrentUser, get_repo, require_authenticated, require_curator
+from backend.integrations.consensus_oauth import (
+    ConsensusOAuth, ConsensusOAuthError, NotAuthorised, get_oauth,
+)
 from backend.integrations.consensus_sync import SOURCE_SYSTEM, sync_demos
 from backend.integrations.consensus import (
     ConsensusClient, ConsensusError, ConsensusSchemaUnknown, ShareRecipient,
@@ -273,3 +276,95 @@ def sync(repo: AssetRepository = Depends(get_repo),
 
     log.info("consensus sync by %s: %s", user.email, result.as_dict())
     return {"source_system": SOURCE_SYSTEM, **result.as_dict()}
+
+
+# ─────────────────────────────────────────────────── Consensus V2 (OAuth 2.0)
+def require_oauth() -> ConsensusOAuth:
+    oauth = get_oauth()
+    if not oauth.configured:
+        raise HTTPException(
+            status_code=503,
+            detail=("Consensus V2 OAuth is not configured. Create a credential "
+                    "set under Integrations > Access Credentials in Consensus, "
+                    "then set CONSENSUS_OAUTH_CLIENT_ID and "
+                    "CONSENSUS_OAUTH_CLIENT_SECRET."))
+    return oauth
+
+
+@router.get("/consensus/oauth/status")
+def oauth_status(oauth: ConsensusOAuth = Depends(get_oauth)):
+    """Is V2 usable? Credential-free, and returns no token values."""
+    return oauth.status()
+
+
+@router.get("/consensus/oauth/start")
+def oauth_start(oauth: ConsensusOAuth = Depends(require_oauth),
+                user: CurrentUser = Depends(require_curator)):
+    """Begin authorisation. Open the returned URL in a browser.
+
+    Requires curator: the resulting token acts on behalf of whoever signs in,
+    and grants this application read access to their Consensus library.
+
+    Returns the URL rather than redirecting, so it is usable from curl and from
+    a fetch() — a 302 to a third-party consent screen is not something an
+    XHR can follow.
+    """
+    url, state = oauth.authorization_url()
+    log.info("consensus oauth: %s started an authorisation", user.email)
+    return {
+        "authorize_url": url,
+        "state": state,
+        "next": ("Open authorize_url in a browser and sign in with the account "
+                 "the sync should run as — a shared or service account, not a "
+                 "personal one, because the integration stops working if that "
+                 "person's access changes."),
+    }
+
+
+@router.get("/consensus/oauth/callback")
+def oauth_callback(code: str | None = None, state: str | None = None,
+                   error: str | None = None, error_description: str | None = None,
+                   oauth: ConsensusOAuth = Depends(require_oauth)):
+    """Where Consensus sends the browser back. Not called directly.
+
+    Deliberately unauthenticated: this is a redirect arriving from a third
+    party, which carries no session. The `state` check is what secures it —
+    it must match one this server issued, and it is single-use.
+    """
+    if error:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Consensus refused the authorisation: {error} "
+                   f"{error_description or ''}".strip())
+    if not code or not state:
+        raise HTTPException(
+            status_code=400,
+            detail=("This endpoint is the OAuth redirect target and expects "
+                    "`code` and `state`. To begin, call "
+                    "GET /api/consensus/oauth/start."))
+
+    try:
+        oauth.exchange(code, state)
+    except ConsensusOAuthError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    status = oauth.status()
+    log.info("consensus oauth: authorised, token valid for %ss",
+             status.get("access_token_expires_in"))
+    return {
+        "authorised": True,
+        "detail": ("Consensus V2 is now authorised. The refresh token is stored "
+                   "under owned/ and the app will renew itself from here."),
+        "status": status,
+    }
+
+
+@router.post("/consensus/oauth/revoke")
+def oauth_revoke(oauth: ConsensusOAuth = Depends(require_oauth),
+                 user: CurrentUser = Depends(require_curator)):
+    """Forget the stored tokens. Re-authorising needs a browser again."""
+    oauth.store.clear()
+    log.info("consensus oauth: %s cleared the stored tokens", user.email)
+    return {"authorised": False,
+            "detail": "Stored tokens cleared. Re-authorise at "
+                      "/api/consensus/oauth/start."}

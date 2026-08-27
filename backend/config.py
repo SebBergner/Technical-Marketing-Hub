@@ -58,6 +58,18 @@ class Settings(BaseSettings):
     #: the viewer host is a config change rather than a code change.
     consensus_viewer_url_template: str = "https://play.goconsensus.com/{hash}"
 
+    # ---- Consensus V2 (OAuth 2.0). A SEPARATE credential from the V1 pair
+    # above: V1 sends api_key/api_secret in the request body, V2 wants a
+    # Bearer JWT minted through Authorization Code + PKCE. Both are needed,
+    # because V2 is read-only and sharing still lives on V1.
+    consensus_oauth_client_id: str | None = None
+    consensus_oauth_client_secret: str | None = None
+    #: Must match the Callback URL registered in Consensus, character for
+    #: character — OAuth compares it exactly, not by host.
+    consensus_oauth_redirect_uri: str =         "http://localhost:8000/api/consensus/oauth/callback"
+    #: read:write is deliberately absent. V2 is used only for reading.
+    consensus_oauth_scopes: str = "public:api:read read:read"
+
     # ---------------------------------------------------------------- Brightcove
     brightcove_account_id: str | None = None
     brightcove_client_id: str | None = None
@@ -85,6 +97,13 @@ class Settings(BaseSettings):
     @property
     def graph_configured(self) -> bool:
         return all((self.graph_tenant_id, self.graph_client_id, self.graph_client_secret))
+
+    @property
+    def consensus_v2_configured(self) -> bool:
+        """Whether the OAuth client exists. Says nothing about whether anyone
+        has authorised yet — that is a stored refresh token, not config."""
+        return bool(self.consensus_oauth_client_id
+                    and self.consensus_oauth_client_secret)
 
     @property
     def consensus_configured(self) -> bool:

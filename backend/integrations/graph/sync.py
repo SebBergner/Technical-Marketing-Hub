@@ -78,6 +78,11 @@ class SyncResult:
     orphan_files: int = 0
     delta_token: str | None = None
     full_resync: bool = False
+    #: True when delta reported nothing changed, so the run did no work. Without
+    #: this the result is a row of zeros, indistinguishable from "enumerated the
+    #: library and found no assets" — which would be a serious fault. One means
+    #: everything is fine, the other means everything is broken.
+    unchanged: bool = False
     #: Spreadsheet-seed rows dropped because real data now supersedes them.
     retired_seed: int = 0
     errors: list[str] = field(default_factory=list)
@@ -88,6 +93,7 @@ class SyncResult:
             "skipped_no_demo_type": self.skipped_no_demo_type,
             "orphan_files": self.orphan_files,
             "full_resync": self.full_resync,
+            "unchanged": self.unchanged,
             "retired_seed": self.retired_seed,
             "has_delta_token": bool(self.delta_token),
             "errors": self.errors,
@@ -196,8 +202,11 @@ def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
         try:
             page = client.delta(drive.drive_id, delta_token)
             if not page.items:
-                log.info("graph sync: no changes")
-                return SyncResult(delta_token=page.delta_token or delta_token)
+                log.info("graph sync: no changes since the last run")
+                if stamp := getattr(repo, "record_sync", None):
+                    stamp(SOURCE_SYSTEM)      # we did check; the check is news
+                return SyncResult(unchanged=True,
+                                  delta_token=page.delta_token or delta_token)
         except DeltaTokenExpired:
             log.warning("graph delta token expired — full resync")
             full = True

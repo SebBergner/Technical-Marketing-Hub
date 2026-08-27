@@ -19,7 +19,7 @@ import pytest
 from backend.integrations.graph.client import (
     DeltaTokenExpired, GraphAuthError, GraphClient, GraphError, GraphPermissionError,
 )
-from backend.integrations.graph.sync import build_assets
+from backend.integrations.graph.sync import build_assets, sync_catalogue
 
 SITE_URL = "https://ptccloud.sharepoint.com/sites/EXT-TDD"
 SITE_ID = "ptccloud.sharepoint.com,guid-1,guid-2"
@@ -396,3 +396,47 @@ def test_deleted_items_are_ignored():
                               "parentReference": {"path": f"/drives/{DRIVE_ID}/root:"}}]
     assets, _ = build_assets(items)
     assert len(assets) == 1
+
+
+# ─────────────────────────── "nothing changed" vs "nothing found"
+def test_an_unchanged_delta_says_so_rather_than_reporting_zeros():
+    """Reported by Liwei from the live tenant: a second SharePoint sync showed
+    assets 0, resources 0, orphan_files 0 — which reads as a broken run. It was
+    the opposite: delta found nothing to do and the index was already correct.
+
+    A row of zeros cannot distinguish "no work needed" from "enumerated the
+    library and found no assets", and those are opposite situations.
+    """
+    class Repo:
+        stamped = []
+        def replace_source_rows(self, assets, source_system):
+            raise AssertionError("an unchanged delta must not rewrite the mirror")
+        def record_sync(self, source): self.stamped.append(source)
+
+    def handler(request):
+        path = request.url.path
+        if ":/sites/" in path:
+            return httpx.Response(200, json={"id": SITE_ID, "webUrl": SITE_URL})
+        if path.endswith("/drives"):
+            return httpx.Response(200, json={
+                "value": [{"id": DRIVE_ID, "name": "Demo Catalog"}]})
+        # A delta with a token and no items: nothing has changed upstream.
+        return httpx.Response(200, json={
+            "value": [], "@odata.deltaLink": "https://x/delta?token=fresh"})
+
+    repo = Repo()
+    result = sync_catalogue(client_for(handler), repo,
+                            drive_name="Demo Catalog", delta_token="previous")
+
+    assert result.unchanged is True
+    assert result.as_dict()["unchanged"] is True
+    assert result.assets == 0, "no work was done, and that is the point"
+    assert result.delta_token == "fresh", "the cursor still moves forward"
+    assert repo.stamped == ["sharepoint"], \
+        "we did check upstream, so freshness must advance even with no changes"
+
+
+def test_a_real_sync_is_not_marked_unchanged():
+    assets, result = build_assets([folder("A Kit")])
+    assert result.unchanged is False
+    assert result.assets == 1

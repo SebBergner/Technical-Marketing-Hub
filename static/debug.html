@@ -138,6 +138,9 @@
       <div class="row" style="margin-top:8px">
         <button id="bSyncGraph">sync SharePoint</button>
         <button id="bSyncConsensus">sync Consensus</button>
+        <label style="display:flex;gap:4px;align-items:center;margin:0">
+          <input type="checkbox" id="fFull" style="width:auto">
+          <span>full re-read</span></label>
       </div>
       <div id="syncOut" style="margin-top:8px" class="muted">
         Nothing refreshes the mirror on its own yet &mdash; the catalogue is a
@@ -426,16 +429,26 @@ async function loadSources() {
 async function runSync(which, label) {
   $("#syncOut").innerHTML = `<span class="muted">syncing ${esc(label)}… `
                           + `this calls the live API and may take a while</span>`;
-  const r = await fetch(`/api/${which}/sync`, { method: "POST" });
+  const full = $("#fFull").checked ? "?full=true" : "";
+  const r = await fetch(`/api/${which}/sync${full}`, { method: "POST" });
   const body = await r.json();
   if (!r.ok) {
     $("#syncOut").innerHTML = `<span class="bad">${esc(body.detail || r.status)}</span>`;
     return;
   }
-  $("#syncOut").innerHTML = `<b>${esc(label)} synced</b><div class="cap">`
-    + Object.entries(body).filter(([, v]) => typeof v !== "object")
-        .map(([k, v]) => `<span class="tag">${esc(k)} ${esc(String(v))}</span>`).join(" ")
-    + "</div>";
+  if (body.unchanged) {
+    // A row of zeros here means "delta found nothing to do", which looks
+    // exactly like "enumerated the library and found no assets". Say which.
+    $("#syncOut").innerHTML = `<b>${esc(label)}</b> &mdash; `
+      + `<span class="yes">no changes since the last sync</span>. Nothing was `
+      + `re-read, and the index is untouched. Tick <b>full re-read</b> to pull `
+      + `everything regardless.`;
+  } else {
+    $("#syncOut").innerHTML = `<b>${esc(label)} synced</b><div class="cap">`
+      + Object.entries(body).filter(([, v]) => typeof v !== "object")
+          .map(([k, v]) => `<span class="tag">${esc(k)} ${esc(String(v))}</span>`).join(" ")
+      + "</div>";
+  }
   await Promise.all([loadSources(), load(), loadBacklog()]);
 }
 

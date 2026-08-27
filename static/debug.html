@@ -11,6 +11,10 @@
   :root {
     --ink:#1f2329; --muted:#6b727a; --faint:#9aa0a8; --line:#dcdfe3;
     --bg:#ffffff; --panel:#f6f7f9; --accent:#2f6b1f; --warn:#9a6a16; --bad:#c0392b;
+    /* One colour per platform. A demo kit to run and a recording to send are
+       different things, so a reader must never have to guess which they got. */
+    --sharepoint:#1a5fa8; --sharepoint-bg:#e8f0f9;
+    --consensus:#c25a10;  --consensus-bg:#fbeee3;
   }
   * { box-sizing:border-box; }
   body { margin:0; font:13px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
@@ -82,6 +86,8 @@
         <div><label>product</label><select id="fProduct"></select></div>
         <div><label>funnel stage</label><select id="fStage"></select></div>
         <div><label>segment</label><select id="fSegment"></select></div>
+        <div><label>source</label><select id="fSource"></select></div>
+        <div><label>product family</label><select id="fFamily"></select></div>
         <div><label>language</label><select id="fLang"></select></div>
         <div><label>consensus uuid</label>
           <select id="fUuid"><option value="">any</option>
@@ -186,6 +192,7 @@ function query() {
   const add = (k, el) => { const v = $(el).value; if (v) p.append(k, v); };
   add("q", "#fq"); add("type", "#fType"); add("product", "#fProduct");
   add("stage", "#fStage"); add("segment", "#fSegment"); add("language", "#fLang");
+  add("source", "#fSource"); add("family", "#fFamily");
   const u = $("#fUuid").value;
   if (u) p.append("has_consensus_uuid", u);
   p.append("sort", $("#fSort").value);
@@ -196,14 +203,26 @@ function query() {
 
 let picksOnly = false;
 
+const SOURCE_STYLE = {
+  sharepoint: ["SP", "var(--sharepoint)", "var(--sharepoint-bg)"],
+  consensus:  ["CS", "var(--consensus)",  "var(--consensus-bg)"],
+};
+function sourceBadge(source) {
+  const [label, fg, bg] = SOURCE_STYLE[source] || ["?", "var(--muted)", "var(--panel)"];
+  return `<span class="tag" title="${esc(source || "unknown")}" style="color:${fg};`
+       + `background:${bg};border-color:${fg};margin-right:4px">${label}</span>`;
+}
+
 async function load() {
   const data = await api("/api/assets?" + query());
   assets = data.items;
   $("#resultCount").textContent = `${data.total} of ${data.total} shown (limit 200)`;
   $("#rows").innerHTML = assets.map((a, i) => `
     <tr data-i="${i}">
-      <td><span class="tag">${esc(a.type)}</span></td>
-      <td>${esc(a.title)}</td>
+      <td>${sourceBadge(a.source)}<span class="tag">${esc(a.type)}</span></td>
+      <td>${a.web_url
+             ? `<a href="${esc(a.web_url)}" target="_blank" rel="noopener">${esc(a.title)}</a>`
+             : esc(a.title)}</td>
       <td>${esc((a.products || []).join(", ")) || "<span class=no>—</span>"}</td>
       <td>${esc(a.funnel_stage) || "<span class=no>—</span>"}</td>
       <td>${esc(a.language)}</td>
@@ -282,21 +301,34 @@ async function boot() {
   fillSelect("#fProduct", facets.products, "products");
   fillSelect("#fStage", facets.funnel_stages, "stages");
   fillSelect("#fSegment", facets.segments, "segments");
+  fillSelect("#fSource", facets.sources, "sources");
+  fillSelect("#fFamily", facets.product_families, "families");
   fillSelect("#fLang", facets.languages, "languages");
 
-  $("#facets").innerHTML = ["types","products","funnel_stages","segments","industries",
-                            "value_drivers","languages","content_depths"]
+  // Default to English. Without it, a search like "codebeamer" returns the six
+  // language variants of one PTC NEXT recording as the top six hits and buries
+  // everything else. The API deliberately does NOT apply this itself -- a
+  // filter that hides 105 items without being asked is not an honest default,
+  // it is just an invisible one. Clients choose; the API stays literal.
+  if (facets.languages.some(l => l.value === "en")) $("#fLang").value = "en";
+
+  $("#facets").innerHTML = ["sources","types","product_families","products","funnel_stages",
+                            "segments","industries","value_drivers","languages","content_depths"]
     .map(k => `<div style="margin-bottom:4px"><span class="muted">${k}</span><br>` +
       (facets[k].length
         ? facets[k].map(f => `<span class="tag">${esc(f.value)} ${f.count}</span>`).join(" ")
         : '<span class="no">none</span>') + "</div>").join("");
 
-  ["#fq","#fType","#fProduct","#fStage","#fSegment","#fLang","#fUuid","#fSort"]
+  ["#fq","#fType","#fProduct","#fStage","#fSegment","#fSource","#fFamily","#fLang",
+   "#fUuid","#fSort"]
     .forEach(s => $(s).addEventListener($(s).tagName === "INPUT" ? "input" : "change", load));
 
   $("#bReset").onclick = () => {
-    ["#fq","#fType","#fProduct","#fStage","#fSegment","#fLang","#fUuid"]
+    ["#fq","#fType","#fProduct","#fStage","#fSegment","#fSource","#fFamily","#fUuid"]
       .forEach(s => $(s).value = "");
+    // Reset restores the English default rather than clearing it -- the reason
+    // it exists does not go away when you press reset.
+    $("#fLang").value = "en";
     $("#fSort").value = "recent"; picksOnly = false; load();
   };
   $("#bPicks").onclick = () => { picksOnly = !picksOnly; load(); };

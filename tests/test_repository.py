@@ -485,3 +485,28 @@ def test_facets_report_source_and_family(empty_repo):
     facets = empty_repo.facets()
     assert {f.value: f.count for f in facets.sources} == {"sharepoint": 1, "consensus": 1}
     assert {f.value: f.count for f in facets.product_families} == {"Windchill": 2}
+
+
+def test_the_api_does_not_quietly_default_to_english(empty_repo):
+    """The English default belongs to the client, not here.
+
+    Clients preselect `en` because otherwise one recording's six translations
+    fill the first page. But a repository that hides 105 items nobody excluded
+    — while still reporting a total — is not a helpful default, just an
+    invisible one. Asking for everything must return everything.
+    """
+    from backend.models import Asset, AssetType
+
+    empty_repo.replace_source_rows([
+        Asset(id="en1", type=AssetType.VIDEO, source="consensus",
+              title="Overview", language="en"),
+        Asset(id="ko1", type=AssetType.VIDEO, source="consensus",
+              title="Overview Korean", language="ko"),
+    ], "consensus")
+
+    everything = empty_repo.list(AssetQuery(limit=10))
+    assert everything.total == 2, "no filter means no filter"
+    assert {a.id for a in everything.items} == {"en1", "ko1"}
+
+    english = empty_repo.list(AssetQuery(languages=["en"], limit=10))
+    assert [a.id for a in english.items] == ["en1"]

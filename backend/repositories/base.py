@@ -15,7 +15,9 @@ from backend.models import (
     Asset, AssetSummary, Facets, MetadataProposal, Page, ProposalSummary,
 )
 
-SortKey = Literal["recent", "most_viewed", "title"]
+#: "relevance" degrades to "recent" when there is no search text, so it is one
+#: concept rather than two and can safely be the default.
+SortKey = Literal["relevance", "recent", "most_viewed", "title"]
 
 
 @dataclass
@@ -39,7 +41,7 @@ class AssetQuery:
     has_consensus_uuid: bool | None = None
     rail: str | None = None
     editor_picks_only: bool = False
-    sort: SortKey = "recent"
+    sort: SortKey = "relevance"
     limit: int = 50
     offset: int = 0
 

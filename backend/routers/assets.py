@@ -32,7 +32,11 @@ def list_assets(
     has_consensus_uuid: bool | None = None,
     rail: str | None = None,
     editor_picks: bool = False,
-    sort: str = Query(default="recent", pattern="^(recent|most_viewed|title)$"),
+    sort: str = Query(
+        default="relevance", pattern="^(relevance|recent|most_viewed|title)$",
+        description="relevance ranks title matches above description matches and "
+                    "opening matches above buried ones; with no search text it "
+                    "is identical to recent"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     repo: AssetRepository = Depends(get_repo),

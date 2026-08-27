@@ -510,3 +510,61 @@ def test_the_api_does_not_quietly_default_to_english(empty_repo):
 
     english = empty_repo.list(AssetQuery(languages=["en"], limit=10))
     assert [a.id for a in english.items] == ["en1"]
+
+
+# ───────────────────────────────────────────────────── relevance ordering
+def test_search_ranks_title_matches_above_description_matches(empty_repo):
+    from backend.models import Asset, AssetType
+    from datetime import date
+
+    empty_repo.replace_source_rows([
+        # Newest, but only mentions the term in passing.
+        Asset(id="aside", type=AssetType.VIDEO, title="Something Else",
+              description="mentions windchill once", uploaded_at=date(2026, 8, 1)),
+        Asset(id="buried", type=AssetType.LDK, title="Managing CAD with Windchill",
+              uploaded_at=date(2020, 1, 1)),
+        Asset(id="prefix", type=AssetType.LDK, title="Windchill Overview",
+              uploaded_at=date(2019, 1, 1)),
+        Asset(id="exact", type=AssetType.LDK, title="Windchill",
+              uploaded_at=date(2018, 1, 1)),
+    ], "sharepoint")
+
+    ranked = [a.id for a in empty_repo.list(
+        AssetQuery(text="windchill", sort="relevance", limit=10)).items]
+
+    assert ranked == ["exact", "prefix", "buried", "aside"], (
+        "exact title, then opening match, then mid-title, then description — "
+        "and the newest item comes last because it is the least relevant")
+
+
+def test_recency_only_breaks_ties(empty_repo):
+    """Equally relevant results keep the previous ordering, so the change is
+    additive rather than a reshuffle."""
+    from backend.models import Asset, AssetType
+    from datetime import date
+
+    empty_repo.replace_source_rows([
+        Asset(id="older", type=AssetType.LDK, title="Windchill Overview",
+              uploaded_at=date(2020, 1, 1)),
+        Asset(id="newer", type=AssetType.LDK, title="Windchill Basics",
+              uploaded_at=date(2026, 1, 1)),
+    ], "sharepoint")
+
+    ranked = [a.id for a in empty_repo.list(
+        AssetQuery(text="windchill", sort="relevance", limit=10)).items]
+    assert ranked == ["newer", "older"]
+
+
+def test_relevance_is_identical_to_recent_without_a_search(empty_repo):
+    """Which is why it is safe as the default — browsing behaviour is unchanged."""
+    from backend.models import Asset, AssetType
+    from datetime import date
+
+    empty_repo.replace_source_rows([
+        Asset(id="old", type=AssetType.LDK, title="A", uploaded_at=date(2019, 1, 1)),
+        Asset(id="new", type=AssetType.LDK, title="B", uploaded_at=date(2026, 1, 1)),
+    ], "sharepoint")
+
+    by_relevance = [a.id for a in empty_repo.list(AssetQuery(sort="relevance")).items]
+    by_recent = [a.id for a in empty_repo.list(AssetQuery(sort="recent")).items]
+    assert by_relevance == by_recent == ["new", "old"]

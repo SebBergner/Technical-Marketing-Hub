@@ -12,6 +12,7 @@ from backend.integrations.consensus import (
     ConsensusDemo, ConsensusError, StubConsensusClient,
 )
 from backend.models import AssetSummary, AssetType
+from backend.services import relevance
 from backend.services.consensus_match import (
     normalise, reconcile, similarity, best_candidates, MATCH_THRESHOLD, STRONG_MATCH,
 )
@@ -259,3 +260,32 @@ def test_the_identical_token_shortcut_does_not_skip_the_disqualifiers():
 def test_genuine_matches_survive_the_new_disqualifiers(asset_title, demo_title, floor):
     """Tightening must not cost real matches -- these are live pairs."""
     assert similarity(asset_title, demo_title) >= floor
+
+
+# ────────────────────────────────────────────────────── relevance scoring
+@pytest.mark.parametrize("title,expected", [
+    ("Windchill", relevance.EXACT_TITLE),
+    ("Windchill PDMLink Overview", relevance.TITLE_PREFIX),
+    ("Managing CAD with Windchill", relevance.TITLE_WORD),
+    ("PreWindchillThing", relevance.TITLE_SUBSTRING),
+    ("Something Else", relevance.NO_MATCH),
+])
+def test_title_match_tiers(title, expected):
+    assert relevance.score("windchill", title) == expected
+
+
+def test_a_description_match_still_counts_but_ranks_last():
+    assert relevance.score("windchill", "Other", "about windchill") \
+        == relevance.DESCRIPTION
+    assert relevance.DESCRIPTION < relevance.TITLE_SUBSTRING
+
+
+def test_an_empty_query_matches_nothing():
+    """Guards the default: with no search text the sort must fall through to
+    recency rather than scoring everything equally."""
+    assert relevance.score("", "Windchill") == relevance.NO_MATCH
+    assert relevance.score(None, "Windchill") == relevance.NO_MATCH
+
+
+def test_scoring_is_case_and_whitespace_insensitive():
+    assert relevance.score("  WINDCHILL  ", "windchill") == relevance.EXACT_TITLE

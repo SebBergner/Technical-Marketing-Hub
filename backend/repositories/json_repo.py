@@ -42,7 +42,7 @@ from backend.models import (
     Page, ProposalState, ProposalSummary, ValueRoadmap,
 )
 from backend.repositories.base import AssetQuery, AssetRepository
-from backend.services import taxonomy
+from backend.services import relevance, taxonomy
 from backend.tables import utcnow
 
 log = logging.getLogger(__name__)
@@ -248,12 +248,20 @@ class JsonAssetRepository(AssetRepository):
         stats = self._load("stats")
         indexed = set(self._load("roadmap"))
 
+        def recency(record: dict) -> date:
+            return _as_date(record.get("uploaded_at")) or date.min
+
         if query.sort == "most_viewed":
             rows.sort(key=lambda r: (stats.get(r["id"], {}) or {}).get("views", 0), reverse=True)
         elif query.sort == "title":
             rows.sort(key=lambda r: r.get("title", "").lower())
+        elif query.sort == "relevance" and query.text:
+            # Recency breaks ties, so equally-relevant results keep the old order.
+            rows.sort(key=lambda r: (relevance.score(query.text, r.get("title"),
+                                                     r.get("description")),
+                                     recency(r)), reverse=True)
         else:
-            rows.sort(key=lambda r: (_as_date(r.get("uploaded_at")) or date.min), reverse=True)
+            rows.sort(key=recency, reverse=True)
 
         window = rows[query.offset: query.offset + query.limit]
         return Page[AssetSummary](

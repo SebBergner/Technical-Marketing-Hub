@@ -21,7 +21,7 @@ from backend.models import (
     Page, ProposalState, ProposalSummary, ValueRoadmap,
 )
 from backend.repositories.base import AssetQuery, AssetRepository
-from backend.services import taxonomy
+from backend.services import relevance, taxonomy
 from backend.tables import (
     AssetCuration, AssetIdentity, AssetSource, AssetStatsRow, AssetValueRoadmap,
     MetadataEdit, MetadataProposal as ProposalRow, ShareEvent, SyncState, utcnow,
@@ -108,12 +108,19 @@ class SqlAssetRepository(AssetRepository):
         rows = self._rows(query)
         indexed = set(self.s.execute(select(AssetValueRoadmap.asset_id)).scalars().all())
 
+        def recency(row) -> "date":
+            return row[0].uploaded_at or datetime.min.date()
+
         if query.sort == "most_viewed":
             rows.sort(key=lambda r: (r[1].views if r[1] else 0), reverse=True)
         elif query.sort == "title":
             rows.sort(key=lambda r: r[0].title.lower())
+        elif query.sort == "relevance" and query.text:
+            rows.sort(key=lambda r: (relevance.score(query.text, r[0].title,
+                                                     r[0].description),
+                                     recency(r)), reverse=True)
         else:  # recent
-            rows.sort(key=lambda r: (r[0].uploaded_at or datetime.min.date()), reverse=True)
+            rows.sort(key=recency, reverse=True)
 
         total = len(rows)
         window = rows[query.offset: query.offset + query.limit]

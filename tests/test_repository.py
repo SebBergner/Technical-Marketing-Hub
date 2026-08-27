@@ -409,3 +409,79 @@ def test_web_url_survives_a_round_trip(repo):
     )], "sharepoint")
 
     assert repo.get("a1").web_url.endswith("/A%20Kit")
+
+
+# ─────────────────────────────── federated catalogue: two sources, one index
+def test_two_sources_coexist_and_stay_distinguishable(empty_repo):
+    """The Portal is a federated index. A result is useless if you cannot tell
+    whether it is a kit to run or a recording to send."""
+    from backend.models import Asset, AssetType
+
+    empty_repo.replace_source_rows(
+        [Asset(id="kit", type=AssetType.LDK, title="Windchill Kit",
+               products=["Windchill PDMLink"], segment="PLM")], "sharepoint")
+    empty_repo.replace_source_rows(
+        [Asset(id="vid", type=AssetType.VIDEO, source="consensus",
+               title="Windchill Overview", products=["Windchill"], segment="PLM",
+               web_url="https://play.goconsensus.com/abc")], "consensus")
+
+    items = {a.id: a for a in empty_repo.list(AssetQuery(limit=10)).items}
+    assert items["kit"].source == "sharepoint"
+    assert items["vid"].source == "consensus"
+    assert empty_repo.count_source_rows("consensus") == 1
+
+
+def test_web_url_reaches_list_responses_not_just_detail(empty_repo):
+    """A grid card links out. A Consensus result with no link is a dead end,
+    and web_url used to be set only on the detail path."""
+    from backend.models import Asset, AssetType
+
+    empty_repo.replace_source_rows([Asset(
+        id="vid", type=AssetType.VIDEO, source="consensus", title="Overview",
+        web_url="https://play.goconsensus.com/abc")], "consensus")
+
+    assert empty_repo.list(AssetQuery(limit=5)).items[0].web_url.endswith("/abc")
+
+
+def test_the_product_family_filter_reaches_both_platforms(empty_repo):
+    """The whole point of families. SharePoint records 'Windchill PDMLink' and
+    Consensus records 'Windchill'; only six product names appear verbatim in
+    both, so filtering on the specific product hides half the catalogue."""
+    from backend.models import Asset, AssetType
+
+    empty_repo.replace_source_rows([Asset(id="kit", type=AssetType.LDK, title="Kit",
+                                    products=["Windchill PDMLink"])], "sharepoint")
+    empty_repo.replace_source_rows([Asset(id="vid", type=AssetType.VIDEO, source="consensus",
+                                    title="Vid", products=["Windchill"])], "consensus")
+
+    both = empty_repo.list(AssetQuery(product_families=["Windchill"], limit=10)).items
+    assert {a.id for a in both} == {"kit", "vid"}
+
+    # The specific product still works, and naturally reaches SharePoint only.
+    exact = empty_repo.list(AssetQuery(products=["Windchill PDMLink"], limit=10)).items
+    assert {a.id for a in exact} == {"kit"}
+
+
+def test_filtering_by_source_isolates_one_platform(empty_repo):
+    from backend.models import Asset, AssetType
+
+    empty_repo.replace_source_rows([Asset(id="kit", type=AssetType.LDK, title="Kit")],
+                             "sharepoint")
+    empty_repo.replace_source_rows([Asset(id="vid", type=AssetType.VIDEO,
+                                    source="consensus", title="Vid")], "consensus")
+
+    assert [a.id for a in empty_repo.list(AssetQuery(sources=["consensus"], limit=5)).items] \
+        == ["vid"]
+
+
+def test_facets_report_source_and_family(empty_repo):
+    from backend.models import Asset, AssetType
+
+    empty_repo.replace_source_rows([Asset(id="kit", type=AssetType.LDK, title="Kit",
+                                    products=["Windchill PDMLink"])], "sharepoint")
+    empty_repo.replace_source_rows([Asset(id="vid", type=AssetType.VIDEO, source="consensus",
+                                    title="Vid", products=["Windchill"])], "consensus")
+
+    facets = empty_repo.facets()
+    assert {f.value: f.count for f in facets.sources} == {"sharepoint": 1, "consensus": 1}
+    assert {f.value: f.count for f in facets.product_families} == {"Windchill": 2}

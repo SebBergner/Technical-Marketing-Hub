@@ -21,6 +21,12 @@ def list_assets(
     driver: list[str] = Query(default=[]),
     language: list[str] = Query(default=[]),
     depth: list[str] = Query(default=[]),
+    source: list[str] = Query(default=[], description="sharepoint | consensus"),
+    family: list[str] = Query(
+        default=[],
+        description="product family — the only product filter that reaches every "
+                    "platform. SharePoint records the specific module "
+                    "('Windchill PDMLink'), Consensus the brand ('Windchill')."),
     customer_facing: bool | None = None,
     has_narrated_audio: bool | None = None,
     has_consensus_uuid: bool | None = None,
@@ -34,6 +40,7 @@ def list_assets(
     return repo.list(AssetQuery(
         text=q, types=type, products=product, funnel_stages=stage, segments=segment,
         industries=industry, value_drivers=driver, languages=language, content_depths=depth,
+        sources=source, product_families=family,
         customer_facing=customer_facing, has_narrated_audio=has_narrated_audio,
         has_consensus_uuid=has_consensus_uuid, rail=rail, editor_picks_only=editor_picks,
         sort=sort, limit=limit, offset=offset,

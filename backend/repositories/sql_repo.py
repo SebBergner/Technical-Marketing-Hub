@@ -21,6 +21,7 @@ from backend.models import (
     Page, ProposalState, ProposalSummary, ValueRoadmap,
 )
 from backend.repositories.base import AssetQuery, AssetRepository
+from backend.services import taxonomy
 from backend.tables import (
     AssetCuration, AssetIdentity, AssetSource, AssetStatsRow, AssetValueRoadmap,
     MetadataEdit, MetadataProposal as ProposalRow, ShareEvent, SyncState, utcnow,
@@ -53,6 +54,7 @@ class SqlAssetRepository(AssetRepository):
 
         for column, values in (
             (AssetSource.type, query.types),
+            (AssetSource.source_system, query.sources),
             (AssetSource.funnel_stage, query.funnel_stages),
             (AssetSource.segment, query.segments),
             (AssetSource.industry, query.industries),
@@ -61,6 +63,20 @@ class SqlAssetRepository(AssetRepository):
         ):
             if values:
                 stmt = stmt.where(column.in_(values))
+
+        if query.product_families:
+            # Families are derived in code, so they cannot be pushed into SQL.
+            # Expanding to the member products keeps the filter in the query
+            # rather than loading the catalogue and filtering in Python.
+            wanted = set(query.product_families)
+            known = {p for r in self.s.execute(select(AssetSource.products)).scalars()
+                     for p in (r or [])}
+            members = [p for p in known if taxonomy.family_of(p) in wanted]
+            if members:
+                stmt = stmt.where(or_(*[AssetSource.products.contains(p)
+                                        for p in members]))
+            else:
+                stmt = stmt.where(AssetSource.asset_id.is_(None))   # match nothing
 
         if query.customer_facing is not None:
             stmt = stmt.where(AssetSource.customer_facing == query.customer_facing)
@@ -152,6 +168,13 @@ class SqlAssetRepository(AssetRepository):
             value_drivers=multi("value_drivers"),
             languages=scalar("language"),
             content_depths=scalar("content_depth"),
+            sources=scalar("source_system"),
+            # Derived, not stored: the mapping lives in code, so changing it
+            # must take effect without a re-sync.
+            product_families=[
+                FacetValue(value=v, count=n) for v, n in sorted(Counter(
+                    f for r in rows for f in taxonomy.families_of(r.products)
+                ).items())],
             total=len(rows),
         )
 
@@ -411,14 +434,15 @@ class SqlAssetRepository(AssetRepository):
     @staticmethod
     def _common(src: AssetSource, stats: AssetStatsRow | None) -> dict:
         return dict(
-            id=src.asset_id, type=src.type, title=src.title, description=src.description,
+            id=src.asset_id, type=src.type, source=src.source_system,
+            title=src.title, description=src.description,
             products=src.products or [], funnel_stage=src.funnel_stage,
             content_depth=src.content_depth, language=src.language, segment=src.segment,
             industry=src.industry, value_drivers=src.value_drivers or [],
             customer_facing=src.customer_facing, has_narrated_audio=src.has_narrated_audio,
             named_customer=src.named_customer, uploaded_at=src.uploaded_at,
             duration_seconds=src.duration_seconds, thumbnail_url=src.thumbnail_url,
-            source_item_id=src.drive_item_id, brightcove_id=src.brightcove_id,
+            web_url=src.web_url, source_item_id=src.drive_item_id, brightcove_id=src.brightcove_id,
             consensus_uuid=src.consensus_uuid,
             resource_count=src.resource_count or 0, video_count=src.video_count or 0,
             resource_counts=src.resource_counts or {},

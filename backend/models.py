@@ -118,6 +118,11 @@ class AssetBase(BaseModel):
 
     id: str                                   # stable slug — never changes, never reused
     type: AssetType
+    #: Which platform this came from: "sharepoint", "consensus", "seed".
+    #: The Portal is a federated index, so the UI labels every result with its
+    #: origin — a demo kit to run and a recorded video to send are different
+    #: things, and a reader must be able to tell them apart at a glance.
+    source: str = "sharepoint"
     title: str
     description: str | None = None
 
@@ -136,6 +141,9 @@ class AssetBase(BaseModel):
     uploaded_at: date | None = None
     duration_seconds: int | None = None
     thumbnail_url: str | None = None
+    #: Where to open this on its own platform. On list responses because a grid
+    #: card links out; a Consensus result is useless without it.
+    web_url: str | None = None
 
     # cross-references — the four ID spaces the Portal exists to correlate
     source_item_id: str | None = None         # SharePoint list item
@@ -169,7 +177,6 @@ class AssetSummary(AssetBase):
 class Asset(AssetBase):
     """Full detail, including the derived index."""
     value_roadmap: ValueRoadmap | None = None
-    web_url: str | None = None
     rails: list[str] = Field(default_factory=list)
     is_editor_pick: bool = False
 
@@ -258,6 +265,13 @@ class Facets(BaseModel):
     value_drivers: list[FacetValue] = Field(default_factory=list)
     languages: list[FacetValue] = Field(default_factory=list)
     content_depths: list[FacetValue] = Field(default_factory=list)
+    #: Which platform results come from. Always present, so the UI can label
+    #: and filter by origin without a second call.
+    sources: list[FacetValue] = Field(default_factory=list)
+    #: The one product filter that reaches BOTH platforms. SharePoint records
+    #: the specific module ("Windchill PDMLink") and Consensus the brand
+    #: ("Windchill"); only the family is common to both.
+    product_families: list[FacetValue] = Field(default_factory=list)
     total: int = 0
 
 

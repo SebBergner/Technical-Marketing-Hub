@@ -42,6 +42,7 @@ from backend.models import (
     Page, ProposalState, ProposalSummary, ValueRoadmap,
 )
 from backend.repositories.base import AssetQuery, AssetRepository
+from backend.services import taxonomy
 from backend.tables import utcnow
 
 log = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ log = logging.getLogger(__name__)
 _FALLBACK_SOURCE = "seed"
 
 _MIRROR_FIELDS = (
-    "id", "type", "title", "description", "products", "funnel_stage", "content_depth",
+    "id", "type", "source", "title", "description", "products", "funnel_stage", "content_depth",
     "language", "segment", "industry", "value_drivers", "customer_facing",
     "has_narrated_audio", "named_customer", "uploaded_at", "duration_seconds",
     "thumbnail_url", "web_url", "source_item_id", "brightcove_id", "consensus_uuid",
@@ -203,6 +204,7 @@ class JsonAssetRepository(AssetRepository):
                     return False
 
             for field, wanted in (("type", query.types),
+                                  ("source", query.sources),
                                   ("funnel_stage", query.funnel_stages),
                                   ("segment", query.segments),
                                   ("industry", query.industries),
@@ -215,6 +217,11 @@ class JsonAssetRepository(AssetRepository):
                                   ("value_drivers", query.value_drivers)):
                 if wanted and not (set(record.get(field) or []) & set(wanted)):
                     return False
+
+            if query.product_families and not (
+                    set(taxonomy.families_of(record.get("products")))
+                    & set(query.product_families)):
+                return False
 
             if query.customer_facing is not None \
                     and bool(record.get("customer_facing", True)) != query.customer_facing:
@@ -266,7 +273,6 @@ class JsonAssetRepository(AssetRepository):
         data = self._common(record, self._load("stats"))
         data.update(
             has_roadmap=roadmap is not None,
-            web_url=record.get("web_url"),
             resources=record.get("resources") or [],
             main_video=record.get("main_video"),
             rails=own.get("rails") or [],
@@ -286,11 +292,19 @@ class JsonAssetRepository(AssetRepository):
             counts = Counter(v for r in rows for v in (r.get(field) or []))
             return [FacetValue(value=v, count=n) for v, n in sorted(counts.items())]
 
+        # Families are derived, not stored: the mapping is code, so a change to
+        # it must take effect without a re-sync.
+        family_counts = Counter(
+            f for r in rows for f in taxonomy.families_of(r.get("products")))
+
         return Facets(
             types=scalar("type"), products=multi("products"),
             funnel_stages=scalar("funnel_stage"), segments=scalar("segment"),
             industries=scalar("industry"), value_drivers=multi("value_drivers"),
             languages=scalar("language"), content_depths=scalar("content_depth"),
+            sources=scalar("source"),
+            product_families=[FacetValue(value=v, count=n)
+                              for v, n in sorted(family_counts.items())],
             total=len(rows),
         )
 
@@ -521,8 +535,10 @@ class JsonAssetRepository(AssetRepository):
     def _common(record: dict, stats: dict) -> dict:
         counters = stats.get(record["id"]) or {}
         return dict(
-            id=record["id"], type=record["type"], title=record["title"],
-            description=record.get("description"),
+            id=record["id"], type=record["type"],
+            source=record.get("source") or "sharepoint",
+            title=record["title"], description=record.get("description"),
+            web_url=record.get("web_url"),
             products=record.get("products") or [],
             funnel_stage=record.get("funnel_stage"),
             content_depth=record.get("content_depth"),

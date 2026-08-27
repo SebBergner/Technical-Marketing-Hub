@@ -6,7 +6,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from backend.deps import CurrentUser, get_repo, require_authenticated
+from backend.deps import CurrentUser, get_repo, require_authenticated, require_curator
+from backend.integrations.consensus_sync import SOURCE_SYSTEM, sync_demos
 from backend.integrations.consensus import (
     ConsensusClient, ConsensusError, ConsensusSchemaUnknown, ShareRecipient,
     get_consensus_client,
@@ -236,3 +237,32 @@ def share_to_consensus(
         recipients=[RecipientIn(email=r.email, first_name=r.first_name,
                                 last_name=r.last_name) for r in link.recipients],
     )
+
+
+@router.post("/sync")
+def sync(repo: AssetRepository = Depends(get_repo),
+         client: ConsensusClient = Depends(get_client),
+         user: CurrentUser = Depends(require_curator)):
+    """Index public Consensus demos as catalogue entries. Requires curator.
+
+    Consensus content stands on its own here — it is not attached to a
+    SharePoint asset. The two catalogues hold different things (455 demo kits
+    against recorded videos), so a search that reaches both is worth more than
+    a join that can only ever cover a handful.
+
+    Only `isPublic` demos are indexed. The rest are customer-specific boards
+    and meeting recordings: unmaintained, and they name customers.
+    """
+    if not client.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail=("Consensus is not configured. Set CONSENSUS_BASE_URL, "
+                    "CONSENSUS_API_KEY, CONSENSUS_API_SECRET and "
+                    "CONSENSUS_USER_EMAIL."))
+    try:
+        result = sync_demos(client, repo)
+    except ConsensusError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    log.info("consensus sync by %s: %s", user.email, result.as_dict())
+    return {"source_system": SOURCE_SYSTEM, **result.as_dict()}

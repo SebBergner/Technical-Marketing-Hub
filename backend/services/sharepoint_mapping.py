@@ -101,10 +101,13 @@ def parse_segment(value) -> tuple[str | None, list[str]]:
     """Segment mixes two delimiters in one column: `IoT,PLM` and `CAD;#SLM`."""
     if not value:
         return None, []
-    if isinstance(value, list):
-        parts = [clean_text(v) for v in value]
-    else:
-        parts = [p.strip() for p in re.split(r";#|,", str(value))]
+    # Split whether the delimiters are between list elements or inside one:
+    # Graph returns Segment as a list, and a single element can still read
+    # "CAD,IoT,PLM". Not splitting further put that whole string into the
+    # facet list as if it were a segment of its own.
+    raw = value if isinstance(value, list) else [value]
+    parts = [clean_text(p) for v in raw
+             for p in re.split(r";#|,", str(v if v is not None else ""))]
     parts = [p for p in parts if p]
     return (parts[0] if parts else None), parts
 

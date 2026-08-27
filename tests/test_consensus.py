@@ -289,3 +289,58 @@ def test_an_empty_query_matches_nothing():
 
 def test_scoring_is_case_and_whitespace_insensitive():
     assert relevance.score("  WINDCHILL  ", "windchill") == relevance.EXACT_TITLE
+
+
+# ─────────────────────────────── multi-word search: the "Creo overview" bug
+def test_words_need_not_be_adjacent():
+    """The reported bug. The filter tested the whole query as one substring, so
+    a search for "Creo overview" returned NOTHING while
+    "Creo Parametric Overview" sat in the catalogue."""
+    assert relevance.matches("Creo overview", "Creo Parametric Overview")
+    assert relevance.score("Creo overview", "Creo Parametric Overview") \
+        == relevance.TITLE_ALL_TERMS
+
+
+def test_word_order_does_not_matter():
+    assert relevance.matches("overview creo", "Creo Parametric Overview")
+
+
+def test_every_term_must_appear():
+    """AND, not OR. Adding a word has to narrow the results, or a search box
+    gives no way to home in on anything."""
+    assert not relevance.matches("creo windchill", "Creo Parametric Overview")
+    assert relevance.matches("creo parametric", "Creo Parametric Overview")
+
+
+def test_a_contiguous_phrase_outranks_the_same_words_scattered():
+    tight = relevance.score("creo overview", "Creo Overview")
+    loose = relevance.score("creo overview", "Creo Parametric Overview")
+    assert tight > loose, "both match, and the closer one must come first"
+
+
+def test_a_term_found_only_in_the_description_still_matches_but_ranks_lower():
+    assert relevance.score("creo overview", "Creo Parametric",
+                           "an overview of the basics") == relevance.ANY_FIELD
+    assert relevance.ANY_FIELD < relevance.TITLE_ALL_TERMS
+
+
+def test_span_prefers_the_title_that_says_it_soonest():
+    """Six tiers barely discriminate on multi-word queries -- "Creo overview"
+    put all 61 live hits into two of them. Span orders within a tier."""
+    assert relevance.span("creo overview", "Creo Parametric Overview") \
+        < relevance.span("creo overview", "PTC NEXT - Spring 2026 - Creo 13 AI Overview")
+    assert relevance.span("creo overview", "Windchill Only") == 10_000
+
+
+def test_ranking_puts_tier_before_span():
+    """A weaker tier must never win on a tighter span alone."""
+    exact = relevance.ranking("creo overview", "Creo Overview")
+    scattered = relevance.ranking("creo overview", "Creo X Overview")
+    assert exact > scattered
+
+
+def test_terms_keep_non_latin_titles():
+    """The catalogue holds Japanese, Korean and Chinese titles. An ASCII-only
+    tokeniser would silently drop them from search entirely."""
+    assert relevance.terms("모델 기반 정의") == ["모델", "기반", "정의"]
+    assert relevance.matches("모델", "모델 기반 정의 (MBD)")

@@ -45,8 +45,13 @@ class SqlAssetRepository(AssetRepository):
             .where(AssetIdentity.retired_at.is_(None))
         )
 
-        if query.text:
-            like = f"%{query.text.lower()}%"
+        # One clause per term, ANDed: every word must appear somewhere, in any
+        # order. A single LIKE on the whole query tested the words as one
+        # contiguous phrase, so "Creo overview" missed "Creo Parametric
+        # Overview". Kept in SQL rather than filtered in Python so the database
+        # still does the narrowing.
+        for term in relevance.terms(query.text):
+            like = f"%{term}%"
             stmt = stmt.where(or_(
                 func.lower(AssetSource.title).like(like),
                 func.lower(func.coalesce(AssetSource.description, "")).like(like),
@@ -116,8 +121,8 @@ class SqlAssetRepository(AssetRepository):
         elif query.sort == "title":
             rows.sort(key=lambda r: r[0].title.lower())
         elif query.sort == "relevance" and query.text:
-            rows.sort(key=lambda r: (relevance.score(query.text, r[0].title,
-                                                     r[0].description),
+            rows.sort(key=lambda r: (*relevance.ranking(query.text, r[0].title,
+                                                        r[0].description),
                                      recency(r)), reverse=True)
         else:  # recent
             rows.sort(key=recency, reverse=True)

@@ -197,11 +197,11 @@ class JsonAssetRepository(AssetRepository):
         rows = self._load_mirror()
 
         def keep(record: dict) -> bool:
-            if query.text:
-                needle = query.text.lower()
-                haystack = f"{record.get('title', '')} {record.get('description') or ''}".lower()
-                if needle not in haystack:
-                    return False
+            # Membership comes from the scorer, so a record can never be
+            # excluded by one rule and ranked by another.
+            if query.text and not relevance.matches(
+                    query.text, record.get("title"), record.get("description")):
+                return False
 
             for field, wanted in (("type", query.types),
                                   ("source", query.sources),
@@ -257,8 +257,8 @@ class JsonAssetRepository(AssetRepository):
             rows.sort(key=lambda r: r.get("title", "").lower())
         elif query.sort == "relevance" and query.text:
             # Recency breaks ties, so equally-relevant results keep the old order.
-            rows.sort(key=lambda r: (relevance.score(query.text, r.get("title"),
-                                                     r.get("description")),
+            rows.sort(key=lambda r: (*relevance.ranking(query.text, r.get("title"),
+                                                        r.get("description")),
                                      recency(r)), reverse=True)
         else:
             rows.sort(key=recency, reverse=True)

@@ -90,6 +90,33 @@ the same parametrised tests, so switching is a config change.
 | Consensus | Client, matching and reconciliation built. Running on the stub until credentials are set. |
 | Auth | App Service Easy Auth (Entra ID), with viewer / curator roles. Off locally by default. |
 
+### Search
+
+One index over every platform. `GET /api/assets` filters and ranks SharePoint
+and Consensus content together; `source` says which a result came from, so the
+UI can label it (blue / orange in `/debug`).
+
+**Every word must appear, in any order.** `Creo overview` finds
+`Creo Parametric Overview` — the filter used to test the whole query as one
+substring, so that returned nothing. Adding a word narrows the results.
+
+**Ranking is `relevance` by default**, which degrades to `recent` when there is
+no search text, so browsing is unchanged. Six tiers — exact title, title
+prefix, title word, title substring, all terms scattered in the title, all
+terms anywhere — then *span* (how far into the title you must read before every
+term has appeared) breaks ties, then recency. Span matters more than it sounds:
+a multi-word query lands almost everything in two tiers, and it is what puts
+`Codebeamer Overview VDK v.1` above `PTC NEXT - Spring 2026 - Codebeamer …`.
+
+`backend/services/relevance.py` owns both membership and order, deliberately —
+written separately they drift, and the failure is silent.
+
+**Two filters reach across platforms.** `language` (both sides 100% covered)
+and `family` — the product family. SharePoint records the specific module
+(`Windchill PDMLink`), Consensus the brand (`Windchill`), and only 6 product
+names appear verbatim in both, so filtering by `product` is effectively
+SharePoint-only while `family` reaches everything.
+
 ### Wiring up Consensus
 
 Built against the OpenAPI spec at

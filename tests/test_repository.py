@@ -568,3 +568,30 @@ def test_relevance_is_identical_to_recent_without_a_search(empty_repo):
     by_relevance = [a.id for a in empty_repo.list(AssetQuery(sort="relevance")).items]
     by_recent = [a.id for a in empty_repo.list(AssetQuery(sort="recent")).items]
     assert by_relevance == by_recent == ["new", "old"]
+
+
+def test_a_multi_word_search_finds_records_with_words_in_between(empty_repo):
+    """End to end through the repository, both backends: this returned zero
+    results before, because the filter tested the query as one substring."""
+    from backend.models import Asset, AssetType
+
+    empty_repo.replace_source_rows([
+        Asset(id="para", type=AssetType.VDK, title="Creo Parametric Overview"),
+        Asset(id="tight", type=AssetType.VDK, title="Creo Overview"),
+        Asset(id="other", type=AssetType.VDK, title="Windchill Overview"),
+    ], "sharepoint")
+
+    found = [a.id for a in empty_repo.list(AssetQuery(text="Creo overview")).items]
+    assert found == ["tight", "para"], "both match; the contiguous one ranks first"
+    assert "other" not in found, "every term must appear"
+
+
+def test_multi_word_search_ignores_word_order(empty_repo):
+    from backend.models import Asset, AssetType
+
+    empty_repo.replace_source_rows(
+        [Asset(id="para", type=AssetType.VDK, title="Creo Parametric Overview")],
+        "sharepoint")
+
+    assert [a.id for a in empty_repo.list(AssetQuery(text="overview creo")).items] \
+        == ["para"]

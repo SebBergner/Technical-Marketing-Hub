@@ -36,6 +36,7 @@ class AssetQuery:
     #: The product filter that reaches both platforms. `products` matches the
     #: specific module and so is effectively SharePoint-only.
     product_families: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     customer_facing: bool | None = None
     has_narrated_audio: bool | None = None
     has_consensus_uuid: bool | None = None

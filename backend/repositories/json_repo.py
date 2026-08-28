@@ -54,7 +54,7 @@ _FALLBACK_SOURCE = "seed"
 
 _MIRROR_FIELDS = (
     "id", "type", "source", "title", "description", "products", "funnel_stage", "content_depth",
-    "language", "segment", "industry", "value_drivers", "customer_facing",
+    "language", "segment", "industry", "value_drivers", "tags", "customer_facing",
     "has_narrated_audio", "named_customer", "uploaded_at", "duration_seconds",
     "thumbnail_url", "web_url", "source_item_id", "brightcove_id", "consensus_uuid",
     "resources", "resource_counts", "resource_count", "video_count", "main_video",
@@ -214,7 +214,8 @@ class JsonAssetRepository(AssetRepository):
                     return False
 
             for field, wanted in (("products", query.products),
-                                  ("value_drivers", query.value_drivers)):
+                                  ("value_drivers", query.value_drivers),
+                                  ("tags", query.tags)):
                 if wanted and not (set(record.get(field) or []) & set(wanted)):
                     return False
 
@@ -310,7 +311,7 @@ class JsonAssetRepository(AssetRepository):
             funnel_stages=scalar("funnel_stage"), segments=scalar("segment"),
             industries=scalar("industry"), value_drivers=multi("value_drivers"),
             languages=scalar("language"), content_depths=scalar("content_depth"),
-            sources=scalar("source"),
+            sources=scalar("source"), tags=multi("tags"),
             product_families=[FacetValue(value=v, count=n)
                               for v, n in sorted(family_counts.items())],
             total=len(rows),
@@ -572,6 +573,7 @@ class JsonAssetRepository(AssetRepository):
             language=record.get("language") or "en",
             segment=record.get("segment"), industry=record.get("industry"),
             value_drivers=record.get("value_drivers") or [],
+            tags=record.get("tags") or [],
             customer_facing=bool(record.get("customer_facing", True)),
             has_narrated_audio=record.get("has_narrated_audio"),
             named_customer=record.get("named_customer"),

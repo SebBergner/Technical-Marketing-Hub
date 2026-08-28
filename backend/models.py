@@ -133,6 +133,15 @@ class AssetBase(BaseModel):
     segment: str | None = None                # CAD / PLM / IPL
     industry: str | None = None
     value_drivers: list[str] = Field(default_factory=list)
+    #: Free-form labels from the source platform, stored verbatim.
+    #:
+    #: Consensus maintains these by hand and a single demo's tags routinely
+    #: span four of our dimensions at once — "PLM, Teaser, Prospecting,
+    #: Windchill" is segment, depth, funnel stage and product. They are kept
+    #: raw as well as classified, because the classifier only recognises
+    #: vocabularies we have verified, and dropping the rest would throw away
+    #: the signal a person deliberately added.
+    tags: list[str] = Field(default_factory=list)
 
     customer_facing: bool = True
     has_narrated_audio: bool | None = None    # gates external sharing for video
@@ -272,6 +281,10 @@ class Facets(BaseModel):
     #: the specific module ("Windchill PDMLink") and Consensus the brand
     #: ("Windchill"); only the family is common to both.
     product_families: list[FacetValue] = Field(default_factory=list)
+    #: Consensus's hand-maintained labels. Kept as their own facet rather than
+    #: folded into the others, because a tag can mean anything and pretending
+    #: otherwise would put unrelated content behind a filter.
+    tags: list[FacetValue] = Field(default_factory=list)
     total: int = 0
 
 

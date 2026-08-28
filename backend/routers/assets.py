@@ -22,6 +22,7 @@ def list_assets(
     language: list[str] = Query(default=[]),
     depth: list[str] = Query(default=[]),
     source: list[str] = Query(default=[], description="sharepoint | consensus"),
+    tag: list[str] = Query(default=[], description="Consensus's own labels, verbatim"),
     family: list[str] = Query(
         default=[],
         description="product family — the only product filter that reaches every "
@@ -44,7 +45,7 @@ def list_assets(
     return repo.list(AssetQuery(
         text=q, types=type, products=product, funnel_stages=stage, segments=segment,
         industries=industry, value_drivers=driver, languages=language, content_depths=depth,
-        sources=source, product_families=family,
+        sources=source, product_families=family, tags=tag,
         customer_facing=customer_facing, has_narrated_audio=has_narrated_audio,
         has_consensus_uuid=has_consensus_uuid, rail=rail, editor_picks_only=editor_picks,
         sort=sort, limit=limit, offset=offset,

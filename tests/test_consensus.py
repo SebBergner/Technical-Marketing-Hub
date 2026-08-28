@@ -344,3 +344,47 @@ def test_terms_keep_non_latin_titles():
     tokeniser would silently drop them from search entirely."""
     assert relevance.terms("모델 기반 정의") == ["모델", "기반", "정의"]
     assert relevance.matches("모델", "모델 기반 정의 (MBD)")
+
+
+# ──────────────────────────── V1 must not silently undo a V2 sync
+def test_a_v1_sync_refuses_to_overwrite_a_v2_mirror(tmp_path):
+    """The failure this guards against is silent and total.
+
+    The mirror is replaced wholesale, so a V1 run over a V2 mirror discards
+    every tag, funnel stage, content depth and view count -- 415, 344, 292 and
+    472 records respectively on the live tenant, and precisely the metadata V2
+    was adopted for. The likeliest trigger is a lapsed token, which is not a
+    reason to throw the data away.
+    """
+    from backend.integrations.consensus_sync import WouldDowngrade, sync_demos
+    from backend.repositories.json_repo import JsonAssetRepository
+
+    repo = JsonAssetRepository(str(tmp_path))
+    repo.record_sync("consensus", "digest", api="v2")
+
+    with pytest.raises(WouldDowngrade, match="expired CONSENSUS_V2_TOKEN"):
+        sync_demos(StubConsensusClient([]), repo)
+
+
+def test_the_downgrade_can_be_overruled_deliberately(tmp_path):
+    """Refusing outright would be its own trap -- there has to be a way back
+    to V1 if V2 goes away for good. It just may not happen by accident."""
+    from backend.integrations.consensus_sync import sync_demos
+    from backend.repositories.json_repo import JsonAssetRepository
+
+    repo = JsonAssetRepository(str(tmp_path))
+    repo.record_sync("consensus", "digest", api="v2")
+
+    result = sync_demos(StubConsensusClient([]), repo, allow_downgrade=True)
+    assert result.indexed == 0
+    assert repo.sync_state("consensus")["api"] == "v1"
+
+
+def test_a_first_v1_sync_is_not_blocked(tmp_path):
+    """No previous V2 sync means nothing to lose."""
+    from backend.integrations.consensus_sync import sync_demos
+    from backend.repositories.json_repo import JsonAssetRepository
+
+    repo = JsonAssetRepository(str(tmp_path))
+    sync_demos(StubConsensusClient([]), repo)
+    assert repo.sync_state("consensus")["api"] == "v1"

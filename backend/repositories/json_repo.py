@@ -427,7 +427,8 @@ class JsonAssetRepository(AssetRepository):
             row["last_success_at"] = utcnow().isoformat(timespec="seconds")
             self._save("sync_state", state)
 
-    def record_sync(self, source_system: str, fingerprint: str | None = None) -> None:
+    def record_sync(self, source_system: str, fingerprint: str | None = None,
+                    api: str | None = None) -> None:
         """Stamp a successful sync for a source with no delta cursor.
 
         Consensus has no delta, so it never called set_sync_token and its
@@ -441,6 +442,8 @@ class JsonAssetRepository(AssetRepository):
             row["last_success_at"] = utcnow().isoformat(timespec="seconds")
             if fingerprint is not None:
                 row["fingerprint"] = fingerprint
+            if api is not None:
+                row["api"] = api
             self._save("sync_state", state)
 
     def sync_state(self, source_system: str) -> dict:

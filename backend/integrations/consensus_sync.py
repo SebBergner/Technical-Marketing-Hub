@@ -296,6 +296,16 @@ def _v2_description(demo: dict) -> str | None:
     return " / ".join(path) if path else None
 
 
+class WouldDowngrade(RuntimeError):
+    """A V1 sync would replace richer V2 data with poorer V1 data.
+
+    The mirror is replaced wholesale, so running V1 over a V2 mirror discards
+    every tag, funnel stage, content depth and view count -- silently, and
+    exactly the metadata V2 was adopted for. The likeliest cause is a lapsed
+    token, which is not a reason to throw the data away.
+    """
+
+
 def sync_demos_v2(client: ConsensusV2Client, repo,
                   v1_client: ConsensusClient | None = None) -> ConsensusSyncResult:
     """Index Consensus through V2, with V1 supplying only the images."""
@@ -306,18 +316,30 @@ def sync_demos_v2(client: ConsensusV2Client, repo,
     result.unchanged = bool(previous.get("fingerprint"))         and previous["fingerprint"] == digest
     repo.replace_source_rows(assets, source_system=SOURCE_SYSTEM)
     if stamp := getattr(repo, "record_sync", None):
-        stamp(SOURCE_SYSTEM, digest)
+        stamp(SOURCE_SYSTEM, digest, api="v2")
     log.info("consensus v2 sync: %s", result.as_dict())
     return result
 
 
-def sync_demos(client: ConsensusClient, repo, limit: int = 2000) -> ConsensusSyncResult:
+def sync_demos(client: ConsensusClient, repo, limit: int = 2000,
+               allow_downgrade: bool = False) -> ConsensusSyncResult:
     """Pull public Consensus demos and replace that source's mirror.
 
     Uses the same `replace_source_rows` contract as the Graph sync, so
     Portal-owned data is untouched and the two sources cannot overwrite each
     other's rows.
     """
+    previous_api = (getattr(repo, "sync_state", lambda _: {})(SOURCE_SYSTEM)
+                    or {}).get("api")
+    if previous_api == "v2" and not allow_downgrade:
+        raise WouldDowngrade(
+            "This mirror was built from Consensus V2 and a V1 sync would "
+            "replace it, discarding every tag, funnel stage, content depth and "
+            "view count -- the metadata V2 exists to provide. The usual cause "
+            "is an expired CONSENSUS_V2_TOKEN; refresh it at "
+            "https://app.goconsensus.com/api/v2/docs/portal/ rather than "
+            "syncing over the data. Pass allow_downgrade to overrule this.")
+
     demos = client.list_demos(limit=limit)
     assets, result = build_assets(demos)
 
@@ -329,6 +351,6 @@ def sync_demos(client: ConsensusClient, repo, limit: int = 2000) -> ConsensusSyn
     # skipping it would leave a gap if the mirror had been cleared by hand.
     repo.replace_source_rows(assets, source_system=SOURCE_SYSTEM)
     if stamp := getattr(repo, "record_sync", None):
-        stamp(SOURCE_SYSTEM, digest)
+        stamp(SOURCE_SYSTEM, digest, api="v1")
     log.info("consensus sync: %s", result.as_dict())
     return result

@@ -11,7 +11,7 @@ from backend.integrations.consensus_oauth import (
     ConsensusOAuth, ConsensusOAuthError, NotAuthorised, get_oauth,
 )
 from backend.integrations.consensus_sync import (
-    SOURCE_SYSTEM, sync_demos, sync_demos_v2,
+    SOURCE_SYSTEM, WouldDowngrade, sync_demos, sync_demos_v2,
 )
 from backend.integrations.consensus_v2 import ConsensusV2Error, get_v2_client
 from backend.integrations.consensus import (
@@ -257,7 +257,8 @@ def share_to_consensus(
 
 
 @router.post("/consensus/sync")
-def sync(repo: AssetRepository = Depends(get_repo),
+def sync(allow_downgrade: bool = False,
+         repo: AssetRepository = Depends(get_repo),
          client: ConsensusClient = Depends(get_client),
          user: CurrentUser = Depends(require_curator)):
     """Index public Consensus demos as catalogue entries. Requires curator.
@@ -287,8 +288,10 @@ def sync(repo: AssetRepository = Depends(get_repo),
                                    client if client.is_configured() else None)
             api = "v2"
         else:
-            result = sync_demos(client, repo)
+            result = sync_demos(client, repo, allow_downgrade=allow_downgrade)
             api = "v1"
+    except WouldDowngrade as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except (ConsensusError, ConsensusV2Error) as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

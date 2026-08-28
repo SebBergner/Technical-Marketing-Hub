@@ -328,7 +328,8 @@ class SqlAssetRepository(AssetRepository):
         self.s.add(row)
         self.s.commit()
 
-    def record_sync(self, source_system: str, fingerprint: str | None = None) -> None:
+    def record_sync(self, source_system: str, fingerprint: str | None = None,
+                    api: str | None = None) -> None:
         """Stamp a successful sync for a source with no delta cursor.
 
         The fingerprint rides in the delta_token column: for a source without a

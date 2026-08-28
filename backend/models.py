@@ -160,6 +160,14 @@ class AssetBase(BaseModel):
     consensus_uuid: str | None = None         # how it goes out externally
 
     stats: AssetStats = Field(default_factory=AssetStats)
+    #: Views recorded by the SOURCE platform, not by us.
+    #:
+    #: Kept apart from `stats.views` on purpose. `stats` is Portal-owned — our
+    #: own counters, which a sync must never overwrite — while this arrives
+    #: with the record and is replaced wholesale like any other mirrored field.
+    #: Writing Consensus's `usage` into stats.views silently discarded it,
+    #: because Portal-owned data is not part of the mirror.
+    external_views: int | None = None
 
     #: Whether a Value Roadmap exists, without shipping the whole thing in list
     #: responses. Lets the UI show an honest "not indexed yet" state in a grid.

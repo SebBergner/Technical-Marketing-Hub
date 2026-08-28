@@ -10,7 +10,10 @@ from backend.deps import CurrentUser, get_repo, require_authenticated, require_c
 from backend.integrations.consensus_oauth import (
     ConsensusOAuth, ConsensusOAuthError, NotAuthorised, get_oauth,
 )
-from backend.integrations.consensus_sync import SOURCE_SYSTEM, sync_demos
+from backend.integrations.consensus_sync import (
+    SOURCE_SYSTEM, sync_demos, sync_demos_v2,
+)
+from backend.integrations.consensus_v2 import ConsensusV2Error, get_v2_client
 from backend.integrations.consensus import (
     ConsensusClient, ConsensusError, ConsensusSchemaUnknown, ShareRecipient,
     get_consensus_client,
@@ -102,8 +105,12 @@ def status(client: ConsensusClient = Depends(get_client),
            repo: AssetRepository = Depends(get_repo)):
     """Is the real client active, and how old is the indexed copy?"""
     state = getattr(repo, "sync_state", None)
+    v2 = get_v2_client()
     return {"configured": client.is_configured(),
             "mode": "http" if client.is_configured() else "stub",
+            # Which API a sync would actually use. V2 is the one with tags.
+            "api": "v2" if v2 is not None else ("v1" if client.is_configured()
+                                                else "stub"),
             "source_system": SOURCE_SYSTEM,
             "indexed": repo.count_source_rows(SOURCE_SYSTEM)
                        if hasattr(repo, "count_source_rows") else None,
@@ -263,19 +270,30 @@ def sync(repo: AssetRepository = Depends(get_repo),
     Only `isPublic` demos are indexed. The rest are customer-specific boards
     and meeting recordings: unmaintained, and they name customers.
     """
-    if not client.is_configured():
+    v2 = get_v2_client()
+    if v2 is None and not client.is_configured():
         raise HTTPException(
             status_code=503,
-            detail=("Consensus is not configured. Set CONSENSUS_BASE_URL, "
-                    "CONSENSUS_API_KEY, CONSENSUS_API_SECRET and "
-                    "CONSENSUS_USER_EMAIL."))
+            detail=("Consensus is not configured. Either authorise V2 at "
+                    "/api/consensus/oauth/start, or set the V1 credentials: "
+                    "CONSENSUS_BASE_URL, CONSENSUS_API_KEY, "
+                    "CONSENSUS_API_SECRET and CONSENSUS_USER_EMAIL."))
     try:
-        result = sync_demos(client, repo)
-    except ConsensusError as exc:
+        if v2 is not None:
+            # V2 whenever it can authenticate: it is the only source of tags,
+            # and tags carry segment, product, funnel stage and industry. V1 is
+            # still asked, but only for the images V2 does not return.
+            result = sync_demos_v2(v2, repo,
+                                   client if client.is_configured() else None)
+            api = "v2"
+        else:
+            result = sync_demos(client, repo)
+            api = "v1"
+    except (ConsensusError, ConsensusV2Error) as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    log.info("consensus sync by %s: %s", user.email, result.as_dict())
-    return {"source_system": SOURCE_SYSTEM, **result.as_dict()}
+    log.info("consensus %s sync by %s: %s", api, user.email, result.as_dict())
+    return {"api": api, **result.as_dict()}
 
 
 # ─────────────────────────────────────────────────── Consensus V2 (OAuth 2.0)

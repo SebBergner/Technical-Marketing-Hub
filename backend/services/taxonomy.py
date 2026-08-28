@@ -148,6 +148,15 @@ _TAG_FUNNEL = {
     "validating": "Decision",
 }
 
+#: Most demos carry SEVERAL funnel tags — 273 are tagged both Prospecting and
+#: Qualifying — but we model one stage. Taking whichever appeared first in the
+#: array made the answer depend on Consensus's ordering, which is not a
+#: decision. Earliest stage wins instead, and deliberately: it answers "how
+#: early in a conversation can this be used", and a demo tagged all three is
+#: genuinely usable from the first meeting onward. The raw tags stay on the
+#: record, so anyone needing the full picture filters on those.
+_FUNNEL_ORDER = ("Awareness", "Consideration", "Decision", "Post-Sale")
+
 #: Depth of treatment. "Technical Tour" is rare (9 uses) and sits alongside
 #: walkthroughs in practice.
 _TAG_DEPTH = {
@@ -217,6 +226,10 @@ def classify_tags(tags: list[str] | None) -> dict:
         if field == "product":
             if value not in out["products"]:
                 out["products"].append(value)
+        elif field == "funnel_stage":
+            current = out["funnel_stage"]
+            if current is None or _FUNNEL_ORDER.index(value) < _FUNNEL_ORDER.index(current):
+                out["funnel_stage"] = value
         elif out[field] is None:
             out[field] = value
     return out

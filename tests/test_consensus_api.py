@@ -11,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import app
+from backend.config import settings
 from backend.deps import get_repo
 from backend.integrations.consensus import (
     ConsensusDemo, ConsensusError, ShareLink, StubConsensusClient,
@@ -44,6 +45,20 @@ FIXTURE_DEMOS = [
     ConsensusDemo(uuid="c0de-1111", title="Registered In Consensus Only",
                   is_published=True),
 ]
+
+
+@pytest.fixture(autouse=True)
+def never_reach_a_real_tenant(monkeypatch):
+    """Blank every Consensus credential for this module.
+
+    A developer with a real .env would otherwise have these tests sync against
+    production. The Graph suite already carries this guard; adding the V2 token
+    to .env is what exposed its absence here.
+    """
+    for name in ("consensus_api_key", "consensus_api_secret",
+                 "consensus_user_email", "consensus_v2_token",
+                 "consensus_oauth_client_id", "consensus_oauth_client_secret"):
+        monkeypatch.setattr(settings, name, None)
 
 
 @pytest.fixture()

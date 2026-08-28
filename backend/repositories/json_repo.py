@@ -58,6 +58,7 @@ _MIRROR_FIELDS = (
     "has_narrated_audio", "named_customer", "uploaded_at", "duration_seconds",
     "thumbnail_url", "web_url", "source_item_id", "brightcove_id", "consensus_uuid",
     "resources", "resource_counts", "resource_count", "video_count", "main_video",
+    "external_views",
 )
 
 
@@ -574,6 +575,7 @@ class JsonAssetRepository(AssetRepository):
             segment=record.get("segment"), industry=record.get("industry"),
             value_drivers=record.get("value_drivers") or [],
             tags=record.get("tags") or [],
+            external_views=record.get("external_views"),
             customer_facing=bool(record.get("customer_facing", True)),
             has_narrated_audio=record.get("has_narrated_audio"),
             named_customer=record.get("named_customer"),

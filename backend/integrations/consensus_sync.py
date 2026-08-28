@@ -45,6 +45,10 @@ import re
 from dataclasses import dataclass, field
 
 from backend.integrations.consensus import ConsensusClient, ConsensusDemo
+from backend.integrations.consensus_v2 import (
+    ConsensusV2Client, folder_path, is_indexable, viewer_url,
+    _as_date as _v2_date,
+)
 from backend.integrations.sync_report import report
 from backend.models import Asset, AssetType
 from backend.services import taxonomy
@@ -194,6 +198,117 @@ def fingerprint(assets: list[Asset]) -> str:
     payload = json.dumps([a.model_dump(mode="json") for a in assets],
                          sort_keys=True, default=str)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def thumbnails_from_v1(client: ConsensusClient | None) -> dict[str, str]:
+    """uuid -> first thumbnail, borrowed from V1.
+
+    V2 is better in every way except one: it returns no images at all, while
+    V1 carries `previewThumbs` on 95% of demos. SharePoint assets have no
+    thumbnails either, so dropping these would leave the entire grid without a
+    single picture.
+
+    So V2 stays authoritative for metadata and V1 is asked for pictures alone.
+    Failure here is not failure of the sync — a catalogue with no images still
+    works, one with no tags is the thing we set out to fix.
+    """
+    if client is None or not client.is_configured():
+        return {}
+    try:
+        return {d.uuid: next(iter((d.raw or {}).get("previewThumbs") or []), None)
+                for d in client.list_demos(limit=2000)}
+    except Exception as exc:                       # noqa: BLE001
+        log.warning("consensus: V1 thumbnails unavailable (%s); "
+                    "indexing without images", exc)
+        return {}
+
+
+def build_assets_v2(demos: list[dict],
+                    thumbnails: dict[str, str] | None = None,
+                    ) -> tuple[list[Asset], ConsensusSyncResult]:
+    """Turn V2 demo records into catalogue assets.
+
+    Strictly better than the V1 path: tags carry segment, product, funnel stage
+    and industry directly, so `internalTitle` parsing drops to a fallback for
+    the 58% of demos that carry no tags. `usage` finally fills view counts,
+    which V1 could not supply at all.
+    """
+    result = ConsensusSyncResult(demos_seen=len(demos))
+    taken: set[str] = set()
+    assets: list[Asset] = []
+
+    for demo in demos:
+        if not is_indexable(demo):
+            result.skipped_private += 1
+            continue
+
+        tags = [t for t in (demo.get("tags") or []) if t and t.strip()]
+        by_tag = taxonomy.classify_tags(tags)
+        # internalTitle is the fallback, not the source: tags are maintained
+        # deliberately, the naming convention only sometimes.
+        parsed = parse_internal_title(demo.get("internalTitle"))
+
+        products = by_tag["products"] or (
+            [parsed["product"]] if parsed["product"] else [])
+        segment = by_tag["segment"] or parsed["segment"]
+        title = (demo.get("title") or demo.get("internalTitle") or "").strip()
+
+        assets.append(Asset(
+            id=_slug(title, taken),
+            type=AssetType.VIDEO,
+            source=SOURCE_SYSTEM,
+            title=title,
+            description=_v2_description(demo),
+            products=products,
+            segment=segment,
+            funnel_stage=by_tag["funnel_stage"],
+            content_depth=by_tag["content_depth"],
+            industry=by_tag["industry"],
+            tags=tags,
+            language=(demo.get("language") or {}).get("code") or "en",
+            duration_seconds=parsed["duration_seconds"],
+            thumbnail_url=(thumbnails or {}).get(demo.get("uuid")),
+            web_url=viewer_url(demo),
+            source_item_id=demo.get("uuid"),
+            consensus_uuid=demo.get("uuid"),
+            uploaded_at=_v2_date(demo.get("creationDate")),
+            customer_facing=True,
+            external_views=int(demo.get("usage") or 0) or None,
+        ))
+        result.with_segment += bool(segment)
+        result.with_product += bool(products)
+
+    result.indexed = len(assets)
+    return assets, result
+
+
+def _v2_description(demo: dict) -> str | None:
+    """Prefer the description, fall back to the folder path.
+
+    V2 descriptions are often empty, and the folder hierarchy —
+    "PTC Digital Thread / Event Support / PTC NEXT - Spring 2026" — is real
+    context that would otherwise be discarded, and it is searchable.
+    """
+    text = (demo.get("description") or "").strip()
+    if text and text.lower() != (demo.get("title") or "").strip().lower():
+        return text
+    path = folder_path(demo)
+    return " / ".join(path) if path else None
+
+
+def sync_demos_v2(client: ConsensusV2Client, repo,
+                  v1_client: ConsensusClient | None = None) -> ConsensusSyncResult:
+    """Index Consensus through V2, with V1 supplying only the images."""
+    demos = client.all_demos()
+    assets, result = build_assets_v2(demos, thumbnails_from_v1(v1_client))
+    digest = fingerprint(assets)
+    previous = (getattr(repo, "sync_state", lambda _: {})(SOURCE_SYSTEM) or {})
+    result.unchanged = bool(previous.get("fingerprint"))         and previous["fingerprint"] == digest
+    repo.replace_source_rows(assets, source_system=SOURCE_SYSTEM)
+    if stamp := getattr(repo, "record_sync", None):
+        stamp(SOURCE_SYSTEM, digest)
+    log.info("consensus v2 sync: %s", result.as_dict())
+    return result
 
 
 def sync_demos(client: ConsensusClient, repo, limit: int = 2000) -> ConsensusSyncResult:

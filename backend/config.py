@@ -69,6 +69,11 @@ class Settings(BaseSettings):
     consensus_oauth_redirect_uri: str =         "http://localhost:8000/api/consensus/oauth/callback"
     #: read:write is deliberately absent. V2 is used only for reading.
     consensus_oauth_scopes: str = "public:api:read read:read"
+    #: A bearer token pasted by hand, from
+    #: https://app.goconsensus.com/api/v2/docs/portal/. Short-lived and tied to
+    #: a person — it exists so V2 work can proceed while the OAuth client
+    #: secret is unusable, and OAuth takes precedence once authorised.
+    consensus_v2_token: str | None = None
 
     # ---------------------------------------------------------------- Brightcove
     brightcove_account_id: str | None = None

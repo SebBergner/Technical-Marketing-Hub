@@ -184,6 +184,68 @@ def test_facet_counts_match_reality(repo):
         assert facet.count == actual, f"product facet {facet.value} count is wrong"
 
 
+def test_a_facet_is_not_scoped_by_its_own_filter(repo):
+    """Choosing a value must not zero out the alternatives to it.
+
+    Counting a dimension by itself makes the control a trap: pick Type=LDK and
+    the Type dropdown reads "LDK (n), Video (0), VDK (0)", which is true and
+    useless, because it can be entered and never left. What the control is
+    really asking is "if I picked this instead, how many?" -- so Type is
+    counted over every filter EXCEPT Type.
+    """
+    unfiltered = {f.value: f.count for f in repo.facets().types}
+    assert len(unfiltered) > 1, "needs at least two types to prove anything"
+    chosen = max(unfiltered, key=unfiltered.get)
+
+    scoped = repo.facets(AssetQuery(types=[chosen]))
+    assert {f.value: f.count for f in scoped.types} == unfiltered
+    # ...while `total` is still the true, fully-filtered result count.
+    assert scoped.total == repo.list(AssetQuery(types=[chosen], limit=10 ** 6)).total
+    assert scoped.total == unfiltered[chosen]
+
+
+def test_every_other_facet_is_still_narrowed(repo):
+    """Self-exclusion applies to one dimension, not to all of them.
+
+    The counterpart to the test above: if choosing a Type left Product alone
+    as well, the panel would go back to promising 382 Creo assets and
+    delivering far fewer.
+    """
+    types = {f.value: f.count for f in repo.facets().types}
+    chosen = max(types, key=types.get)
+    assert types[chosen] < repo.facets().total, "need a type that excludes something"
+
+    before = {f.value: f.count for f in repo.facets().product_families}
+    after = {f.value: f.count for f in
+             repo.facets(AssetQuery(types=[chosen])).product_families}
+    assert after != before
+    for family, count in after.items():
+        assert count <= before[family]
+        actual = repo.list(AssetQuery(types=[chosen], product_families=[family],
+                                      limit=10 ** 6)).total
+        assert count == actual, f"{family} promises {count}, delivers {actual}"
+
+
+def test_facets_stay_honest_when_two_dimensions_are_filtered(repo):
+    """Each dimension excludes only itself, never the other."""
+    types = {f.value: f.count for f in repo.facets().types}
+    chosen_type = max(types, key=types.get)
+    fams = {f.value: f.count for f in
+            repo.facets(AssetQuery(types=[chosen_type])).product_families}
+    chosen_family = max(fams, key=fams.get)
+
+    both = repo.facets(AssetQuery(types=[chosen_type],
+                                  product_families=[chosen_family]))
+    # Type is counted across the family slice, so switching type stays possible.
+    assert {f.value: f.count for f in both.types} == {
+        f.value: f.count
+        for f in repo.facets(AssetQuery(product_families=[chosen_family])).types}
+    # Family is counted across the type slice, likewise.
+    assert {f.value: f.count for f in both.product_families} == fams
+    assert both.total == repo.list(AssetQuery(
+        types=[chosen_type], product_families=[chosen_family], limit=10 ** 6)).total
+
+
 # ────────────────────────────────────────────────────── real-catalogue shape
 def test_resources_reflect_the_folder_structure(repo):
     """An asset is a SharePoint folder; its files are resources."""

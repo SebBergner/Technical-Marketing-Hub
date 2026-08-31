@@ -1876,19 +1876,32 @@ hubApplyFilters();
   /* One compact button per platform the asset is actually on. Nothing is
      rendered for platforms it is not on -- with three sources, labelling every
      absence would give each card a row of things it is not. */
-  /* A logo button is an icon, not a bar: the actions row is flex, so without
-     this it stretched to the full card width around a 16px mark. */
-  .hub-platform { display:inline-flex; align-items:center; gap:5px;
-    flex:0 0 auto !important; width:auto !important; padding:5px 9px; }
-  .asset-card__actions { justify-content:flex-start; }
-  .hub-platform__logo { height:14px; width:auto; }
-  .hub-platform__logo { height:16px; width:16px; }
-  /* The Consensus mark is a full-colour gradient, so the button must not tint
-     it -- it sits on a neutral surface instead of the platform orange. */
-  .hub-platform--consensus {
+  /* The platform that HOSTS the asset gets the verb; any other platform it
+     also lives on gets just its mark. A Consensus demo exists to be shared, so
+     it keeps the full share button -- in Consensus colours. A SharePoint kit
+     that merely has a Consensus recording gets a 36px logo: real, secondary,
+     and still legible once a third platform appears beside it. */
+  .hub-platform { display:inline-flex; align-items:center; justify-content:center;
+    gap:6px; padding:5px 9px; }
+  .asset-card__actions { justify-content:flex-start; gap:6px; }
+  .hub-platform__logo { height:16px; width:16px; flex:0 0 auto; }
+
+  /* Cross-reference: the mark alone, on a neutral surface. It must not be
+     tinted -- the Consensus mark is a full-colour gradient. */
+  .hub-platform--ref { flex:0 0 auto; width:auto;
     background: var(--orion-surface-2); border:1px solid var(--orion-border-md);
-    color: var(--orion-text);
-  }
+    color: var(--orion-text); }
+  .hub-platform--ref:hover { border-color:#FC6839; }
+
+  /* Home platform: fills the row as the original share button did. The mark
+     would disappear into the platform's own orange, so the colour carries the
+     identity and a plain white icon carries the verb. */
+  .hub-platform--home { flex:1 1 auto; width:100%; border:none; color:#fff;
+    font-weight:600; padding:7px 12px; }
+  .hub-platform--home .orion-ico { color:#fff; }
+  .hub-platform--home.hub-platform--consensus {
+    background: linear-gradient(135deg,#FFB352 0%,#FC6839 52%,#EB2E24 100%); }
+  .hub-platform--home.hub-platform--consensus:hover { filter:brightness(1.07); }
 </style>
 <div id="hubApiStatus" class="hub-api-status"></div>
 <script src="/static/hub-api.js" defer></script>

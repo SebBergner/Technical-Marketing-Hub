@@ -151,14 +151,22 @@
    * in there yet, so the button falls back to an icon and the platform name --
    * and the moment someone drops a <symbol id="logo-consensus"> into
    * index.html it starts using it, with no change here. */
+  /* Distribution platforms an asset can be acted on.
+   *
+   * `field` is what proves the asset is really there; `home` is the source
+   * value for which this platform IS the asset's home rather than a
+   * cross-reference. Adding Brightcove later means one entry here and nothing
+   * else.
+   */
   var PLATFORMS = [
     {
       key: "consensus",
       field: "consensus_uuid",
+      home: "consensus",
       label: "Consensus",
+      verb: "Share Demo",
       sprite: "logo-consensus",
-      fallbackIcon: "i-send",
-      title: "Share this through Consensus"
+      icon: "i-send"
     }
   ];
 
@@ -166,15 +174,21 @@
     return !!document.getElementById(id);
   }
 
-  /* Replace the card's action area with one compact button per platform the
-   * asset is genuinely on.
+  /* Rebuild the card's action area from the platforms the asset is genuinely
+   * on -- and in the form that matches what the platform IS to that asset.
    *
-   * Nothing is rendered for platforms it is NOT on. videoAssetFromData()
-   * shipped a "No audio track" badge in that slot, which was the mockup's only
-   * reason for being unshareable and the wrong reason here -- a SharePoint kit
-   * is not silent, it simply has no Consensus recording. Labelling every
-   * absence does not scale either: with three platforms each card would carry
-   * a row of things it is not. Presence is worth showing; absence is not.
+   * A Consensus demo exists in order to be shared, so Consensus is its home
+   * and it keeps the full "Share Demo" button, in Consensus colours. A
+   * SharePoint kit that merely happens to have a Consensus recording gets the
+   * mark alone: a real but secondary affordance, and one that stays legible
+   * when a third and fourth platform appear beside it. Home platforms get the
+   * verb, references get the logo.
+   *
+   * Nothing at all is rendered for a platform the asset is NOT on.
+   * videoAssetFromData() shipped a "No audio track" badge in this slot, which
+   * was the mockup's only reason for being unshareable and the wrong reason
+   * here. Labelling every absence does not scale either -- with three
+   * platforms each card would carry a row of things it is not.
    */
   function platformActions(card, a) {
     var actions = card.querySelector(".asset-card__actions");
@@ -186,18 +200,33 @@
       return;
     }
 
+    // The home platform first: it is the primary action on the card.
+    available.sort(function (x, y) {
+      return (y.home === a.source) - (x.home === a.source);
+    });
+
     actions.innerHTML = "";
     available.forEach(function (p) {
+      var isHome = p.home === a.source;
       var btn = document.createElement("button");
-      btn.className = "btn-primary-sm hub-platform hub-platform--" + p.key;
-      btn.title = p.title;
-      btn.setAttribute("aria-label", p.title);
-      btn.innerHTML = spriteExists(p.sprite)
-        ? '<svg class="hub-platform__logo"><use href="#' + p.sprite + '"/></svg>'
-        : '<svg class="orion-ico--sm orion-ico"><use href="#' + p.fallbackIcon
-          + '"/></svg>' + p.label;
+      btn.className = "btn-primary-sm hub-platform hub-platform--" + p.key
+                    + (isHome ? " hub-platform--home" : " hub-platform--ref");
+      btn.title = isHome ? p.verb : "Also on " + p.label + " -- share that copy";
+      btn.setAttribute("aria-label", btn.title);
 
-      var meta = [a.segment, a.funnel_stage].filter(Boolean).join(" \u00b7 ");
+      if (isHome) {
+        // The mark is a full-colour gradient and would vanish on the platform's
+        // own orange, so the colour carries the identity and the icon the verb.
+        btn.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#'
+                      + p.icon + '"/></svg>' + p.verb;
+      } else {
+        btn.innerHTML = spriteExists(p.sprite)
+          ? '<svg class="hub-platform__logo"><use href="#' + p.sprite + '"/></svg>'
+          : '<svg class="orion-ico--sm orion-ico"><use href="#' + p.icon
+            + '"/></svg>' + p.label;
+      }
+
+      var meta = [a.segment, a.funnel_stage].filter(Boolean).join(" · ");
       btn.addEventListener("click", function () {
         window.openShareModal(a.title, meta, a[p.field]);
       });
@@ -243,6 +272,17 @@
   function fillSelect(id, facet) {
     var el = document.getElementById(id);
     if (!el || !facet || !facet.length) return;
+
+    // Keep the labels already in the markup. Our facet values are storage
+    // keys -- "video", "vdk" -- and rebuilding from them turned Elio's
+    // "Video / LDK / VDK" into lower case. The data decides which options
+    // exist and what they count; the markup still decides what they are
+    // called, and an unlabelled value falls back to itself.
+    var labels = {};
+    Array.prototype.forEach.call(el.options, function (o) {
+      if (o.value) labels[o.value] = o.textContent.replace(/\s*\(\d+\)\s*$/, "");
+    });
+
     var keep = el.options.length ? el.options[0] : null;
     el.innerHTML = "";
     if (keep) el.appendChild(keep);
@@ -250,7 +290,7 @@
       .forEach(function (f) {
         var o = document.createElement("option");
         o.value = f.value;
-        o.textContent = f.value + " (" + f.count + ")";
+        o.textContent = (labels[f.value] || f.value) + " (" + f.count + ")";
         el.appendChild(o);
       });
   }
@@ -302,7 +342,8 @@
    * real catalogue of 382 and 491 those are not merely stale, they contradict
    * what the same page shows two panels away. Numbers nobody can reconcile are
    * worse than no numbers, so each one is either corrected or removed. */
-  function fillSidebarCounts(facets, assets) {
+  function fillSidebarCounts(facets) {
+    if (!baselineFacets) baselineFacets = facets;
     var counts = {};
     // Families, segments and funnel stages all label themselves in the nav, so
     // one flat lookup keyed by the displayed name covers every group.
@@ -346,8 +387,10 @@
         cleared++;
       }
     });
-    console.info("[hub-api] sidebar: %d counts corrected, %d removed",
-                 updated, cleared);
+    if (facets === baselineFacets) {
+      console.info("[hub-api] sidebar: %d counts corrected, %d removed",
+                   updated, cleared);
+    }
   }
 
   /* ------------------------------------------------- API-driven filtering */
@@ -364,8 +407,8 @@
   var LANDING = ["continueSection", "latestUploadsSection", "mostViewedSection",
                  "browseByProductSection", "editorsPicksSection"];
   var RESULT_LIMIT = 200;        // the API's own ceiling, and plenty to scroll
-  var navFilter = null;          // {key, value, label} from the left nav
   var inFlight = 0;
+  var baselineFacets = null;     // whole-catalogue counts, for when all clear
 
   function val(id) {
     var el = document.getElementById(id);
@@ -383,7 +426,6 @@
     var cf = val("hubFilterCf");
     if (cf === "yes") params.set("customer_facing", "true");
     if (cf === "no") params.set("customer_facing", "false");
-    if (navFilter) params.append(navFilter.key, navFilter.value);
     return params;
   }
 
@@ -407,6 +449,7 @@
     var params = currentQuery();
     var active = params.toString().length > 0;
 
+    markNavActive();
     var reset = document.getElementById("hubResetBtn");
     if (reset) reset.style.display = active ? "inline-flex" : "none";
     LANDING.forEach(function (id) {
@@ -418,7 +461,10 @@
     });
     var all = document.getElementById("allAssetsSection");
     if (all) all.style.display = active ? "" : "none";
-    if (!active) return;
+    if (!active) {
+      if (baselineFacets) fillSidebarCounts(baselineFacets);
+      return;
+    }
 
     var ticket = ++inFlight;
     var assetParams = new URLSearchParams(params);
@@ -451,6 +497,10 @@
     rescoreSelect("hubFilterProduct", facets.product_families);
     rescoreSelect("hubFilterSegment", facets.segments);
     rescoreSelect("hubFilterStage", facets.funnel_stages);
+    // The sidebar shows the same three dimensions, so it takes the same
+    // numbers. Leaving it on whole-catalogue counts would reintroduce, one
+    // panel over, exactly the contradiction this is meant to remove.
+    fillSidebarCounts(facets);
 
     var none = document.querySelector(".hub-noresults");
     if (none) none.classList.toggle("show", page.total === 0);
@@ -489,41 +539,61 @@
       var el = document.getElementById(id);
       if (el) el.value = "";
     });
-    navFilter = null;
-    markNavActive(null);
     applyFilters();
   }
 
   /* ---------------------------------------------------------- the left nav */
 
-  /* Clicking "LDKs" should land you in the catalogue already narrowed to LDKs,
-   * which is what the nav looks like it promises. Home clears everything and
-   * returns to the curated landing page. */
-  function wireNav(facets) {
-    var families = {};
-    (facets.product_families || []).forEach(function (f) { families[f.value] = 1; });
-    var stages = {};
-    (facets.funnel_stages || []).forEach(function (f) { stages[f.value] = 1; });
-    var types = { "Videos": "video", "LDKs": "ldk", "VDKs": "vdk",
-                  "Virtual Machines": "vm" };
+  /* The left nav and the filter bar were two independent filter systems aimed
+   * at the same three dimensions, and that is what made the panel feel broken:
+   * pick "Videos" in the nav and the Type dropdown still read "All", while
+   * every other Type option read (0). Both were telling the truth and together
+   * they were incoherent.
+   *
+   * Every nav group maps exactly onto a control that already exists -- BROWSE
+   * BY TYPE onto Type, BROWSE BY PRODUCT onto Product, FUNNEL STAGE onto
+   * Stage. So the nav stops being a filter of its own and becomes a second
+   * view of the same state: clicking it sets the dropdown, and the dropdown
+   * lights the nav. One source of truth per dimension, and they can no longer
+   * disagree because there is nothing left to disagree with.
+   *
+   * (The other half of the fix is in the API: a facet is now counted over
+   * every filter EXCEPT its own, so with Type=Video the Type dropdown still
+   * offers LDK 259 and VDK 196 rather than two dead zeroes.)
+   */
+  var NAV_TYPE = { "Videos": "video", "LDKs": "ldk", "VDKs": "vdk",
+                   "Virtual Machines": "vm" };
+  var navTargets = {};   // nav label -> {control, value}
 
+  function wireNav(facets) {
+    var families = {}, stages = {};
+    (facets.product_families || []).forEach(function (f) { families[f.value] = 1; });
+    (facets.funnel_stages || []).forEach(function (f) { stages[f.value] = 1; });
+
+    navTargets = {};
     document.querySelectorAll(".orion-navitem").forEach(function (item) {
       var name = navLabel(item);
       var target = null;
-      if (name === "Home") target = { key: null };
-      else if (types[name]) target = { key: "type", value: types[name] };
-      else if (families[name]) target = { key: "family", value: name };
-      else if (stages[name]) target = { key: "stage", value: name };
+      if (name === "Home") target = { control: null };
+      else if (NAV_TYPE[name]) target = { control: "hubFilterType", value: NAV_TYPE[name] };
+      else if (families[name]) target = { control: "hubFilterProduct", value: name };
+      else if (stages[name]) target = { control: "hubFilterStage", value: name };
       if (!target) return;              // Favorites, Request New Asset, ...
 
+      navTargets[name] = target;
       item.style.cursor = "pointer";
       item.addEventListener("click", function () {
-        if (target.key) {
-          navFilter = { key: target.key, value: target.value, label: name };
-          markNavActive(name);
+        if (!target.control) { clearAll(); }
+        else {
+          // Re-read the control every time: takeOverControls() replaces these
+          // nodes to drop Elio's listeners, so a captured reference would be
+          // pointing at an element no longer in the document.
+          var el = document.getElementById(target.control);
+          if (!el) return;
+          // Clicking the group you are already in leaves it, so the nav has
+          // an exit of its own rather than only the dropdown beside it.
+          el.value = (el.value === target.value) ? "" : target.value;
           applyFilters();
-        } else {
-          clearAll();                   // Home
         }
         window.scrollTo({ top: 0, behavior: "smooth" });
       });
@@ -542,11 +612,23 @@
     return name || label.textContent.trim();
   }
 
-  function markNavActive(name) {
+  /* Derived from the controls rather than set alongside them, so the highlight
+   * is correct however the filter was chosen -- nav, dropdown, or product
+   * tile. Home lights up when nothing is filtered at all. */
+  function markNavActive() {
+    var anyOn = CONTROLS.some(function (id) {
+      var el = document.getElementById(id);
+      return el && el.value;
+    });
     document.querySelectorAll(".orion-navitem").forEach(function (item) {
-      var text = navLabel(item);
-      item.classList.toggle("is-active",
-        name === null ? text === "Home" : text === name);
+      var target = navTargets[navLabel(item)];
+      var on = false;
+      if (target && !target.control) on = !anyOn;                  // Home
+      else if (target) {
+        var el = document.getElementById(target.control);
+        on = !!el && el.value === target.value;
+      }
+      item.classList.toggle("is-active", on);
     });
   }
 
@@ -591,8 +673,8 @@
       // The tile looks clickable and now behaves that way, matching the nav.
       tile.style.cursor = "pointer";
       tile.addEventListener("click", function () {
-        navFilter = { key: "family", value: family, label: family };
-        markNavActive(family);
+        var el = document.getElementById("hubFilterProduct");
+        if (el) el.value = family;
         applyFilters();
         window.scrollTo({ top: 0, behavior: "smooth" });
       });
@@ -668,9 +750,10 @@
     fillSelect("hubFilterSegment", facets.segments);
     fillSelect("hubFilterStage", facets.funnel_stages);
     fillSelect("hubFilterType", facets.types);
-    fillSidebarCounts(facets, assets);
+    fillSidebarCounts(facets);
     takeOverControls();
     wireNav(facets);
+    markNavActive();
     fillProductTiles();
 
     var bySource = assets.reduce(function (acc, a) {

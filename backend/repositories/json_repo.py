@@ -34,6 +34,7 @@ import logging
 import os
 import threading
 from collections import Counter
+from dataclasses import replace
 from datetime import date
 from typing import Any
 
@@ -292,32 +293,63 @@ class JsonAssetRepository(AssetRepository):
         return Asset(**data)
 
     def facets(self, query: AssetQuery | None = None) -> Facets:
+        """Every filter value with a real count, each scoped to its own slice.
+
+        A facet is counted over the results of every filter EXCEPT its own.
+        Counting a dimension by itself is what makes a filter panel a trap:
+        choose Type=VDK and the Type dropdown reads "VDK (196), Video (0),
+        LDK (0)" -- true, and useless, because it can be entered and never
+        left. The question the control actually answers is "if I picked this
+        instead, how many?", which is this slice. Every other dimension stays
+        scoped by Type=VDK, so Product still narrows honestly.
+
+        `total` excludes nothing: it is the real result count.
+        """
+        base = query or AssetQuery()
         # Deliberately the same _rows() the listing uses, so a facet count can
         # never disagree with the number of results clicking it produces.
-        rows = self._rows(query) if query else self._load_mirror()
+        full = self._rows(base) if query else self._load_mirror()
+        cache: dict[str, list[dict]] = {}
 
-        def scalar(field: str) -> list[FacetValue]:
+        def rows_for(dimension: str) -> list[dict]:
+            # An unfiltered dimension has nothing to exclude and shares `full`,
+            # so a typical request re-filters once or twice, not eleven times.
+            if not getattr(base, dimension):
+                return full
+            if dimension not in cache:
+                cache[dimension] = self._rows(replace(base, **{dimension: []}))
+            return cache[dimension]
+
+        def scalar(field: str, dimension: str) -> list[FacetValue]:
+            rows = rows_for(dimension)
             counts = Counter(r.get(field) for r in rows if r.get(field))
             return [FacetValue(value=v, count=n) for v, n in sorted(counts.items())]
 
-        def multi(field: str) -> list[FacetValue]:
+        def multi(field: str, dimension: str) -> list[FacetValue]:
+            rows = rows_for(dimension)
             counts = Counter(v for r in rows for v in (r.get(field) or []))
             return [FacetValue(value=v, count=n) for v, n in sorted(counts.items())]
 
         # Families are derived, not stored: the mapping is code, so a change to
         # it must take effect without a re-sync.
         family_counts = Counter(
-            f for r in rows for f in taxonomy.families_of(r.get("products")))
+            f for r in rows_for("product_families")
+            for f in taxonomy.families_of(r.get("products")))
 
         return Facets(
-            types=scalar("type"), products=multi("products"),
-            funnel_stages=scalar("funnel_stage"), segments=scalar("segment"),
-            industries=scalar("industry"), value_drivers=multi("value_drivers"),
-            languages=scalar("language"), content_depths=scalar("content_depth"),
-            sources=scalar("source"), tags=multi("tags"),
+            types=scalar("type", "types"),
+            products=multi("products", "products"),
+            funnel_stages=scalar("funnel_stage", "funnel_stages"),
+            segments=scalar("segment", "segments"),
+            industries=scalar("industry", "industries"),
+            value_drivers=multi("value_drivers", "value_drivers"),
+            languages=scalar("language", "languages"),
+            content_depths=scalar("content_depth", "content_depths"),
+            sources=scalar("source", "sources"),
+            tags=multi("tags", "tags"),
             product_families=[FacetValue(value=v, count=n)
                               for v, n in sorted(family_counts.items())],
-            total=len(rows),
+            total=len(full),
         )
 
     def rails(self) -> dict[str, list[str]]:

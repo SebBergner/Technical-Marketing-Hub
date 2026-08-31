@@ -10,6 +10,7 @@ junction tables, not a different database.
 """
 from __future__ import annotations
 
+import dataclasses
 from collections import Counter
 from datetime import datetime
 
@@ -157,46 +158,69 @@ class SqlAssetRepository(AssetRepository):
         return Asset(**data)
 
     def facets(self, query: AssetQuery | None = None) -> Facets:
-        if query is not None:
-            # Reuse the listing's own filtering so a facet count can never
-            # disagree with the number of results clicking it produces. limit
-            # and offset are neutralised: facets describe the whole slice, not
-            # the page of it being shown.
-            import dataclasses
-            unpaged = dataclasses.replace(query, limit=10 ** 9, offset=0)
-            rows = [pair[0] for pair in self._rows(unpaged)]
-        else:
-            rows = self.s.execute(
+        """Every filter value with a real count, each scoped to its own slice.
+
+        Mirrors JsonAssetRepository.facets exactly, including the
+        self-exclusion rule -- a facet is counted over every filter except its
+        own, so a dropdown can always be changed as well as entered. See the
+        docstring there for why. The two implementations are held to the same
+        assertions in tests/test_repository.py.
+        """
+        # limit and offset are neutralised throughout: facets describe the
+        # whole slice, not the page of it being shown.
+        base = dataclasses.replace(query, limit=10 ** 9, offset=0)             if query is not None else None
+
+        def unfiltered() -> list:
+            return self.s.execute(
                 select(AssetSource)
                 .join(AssetIdentity, AssetIdentity.asset_id == AssetSource.asset_id)
                 .where(AssetIdentity.retired_at.is_(None))
             ).scalars().all()
 
-        def scalar(attr: str) -> list[FacetValue]:
+        # Reuse the listing's own filtering so a facet count can never disagree
+        # with the number of results clicking it produces.
+        full = [pair[0] for pair in self._rows(base)] if base else unfiltered()
+        cache: dict[str, list] = {}
+
+        def rows_for(dimension: str) -> list:
+            if base is None or not getattr(base, dimension):
+                return full
+            if dimension not in cache:
+                cleared = dataclasses.replace(base, **{dimension: []})
+                cache[dimension] = [pair[0] for pair in self._rows(cleared)]
+            return cache[dimension]
+
+        def scalar(attr: str, dimension: str) -> list[FacetValue]:
+            rows = rows_for(dimension)
             c = Counter(getattr(r, attr) for r in rows if getattr(r, attr))
             return [FacetValue(value=v, count=n) for v, n in sorted(c.items())]
 
-        def multi(attr: str) -> list[FacetValue]:
+        def multi(attr: str, dimension: str) -> list[FacetValue]:
+            rows = rows_for(dimension)
             c = Counter(v for r in rows for v in (getattr(r, attr) or []))
             return [FacetValue(value=v, count=n) for v, n in sorted(c.items())]
 
         return Facets(
-            types=scalar("type"),
-            products=multi("products"),
-            funnel_stages=scalar("funnel_stage"),
-            segments=scalar("segment"),
-            industries=scalar("industry"),
-            value_drivers=multi("value_drivers"),
-            languages=scalar("language"),
-            content_depths=scalar("content_depth"),
-            sources=scalar("source_system"),
+            types=scalar("type", "types"),
+            products=multi("products", "products"),
+            funnel_stages=scalar("funnel_stage", "funnel_stages"),
+            segments=scalar("segment", "segments"),
+            industries=scalar("industry", "industries"),
+            value_drivers=multi("value_drivers", "value_drivers"),
+            languages=scalar("language", "languages"),
+            content_depths=scalar("content_depth", "content_depths"),
+            sources=scalar("source_system", "sources"),
+            # No tags: AssetSource has no such column. The SQL schema predates
+            # the Consensus tag work and this backend has not been used since,
+            # so the gap is left visible rather than papered over with [].
             # Derived, not stored: the mapping lives in code, so changing it
             # must take effect without a re-sync.
             product_families=[
                 FacetValue(value=v, count=n) for v, n in sorted(Counter(
-                    f for r in rows for f in taxonomy.families_of(r.products)
+                    f for r in rows_for("product_families")
+                    for f in taxonomy.families_of(r.products)
                 ).items())],
-            total=len(rows),
+            total=len(full),
         )
 
     def rails(self) -> dict[str, list[str]]:

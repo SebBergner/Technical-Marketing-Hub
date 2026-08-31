@@ -143,20 +143,66 @@
     }
   }
 
-  /* videoAssetFromData() falls back to a "No audio track" badge whenever there
-   * is no share payload, because in the mockup the only reason to be unable to
-   * share was a silent cut. For a SharePoint demo kit that is simply untrue --
-   * it is not missing narration, it is not registered in Consensus -- and a
-   * label that states the wrong reason is worse than none, because someone
-   * will act on it. */
-  function fixShareFallback(card, a) {
-    if (a.consensus_uuid) return;
-    var badge = card.querySelector(".orion-badge");
-    if (!badge) return;
-    if (a.has_narrated_audio === false) return;   // then the badge is correct
-    badge.textContent = "Not on Consensus";
-    badge.title = "This asset has no Consensus recording, so it cannot be "
-                + "shared externally from here.";
+  /* Distribution platforms an asset can be acted on, keyed by the field that
+   * proves it is actually there. Adding Brightcove or Velocity later means one
+   * entry here and nothing else.
+   *
+   * `sprite` is looked up in the page's SVG symbol set. Consensus has no mark
+   * in there yet, so the button falls back to an icon and the platform name --
+   * and the moment someone drops a <symbol id="logo-consensus"> into
+   * index.html it starts using it, with no change here. */
+  var PLATFORMS = [
+    {
+      key: "consensus",
+      field: "consensus_uuid",
+      label: "Consensus",
+      sprite: "logo-consensus",
+      fallbackIcon: "i-send",
+      title: "Share this through Consensus"
+    }
+  ];
+
+  function spriteExists(id) {
+    return !!document.getElementById(id);
+  }
+
+  /* Replace the card's action area with one compact button per platform the
+   * asset is genuinely on.
+   *
+   * Nothing is rendered for platforms it is NOT on. videoAssetFromData()
+   * shipped a "No audio track" badge in that slot, which was the mockup's only
+   * reason for being unshareable and the wrong reason here -- a SharePoint kit
+   * is not silent, it simply has no Consensus recording. Labelling every
+   * absence does not scale either: with three platforms each card would carry
+   * a row of things it is not. Presence is worth showing; absence is not.
+   */
+  function platformActions(card, a) {
+    var actions = card.querySelector(".asset-card__actions");
+    if (!actions) return;
+
+    var available = PLATFORMS.filter(function (p) { return a[p.field]; });
+    if (!available.length) {
+      actions.remove();          // say nothing rather than say "not available"
+      return;
+    }
+
+    actions.innerHTML = "";
+    available.forEach(function (p) {
+      var btn = document.createElement("button");
+      btn.className = "btn-primary-sm hub-platform hub-platform--" + p.key;
+      btn.title = p.title;
+      btn.setAttribute("aria-label", p.title);
+      btn.innerHTML = spriteExists(p.sprite)
+        ? '<svg class="hub-platform__logo"><use href="#' + p.sprite + '"/></svg>'
+        : '<svg class="orion-ico--sm orion-ico"><use href="#' + p.fallbackIcon
+          + '"/></svg>' + p.label;
+
+      var meta = [a.segment, a.funnel_stage].filter(Boolean).join(" \u00b7 ");
+      btn.addEventListener("click", function () {
+        window.openShareModal(a.title, meta, a[p.field]);
+      });
+      actions.appendChild(btn);
+    });
   }
 
   function buildCard(a) {
@@ -168,7 +214,7 @@
     card.dataset.assetId = a.id || "";
 
     retypeCard(card, a);
-    fixShareFallback(card, a);
+    platformActions(card, a);
 
     var meta = card.querySelector(".asset-card__meta");
     if (meta) meta.insertBefore(sourceBadge(a.source), meta.firstChild);
@@ -504,6 +550,55 @@
     });
   }
 
+  /* --------------------------------------------------- browse-by-product */
+
+  /* The product tiles ship with counts typed in by hand -- "24 videos, 9 kits,
+   * 1 VDE" for Windchill, which really has 203 assets. Same problem as the
+   * sidebar, and the same answer: ask for the counts, or show none.
+   *
+   * The breakdown per family is exactly what a scoped facet call returns, so
+   * one request per tile gives the real split. Four small parallel requests on
+   * a page that already fetched 946 assets is not worth optimising away.
+   */
+  var TILE_FAMILY = { "logo-windchill": "Windchill", "logo-creo": "Creo",
+                      "logo-servicemax": "ServiceMax",
+                      "logo-codebeamer": "Codebeamer",
+                      "logo-seismic": "Seismic" };
+
+  async function fillProductTiles() {
+    var tiles = document.querySelectorAll("#browseByProductSection .product-tile");
+    await Promise.all(Array.prototype.map.call(tiles, async function (tile) {
+      var use = tile.querySelector("use");
+      var href = use ? (use.getAttribute("href") || "").replace("#", "") : "";
+      var family = TILE_FAMILY[href];
+      var out = tile.querySelector(".product-tile__count");
+      if (!out) return;
+      if (!family) { out.textContent = ""; return; }
+
+      try {
+        var facets = await getJSON("/api/taxonomy?family=" + encodeURIComponent(family));
+        var byType = {};
+        (facets.types || []).forEach(function (t) { byType[t.value] = t.count; });
+        var kits = (byType.ldk || 0) + (byType.vdk || 0);
+        var parts = [];
+        if (byType.video) parts.push(byType.video + " videos");
+        if (kits) parts.push(kits + " kits");
+        out.textContent = parts.join(" \u00b7 ") || facets.total + " assets";
+      } catch (err) {
+        out.textContent = "";      // no number beats a wrong one
+      }
+
+      // The tile looks clickable and now behaves that way, matching the nav.
+      tile.style.cursor = "pointer";
+      tile.addEventListener("click", function () {
+        navFilter = { key: "family", value: family, label: family };
+        markNavActive(family);
+        applyFilters();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    }));
+  }
+
   /* ------------------------------------------------------------------ boot */
 
   /* Fetch and parse, treating a non-2xx as the failure it is. Reading `.items`
@@ -576,6 +671,7 @@
     fillSidebarCounts(facets, assets);
     takeOverControls();
     wireNav(facets);
+    fillProductTiles();
 
     var bySource = assets.reduce(function (acc, a) {
       acc[a.source] = (acc[a.source] || 0) + 1;

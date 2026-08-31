@@ -361,6 +361,20 @@
    * worse than no numbers, so each one is either corrected or removed. */
   function fillSidebarCounts(facets) {
     if (!baselineFacets) baselineFacets = facets;
+
+    /* Which nav labels the catalogue knows about at all, from the unfiltered
+     * counts. It is the difference between "zero here" and "we have no such
+     * number", and the sidebar has to be able to say both. */
+    var knownValues = {};
+    ["product_families", "segments", "funnel_stages", "content_depths"]
+      .forEach(function (k) {
+        (baselineFacets[k] || []).forEach(function (f) { knownValues[f.value] = 1; });
+      });
+    (baselineFacets.types || []).forEach(function (f) {
+      Object.keys(NAV_TYPE).forEach(function (label) {
+        if (NAV_TYPE[label] === f.value) knownValues[label] = 1;
+      });
+    });
     var counts = {};
     // Families, segments and funnel stages all label themselves in the nav, so
     // one flat lookup keyed by the displayed name covers every group.
@@ -397,6 +411,11 @@
       if (counts[name] !== undefined) {
         count.textContent = counts[name];
         updated++;
+      } else if (knownValues[name]) {
+        // The value exists in the catalogue but nothing in the current slice
+        // matches it. That is a real zero, and blank would read as "unknown".
+        count.textContent = "0";
+        updated++;
       } else {
         // No honest number for this one -- Favorites needs per-user state we
         // do not collect. Drop the figure rather than leave a fabricated one.
@@ -426,6 +445,11 @@
   var RESULT_LIMIT = 200;        // the API's own ceiling, and plenty to scroll
   var inFlight = 0;
   var baselineFacets = null;     // whole-catalogue counts, for when all clear
+  /* An explicit sort, when something other than the default is wanted -- the
+   * Latest Uploads view, and the segment pages, whose grid must NOT repeat the
+   * ten cards already in the rail above it. Both default to recency otherwise,
+   * and the overlap was exactly 10 of 10. */
+  var sortOverride = null;
 
   function val(id) {
     var el = document.getElementById(id);
@@ -446,6 +470,16 @@
     return params;
   }
 
+  /* The sort is not part of the facet query -- counts do not depend on order
+   * -- so it is added only where results are fetched. */
+  function effectiveSort() {
+    if (sortOverride) return sortOverride;
+    // On a segment page the rail above already shows the ten newest, so the
+    // grid lists the whole segment alphabetically instead of repeating them.
+    if (val("hubFilterSegment") && !val("hubSearchInput")) return "title";
+    return null;
+  }
+
   /* Rewrite each option's count in place, keeping the selection. A value the
    * current filters exclude entirely shows as (0) rather than disappearing:
    * options vanishing as you type is disorienting, and (0) is the honest
@@ -464,9 +498,11 @@
 
   async function applyFilters() {
     var params = currentQuery();
-    var active = params.toString().length > 0;
+    var active = params.toString().length > 0 || !!sortOverride;
 
     markNavActive();
+    renderSuggestions(val("hubSearchInput"));
+    renderSegmentHeader();
     var reset = document.getElementById("hubResetBtn");
     if (reset) reset.style.display = active ? "inline-flex" : "none";
     LANDING.forEach(function (id) {
@@ -482,10 +518,13 @@
       if (baselineFacets) fillSidebarCounts(baselineFacets);
       return;
     }
+    if (all) all.style.display = "";
 
     var ticket = ++inFlight;
     var assetParams = new URLSearchParams(params);
     assetParams.set("limit", RESULT_LIMIT);
+    var sort = effectiveSort();
+    if (sort) assetParams.set("sort", sort);
 
     var page, facets;
     try {
@@ -501,6 +540,22 @@
     var grid = document.getElementById("allAssetsGrid");
     grid.innerHTML = "";
     page.items.forEach(function (a) { grid.appendChild(buildCard(a)); });
+
+    // "All Assets" under a PLM page is misleading -- they are all PLM assets.
+    var heading = document.querySelector("#allAssetsSection .section-head__title");
+    if (heading) {
+      var seg = val("hubFilterSegment");
+      var node = heading.firstChild;
+      while (node) {
+        if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+          node.textContent = sortOverride === "recent" ? " Latest uploads "
+                           : seg ? " All " + seg + " assets "
+                           : " All Assets ";
+          break;
+        }
+        node = node.nextSibling;
+      }
+    }
 
     var count = document.getElementById("allAssetsCount");
     if (count) {
@@ -556,6 +611,7 @@
       var el = document.getElementById(id);
       if (el) el.value = "";
     });
+    sortOverride = null;
     applyFilters();
   }
 
@@ -580,19 +636,25 @@
    */
   var NAV_TYPE = { "Videos": "video", "LDKs": "ldk", "VDKs": "vdk",
                    "Virtual Machines": "vm" };
-  var navTargets = {};   // nav label -> {control, value}
+  var navTargets = {};   // nav label -> {control, value, page}
 
   function wireNav(facets) {
-    var families = {}, stages = {};
+    var families = {}, stages = {}, segments = {};
     (facets.product_families || []).forEach(function (f) { families[f.value] = 1; });
     (facets.funnel_stages || []).forEach(function (f) { stages[f.value] = 1; });
+    (facets.segments || []).forEach(function (f) { segments[f.value] = 1; });
 
     navTargets = {};
     document.querySelectorAll(".orion-navitem").forEach(function (item) {
       var name = navLabel(item);
       var target = null;
       if (name === "Home") target = { control: null };
+      else if (name === "Latest Uploads") target = { control: null, sort: "recent" };
       else if (NAV_TYPE[name]) target = { control: "hubFilterType", value: NAV_TYPE[name] };
+      // A segment is a destination, not a filter toggle: it opens a page and
+      // clears everything else, because that is what a nav item promises.
+      else if (segments[name]) target = { control: "hubFilterSegment", value: name,
+                                          page: true };
       else if (families[name]) target = { control: "hubFilterProduct", value: name };
       else if (stages[name]) target = { control: "hubFilterStage", value: name };
       if (!target) return;              // Favorites, Request New Asset, ...
@@ -600,7 +662,11 @@
       navTargets[name] = target;
       item.style.cursor = "pointer";
       item.addEventListener("click", function () {
-        if (!target.control) { clearAll(); }
+        if (!target.control) {
+          clearAll();
+          if (target.sort) { sortOverride = target.sort; applyFilters(); }
+        }
+        else if (target.page) { openSegment(target.value); }
         else {
           // Re-read the control every time: takeOverControls() replaces these
           // nodes to drop Elio's listeners, so a captured reference would be
@@ -614,6 +680,48 @@
         }
         window.scrollTo({ top: 0, behavior: "smooth" });
       });
+    });
+  }
+
+  /* Nav entries that cannot do anything.
+   *
+   * Elio's sidebar promises five things this catalogue cannot deliver, and a
+   * control that looks live and does nothing is the most expensive kind of
+   * wrong: the reader concludes the app is broken rather than that the data is
+   * missing. Each is dimmed, made unclickable, and given the reason on hover.
+   *
+   * Two are empty categories and may fill up later; three need data nobody
+   * collects yet. Either way the honest state is visible rather than implied.
+   */
+  var UNAVAILABLE = {
+    "Favorites": "Favourites need a per-user store, which the Hub does not have yet",
+    "Most Viewed": "No view counts for SharePoint assets yet, so any ranking "
+                 + "would show Consensus only",
+    "Virtual Machines": "No virtual machines in the catalogue yet",
+    "Post-Sale": "No assets are tagged Post-Sale yet"
+  };
+
+  function markUnavailable(facets) {
+    var live = {};
+    ["types", "funnel_stages", "product_families", "segments"].forEach(function (k) {
+      (facets[k] || []).forEach(function (f) { if (f.count) live[f.value] = 1; });
+    });
+    Object.keys(NAV_TYPE).forEach(function (label) {
+      if (live[NAV_TYPE[label]]) live[label] = 1;
+    });
+
+    document.querySelectorAll(".orion-navitem").forEach(function (item) {
+      var name = navLabel(item);
+      var reason = UNAVAILABLE[name];
+      // Only dim it if the catalogue really has nothing -- if VMs appear
+      // tomorrow the item must come back to life on its own.
+      if (!reason || live[name]) return;
+      item.classList.add("hub-nav--dead");
+      item.title = reason;
+      item.style.cursor = "default";
+      item.addEventListener("click", function (e) {
+        e.stopImmediatePropagation(); e.preventDefault();
+      }, true);
     });
   }
 
@@ -633,7 +741,7 @@
    * is correct however the filter was chosen -- nav, dropdown, or product
    * tile. Home lights up when nothing is filtered at all. */
   function markNavActive() {
-    var anyOn = CONTROLS.some(function (id) {
+    var anyOn = !!sortOverride || CONTROLS.some(function (id) {
       var el = document.getElementById(id);
       return el && el.value;
     });
@@ -647,6 +755,275 @@
       }
       item.classList.toggle("is-active", on);
     });
+  }
+
+  /* ------------------------------------------------- the suggestion strip */
+
+  /* Someone who searches "windchill" wants the 203 Windchill demos, not to
+   * scroll 165 result cards deciding whether they got them. So when a query
+   * names a category, offer the category above the results.
+   *
+   * The offer is deliberately not always "go to a page". Pages exist for
+   * segments only, and routing a product name to a segment page would lose
+   * assets silently: ThingWorx genuinely splits 64 IoT / 44 PLM, and Arbortext
+   * 11 SLM / 4 PLM, so "go to the IoT page" would quietly drop 44 ThingWorx
+   * demos. A family therefore offers a scope -- show all 111 -- which is
+   * complete, and a segment offers its page, which exists.
+   *
+   *   query names a segment  ->  open that segment's page
+   *   query names a family   ->  filter to all of it, no page needed
+   *   query names a type     ->  same
+   *
+   * One mechanism, and it does not force nineteen pages into being just to
+   * satisfy the search box.
+   */
+  var TYPE_LABELS = { video: "Videos", ldk: "LDKs", vdk: "VDKs",
+                      vm: "Virtual Machines" };
+
+  //: Below this a suggestion is noise. "Show all 1 Consensus Introduction
+  //: demos" costs a click to learn nothing; the results already show it.
+  var SUGGEST_MIN = 5;
+
+  /* Whole-word containment, so "creo overview" still offers Creo while "score"
+   * does not offer SCO.
+   *
+   * Plus a prefix rule for the singular/plural case -- "video" must reach
+   * "Videos", "ldk" must reach "LDKs" -- which only runs one way round: a
+   * query word may extend a label, never the reverse. That direction is what
+   * keeps "score" away from SCO, and it lets three characters be enough, which
+   * this vocabulary needs (ldk, vdk, plm, alm are all three).
+   */
+  function namesCategory(query, label) {
+    var words = query.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(" ");
+    var l = label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (l.length < 3) return false;
+    if ((" " + words.join(" ") + " ").indexOf(" " + l + " ") !== -1) return true;
+    return words.some(function (w) {
+      return w.length >= 3 && l.indexOf(w) === 0;
+    });
+  }
+
+  function suggestionsFor(query) {
+    if (!query || query.trim().length < 3 || !baselineFacets) return [];
+    var out = [];
+    var seg = document.getElementById("hubFilterSegment");
+    var fam = document.getElementById("hubFilterProduct");
+    var typ = document.getElementById("hubFilterType");
+
+    (baselineFacets.product_families || []).forEach(function (f) {
+      if (f.count >= SUGGEST_MIN && namesCategory(query, f.value)
+          && (!fam || fam.value !== f.value)) {
+        out.push({ rank: 1, size: f.value.length, label: f.value,
+                   text: "Show all " + f.count + " " + f.value + " demos",
+                   run: function () { if (fam) fam.value = f.value;
+                                      clearSearchOnly(); applyFilters(); } });
+      }
+    });
+    (baselineFacets.segments || []).forEach(function (f) {
+      if (f.count >= SUGGEST_MIN && namesCategory(query, f.value)
+          && (!seg || seg.value !== f.value)) {
+        out.push({ rank: 2, size: f.value.length, label: f.value,
+                   text: "Go to the " + f.value + " page",
+                   page: true, run: function () { openSegment(f.value); } });
+      }
+    });
+    (baselineFacets.types || []).forEach(function (f) {
+      var label = TYPE_LABELS[f.value];
+      if (label && f.count >= SUGGEST_MIN && namesCategory(query, label)
+          && (!typ || typ.value !== f.value)) {
+        out.push({ rank: 3, size: label.length, label: label,
+                   text: "Show all " + f.count + " " + label,
+                   run: function () { if (typ) typ.value = f.value;
+                                      clearSearchOnly(); applyFilters(); } });
+      }
+    });
+
+    // A product name beats a segment name beats a type; the longest match wins
+    // within a kind, so "Consensus Introduction" is not shadowed by a shorter
+    // family that happens to share a word.
+    out.sort(function (a, b) { return a.rank - b.rank || b.size - a.size; });
+    return out.slice(0, 2);
+  }
+
+  /* Applying a category replaces the free-text search rather than adding to
+   * it: "windchill" AND family=Windchill is the same set, and leaving the text
+   * in place makes the filter bar look like it is doing two things. */
+  function clearSearchOnly() {
+    var el = document.getElementById("hubSearchInput");
+    if (el) el.value = "";
+  }
+
+  function renderSuggestions(query) {
+    var host = document.getElementById("hubSuggest");
+    if (!host) return;
+    var items = suggestionsFor(query);
+    if (!items.length) { host.style.display = "none"; host.innerHTML = ""; return; }
+
+    host.innerHTML = "";
+    items.forEach(function (it) {
+      var b = document.createElement("button");
+      b.className = "hub-suggest__btn" + (it.page ? " hub-suggest__btn--page" : "");
+      b.innerHTML = escapeHtml(it.text)
+        + ' <svg class="orion-ico orion-ico--sm"><use href="#i-chevron-right"/></svg>';
+      b.addEventListener("click", it.run);
+      host.appendChild(b);
+    });
+    host.style.display = "";
+  }
+
+  /* ------------------------------------------------------ segment pages */
+
+  /* Elio's nav browses by product. Nineteen product families exist and the
+   * tail runs down to one asset each, so a page per product would be mostly
+   * empty rooms. Six segments cover the same catalogue at a size worth
+   * visiting -- CAD 402, PLM 250, ALM 102, IoT 78, SLM 35, SCO 1 -- so the
+   * group becomes Browse by Segment and products stay a filter.
+   *
+   * Built from the API rather than edited into the markup, because the
+   * hardcoded list was already wrong: it offers IPL, which matches nothing in
+   * the catalogue, and omits IoT, which has 78 demos.
+   */
+  var segmentIndex = {};       // key -> the /api/segments row
+
+  function escapeHtml(text) {
+    var d = document.createElement("div");
+    d.textContent = text == null ? "" : String(text);
+    return d.innerHTML;
+  }
+
+  async function buildSegmentNav() {
+    var heading = null;
+    document.querySelectorAll(".orion-group").forEach(function (g) {
+      if (g.textContent.trim().toLowerCase() === "browse by product") heading = g;
+    });
+    if (!heading) return null;
+
+    var payload;
+    try { payload = await getJSON("/api/segments"); }
+    catch (err) {
+      console.error("[hub-api] segments unavailable, leaving the nav alone", err);
+      return null;
+    }
+    segmentIndex = {};
+    (payload.segments || []).forEach(function (sg) { segmentIndex[sg.key] = sg; });
+
+    // Drop the product items that followed the heading, then insert segments.
+    var node = heading.nextElementSibling;
+    while (node && node.classList.contains("orion-navitem")) {
+      var next = node.nextElementSibling;
+      node.remove();
+      node = next;
+    }
+    heading.textContent = "Browse by Segment";
+
+    var anchor = heading;
+    (payload.segments || []).forEach(function (sg) {
+      var item = document.createElement("div");
+      item.className = "orion-navitem";
+      // No icon. Six identical marks in a column carry no information and
+      // read as noise; the product group had distinct logos, which is what
+      // made icons worth having there.
+      item.innerHTML = '<span class="label">' + escapeHtml(sg.label) + '</span>'
+        + '<span class="count">' + sg.total + '</span>';
+      anchor.after(item);
+      anchor = item;
+    });
+    return payload;
+  }
+
+  /* Opening a segment clears every other filter. That is the whole difference
+   * between a nav item and a dropdown: one takes you somewhere, the other
+   * narrows where you already are. Choosing Creo and then Windchill in the nav
+   * used to leave you the intersection, which is not what a sidebar promises.
+   */
+  function openSegment(key) {
+    CONTROLS.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+    var sel = document.getElementById("hubFilterSegment");
+    if (sel) sel.value = key;
+    applyFilters();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  /* The page header: derived facts always, editorial content only when a
+   * person has actually written it. An unwritten description renders as a
+   * visible gap rather than a plausible sentence nobody stands behind -- a
+   * hand-typed number already lied on this page once, claiming Creo had 24
+   * demos against a real 382. */
+  async function renderSegmentHeader() {
+    var host = document.getElementById("hubSegmentPage");
+    if (!host) return;
+    var sel = document.getElementById("hubFilterSegment");
+    var key = sel ? sel.value : "";
+    if (!key) { host.style.display = "none"; host.innerHTML = ""; return; }
+
+    var sg;
+    try { sg = await getJSON("/api/segments/" + encodeURIComponent(key)); }
+    catch (err) { host.style.display = "none"; return; }
+
+    var families = (sg.families || []).slice()
+      .sort(function (a, b) { return b.count - a.count; }).slice(0, 4);
+    var byType = {};
+    (sg.types || []).forEach(function (t) { byType[t.value] = t.count; });
+    var kits = (byType.ldk || 0) + (byType.vdk || 0);
+
+    var ed = sg.editorial || {};
+    var blurb = ed.blurb
+      ? '<p class="hub-seg__blurb">' + escapeHtml(ed.blurb) + '</p>'
+      : '<p class="hub-seg__blurb hub-seg__blurb--empty">No description written '
+        + 'yet &mdash; whoever owns ' + escapeHtml(sg.label) + ' should add one '
+        + 'so this page says what the segment is for.</p>';
+
+    var owner = ed.owner
+      ? '<strong>' + escapeHtml(ed.owner.name) + '</strong>'
+        + (ed.owner.email ? ' <a href="mailto:' + escapeHtml(ed.owner.email)
+            + '">' + escapeHtml(ed.owner.email) + '</a>' : '')
+      : '<span class="hub-seg__empty">no owner recorded</span>';
+
+    var stamp = ed.updated_at
+      ? '<span class="hub-seg__stamp">updated ' + escapeHtml(ed.updated_at)
+        + (ed.updated_by ? ' by ' + escapeHtml(ed.updated_by) : '') + '</span>'
+      : '';
+
+    host.innerHTML =
+        '<button class="hub-seg__back" id="hubSegBack">'
+      +   '<svg class="orion-ico orion-ico--sm"><use href="#i-chevron-right"/></svg>'
+      +   ' All demos</button>'
+      + '<div class="hub-seg__head">'
+      +   '<h2 class="hub-seg__title">' + escapeHtml(sg.label) + '</h2>'
+      +   '<span class="hub-seg__count">' + sg.total + ' assets'
+      +     (byType.video ? ' &middot; ' + byType.video + ' videos' : '')
+      +     (kits ? ' &middot; ' + kits + ' kits' : '') + '</span>'
+      + '</div>'
+      + blurb
+      + '<div class="hub-seg__foot">'
+      +   '<span class="hub-seg__fams">'
+      +     families.map(function (f) {
+              return '<button class="hub-seg__fam" data-family="'
+                + escapeHtml(f.value) + '">' + escapeHtml(f.value)
+                + ' <em>' + f.count + '</em></button>'; }).join('')
+      +   '</span>'
+      +   '<span class="hub-seg__contact">Contact: ' + owner + stamp + '</span>'
+      + '</div>'
+      + '<div class="hub-seg__latest"><h3>Latest in ' + escapeHtml(sg.label)
+      +   '</h3><div class="asset-row" id="hubSegLatest"></div></div>';
+    host.style.display = "";
+
+    var back = document.getElementById("hubSegBack");
+    if (back) back.addEventListener("click", clearAll);
+
+    host.querySelectorAll(".hub-seg__fam").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var el = document.getElementById("hubFilterProduct");
+        if (el) el.value = b.dataset.family;
+        applyFilters();
+      });
+    });
+
+    var rail = document.getElementById("hubSegLatest");
+    (sg.latest || []).forEach(function (a) { rail.appendChild(buildCard(a)); });
   }
 
   /* --------------------------------------------------- browse-by-product */
@@ -769,7 +1146,9 @@
     fillSelect("hubFilterType", facets.types);
     fillSidebarCounts(facets);
     takeOverControls();
+    await buildSegmentNav();
     wireNav(facets);
+    markUnavailable(facets);
     markNavActive();
     fillProductTiles();
 

@@ -618,10 +618,14 @@ a:hover { text-decoration: underline; }
         </label>
         <button class="hub-reset-cta" id="hubResetBtn" onclick="hubResetFilters()" style="display:none;">Reset filters</button>
       </div>
+      <div class="hub-suggest" id="hubSuggest" style="display:none;"></div>
       <div class="hub-noresults" id="hubNoResults">No assets match these filters. Try clearing one.</div>
     </div>
 
     <div class="orion-thread" id="mainThread">
+
+      <!-- Segment landing page: rendered by hub-api.js when a segment is on -->
+      <div class="section hub-seg" id="hubSegmentPage" style="display:none;"></div>
 
       <!-- All Assets (filtered results) -->
       <div class="section" id="allAssetsSection" style="display:none;">
@@ -1917,6 +1921,60 @@ hubApplyFilters();
      itself up and forcing a minimum would only add dead space. */
   .asset-card__title { display:-webkit-box; -webkit-box-orient:vertical;
     -webkit-line-clamp:2; overflow:hidden; }
+
+  /* ------------------------------------------------- segment landing page */
+  .hub-seg { padding:18px 20px; border:1px solid var(--orion-border);
+    border-radius:var(--orion-radius); background:var(--orion-surface-2); }
+  .hub-seg__back { display:inline-flex; align-items:center; gap:4px; border:none;
+    background:transparent; color:var(--orion-text-3); font:inherit;
+    font-size:12px; cursor:pointer; padding:0 0 8px; }
+  .hub-seg__back:hover { color:var(--orion-text); }
+  /* The chevron points forward in the sprite; this is a way back. */
+  .hub-seg__back svg { transform:rotate(180deg); }
+  .hub-seg__head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  .hub-seg__title { margin:0; font-size:22px; font-weight:650;
+    color:var(--orion-text); }
+  .hub-seg__count { font-size:12.5px; color:var(--orion-text-3);
+    font-variant-numeric:tabular-nums; }
+  .hub-seg__blurb { margin:8px 0 14px; font-size:13.5px; line-height:1.55;
+    color:var(--orion-text-2); max-width:70ch; }
+  /* Missing editorial content must look missing. A plausible sentence nobody
+     stands behind is worse than a visible gap. */
+  .hub-seg__blurb--empty { color:var(--orion-text-3); font-style:italic; }
+  .hub-seg__foot { display:flex; align-items:center; justify-content:space-between;
+    gap:14px; flex-wrap:wrap; padding-top:12px;
+    border-top:1px solid var(--orion-border); }
+  .hub-seg__fams { display:flex; gap:6px; flex-wrap:wrap; }
+  .hub-seg__fam { border:1px solid var(--orion-border-md); background:transparent;
+    color:var(--orion-text-2); border-radius:999px; padding:3px 10px;
+    font:inherit; font-size:12px; cursor:pointer; }
+  .hub-seg__fam:hover { border-color:var(--orion-accent, #5b6cff);
+    color:var(--orion-text); }
+  .hub-seg__fam em { font-style:normal; color:var(--orion-text-3);
+    font-variant-numeric:tabular-nums; }
+  .hub-seg__contact { font-size:12.5px; color:var(--orion-text-2); }
+  .hub-seg__empty { color:var(--orion-text-3); font-style:italic; }
+  .hub-seg__stamp { display:block; font-size:11px; color:var(--orion-text-3); }
+  .hub-seg__latest { margin-top:16px; }
+  .hub-seg__latest h3 { margin:0 0 10px; font-size:13.5px; font-weight:600;
+    color:var(--orion-text-2); }
+  .hub-seg__latest .asset-row { overflow-x:auto; }
+
+  /* A nav entry with nothing behind it. Dimmed rather than removed, because
+     the category is real and may fill up -- and because silently deleting
+     Elio's entries would hide the gap instead of showing it. */
+  .hub-nav--dead { opacity:.38; }
+  .hub-nav--dead:hover { background:transparent; }
+
+  /* ------------------------------------------------------ suggestion strip */
+  .hub-suggest { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .hub-suggest__btn { display:inline-flex; align-items:center; gap:6px;
+    border:1px solid var(--orion-border-md); background:var(--orion-surface);
+    color:var(--orion-text); border-radius:999px; padding:6px 12px;
+    font:inherit; font-size:12.5px; font-weight:550; cursor:pointer; }
+  .hub-suggest__btn:hover { border-color:var(--orion-accent, #5b6cff); }
+  .hub-suggest__btn--page { border-color:var(--orion-accent, #5b6cff);
+    color:var(--orion-accent, #5b6cff); }
 </style>
 <div id="hubApiStatus" class="hub-api-status"></div>
 <script src="/static/hub-api.js" defer></script>

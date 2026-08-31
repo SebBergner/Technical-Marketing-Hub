@@ -156,12 +156,21 @@ class SqlAssetRepository(AssetRepository):
         )
         return Asset(**data)
 
-    def facets(self) -> Facets:
-        rows = self.s.execute(
-            select(AssetSource)
-            .join(AssetIdentity, AssetIdentity.asset_id == AssetSource.asset_id)
-            .where(AssetIdentity.retired_at.is_(None))
-        ).scalars().all()
+    def facets(self, query: AssetQuery | None = None) -> Facets:
+        if query is not None:
+            # Reuse the listing's own filtering so a facet count can never
+            # disagree with the number of results clicking it produces. limit
+            # and offset are neutralised: facets describe the whole slice, not
+            # the page of it being shown.
+            import dataclasses
+            unpaged = dataclasses.replace(query, limit=10 ** 9, offset=0)
+            rows = [pair[0] for pair in self._rows(unpaged)]
+        else:
+            rows = self.s.execute(
+                select(AssetSource)
+                .join(AssetIdentity, AssetIdentity.asset_id == AssetSource.asset_id)
+                .where(AssetIdentity.retired_at.is_(None))
+            ).scalars().all()
 
         def scalar(attr: str) -> list[FacetValue]:
             c = Counter(getattr(r, attr) for r in rows if getattr(r, attr))

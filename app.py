@@ -76,7 +76,30 @@ async def debug_page():
     """Plain data inspector. Separate from index.html on purpose — that file is
     Elio's, and the two must not collide."""
     return FileResponse(os.path.join(BASE_DIR, "static", "debug.html"))
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+class RevalidatingStatic(StaticFiles):
+    """Static files that must be revalidated on every request.
+
+    Without this the browser applies its own heuristic freshness and happily
+    serves a stale script for minutes. That cost real time here -- the page
+    kept running a superseded hub-api.js while the file on disk and the one the
+    server returned were both current -- and it would cost Elio the same every
+    time he edits and reloads.
+
+    `no-cache` is not `no-store`: the response is still cached and still
+    revalidated with an ETag, so an unchanged file is a 304 and costs nothing.
+    """
+
+    def is_not_modified(self, response_headers, request_headers) -> bool:
+        return super().is_not_modified(response_headers, request_headers)
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
+app.mount("/static", RevalidatingStatic(directory=os.path.join(BASE_DIR, "static")),
+          name="static")
 
 
 @app.get("/health")

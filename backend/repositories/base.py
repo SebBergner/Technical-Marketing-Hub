@@ -64,7 +64,14 @@ class AssetRepository(ABC):
     def get(self, asset_id: str) -> Asset | None: ...
 
     @abstractmethod
-    def facets(self) -> Facets: ...
+    def facets(self, query: AssetQuery | None = None) -> Facets:
+        """Counts over the whole catalogue, or over one filtered slice.
+
+        Scoped counts are what make a filter panel honest. With Type=VDK
+        chosen, "Creo (382)" is a lie -- 382 is the whole catalogue, and
+        clicking it narrows to far fewer. The count has to describe what you
+        would actually get.
+        """
 
     @abstractmethod
     def rails(self) -> dict[str, list[str]]:

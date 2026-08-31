@@ -291,8 +291,10 @@ class JsonAssetRepository(AssetRepository):
         )
         return Asset(**data)
 
-    def facets(self) -> Facets:
-        rows = self._load_mirror()
+    def facets(self, query: AssetQuery | None = None) -> Facets:
+        # Deliberately the same _rows() the listing uses, so a facet count can
+        # never disagree with the number of results clicking it produces.
+        rows = self._rows(query) if query else self._load_mirror()
 
         def scalar(field: str) -> list[FacetValue]:
             counts = Counter(r.get(field) for r in rows if r.get(field))

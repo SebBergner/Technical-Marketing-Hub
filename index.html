@@ -1812,6 +1812,34 @@ hubApplyFilters();
   /* !important because hubApplyFilters() rewrites style.display on these
      sections whenever no filter is active. */
   .hub-hidden { display:none !important; }
+
+  /* --- fixes reported from use --------------------------------------- */
+
+  /* The search input set background:transparent but never a colour, so it
+     fell back to the browser default black. Invisible on the dark theme,
+     where everything around it is light-on-dark. */
+  .hero-search__field input { color: var(--orion-text); }
+
+  /* The chevron is a sibling of the <select>, so clicking it hit the label
+     and nothing opened -- only the select's own narrow box worked. Widening
+     the select to run underneath the arrow, and making the arrow ignore
+     pointer events, means the whole pill opens the menu.
+     The padding is the second half of the report: the text sat hard against
+     the border on both sides. */
+  .filter-pill { position: relative; padding-right: 0 !important; }
+  /* The select has to reach the pill's right edge, or the arrow sits beyond it
+     in the padding and clicks there land on the label instead. The pill gives
+     up its right padding and the select takes it over, so the arrow ends up
+     inside the select's own box. */
+  .filter-pill select {
+    flex: 1; padding: 2px 30px 2px 6px !important; text-overflow: ellipsis;
+  }
+  .filter-pill > svg { position: absolute; right: 11px; pointer-events: none; }
+  /* The dropdown list itself renders with the OS palette unless told the
+     surface it sits on, which on the dark theme gives black-on-black. */
+  .filter-pill select, .filter-pill option {
+    background: var(--orion-surface); color: var(--orion-text);
+  }
   /* One colour per platform. A kit you run and a recording you send are
      different things; a card that does not say which makes you guess. */
   .hub-source { margin-right:6px; font-size:10px; }

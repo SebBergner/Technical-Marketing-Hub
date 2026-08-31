@@ -103,6 +103,62 @@
     return badge;
   }
 
+  /* Elio's own static cards already establish the convention: a kit is a box,
+   * a VDK a monitor, a recording a video camera. videoAssetFromData() hardcodes
+   * the video one because it was written for Consensus content. */
+  var TYPE_CHIP = {
+    video: ["i-video", "Video"],
+    ldk:   ["i-box", "LDK"],
+    vdk:   ["i-monitor", "VDK"],
+    vm:    ["i-monitor", "Virtual Machine"]
+  };
+
+  function retypeCard(card, a) {
+    var chip = card.querySelector(".type-chip");
+    var spec = TYPE_CHIP[a.type] || TYPE_CHIP.video;
+    if (chip) {
+      chip.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#'
+                     + spec[0] + '"/></svg>' + spec[1];
+    }
+
+    /* The play button was on every card and did nothing on most of them.
+     * A Consensus record IS a recording, so it plays -- in the Consensus
+     * player, which is where the video actually lives. A SharePoint demo kit
+     * is a folder of files with no single thing to play, so the control is
+     * removed rather than left there inert. */
+    var play = card.querySelector(".play-btn");
+    if (!play) return;
+    if (a.source === "consensus" && a.web_url) {
+      var link = document.createElement("a");
+      link.className = "play-btn";
+      link.href = a.web_url;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.title = "Play in Consensus";
+      link.innerHTML = play.innerHTML;
+      link.style.cursor = "pointer";
+      play.replaceWith(link);
+    } else {
+      play.remove();
+    }
+  }
+
+  /* videoAssetFromData() falls back to a "No audio track" badge whenever there
+   * is no share payload, because in the mockup the only reason to be unable to
+   * share was a silent cut. For a SharePoint demo kit that is simply untrue --
+   * it is not missing narration, it is not registered in Consensus -- and a
+   * label that states the wrong reason is worse than none, because someone
+   * will act on it. */
+  function fixShareFallback(card, a) {
+    if (a.consensus_uuid) return;
+    var badge = card.querySelector(".orion-badge");
+    if (!badge) return;
+    if (a.has_narrated_audio === false) return;   // then the badge is correct
+    badge.textContent = "Not on Consensus";
+    badge.title = "This asset has no Consensus recording, so it cannot be "
+                + "shared externally from here.";
+  }
+
   function buildCard(a) {
     var card = window.videoAssetFromData(toCardData(a));
     // videoAssetFromData hardcodes type=video, which is right for Consensus
@@ -110,6 +166,9 @@
     card.dataset.type = a.type || "video";
     card.dataset.source = a.source || "";
     card.dataset.assetId = a.id || "";
+
+    retypeCard(card, a);
+    fixShareFallback(card, a);
 
     var meta = card.querySelector(".asset-card__meta");
     if (meta) meta.insertBefore(sourceBadge(a.source), meta.firstChild);
@@ -245,6 +304,206 @@
                  updated, cleared);
   }
 
+  /* ------------------------------------------------- API-driven filtering */
+
+  /* The page originally filtered a client-side array with title.indexOf().
+   * Two things that cannot fix: the facet counts stay global, so with Type=VDK
+   * chosen "Creo (382)" still claims the whole catalogue; and there is no
+   * ranking, so a search returns matches in whatever order the array happened
+   * to be in. Both are already solved on the server, so the filters query it.
+   */
+
+  var CONTROLS = ["hubSearchInput", "hubFilterType", "hubFilterProduct",
+                  "hubFilterSegment", "hubFilterStage", "hubFilterCf"];
+  var LANDING = ["continueSection", "latestUploadsSection", "mostViewedSection",
+                 "browseByProductSection", "editorsPicksSection"];
+  var RESULT_LIMIT = 200;        // the API's own ceiling, and plenty to scroll
+  var navFilter = null;          // {key, value, label} from the left nav
+  var inFlight = 0;
+
+  function val(id) {
+    var el = document.getElementById(id);
+    return el ? el.value.trim() : "";
+  }
+
+  function currentQuery() {
+    var params = new URLSearchParams();
+    var q = val("hubSearchInput");
+    if (q) params.set("q", q);
+    if (val("hubFilterType")) params.append("type", val("hubFilterType"));
+    if (val("hubFilterProduct")) params.append("family", val("hubFilterProduct"));
+    if (val("hubFilterSegment")) params.append("segment", val("hubFilterSegment"));
+    if (val("hubFilterStage")) params.append("stage", val("hubFilterStage"));
+    var cf = val("hubFilterCf");
+    if (cf === "yes") params.set("customer_facing", "true");
+    if (cf === "no") params.set("customer_facing", "false");
+    if (navFilter) params.append(navFilter.key, navFilter.value);
+    return params;
+  }
+
+  /* Rewrite each option's count in place, keeping the selection. A value the
+   * current filters exclude entirely shows as (0) rather than disappearing:
+   * options vanishing as you type is disorienting, and (0) is the honest
+   * answer to "what would I get". */
+  function rescoreSelect(id, facet) {
+    var el = document.getElementById(id);
+    if (!el || !facet) return;
+    var counts = {};
+    facet.forEach(function (f) { counts[f.value] = f.count; });
+    Array.prototype.forEach.call(el.options, function (o) {
+      if (!o.value) return;                        // the "All" entry
+      var base = o.textContent.replace(/\s*\(\d+\)\s*$/, "");
+      o.textContent = base + " (" + (counts[o.value] || 0) + ")";
+    });
+  }
+
+  async function applyFilters() {
+    var params = currentQuery();
+    var active = params.toString().length > 0;
+
+    var reset = document.getElementById("hubResetBtn");
+    if (reset) reset.style.display = active ? "inline-flex" : "none";
+    LANDING.forEach(function (id) {
+      var el = document.getElementById(id);
+      // Never re-show a section hidden for want of honest data.
+      if (el && !el.classList.contains("hub-hidden")) {
+        el.style.display = active ? "none" : "";
+      }
+    });
+    var all = document.getElementById("allAssetsSection");
+    if (all) all.style.display = active ? "" : "none";
+    if (!active) return;
+
+    var ticket = ++inFlight;
+    var assetParams = new URLSearchParams(params);
+    assetParams.set("limit", RESULT_LIMIT);
+
+    var page, facets;
+    try {
+      page = await getJSON("/api/assets?" + assetParams);
+      facets = await getJSON("/api/taxonomy?" + params);
+    } catch (err) {
+      console.error("[hub-api] filter request failed", err);
+      report("Filtering failed - " + err.message, true);
+      return;
+    }
+    if (ticket !== inFlight) return;   // a slower earlier reply must not win
+
+    var grid = document.getElementById("allAssetsGrid");
+    grid.innerHTML = "";
+    page.items.forEach(function (a) { grid.appendChild(buildCard(a)); });
+
+    var count = document.getElementById("allAssetsCount");
+    if (count) {
+      count.textContent = page.total > page.items.length
+        ? "(showing " + page.items.length + " of " + page.total + ")"
+        : "(" + page.total + ")";
+    }
+
+    // Scoped counts: this is what makes the panel honest once anything is on.
+    rescoreSelect("hubFilterType", facets.types);
+    rescoreSelect("hubFilterProduct", facets.product_families);
+    rescoreSelect("hubFilterSegment", facets.segments);
+    rescoreSelect("hubFilterStage", facets.funnel_stages);
+
+    var none = document.querySelector(".hub-noresults");
+    if (none) none.classList.toggle("show", page.total === 0);
+  }
+
+  function debounce(fn, ms) {
+    var t;
+    return function () { clearTimeout(t); t = setTimeout(fn, ms); };
+  }
+
+  /* Elio binds his handler with addEventListener, which captures the function
+   * reference -- reassigning the global would leave his version still wired up
+   * and fighting this one. Cloning each control drops its listeners outright,
+   * which is the only reliable way to take them over. */
+  function takeOverControls() {
+    var debounced = debounce(applyFilters, 200);
+    CONTROLS.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      var fresh = el.cloneNode(true);
+      el.replaceWith(fresh);
+      fresh.addEventListener(fresh.tagName === "INPUT" ? "input" : "change",
+                             debounced);
+    });
+    var reset = document.getElementById("hubResetBtn");
+    if (reset) {
+      var freshReset = reset.cloneNode(true);
+      reset.replaceWith(freshReset);
+      freshReset.addEventListener("click", clearAll);
+    }
+    window.hubApplyFilters = applyFilters;   // for anything else that calls it
+  }
+
+  function clearAll() {
+    CONTROLS.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+    navFilter = null;
+    markNavActive(null);
+    applyFilters();
+  }
+
+  /* ---------------------------------------------------------- the left nav */
+
+  /* Clicking "LDKs" should land you in the catalogue already narrowed to LDKs,
+   * which is what the nav looks like it promises. Home clears everything and
+   * returns to the curated landing page. */
+  function wireNav(facets) {
+    var families = {};
+    (facets.product_families || []).forEach(function (f) { families[f.value] = 1; });
+    var stages = {};
+    (facets.funnel_stages || []).forEach(function (f) { stages[f.value] = 1; });
+    var types = { "Videos": "video", "LDKs": "ldk", "VDKs": "vdk",
+                  "Virtual Machines": "vm" };
+
+    document.querySelectorAll(".orion-navitem").forEach(function (item) {
+      var name = navLabel(item);
+      var target = null;
+      if (name === "Home") target = { key: null };
+      else if (types[name]) target = { key: "type", value: types[name] };
+      else if (families[name]) target = { key: "family", value: name };
+      else if (stages[name]) target = { key: "stage", value: name };
+      if (!target) return;              // Favorites, Request New Asset, ...
+
+      item.style.cursor = "pointer";
+      item.addEventListener("click", function () {
+        if (target.key) {
+          navFilter = { key: target.key, value: target.value, label: name };
+          markNavActive(name);
+          applyFilters();
+        } else {
+          clearAll();                   // Home
+        }
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    });
+  }
+
+  function navLabel(item) {
+    var label = item.querySelector(".label");
+    if (!label) return "";
+    var name = "";
+    label.childNodes.forEach(function (n) {
+      if (!name && n.nodeType === Node.TEXT_NODE && n.textContent.trim()) {
+        name = n.textContent.trim();
+      }
+    });
+    return name || label.textContent.trim();
+  }
+
+  function markNavActive(name) {
+    document.querySelectorAll(".orion-navitem").forEach(function (item) {
+      var text = navLabel(item);
+      item.classList.toggle("is-active",
+        name === null ? text === "Home" : text === name);
+    });
+  }
+
   /* ------------------------------------------------------------------ boot */
 
   /* Fetch and parse, treating a non-2xx as the failure it is. Reading `.items`
@@ -315,6 +574,8 @@
     fillSelect("hubFilterStage", facets.funnel_stages);
     fillSelect("hubFilterType", facets.types);
     fillSidebarCounts(facets, assets);
+    takeOverControls();
+    wireNav(facets);
 
     var bySource = assets.reduce(function (acc, a) {
       acc[a.source] = (acc[a.source] || 0) + 1;

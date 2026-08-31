@@ -200,31 +200,40 @@ def fingerprint(assets: list[Asset]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
-def thumbnails_from_v1(client: ConsensusClient | None) -> dict[str, str]:
-    """uuid -> first thumbnail, borrowed from V1.
+def media_from_v1(client: ConsensusClient | None) -> dict[str, dict]:
+    """uuid -> {thumbnail, preview_link}, borrowed from V1.
 
-    V2 is better in every way except one: it returns no images at all, while
-    V1 carries `previewThumbs` on 95% of demos. SharePoint assets have no
-    thumbnails either, so dropping these would leave the entire grid without a
-    single picture.
+    V2 is better in every way except two: it returns no images at all, and it
+    dropped `previewLink`. V1 carries `previewThumbs` on 95% of demos and the
+    real viewer URL on all of them, both in the same response — so one call
+    covers both and V2 stays authoritative for everything else.
 
-    So V2 stays authoritative for metadata and V1 is asked for pictures alone.
+    The link matters as much as the picture. A reconstructed
+    `play.goconsensus.com/<uuid>` opens a page that does not play; the genuine
+    link carries `?preview=sales` and does. Reconstruction stays as a fallback
+    for when V1 is unreachable, but it is second best and this is first.
+
     Failure here is not failure of the sync — a catalogue with no images still
     works, one with no tags is the thing we set out to fix.
     """
     if client is None or not client.is_configured():
         return {}
     try:
-        return {d.uuid: next(iter((d.raw or {}).get("previewThumbs") or []), None)
-                for d in client.list_demos(limit=2000)}
+        return {
+            d.uuid: {
+                "thumbnail": next(iter((d.raw or {}).get("previewThumbs") or []), None),
+                "preview_link": (d.raw or {}).get("previewLink"),
+            }
+            for d in client.list_demos(limit=2000)
+        }
     except Exception as exc:                       # noqa: BLE001
-        log.warning("consensus: V1 thumbnails unavailable (%s); "
-                    "indexing without images", exc)
+        log.warning("consensus: V1 media unavailable (%s); indexing without "
+                    "images, and with reconstructed viewer links", exc)
         return {}
 
 
 def build_assets_v2(demos: list[dict],
-                    thumbnails: dict[str, str] | None = None,
+                    media: dict[str, dict] | None = None,
                     ) -> tuple[list[Asset], ConsensusSyncResult]:
     """Turn V2 demo records into catalogue assets.
 
@@ -242,6 +251,7 @@ def build_assets_v2(demos: list[dict],
             result.skipped_private += 1
             continue
 
+        extra = (media or {}).get(demo.get("uuid")) or {}
         tags = [t for t in (demo.get("tags") or []) if t and t.strip()]
         by_tag = taxonomy.classify_tags(tags)
         # internalTitle is the fallback, not the source: tags are maintained
@@ -267,8 +277,9 @@ def build_assets_v2(demos: list[dict],
             tags=tags,
             language=(demo.get("language") or {}).get("code") or "en",
             duration_seconds=parsed["duration_seconds"],
-            thumbnail_url=(thumbnails or {}).get(demo.get("uuid")),
-            web_url=viewer_url(demo),
+            thumbnail_url=extra.get("thumbnail"),
+            # The real link first; reconstruct only when V1 could not be asked.
+            web_url=extra.get("preview_link") or viewer_url(demo),
             source_item_id=demo.get("uuid"),
             consensus_uuid=demo.get("uuid"),
             uploaded_at=_v2_date(demo.get("creationDate")),
@@ -310,7 +321,7 @@ def sync_demos_v2(client: ConsensusV2Client, repo,
                   v1_client: ConsensusClient | None = None) -> ConsensusSyncResult:
     """Index Consensus through V2, with V1 supplying only the images."""
     demos = client.all_demos()
-    assets, result = build_assets_v2(demos, thumbnails_from_v1(v1_client))
+    assets, result = build_assets_v2(demos, media_from_v1(v1_client))
     digest = fingerprint(assets)
     previous = (getattr(repo, "sync_state", lambda _: {})(SOURCE_SYSTEM) or {})
     result.unchanged = bool(previous.get("fingerprint"))         and previous["fingerprint"] == digest

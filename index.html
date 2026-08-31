@@ -1922,9 +1922,46 @@ hubApplyFilters();
   .asset-card__title { display:-webkit-box; -webkit-box-orient:vertical;
     -webkit-line-clamp:2; overflow:hidden; }
 
+  /* A derived cover for the 455 SharePoint assets that have no picture and no
+     way to make one. An identifier, not a photograph -- see paintCover(). */
+  .hub-cover { position:relative; overflow:hidden;
+    background:
+      linear-gradient(140deg,
+        hsl(var(--cover-hue) 42% 46% / .30) 0%,
+        hsl(var(--cover-hue) 42% 46% / .10) 62%,
+        transparent 100%),
+      var(--orion-surface-3); }
+  .hub-cover__mark { position:absolute; inset:0; display:flex;
+    align-items:center; justify-content:center; user-select:none; }
+  .hub-cover__mark svg { width:42px; height:42px; opacity:.55; }
+  /* No mark in the sprite for this family -- its name, which is still
+     distinctive and still scannable. */
+  .hub-cover__mark--text { font-size:15px; font-weight:650; letter-spacing:.2px;
+    padding:0 14px; text-align:center;
+    color:hsl(var(--cover-hue) 34% 46% / .62); }
+  :root:not([data-theme="light"]) .hub-cover__mark--text,
+  :root[data-theme="dark"] .hub-cover__mark--text {
+    color:hsl(var(--cover-hue) 42% 74% / .42); }
+  :root:not([data-theme="light"]) .hub-cover__mark svg,
+  :root[data-theme="dark"] .hub-cover__mark svg { opacity:.42; }
+
   /* ------------------------------------------------- segment landing page */
   .hub-seg { padding:18px 20px; border:1px solid var(--orion-border);
     border-radius:var(--orion-radius); background:var(--orion-surface-2); }
+  /* Collapsed: one line with a chevron, so a search is not pushed below the
+     fold by an introduction nobody is reading at that moment. */
+  .hub-seg__toggle { display:none; align-items:center; gap:8px; width:100%;
+    border:none; background:transparent; color:var(--orion-text); font:inherit;
+    font-size:14px; font-weight:600; cursor:pointer; padding:0; text-align:left; }
+  .hub-seg__toggle svg { transform:rotate(90deg); transition:transform .15s;
+    color:var(--orion-text-3); }
+  .hub-seg__toggle-count { margin-left:auto; font-size:12px; font-weight:400;
+    color:var(--orion-text-3); font-variant-numeric:tabular-nums; }
+  .hub-seg--collapsed { padding:11px 20px; }
+  .hub-seg--collapsed .hub-seg__toggle { display:flex; }
+  .hub-seg--collapsed .hub-seg__toggle svg { transform:rotate(0deg); }
+  .hub-seg--collapsed > *:not(.hub-seg__toggle) { display:none; }
+
   .hub-seg__back { display:inline-flex; align-items:center; gap:4px; border:none;
     background:transparent; color:var(--orion-text-3); font:inherit;
     font-size:12px; cursor:pointer; padding:0 0 8px; }

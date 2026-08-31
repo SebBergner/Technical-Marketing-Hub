@@ -261,6 +261,7 @@
     retypeCard(card, a);
     platformActions(card, a);
     clampDescription(card, a);
+    paintCover(card, a);
 
     var meta = card.querySelector(".asset-card__meta");
     if (meta) meta.insertBefore(sourceBadge(a.source), meta.firstChild);
@@ -361,6 +362,7 @@
    * worse than no numbers, so each one is either corrected or removed. */
   function fillSidebarCounts(facets) {
     if (!baselineFacets) baselineFacets = facets;
+
 
     /* Which nav labels the catalogue knows about at all, from the unfiltered
      * counts. It is the difference between "zero here" and "we have no such
@@ -757,6 +759,95 @@
     });
   }
 
+  /* ------------------------------------------------------- cover images */
+
+  /* Not one of the 455 SharePoint assets has a thumbnail, so half the grid was
+   * empty rectangles that read as broken rather than as absent. There is also
+   * nothing in the folders to make one from: 4 assets contain an image and all
+   * four are documentation screenshots (image1.bmp, logo.png,
+   * not-ok-warning.png), and no file anywhere is named like a cover.
+   *
+   * So the cover is derived from what is already known -- product family,
+   * type, title -- rather than fetched. Every asset gets one, instantly, with
+   * no request and nothing to store, and it can never fail or expire.
+   *
+   * This is deliberately an identifier and not a photograph. An LDK is a
+   * folder of CAD files and a script; there is no picture of it, and a frame
+   * grabbed from its walkthrough video would imply it is something to watch.
+   * A real poster frame from Consensus still wins where one exists -- this
+   * fills in behind it, and behind any future Graph thumbnail too.
+   */
+
+  /* Hand-picked for the families people already associate with a colour;
+   * everything else is hashed from the name below, so all nineteen get one
+   * without nineteen lines of guesswork. */
+  var FAMILY_HUE = {
+    "Windchill": 212, "Creo": 152, "ThingWorx": 268, "Codebeamer": 22,
+    "Mathcad": 194, "ServiceMax": 340, "Arbortext": 42
+  };
+  var FAMILY_MARK = {
+    "Windchill": ["logo-windchill-mark", "0 0 259.46 299.60"],
+    "Creo": ["logo-creo-mark", "0 0 397.21 449.90"],
+    "ServiceMax": ["logo-servicemax-mark", "0 0 71.14 82.15"],
+    "Codebeamer": ["logo-codebeamer-mark", "0 0 261.71 300.76"]
+  };
+
+  /* The family comes from the API, not from matching product strings here.
+   * The first attempt did match them, and got Kepware wrong: its product is
+   * "KEPServerEX", which contains the family name nowhere. The rule that knows
+   * that lives in backend/services/taxonomy.py, so the summary now carries its
+   * answer and this reads it. One rule, in one place. */
+  function coverFamily(a) {
+    return (a.product_families || [])[0] || null;
+  }
+
+  /* Same name, same colour, always -- an asset must not change appearance
+   * between two renders of the same grid. */
+  function hueFor(name) {
+    if (!name) return 220;
+    if (FAMILY_HUE[name] !== undefined) return FAMILY_HUE[name];
+    var h = 0;
+    for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+    return h;
+  }
+
+  function paintCover(card, a) {
+    var thumb = card.querySelector(".asset-card__thumb");
+    if (!thumb || a.thumbnail_url) return;      // a real picture always wins
+
+    var family = coverFamily(a);
+    thumb.classList.add("hub-cover");
+    thumb.style.setProperty("--cover-hue", hueFor(family));
+
+    /* What the cover says is which product this is.
+     *
+     * The first attempt put the title's initials here and they collided badly:
+     * SharePoint titles follow "<Product> <Module> Overview VDK v.N", so three
+     * neighbouring cards all read "NOV". The title is printed in full directly
+     * underneath anyway, which made it redundant as well as ambiguous.
+     *
+     * Product identity is neither. A wall of Windchill marks beside a wall of
+     * Creo marks is scannable at a glance, which is the one job a cover has
+     * here. Four families have a mark in the sprite -- 75% of assignments --
+     * and the rest show the family name, which is still distinctive per
+     * family and never collides meaninglessly.
+     */
+    var mark = document.createElement("span");
+    mark.className = "hub-cover__mark";
+    mark.setAttribute("aria-hidden", "true");
+    var logo = family && FAMILY_MARK[family];
+    if (logo && document.getElementById(logo[0])) {
+      mark.innerHTML = '<svg viewBox="' + logo[1] + '"><use href="#'
+                     + logo[0] + '"/></svg>';
+    } else {
+      mark.className += " hub-cover__mark--text";
+      // The type is never the fallback: its chip is already in the corner, and
+      // a cover reading "VDK" says nothing the card has not already said.
+      mark.textContent = family || (a.products || [])[0] || "";
+    }
+    thumb.insertBefore(mark, thumb.firstChild);
+  }
+
   /* ------------------------------------------------- the suggestion strip */
 
   /* Someone who searches "windchill" wants the 203 Windchill demos, not to
@@ -959,6 +1050,19 @@
     var key = sel ? sel.value : "";
     if (!key) { host.style.display = "none"; host.innerHTML = ""; return; }
 
+    /* Once someone starts searching inside a segment they are looking for a
+     * result, not reading the introduction, and a full-height header pushes
+     * every result below the fold. Collapse to a single line they can reopen.
+     * Re-render only when the segment itself changes, so typing does not
+     * rebuild ten cards on every keystroke. */
+    var searching = !!val("hubSearchInput");
+    if (host.dataset.segment === key) {
+      host.classList.toggle("hub-seg--collapsed", searching && !host.dataset.pinned);
+      return;
+    }
+    host.dataset.segment = key;
+    delete host.dataset.pinned;
+
     var sg;
     try { sg = await getJSON("/api/segments/" + encodeURIComponent(key)); }
     catch (err) { host.style.display = "none"; return; }
@@ -988,7 +1092,11 @@
       : '';
 
     host.innerHTML =
-        '<button class="hub-seg__back" id="hubSegBack">'
+        '<button class="hub-seg__toggle" id="hubSegToggle" aria-expanded="true">'
+      +   '<svg class="orion-ico orion-ico--sm"><use href="#i-chevron-right"/></svg>'
+      +   '<span class="hub-seg__toggle-label">' + escapeHtml(sg.label) + '</span>'
+      +   '<span class="hub-seg__toggle-count">' + sg.total + '</span></button>'
+      + '<button class="hub-seg__back" id="hubSegBack">'
       +   '<svg class="orion-ico orion-ico--sm"><use href="#i-chevron-right"/></svg>'
       +   ' All demos</button>'
       + '<div class="hub-seg__head">'
@@ -1013,6 +1121,18 @@
 
     var back = document.getElementById("hubSegBack");
     if (back) back.addEventListener("click", clearAll);
+
+    /* Reopening it while searching pins it open: the collapse is a default,
+     * not a rule, and someone who deliberately expands it should not have it
+     * shut again by their next keystroke. */
+    var toggle = document.getElementById("hubSegToggle");
+    if (toggle) toggle.addEventListener("click", function () {
+      var collapsed = host.classList.toggle("hub-seg--collapsed");
+      toggle.setAttribute("aria-expanded", String(!collapsed));
+      if (collapsed) delete host.dataset.pinned; else host.dataset.pinned = "1";
+    });
+
+    host.classList.toggle("hub-seg--collapsed", !!val("hubSearchInput"));
 
     host.querySelectorAll(".hub-seg__fam").forEach(function (b) {
       b.addEventListener("click", function () {

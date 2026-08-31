@@ -169,21 +169,27 @@ def is_indexable(demo: dict) -> bool:
 
 
 def viewer_url(demo: dict) -> str | None:
-    """Where a person opens this demo.
+    """Where a person opens this demo — the fallback when V1 is unreachable.
 
     **V2 does not return `previewLink`** — V1 did, and the field is absent from
     the V2 schema entirely. Without reconstructing it every Consensus card in
     the grid is a dead end, which is most of what a Consensus result is for.
 
-    V1's value was `https://play.goconsensus.com/<uuid>?preview=sales`, so the
-    uuid is all that was ever needed; the host comes from
-    CONSENSUS_VIEWER_URL_TEMPLATE rather than being hardcoded.
+    `?preview=sales` is not decoration. Bare
+    `play.goconsensus.com/<uuid>` opens a viewer that does not play: the demo
+    loads without the internal preview context and there is nothing to watch.
+    The first version of this function dropped the query string even though the
+    docstring above it recorded the correct value, which is how every Consensus
+    play button came to lead somewhere dead.
+
+    Prefer the real `previewLink` from V1 where it can be had — see
+    `media_from_v1` — and reach this only when it cannot.
     """
     uuid = demo.get("uuid")
     if not uuid:
         return None
     template = (settings.consensus_viewer_url_template
-                or "https://play.goconsensus.com/{hash}")
+                or "https://play.goconsensus.com/{hash}?preview=sales")
     return template.format(hash=uuid)
 
 

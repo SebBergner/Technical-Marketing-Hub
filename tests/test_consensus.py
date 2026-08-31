@@ -388,3 +388,57 @@ def test_a_first_v1_sync_is_not_blocked(tmp_path):
     repo = JsonAssetRepository(str(tmp_path))
     sync_demos(StubConsensusClient([]), repo)
     assert repo.sync_state("consensus")["api"] == "v1"
+
+
+# ─────────────────────────────────────────── the link that actually plays
+def test_the_viewer_url_carries_the_preview_parameter():
+    """`?preview=sales` is load-bearing, not decoration.
+
+    Bare play.goconsensus.com/<uuid> opens a viewer with nothing to watch. The
+    first version of viewer_url() dropped the query string even though its own
+    docstring recorded the correct value, and every Consensus play button in
+    the grid led somewhere dead until Liwei tried one.
+    """
+    from backend.integrations.consensus_v2 import viewer_url
+    url = viewer_url({"uuid": "abc-123"})
+    assert url.endswith("?preview=sales"), url
+    assert "abc-123" in url
+
+
+def test_no_uuid_means_no_viewer_url():
+    from backend.integrations.consensus_v2 import viewer_url
+    assert viewer_url({}) is None
+
+
+def test_the_real_preview_link_beats_the_reconstructed_one():
+    """V1 returns the genuine link in the same call that returns thumbnails,
+    so reconstruction is the fallback and never the first choice."""
+    from backend.integrations.consensus_sync import build_assets_v2
+
+    demo = {"uuid": "u1", "title": "A demo", "isPublic": True,
+            "isPublished": True, "isArchived": False}
+    real = "https://play.goconsensus.com/u1?preview=sales&from=v1"
+
+    with_v1, _ = build_assets_v2([demo], {"u1": {"preview_link": real,
+                                                 "thumbnail": "t.png"}})
+    assert with_v1[0].web_url == real
+    assert with_v1[0].thumbnail_url == "t.png"
+
+    # V1 unreachable: reconstruct, and the reconstruction must still play.
+    without, _ = build_assets_v2([demo], {})
+    assert without[0].web_url.endswith("?preview=sales")
+    assert without[0].thumbnail_url is None
+
+
+def test_the_family_travels_with_the_asset():
+    """A client cannot re-derive it: "KEPServerEX" is Kepware and says so
+    nowhere in its name. The rule lives in one place and its answer ships."""
+    from backend.config import settings
+    from backend.repositories.base import AssetQuery
+    from backend.repositories.json_repo import JsonAssetRepository
+
+    repo = JsonAssetRepository(settings.data_dir)
+    page = repo.list(AssetQuery(products=["KEPServerEX"], limit=5))
+    if not page.items:
+        pytest.skip("no KEPServerEX assets in this catalogue")
+    assert "Kepware" in page.items[0].product_families

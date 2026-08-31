@@ -56,7 +56,10 @@ class Settings(BaseSettings):
     consensus_source_name: str = "TDD Portal"
     #: Sends return only a hash, never a full URL. Configurable so correcting
     #: the viewer host is a config change rather than a code change.
-    consensus_viewer_url_template: str = "https://play.goconsensus.com/{hash}"
+    #: `?preview=sales` is load-bearing: without it the viewer opens but does
+    #: not play. Only a fallback -- the real previewLink comes from V1.
+    consensus_viewer_url_template: str = (
+        "https://play.goconsensus.com/{hash}?preview=sales")
 
     # ---- Consensus V2 (OAuth 2.0). A SEPARATE credential from the V1 pair
     # above: V1 sends api_key/api_secret in the request body, V2 wants a

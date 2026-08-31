@@ -127,6 +127,12 @@ class AssetBase(BaseModel):
     description: str | None = None
 
     products: list[str] = Field(default_factory=list)
+    #: The families those products roll up to, derived by
+    #: backend.services.taxonomy. On the summary because the UI needs it per
+    #: card -- colouring a cover, grouping a grid -- and a client that
+    #: re-derives it from the product strings gets it wrong: "KEPServerEX" is
+    #: Kepware and says so nowhere in its name. One rule, in one place.
+    product_families: list[str] = Field(default_factory=list)
     funnel_stage: FunnelStage | None = None
     content_depth: ContentDepth | None = None
     language: str = "en"

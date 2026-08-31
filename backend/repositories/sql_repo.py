@@ -503,7 +503,8 @@ class SqlAssetRepository(AssetRepository):
         return dict(
             id=src.asset_id, type=src.type, source=src.source_system,
             title=src.title, description=src.description,
-            products=src.products or [], funnel_stage=src.funnel_stage,
+            products=src.products or [],
+            product_families=taxonomy.families_of(src.products), funnel_stage=src.funnel_stage,
             content_depth=src.content_depth, language=src.language, segment=src.segment,
             industry=src.industry, value_drivers=src.value_drivers or [],
             customer_facing=src.customer_facing, has_narrated_audio=src.has_narrated_audio,

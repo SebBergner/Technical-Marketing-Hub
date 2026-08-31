@@ -606,6 +606,7 @@ class JsonAssetRepository(AssetRepository):
             title=record["title"], description=record.get("description"),
             web_url=record.get("web_url"),
             products=record.get("products") or [],
+            product_families=taxonomy.families_of(record.get("products")),
             funnel_stage=record.get("funnel_stage"),
             content_depth=record.get("content_depth"),
             language=record.get("language") or "en",

@@ -86,4 +86,10 @@ async def health():
 
 @app.get("/")
 async def index():
+    """Elio's UI, fed from the live API by static/hub-api.js.
+
+    The file itself is his and arrives from the Elio-UI-Development branch
+    essentially unchanged; the integration is one script tag at the bottom, so
+    merging his next revision stays trivial.
+    """
     return FileResponse(os.path.join(BASE_DIR, "index.html"))

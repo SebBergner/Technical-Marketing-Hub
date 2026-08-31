@@ -1893,15 +1893,30 @@ hubApplyFilters();
     color: var(--orion-text); }
   .hub-platform--ref:hover { border-color:#FC6839; }
 
-  /* Home platform: fills the row as the original share button did. The mark
-     would disappear into the platform's own orange, so the colour carries the
-     identity and a plain white icon carries the verb. */
-  .hub-platform--home { flex:1 1 auto; width:100%; border:none; color:#fff;
-    font-weight:600; padding:7px 12px; }
-  .hub-platform--home .orion-ico { color:#fff; }
+  /* Home platform: outline only. A filled gradient bar was the loudest thing
+     on a grid of 200 cards and drowned the titles it was meant to sit under.
+     A third of the tile is enough for the verb and leaves two thirds free for
+     whatever comes next -- a second platform, Add to Velocity, Favourite. */
+  .hub-platform--home { flex:0 0 33%; max-width:33%; background:transparent;
+    font-weight:600; font-size:10.5px; padding:4px 2px; letter-spacing:-.1px;
+    white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis; display:block; text-align:center; }
   .hub-platform--home.hub-platform--consensus {
-    background: linear-gradient(135deg,#FFB352 0%,#FC6839 52%,#EB2E24 100%); }
-  .hub-platform--home.hub-platform--consensus:hover { filter:brightness(1.07); }
+    border:1px solid #FC6839; color:#FC6839; }
+  .hub-platform--home.hub-platform--consensus:hover {
+    background:rgba(252,104,57,.10); }
+
+  /* Elio's stats slot holds one short line; ours holds a description that runs
+     to 1194 characters at worst, which stretched cards from 286px to 709px.
+     Three lines, with the whole text on hover. */
+  .asset-card__stats.hub-desc {
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;
+    overflow:hidden; align-items:flex-start; }
+  /* Titles wrap to two lines at most for the same reason. No reserved height:
+     the cards in a row already stretch to the tallest, so the grid squares
+     itself up and forcing a minimum would only add dead space. */
+  .asset-card__title { display:-webkit-box; -webkit-box-orient:vertical;
+    -webkit-line-clamp:2; overflow:hidden; }
 </style>
 <div id="hubApiStatus" class="hub-api-status"></div>
 <script src="/static/hub-api.js" defer></script>

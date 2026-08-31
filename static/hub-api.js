@@ -215,10 +215,9 @@
       btn.setAttribute("aria-label", btn.title);
 
       if (isHome) {
-        // The mark is a full-colour gradient and would vanish on the platform's
-        // own orange, so the colour carries the identity and the icon the verb.
-        btn.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#'
-                      + p.icon + '"/></svg>' + p.verb;
+        // Text alone: at a third of the tile there is no room for a mark
+        // beside it, and the orange outline already says which platform.
+        btn.textContent = p.verb;
       } else {
         btn.innerHTML = spriteExists(p.sprite)
           ? '<svg class="hub-platform__logo"><use href="#' + p.sprite + '"/></svg>'
@@ -234,6 +233,23 @@
     });
   }
 
+  /* The description lands in Elio's stats slot, which in the mockup holds one
+   * short line -- "214 views - Uploaded Jul 21", about 80 characters. Real
+   * SharePoint descriptions run to a median of 166 and a maximum of 1194, with
+   * no clamp on them, so cards ranged from 286px to 709px and the grid came
+   * out ragged.
+   *
+   * Three lines, and the full text on hover so nothing is actually lost. The
+   * class matters: the same element holds a real stats line on the static
+   * cards, and clamping that would be wrong.
+   */
+  function clampDescription(card, a) {
+    var el = card.querySelector(".asset-card__stats");
+    if (!el || !a.description) return;
+    el.classList.add("hub-desc");
+    el.title = a.description;
+  }
+
   function buildCard(a) {
     var card = window.videoAssetFromData(toCardData(a));
     // videoAssetFromData hardcodes type=video, which is right for Consensus
@@ -244,6 +260,7 @@
 
     retypeCard(card, a);
     platformActions(card, a);
+    clampDescription(card, a);
 
     var meta = card.querySelector(".asset-card__meta");
     if (meta) meta.insertBefore(sourceBadge(a.source), meta.firstChild);

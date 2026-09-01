@@ -1922,6 +1922,16 @@ hubApplyFilters();
   .asset-card__title { display:-webkit-box; -webkit-box-orient:vertical;
     -webkit-line-clamp:2; overflow:hidden; }
 
+  /* The type chip sat top-left, straight over the part of a thumbnail that
+     carries its title -- Consensus poster frames put their wordmark there, so
+     "Video" was covering "PERSONALIZED DEMO". The top edge is where a picture
+     says what it is; the bottom-left corner is empty on every card we build.
+
+     Except Elio's ranked cards, which put #1..#5 there, so those keep the
+     original position rather than stacking two pills in one corner. */
+  .asset-card__thumb:not(:has(.rank-chip)) .type-chip {
+    top:auto; bottom:8px; }
+
   /* A derived cover for the 455 SharePoint assets that have no picture and no
      way to make one. An identifier, not a photograph -- see paintCover(). */
   .hub-cover { position:relative; overflow:hidden;

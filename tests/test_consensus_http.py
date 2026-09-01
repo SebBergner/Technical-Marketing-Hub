@@ -272,8 +272,13 @@ def test_create_demoboard_sends_documented_body_and_maps_response():
     assert seen["body"]["organization"] == "Acme Robotics"
     assert seen["body"]["demo_uuid"] == DEMO_ITEM["uuid"]
     assert seen["body"]["creationSource"] == "api"
+    # Verified against the live API on 2026-08-31. The address key is
+    # `contact_email` -- `email` fails with "This value is required" -- while
+    # the names stay `first_name`/`last_name`; `contact_first_name` and
+    # `contact_last_name` are accepted and silently ignored.
     assert seen["body"]["share_to"] == [
-        {"email": "buyer@acme.com", "first_name": "John", "last_name": "Smith"}]
+        {"contact_email": "buyer@acme.com",
+         "first_name": "John", "last_name": "Smith"}]
 
     assert link.kind == "demoboard"
     assert link.send_demo_uuid == "99999999-8888-7777-6666-555555555555"
@@ -384,3 +389,37 @@ def test_probe_reports_bad_credentials_without_raising():
     assert result["auth"]["ok"] is False
     assert "Invalid auth token" in result["auth"]["error"]
     assert "demo_search" not in result, "should not continue past a failed auth check"
+
+
+def test_a_validation_failure_names_the_field_that_is_wrong():
+    """Consensus reports validation errors in a top-level `errors` map, not in
+    `data.error`, and dropping it turned a precise complaint into
+    "error from /sales/createsenddemo" -- which cost a debugging round.
+    """
+    from backend.integrations.consensus import ConsensusAPIError
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={
+            "status": 400, "data": None,
+            "errors": {"auth": {"source_name": "Invalid value for source_name field"},
+                       "share_to": [{"contact_email": "This value is required."}]},
+        })
+
+    client = client_for(handler)
+    with pytest.raises(ConsensusAPIError) as caught:
+        client.list_demos(limit=1)
+    message = str(caught.value)
+    assert "share_to[0].contact_email" in message
+    assert "This value is required." in message
+    assert "auth.source_name" in message
+
+
+def test_a_recipients_link_is_not_the_sales_preview_link():
+    """`?preview=sales` belongs on a card in our own catalogue, not on
+    something sent to a customer."""
+    client = HttpConsensusClient(
+        base_url="https://example.test", api_key="k", api_secret="s",
+        user_email="a@b.c",
+        viewer_url_template="https://play.goconsensus.com/{hash}?preview=sales")
+    assert client._viewer_url("abc") == "https://play.goconsensus.com/abc?preview=sales"
+    assert client._share_url("abc") == "https://play.goconsensus.com/abc"

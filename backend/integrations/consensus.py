@@ -100,15 +100,52 @@ class ShareRecipient:
     contact_uuid: str | None = None
 
     def to_payload(self) -> dict[str, Any]:
-        """⚠ The spec declares `share_to` items as a bare `type: object` with no
-        properties, so these key names are inferred from the *response* shape,
-        which does document `email` / `first_name` / `last_name`."""
-        payload: dict[str, Any] = {"email": self.email}
+        """Verified against the live API on 2026-08-31, not inferred.
+
+        The spec declares `share_to` items as a bare `type: object` with no
+        properties, so this was originally guessed from the *response* shape --
+        `email` / `first_name` / `last_name` -- and the guess was wrong. The
+        address field is **`contact_email`**; sending `email` fails with
+        "contact_email: This value is required."
+
+        The two name fields are not symmetric with it. `first_name` and
+        `last_name` are correct and come back populated; `contact_first_name`
+        and `contact_last_name` are accepted and silently ignored, as are
+        `firstName` / `lastName` and a combined `contact_name`. All four were
+        tried against the live endpoint and returned empty names.
+        """
+        payload: dict[str, Any] = {"contact_email": self.email}
         if self.first_name:
             payload["first_name"] = self.first_name
         if self.last_name:
             payload["last_name"] = self.last_name
         return payload
+
+
+def _describe_fields(errors: Any) -> str | None:
+    """Flatten Consensus's `errors` map into one readable line.
+
+    It arrives as `{"auth": {"source_name": "..."},
+                   "share_to": [{"contact_email": "..."}]}` -- nested, and
+    sometimes a list because the offending item is one of several.
+    """
+    if not isinstance(errors, (dict, list)):
+        return None
+
+    parts: list[str] = []
+
+    def walk(node: Any, path: str) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                walk(value, f"{path}.{key}" if path else str(key))
+        elif isinstance(node, list):
+            for index, value in enumerate(node):
+                walk(value, f"{path}[{index}]")
+        elif node:
+            parts.append(f"{path}: {node}" if path else str(node))
+
+    walk(errors, "")
+    return "; ".join(parts) or None
 
 
 @dataclass(frozen=True)
@@ -338,7 +375,7 @@ class HttpConsensusClient:
         raise ConsensusError(f"Consensus request to {path} failed: {last}") from last
 
     @staticmethod
-    def _check(payload: Any, http_status: int, path: str) -> Any:
+    def _check(payload: Any, http_status: int, path: str) -> Any:  # noqa: D401
         """The docs put the authoritative status inside the body.
 
         They do not say whether the HTTP status always agrees, so an error in
@@ -348,12 +385,20 @@ class HttpConsensusClient:
             body_status = payload.get("status")
             error = (payload.get("data") or {}).get("error") if isinstance(
                 payload.get("data"), dict) else None
+            # A validation failure does not use data.error at all: it returns a
+            # top-level `errors` map naming the offending fields. Dropping it
+            # turned "share_to[0].contact_email: This value is required" into a
+            # bare "error from /sales/createsenddemo", which says nothing about
+            # what to fix.
+            fields = payload.get("errors")
 
-            if error or (isinstance(body_status, int) and body_status >= 400):
+            if error or fields or (isinstance(body_status, int) and body_status >= 400):
                 raise ConsensusAPIError(
                     status=body_status if isinstance(body_status, int) else http_status,
                     code=(error or {}).get("code"),
-                    message=(error or {}).get("message") or f"error from {path}",
+                    message=((error or {}).get("message")
+                             or _describe_fields(fields)
+                             or f"error from {path}"),
                 )
 
         if http_status >= 400:
@@ -521,6 +566,16 @@ class HttpConsensusClient:
         })
         return [self._to_demo(item) for item in self._items(payload)][:limit]
 
+    def _share_url(self, hash_value: str) -> str:
+        """Where a *recipient* opens a DemoBoard.
+
+        Not the same URL as browsing the demo ourselves. `?preview=sales` puts
+        the viewer in internal preview mode, which is right for a card in our
+        own catalogue and wrong for something sent to a customer, so the query
+        is stripped here. Verified: the bare hash URL resolves 200.
+        """
+        return self._viewer_url(hash_value).split("?")[0]
+
     def _viewer_url(self, hash_value: str) -> str:
         return self._viewer_template.format(hash=hash_value)
 
@@ -575,7 +630,7 @@ class HttpConsensusClient:
         hash_value = item.get("hash")
         if not hash_value:
             raise ConsensusError(f"no hash in createlink response for demo {uuid}")
-        return ShareLink(url=self._viewer_url(hash_value), demo_uuid=uuid,
+        return ShareLink(url=self._share_url(hash_value), demo_uuid=uuid,
                          created_at=utcnow(), kind="marketing",
                          send_demo_uuid=item.get("uuid"), send_demo_hash=hash_value)
 
@@ -627,7 +682,7 @@ class HttpConsensusClient:
         )
 
         return ShareLink(
-            url=self._viewer_url(send_hash), demo_uuid=demo.uuid, created_at=utcnow(),
+            url=self._share_url(send_hash), demo_uuid=demo.uuid, created_at=utcnow(),
             kind="demoboard", send_demo_uuid=item.get("senddemo_uuid"),
             send_demo_hash=send_hash, is_test=bool(item.get("isTest", is_test)),
             recipients=returned,

@@ -1160,29 +1160,37 @@ a:hover { text-decoration: underline; }
       </div>
 
       <div class="form-row">
-        <label for="shareOrg">Account / Organization</label>
-        <input type="text" id="shareOrg" value="Bobcat">
+        <label for="shareOrg">Account / Organization <span class="hub-req">required</span></label>
+        <input type="text" id="shareOrg" placeholder="The customer or prospect this board is for">
       </div>
       <div class="form-row">
-        <label for="shareOpp">Opportunity</label>
-        <input type="text" id="shareOpp" value="Bobcat – Windchill AI Expansion FY26Q3">
+        <label for="shareOpp">Opportunity <span class="hub-opt">optional</span></label>
+        <input type="text" id="shareOpp" placeholder="e.g. Windchill AI Expansion FY26Q3">
       </div>
       <div class="form-row">
-        <label>Recipients</label>
-        <div class="chip-input">
-          <span class="chip">j.render@bobcat.com</span>
-          <span class="chip">m.alvarez@bobcat.com</span>
-          <input type="text" placeholder="Add email…">
+        <label for="shareRecipientInput">Recipients <span class="hub-req">required</span></label>
+        <div class="chip-input" id="shareChips">
+          <input type="text" id="shareRecipientInput"
+                 placeholder="name@company.com, or Jane Doe &lt;jane@company.com&gt;">
         </div>
+        <div class="hub-hint">Enter or comma to add. Each recipient gets their own
+          tracked invite.</div>
       </div>
+      <label class="hub-testrow">
+        <input type="checkbox" id="shareIsTest" checked>
+        <span>Test send &mdash; creates the DemoBoard flagged as a test so it stays
+          out of Consensus reporting. Uncheck for a real send.</span>
+      </label>
+
+      <div class="share-error" id="shareError" style="display:none;"></div>
 
       <div class="share-result" id="shareResult" style="display:none;">
-        <div class="share-result__label"><svg class="orion-ico orion-ico--sm"><use href="#i-check"/></svg> DemoBoard link ready</div>
+        <div class="share-result__label"><svg class="orion-ico orion-ico--sm"><use href="#i-check"/></svg> <span id="shareResultLabel">DemoBoard created</span></div>
         <div class="share-result__link">
-          <span id="shareLinkText">play.goconsensus.com/9f3ab2e1</span>
+          <span id="shareLinkText">—</span>
           <button onclick="copyShareLink()" id="copyBtn">Copy</button>
         </div>
-        <div class="share-result__meta">Sent to 2 recipients · view engagement anytime in Consensus Reports</div>
+        <div class="share-result__meta" id="shareResultMeta"></div>
       </div>
     </div>
     <div class="modal__foot">
@@ -2022,6 +2030,30 @@ hubApplyFilters();
   .hub-suggest__btn:hover { border-color:var(--orion-accent, #5b6cff); }
   .hub-suggest__btn--page { border-color:var(--orion-accent, #5b6cff);
     color:var(--orion-accent, #5b6cff); }
+
+  /* ------------------------------------------------------- share modal */
+  .hub-req { font-size:10.5px; font-weight:600; text-transform:uppercase;
+    letter-spacing:.4px; color:#c25a10; margin-left:6px; }
+  .hub-opt { font-size:10.5px; font-weight:500; text-transform:uppercase;
+    letter-spacing:.4px; color:var(--orion-text-3); margin-left:6px; }
+  .hub-hint { font-size:11.5px; color:var(--orion-text-3); margin-top:5px; }
+  .chip-input .chip { display:inline-flex; align-items:center; gap:6px;
+    background:var(--orion-surface-3); border:1px solid var(--orion-border-md);
+    border-radius:var(--orion-radius-pill); padding:3px 6px 3px 10px;
+    font-size:12px; color:var(--orion-text); }
+  .chip__x { border:none; background:transparent; color:var(--orion-text-3);
+    cursor:pointer; font-size:14px; line-height:1; padding:0 2px; }
+  .chip__x:hover { color:var(--orion-text); }
+  .chip-input input { flex:1; min-width:170px; border:none; outline:none;
+    background:transparent; font:inherit; font-size:13px; color:var(--orion-text); }
+  /* A real send emails real people, so the safe option is the default and the
+     switch that arms it has to be visible rather than buried. */
+  .hub-testrow { display:flex; gap:9px; align-items:flex-start; margin-top:14px;
+    font-size:12px; color:var(--orion-text-2); line-height:1.45; cursor:pointer; }
+  .hub-testrow input { margin-top:2px; flex:0 0 auto; }
+  .share-error { margin-top:14px; padding:10px 12px; border-radius:6px;
+    border:1px solid #c2410c66; background:#c2410c14; color:#c2410c;
+    font-size:12.5px; line-height:1.5; white-space:pre-wrap; }
 </style>
 <div id="hubApiStatus" class="hub-api-status"></div>
 <script src="/static/hub-api.js" defer></script>

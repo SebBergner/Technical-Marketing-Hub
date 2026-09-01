@@ -1110,7 +1110,8 @@ a:hover { text-decoration: underline; }
             </div>
             <div id="attachmentsSection">
               <div class="field-hint">Product brief, messaging document, screen grabs, or existing video snippets — whatever you've got.</div>
-              <label class="upload-drop">
+              <label class="upload-drop upload-drop--disabled"
+                     title="Attachments are not carried yet -- link them in the notes instead">
                 <input type="file" multiple onchange="handleAttachmentFiles(this)">
                 <svg class="orion-ico ico-muted"><use href="#i-upload"/></svg>
                 <span class="upload-drop__title">Click to attach files</span>
@@ -1722,15 +1723,22 @@ function computeProductScope() {
 function onStartingMaterialsChange(el) {
   document.getElementById('attachmentsSection').style.display = el.dataset.value === 'have' ? '' : 'none';
 }
+/* This used to render a chip per file and then clear the input, discarding
+   every File object. Nothing was uploaded and nothing could be: the request
+   endpoint carries no files either. The chip made it look attached, which is
+   the worst of the three possible states -- someone would attach a spec,
+   submit, and never know it was dropped.
+
+   Until there is somewhere for files to live, the control says so. */
 function handleAttachmentFiles(input) {
   var list = document.getElementById('attachmentList');
-  Array.from(input.files).forEach(function(f) {
-    var chip = document.createElement('span');
-    chip.className = 'chip';
-    chip.innerHTML = '<svg class="orion-ico orion-ico--sm"><use href="#i-file-text"/></svg> ' + f.name;
-    list.appendChild(chip);
-  });
+  var names = Array.from(input.files).map(function(f) { return f.name; });
   input.value = '';
+  if (!names.length) return;
+  list.innerHTML = '<span class="attach-warn">'
+    + 'Attachments cannot be carried yet, so ' + names.length + ' file'
+    + (names.length === 1 ? ' was' : 's were') + ' not kept. '
+    + 'Put a link in the notes below, or email them to the team.</span>';
 }
 /* Replaced at runtime by hub-api.js, which actually posts the answers. This
    remains as the fallback for the case where that script fails to load: it is
@@ -2097,6 +2105,12 @@ hubApplyFilters();
   /* Recorded but not yet in SharePoint is not a failure and must not look
      like one -- but it is not the plain success either. */
   .req-outcome--warn { color: #c2410c; }
+
+  /* An affordance that cannot do its job, marked rather than removed, so the
+     gap stays visible and comes back the day files have somewhere to live. */
+  .upload-drop--disabled { opacity: .5; }
+  .attach-warn { display: block; font-size: 12px; line-height: 1.5;
+    color: #c2410c; }
 </style>
 <div id="hubApiStatus" class="hub-api-status"></div>
 <script src="/static/hub-api.js" defer></script>

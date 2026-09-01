@@ -756,6 +756,53 @@
     });
   }
 
+  /* The product pills shipped as a hand-typed five: Windchill, Creo,
+   * ServiceMax, Codebeamer, Other. The catalogue has NINETEEN families, and
+   * three of the largest were missing -- ThingWorx with 111 assets, Mathcad
+   * with 43, Arbortext with 15 -- so anyone wanting a ThingWorx video had to
+   * file it as "Other". The single most useful field for routing a request
+   * was the one most likely to be useless.
+   *
+   * Built from the same facets the rest of the page uses, so it cannot drift
+   * again: a family that appears in the catalogue appears here the same day.
+   * Ordered by how much of the catalogue each one holds, because that is also
+   * roughly the order people look for them in.
+   */
+  function fillProductPills(facets) {
+    var row = document.getElementById("productScopeRow");
+    if (!row) return;
+    var families = (facets.product_families || []).slice()
+      .sort(function (a, b) { return b.count - a.count; });
+    if (!families.length) return;          // keep the markup rather than empty it
+
+    row.innerHTML = "";
+    families.forEach(function (f) {
+      var pill = document.createElement("span");
+      pill.className = "stage-pill";
+      pill.dataset.value = f.value;
+      pill.textContent = f.value;
+      pill.title = f.count + " asset" + (f.count === 1 ? "" : "s") + " today";
+      row.appendChild(pill);
+    });
+    // "Other" is not a family and has no count; it is the honest home for a
+    // product the catalogue has never carried, which is exactly when someone
+    // is most likely to be requesting one.
+    var other = document.createElement("span");
+    other.className = "stage-pill";
+    other.dataset.value = "Other";
+    other.textContent = "Other";
+    row.appendChild(other);
+
+    // Elio's pills call pillToggle + computeProductScope through inline
+    // onclick; rebuilt ones need the same behaviour bound directly.
+    row.querySelectorAll(".stage-pill").forEach(function (pill) {
+      pill.addEventListener("click", function () {
+        window.pillToggle(pill);
+        if (window.computeProductScope) window.computeProductScope();
+      });
+    });
+  }
+
   /* -------------------------------------------------- the request intake */
 
   /* submitAssetRequest() hid the form and showed the success card. No request
@@ -1597,6 +1644,7 @@
     takeOverControls();
     wireShareModal();
     wireRequestForm();
+    fillProductPills(facets);
     await buildSegmentNav();
     wireNav(facets);
     markUnavailable(facets);

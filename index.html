@@ -267,7 +267,14 @@ a:hover { text-decoration: underline; }
   padding: 7px 14px; border-radius: var(--orion-radius-pill); border: 1px solid var(--orion-border-md);
   font-size: 12.5px; font-weight: 500; cursor: pointer; color: var(--orion-text-2); background: var(--orion-surface);
 }
-.stage-pill--active { background: var(--orion-text); color: #fff; border-color: var(--orion-text); font-weight: 600; }
+/* A selected pill inverts, and inverting means BOTH halves flip. The original
+   painted the background with --orion-text -- a foreground token -- and left
+   the label a literal #fff. That reads correctly in light mode by luck, since
+   --orion-text is near-black there; in dark mode it is near-white, so the
+   label vanished into its own background. Pairing it with --orion-surface
+   keeps the contrast in both themes with no theme-specific rule. */
+.stage-pill--active { background: var(--orion-text); color: var(--orion-surface);
+  border-color: var(--orion-text); font-weight: 600; }
 
 /* ============================================================
    REQUEST ASSET FORM
@@ -290,8 +297,19 @@ a:hover { text-decoration: underline; }
 .upload-drop__sub { font-size: 12px; color: var(--orion-text-3); }
 .attachment-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .attachment-list:empty { display: none; }
-.derived-output { border: 1px solid var(--orion-indigo); background: var(--orion-indigo-soft); border-radius: var(--orion-radius-sm); padding: 10px 14px; }
+/* --orion-indigo-soft is a light-mode tint with no dark counterpart, and the
+   value inside uses --orion-text, which follows the theme. In dark mode that
+   put near-white text on a near-white panel: the derived scope was invisible.
+   A translucent wash of the indigo keeps the accent in both themes, because
+   it takes its lightness from whatever is behind it. */
+.derived-output { border: 1px solid var(--orion-indigo);
+  background: color-mix(in srgb, var(--orion-indigo) 12%, transparent);
+  border-radius: var(--orion-radius-sm); padding: 10px 14px; }
+/* indigo-strong is dark enough to disappear against the dark app background,
+   so the label lightens with the theme rather than staying put. */
 .derived-output__label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--orion-indigo-strong); margin-bottom: 3px; }
+:root:not([data-theme="light"]) .derived-output__label,
+:root[data-theme="dark"] .derived-output__label { color: #a5adff; }
 .derived-output__value { font-size: 14px; font-weight: 600; color: var(--orion-text); }
 
 /* ============================================================
@@ -324,7 +342,14 @@ a:hover { text-decoration: underline; }
 
 .form-row { display: flex; flex-direction: column; gap: 5px; }
 .form-row label { font-size: 12px; font-weight: 600; color: var(--orion-text-2); }
-.form-row input { padding: 8px 10px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); font: inherit; font-size: 13px; width: 100%; }
+/* No background or colour was set, so date and file inputs fell through to the
+   browser default -- white box, black text -- in dark mode. */
+.form-row input { padding: 8px 10px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); font: inherit; font-size: 13px; width: 100%;
+  background: var(--orion-surface); color: var(--orion-text); }
+.form-row input::placeholder { color: var(--orion-text-3); }
+/* The native calendar and file glyphs are dark-on-dark otherwise. */
+:root:not([data-theme="light"]) .form-row input,
+:root[data-theme="dark"] .form-row input { color-scheme: dark; }
 .chip-input { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); padding: 7px 8px; }
 .chip-input .chip { display: flex; align-items: center; gap: 5px; background: var(--orion-surface-2); border-radius: var(--orion-radius-pill); padding: 3px 9px; font-size: 12px; }
 .chip-input input { border: none; outline: none; flex: 1; min-width: 120px; font: inherit; font-size: 13px; padding: 3px 4px; }

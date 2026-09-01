@@ -39,7 +39,7 @@ from datetime import date
 from typing import Any
 
 from backend.models import (
-    Asset, AssetStats, AssetSummary, Capability, Facets, FacetValue, MetadataProposal,
+    Asset, AssetRequest, AssetStats, AssetSummary, Capability, Facets, FacetValue, MetadataProposal,
     Page, ProposalState, ProposalSummary, ValueRoadmap,
 )
 from backend.repositories.base import AssetQuery, AssetRepository
@@ -368,6 +368,65 @@ class JsonAssetRepository(AssetRepository):
             row = stats.setdefault(asset_id, {})
             row[stat] = (row.get(stat) or 0) + amount
             self._save("stats", stats)
+
+    # ------------------------------------------------------------- requests
+    def _requests_path(self) -> str:
+        return os.path.join(self.owned_dir, "requests.jsonl")
+
+    def save_request(self, request: AssetRequest) -> None:
+        """Append one submission, flushed to disk before returning.
+
+        JSON Lines rather than a JSON array: an append cannot corrupt what is
+        already there, and a truncated write costs the last line rather than
+        the file. This is the one store here that cannot be rebuilt from
+        anywhere, so it is written first and written plainly.
+        """
+        path = self._requests_path()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        line = json.dumps(request.model_dump(mode="json"), ensure_ascii=False)
+        with self._lock:
+            with open(path, "a", encoding="utf-8") as fh:
+                fh.write(line + "\n")
+                fh.flush()
+                os.fsync(fh.fileno())
+
+    def mark_request_synced(self, request_id: str, item_id: str) -> None:
+        """Rewrite the one line whose request reached SharePoint.
+
+        A rewrite rather than another append, because two lines for one
+        request would make "did this sync?" ambiguous, and that question is
+        the only reason the flag exists.
+        """
+        path = self._requests_path()
+        if not os.path.exists(path):
+            return
+        with self._lock:
+            with open(path, encoding="utf-8") as fh:
+                rows = [json.loads(line) for line in fh if line.strip()]
+            for row in rows:
+                if row.get("id") == request_id:
+                    row["sharepoint_item_id"] = item_id
+                    row["synced"] = True
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                for row in rows:
+                    fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp, path)
+
+    def unsynced_requests(self) -> list[AssetRequest]:
+        """Submissions that never reached SharePoint.
+
+        Without a way to ask, an outage hides itself: the request is safe in a
+        file nobody thinks to open.
+        """
+        path = self._requests_path()
+        if not os.path.exists(path):
+            return []
+        with open(path, encoding="utf-8") as fh:
+            rows = [json.loads(line) for line in fh if line.strip()]
+        return [AssetRequest(**r) for r in rows if not r.get("synced")]
 
     def replace_source_rows(self, assets: list[Asset], source_system: str) -> int:
         """The ONLY sanctioned writer of mirror data.

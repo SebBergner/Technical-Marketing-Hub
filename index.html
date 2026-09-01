@@ -976,6 +976,7 @@ a:hover { text-decoration: underline; }
         </div>
       </div>
 
+      <div class="req-error" id="reqError" style="display:none;"></div>
       <div id="requestFormCard" style="display:flex; flex-direction:column; gap:22px; margin-top:18px;">
 
         <div class="section" style="margin-bottom:0;">
@@ -1018,7 +1019,7 @@ a:hover { text-decoration: underline; }
         <div class="section" style="margin-bottom:0;">
           <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-message-square"/></svg> Narrative angle</div>
           <div class="form-section">
-            <div class="stage-row">
+            <div class="stage-row" id="narrativeAngleRow">
               <span class="stage-pill stage-pill--active" onclick="pillSelect(this)">Value proposition-led</span>
               <span class="stage-pill" onclick="pillSelect(this)">Features &amp; functions-led</span>
               <span class="stage-pill" onclick="pillSelect(this)">Mix of both</span>
@@ -1031,7 +1032,7 @@ a:hover { text-decoration: underline; }
           <div class="form-section">
             <div class="form-row">
               <label>Desired length</label>
-              <div class="stage-row">
+              <div class="stage-row" id="desiredLengthRow">
                 <span class="stage-pill" onclick="pillSelect(this)">&lt; 1 min</span>
                 <span class="stage-pill stage-pill--active" onclick="pillSelect(this)">1–3 min</span>
                 <span class="stage-pill" onclick="pillSelect(this)">3–5 min</span>
@@ -1150,6 +1151,7 @@ a:hover { text-decoration: underline; }
       <div class="share-result" id="requestSuccessCard" style="display:none; margin-top:18px;">
         <div class="share-result__label"><svg class="orion-ico orion-ico--sm"><use href="#i-check"/></svg> Request submitted</div>
         <div class="share-result__meta">The Technical Marketing team will review your request and follow up by email.</div>
+        <div class="req-outcome" id="reqOutcome"></div>
         <div style="margin-top:12px;"><button class="btn-ghost" style="flex:none;" onclick="closeRequestView()">Back to Technical Marketing Hub</button></div>
       </div>
     </div>
@@ -1730,11 +1732,18 @@ function handleAttachmentFiles(input) {
   });
   input.value = '';
 }
+/* Replaced at runtime by hub-api.js, which actually posts the answers. This
+   remains as the fallback for the case where that script fails to load: it is
+   better to say the Hub is unavailable than to show a success screen for a
+   request that went nowhere, which is what this function used to do. */
 function submitAssetRequest(e) {
   e.preventDefault();
-  document.getElementById('requestFormCard').style.display = 'none';
-  document.getElementById('requestSuccessCard').style.display = '';
-  document.getElementById('requestViewPage').scrollTop = 0;
+  var box = document.getElementById('reqError');
+  if (box) {
+    box.textContent = 'The Hub could not be reached, so this was not submitted. '
+                    + 'Please reload the page and try again.';
+    box.style.display = '';
+  }
 }
 
 function escAttr(s) { return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
@@ -2079,6 +2088,15 @@ hubApplyFilters();
   .share-error { margin-top:14px; padding:10px 12px; border-radius:6px;
     border:1px solid #c2410c66; background:#c2410c14; color:#c2410c;
     font-size:12.5px; line-height:1.5; white-space:pre-wrap; }
+
+  /* --------------------------------------------------- request intake */
+  .req-error { margin: 0 0 4px; padding: 10px 12px; border-radius: 6px;
+    border: 1px solid #c2410c66; background: #c2410c14; color: #c2410c;
+    font-size: 12.5px; line-height: 1.5; }
+  .req-outcome { margin-top: 10px; font-size: 13px; color: var(--orion-text-2); }
+  /* Recorded but not yet in SharePoint is not a failure and must not look
+     like one -- but it is not the plain success either. */
+  .req-outcome--warn { color: #c2410c; }
 </style>
 <div id="hubApiStatus" class="hub-api-status"></div>
 <script src="/static/hub-api.js" defer></script>

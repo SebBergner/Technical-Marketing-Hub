@@ -324,14 +324,24 @@ class AssetRequestCreate(BaseModel):
     narrative: str | None = None
     video_kind: str | None = None
     target_length: str | None = None
+    #: none | footage | story — the form's own values, mapped to readable
+    #: labels on the way into SharePoint.
+    customer_involvement: str | None = None
     named_customer: str | None = None
     distribution_channels: list[str] = Field(default_factory=list)
+    #: Derived from the channels by CHANNEL_TO_DEPTH, and carried so the team
+    #: can see what the requester was told to expect.
+    content_depth: ContentDepth | None = None
     recommendations: list[RecommendedAsset] = Field(default_factory=list)
     needed_by: date | None = None
+    #: Why that date — "product launch, trade show, exec review". A deadline
+    #: with a reason behind it can be negotiated; one without cannot.
+    compelling_event: str | None = None
     starting_materials: list[str] = Field(default_factory=list)
     requester_name: str | None = None
     requester_email: str | None = None
     requester_team: str | None = None
+    notes: str | None = None
 
 
 class AssetRequest(AssetRequestCreate):
@@ -340,3 +350,9 @@ class AssetRequest(AssetRequestCreate):
     id: str
     submitted_at: datetime
     status: str = "new"
+    #: The list item this became, once SharePoint has it. None means the local
+    #: copy is the only one — see `synced`.
+    sharepoint_item_id: str | None = None
+    #: False when SharePoint could not be reached. The submission is safe
+    #: either way; this is what says a retry is owed.
+    synced: bool = False

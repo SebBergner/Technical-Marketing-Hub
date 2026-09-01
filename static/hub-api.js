@@ -756,6 +756,135 @@
     });
   }
 
+  /* -------------------------------------------------- the request intake */
+
+  /* submitAssetRequest() hid the form and showed the success card. No request
+   * was made and nothing was written anywhere -- the same shape as the
+   * DemoBoard modal before it was wired. A form that says "submitted" and
+   * loses the answer is worse than one with no button.
+   *
+   * It posts to /api/requests now, which appends the submission locally
+   * BEFORE touching Graph and then writes it to the Demo Requests list on
+   * EXT-TDD. The two outcomes are different promises and the screen says
+   * which one it is: recorded here, or visible to the team.
+   */
+  var REQ_ROWS = {
+    asset_type: "assetTypeRow",
+    products: "productScopeRow",
+    narrative: "narrativeAngleRow",
+    target_length: "desiredLengthRow",
+    customer_involvement: "customerRow",
+    distribution_channels: "distributionRow",
+    starting_materials: "startingMaterialsRow"
+  };
+
+  /* Pills carry data-value where one exists and otherwise mean their own
+   * text. Reading textContent as the fallback keeps the two rows that were
+   * built without data-value working, rather than silently sending nothing. */
+  function pillValues(rowId) {
+    var row = document.getElementById(rowId);
+    if (!row) return [];
+    return Array.prototype.map.call(
+      row.querySelectorAll(".stage-pill--active"),
+      function (p) { return p.dataset.value || p.textContent.trim(); });
+  }
+
+  function fieldValue(id) {
+    var el = document.getElementById(id);
+    return el && el.value.trim() ? el.value.trim() : null;
+  }
+
+  function collectRequest() {
+    var body = {
+      asset_type: pillValues(REQ_ROWS.asset_type)[0] || "video",
+      products: pillValues(REQ_ROWS.products),
+      brief: fieldValue("reqBrief"),
+      narrative: pillValues(REQ_ROWS.narrative)[0] || null,
+      target_length: pillValues(REQ_ROWS.target_length)[0] || null,
+      customer_involvement: pillValues(REQ_ROWS.customer_involvement)[0] || null,
+      distribution_channels: pillValues(REQ_ROWS.distribution_channels),
+      starting_materials: pillValues(REQ_ROWS.starting_materials),
+      needed_by: fieldValue("reqTargetDate"),
+      compelling_event: fieldValue("reqCompellingEvent"),
+      requester_name: fieldValue("reqName"),
+      requester_email: fieldValue("reqEmail"),
+      notes: fieldValue("reqNotes")
+    };
+    // The starting-materials pills are ours to label; the list column expects
+    // the words a person would read.
+    var materials = { have: "Have materials", liberty: "Team has creative liberty" };
+    body.starting_materials = body.starting_materials.map(function (v) {
+      return materials[v] || v;
+    });
+    return body;
+  }
+
+  function requestProblem(message) {
+    var box = document.getElementById("reqError");
+    if (!box) return;
+    box.textContent = message || "";
+    box.style.display = message ? "" : "none";
+    if (message) box.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  async function submitRequest(event) {
+    if (event) event.preventDefault();
+    requestProblem("");
+
+    var body = collectRequest();
+    if (!body.products.length) {
+      requestProblem("Choose at least one product. It is what routes the request "
+                   + "to the person who can scope it.");
+      return;
+    }
+
+    var button = document.querySelector('[onclick*="submitAssetRequest"]');
+    var restore = button ? button.innerHTML : null;
+    if (button) { button.disabled = true; button.textContent = "Submitting\u2026"; }
+
+    try {
+      var response = await fetch("/api/requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      var data = await response.json();
+      if (!response.ok) {
+        requestProblem(data.detail
+          || ("The request was not saved (HTTP " + response.status + ")."));
+        return;
+      }
+
+      document.getElementById("requestFormCard").style.display = "none";
+      var card = document.getElementById("requestSuccessCard");
+      card.style.display = "";
+
+      /* The reference is the point of the success screen: without it the
+       * requester has nothing to quote when they chase it. */
+      var note = document.getElementById("reqOutcome");
+      if (note) {
+        note.textContent = data.synced
+          ? "Reference " + data.id + ". It is in the team's Demo Requests list."
+          : "Reference " + data.id + ". " + (data.warning || "")
+            + " Nothing has been lost — the team will pick it up.";
+        note.className = "req-outcome" + (data.synced ? "" : " req-outcome--warn");
+      }
+      document.getElementById("requestViewPage").scrollTop = 0;
+    } catch (err) {
+      requestProblem("Could not reach the Hub: " + err.message
+                   + ". Nothing was submitted, so nothing was lost — try again.");
+    } finally {
+      if (button) { button.disabled = false; button.innerHTML = restore; }
+    }
+  }
+
+  /* Elio binds the submit through an inline onclick, so replacing the global
+   * is enough here -- unlike the filter controls, which use addEventListener
+   * and had to be cloned to drop their handlers. */
+  function wireRequestForm() {
+    window.submitAssetRequest = submitRequest;
+  }
+
   /* ---------------------------------------------------- the share modal */
 
   /* Elio's DemoBoard modal was a mockup and said so nowhere: two hardcoded
@@ -1467,6 +1596,7 @@
     fillSidebarCounts(facets);
     takeOverControls();
     wireShareModal();
+    wireRequestForm();
     await buildSegmentNav();
     wireNav(facets);
     markUnavailable(facets);

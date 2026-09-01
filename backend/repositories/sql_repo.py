@@ -233,6 +233,23 @@ class SqlAssetRepository(AssetRepository):
                 out.setdefault(rail, []).append((row.rail_order or 0, row.asset_id))
         return {rail: [aid for _, aid in sorted(items)] for rail, items in out.items()}
 
+    # ---------------------------------------------------------------- requests
+    def save_request(self, request) -> None:
+        """Not implemented here.
+
+        The intake store is a JSON Lines file by design -- append-only, and
+        the one thing in this application that cannot be rebuilt from any
+        source. This backend has no table for it and has not been used since
+        the file-backed repository became the default, so it fails loudly
+        rather than accepting a submission it would then drop.
+        """
+        raise NotImplementedError(
+            "SqlAssetRepository has no request store; use JsonAssetRepository")
+
+    def mark_request_synced(self, request_id: str, item_id: str) -> None:
+        raise NotImplementedError(
+            "SqlAssetRepository has no request store; use JsonAssetRepository")
+
     # ----------------------------------------------------------------- write
     def increment_stat(self, asset_id: str, stat: str, amount: int = 1) -> None:
         if stat not in {"views", "downloads", "launches", "shares"}:

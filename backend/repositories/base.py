@@ -12,7 +12,8 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from backend.models import (
-    Asset, AssetSummary, Facets, MetadataProposal, Page, ProposalSummary,
+    Asset, AssetRequest, AssetSummary, Facets, MetadataProposal, Page,
+    ProposalSummary,
 )
 
 #: "relevance" degrades to "recent" when there is no search text, so it is one
@@ -59,6 +60,18 @@ class AssetRepository(ABC):
 
     @abstractmethod
     def list(self, query: AssetQuery) -> Page[AssetSummary]: ...
+
+    @abstractmethod
+    def save_request(self, request: "AssetRequest") -> None:
+        """Append one intake submission.
+
+        Append-only and irreplaceable: a request exists nowhere else until it
+        reaches SharePoint, and it must survive that write failing.
+        """
+
+    @abstractmethod
+    def mark_request_synced(self, request_id: str, item_id: str) -> None:
+        """Record which SharePoint item a request became."""
 
     @abstractmethod
     def get(self, asset_id: str) -> Asset | None: ...

@@ -116,5 +116,13 @@ read-only mirror; this list is the one place the Portal *originates* data, so
 it is Portal-owned and SharePoint is the store of record for it. It must never
 be rebuilt by a sync.
 
-Requires `Sites.Selected` with **write** on EXT-TDD. The current grant is
-read-only, so ask for the write grant at the same time.
+Requires `Sites.Selected` with **write** on EXT-TDD, and we have it —
+confirmed 2026-08-31 by a non-destructive probe: a PATCH carrying a
+deliberately wrong `If-Match` returned **412 precondition failed**, not 403.
+Graph checks authorisation before preconditions, so reaching the ETag check
+means the write role is granted. Nothing was modified. (`writeback.py` encodes
+the same expectation: it treats a 403 on PATCH as the read-only signal.)
+
+The site-level grant cannot be *read* — `GET /sites/{id}/permissions` needs
+`Sites.FullControl.All` and returns 403 — so this probe, or an actual write,
+is the only way to know.

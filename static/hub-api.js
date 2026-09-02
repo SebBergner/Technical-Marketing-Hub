@@ -93,14 +93,40 @@
   /* Where a result came from. Two platforms hold different things — a kit to
    * run versus a recording to send — so a card that does not say which is
    * asking the reader to guess. */
-  function sourceBadge(source) {
-    var badge = document.createElement("span");
-    badge.className = "orion-badge hub-source hub-source--" + source;
-    badge.textContent = source === "consensus" ? "Consensus" : "SharePoint";
-    badge.title = source === "consensus"
-      ? "A recorded video, ready to send to a customer"
-      : "A demo kit from SharePoint, to run yourself";
-    return badge;
+  /* The platform label is the action.
+   *
+   * Serge, 2026-09-02: "instead of share demo, you could remove that
+   * altogether and just click consensus and it would take you to the video in
+   * consensus. That way you're saving real estate and it's super logical,
+   * because it's implying if you're at SharePoint, you click on SharePoint, it
+   * takes you to SharePoint."
+   *
+   * So the badge stops being decoration and becomes the link. That also
+   * removes the separate share control from the card entirely, which is what
+   * made the actions row worth its space in the first place.
+   */
+  var PLATFORM_LABEL = {
+    consensus: ["Consensus", "Open this demo in Consensus"],
+    sharepoint: ["SharePoint", "Open this demo kit's folder in SharePoint"]
+  };
+
+  function platformBadge(source, href) {
+    var spec = PLATFORM_LABEL[source] || [source, "Open in " + source];
+    // Without somewhere to go it stays a label; a link that goes nowhere is
+    // worse than a badge that never claimed to be one.
+    var el = document.createElement(href ? "a" : "span");
+    el.className = "orion-badge hub-source hub-source--" + source
+                 + (href ? " hub-source--link" : "");
+    el.textContent = spec[0];
+    el.title = href ? spec[1] : spec[0];
+    if (href) {
+      el.href = href;
+      el.target = "_blank";
+      el.rel = "noopener";
+      // The card's own click opens the details page; this one must not.
+      el.addEventListener("click", function (e) { e.stopPropagation(); });
+    }
+    return el;
   }
 
   /* Elio's own static cards already establish the convention: a kit is a box,
@@ -128,19 +154,68 @@
      * removed rather than left there inert. */
     var play = card.querySelector(".play-btn");
     if (!play) return;
-    if (a.source === "consensus" && a.web_url) {
-      var link = document.createElement("a");
-      link.className = "play-btn";
-      link.href = a.web_url;
-      link.target = "_blank";
-      link.rel = "noopener";
-      link.title = "Play in Consensus";
-      link.innerHTML = play.innerHTML;
-      link.style.cursor = "pointer";
-      play.replaceWith(link);
-    } else {
-      play.remove();
+    var url = previewUrl(a);
+    if (!url) { play.remove(); return; }   // nothing to play: no control
+
+    var button = document.createElement("button");
+    button.className = "play-btn";
+    button.type = "button";
+    button.title = "Play preview";
+    button.innerHTML = play.innerHTML;
+    button.style.cursor = "pointer";
+    button.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      openPreview(a);
+    });
+    play.replaceWith(button);
+  }
+
+  /* Plays inside the Hub rather than in a tab.
+   *
+   * Elio: "I'd rather do a popup, and everything's hidden." A browser popup
+   * cannot do that any more -- Chrome ignores `location=no` and still shows a
+   * copyable origin bar -- but an iframe genuinely can, and Consensus permits
+   * it: neither play.goconsensus.com nor app.goconsensus.com sends
+   * X-Frame-Options or a frame-ancestors policy. Checked 2026-09-02.
+   */
+  function openPreview(a) {
+    var url = previewUrl(a);
+    if (!url) return;
+
+    var backdrop = document.getElementById("hubPreviewBackdrop");
+    if (!backdrop) {
+      backdrop = document.createElement("div");
+      backdrop.id = "hubPreviewBackdrop";
+      backdrop.className = "hub-preview";
+      backdrop.innerHTML =
+          '<div class="hub-preview__box">'
+        +   '<div class="hub-preview__bar">'
+        +     '<span class="hub-preview__title" id="hubPreviewTitle"></span>'
+        +     '<button class="hub-preview__close" title="Close">&times;</button>'
+        +   '</div>'
+        +   '<iframe class="hub-preview__frame" id="hubPreviewFrame"'
+        +     ' allow="fullscreen; autoplay" referrerpolicy="no-referrer"></iframe>'
+        + '</div>';
+      document.body.appendChild(backdrop);
+
+      var shut = function () {
+        backdrop.classList.remove("open");
+        // Blank the src on close, or the demo keeps playing behind the page.
+        document.getElementById("hubPreviewFrame").src = "about:blank";
+      };
+      backdrop.querySelector(".hub-preview__close").addEventListener("click", shut);
+      backdrop.addEventListener("click", function (e) {
+        if (e.target === backdrop) shut();
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && backdrop.classList.contains("open")) shut();
+      });
     }
+
+    document.getElementById("hubPreviewTitle").textContent = a.title || "";
+    document.getElementById("hubPreviewFrame").src = url;
+    backdrop.classList.add("open");
   }
 
   /* Distribution platforms an asset can be acted on, keyed by the field that
@@ -190,11 +265,26 @@
    * here. Labelling every absence does not scale either -- with three
    * platforms each card would carry a row of things it is not.
    */
+  /* HIDDEN, not deleted.
+   *
+   * Seb, 2026-09-02: "don't remove the current share functionality that you
+   * have. Just hide it." The DemoBoard modal works and is verified against the
+   * live API; what it cannot do without SSO is create the board as the person
+   * pressing the button, and until then every board would be filed under one
+   * name. Serge's interim answer -- click the Consensus badge, make the board
+   * there, logged in as yourself -- is what the card offers instead.
+   *
+   * Flip this to false the day Easy Auth is configured. Nothing else needs to
+   * change: the `as_user` plumbing behind it is already in place and tested.
+   */
+  var SHARE_BUTTON_HIDDEN = true;
+
   function platformActions(card, a) {
     var actions = card.querySelector(".asset-card__actions");
     if (!actions) return;
 
-    var available = PLATFORMS.filter(function (p) { return a[p.field]; });
+    var available = SHARE_BUTTON_HIDDEN
+      ? [] : PLATFORMS.filter(function (p) { return a[p.field]; });
     if (!available.length) {
       actions.remove();          // say nothing rather than say "not available"
       return;
@@ -260,23 +350,82 @@
     clampDescription(card, a);
     paintCover(card, a);
 
+    /* One badge per platform the asset is actually on, each linking there.
+     * A SharePoint kit that also has a Consensus recording gets both, which is
+     * the honest picture and replaces the small logo button that used to say
+     * the same thing less clearly. */
     var meta = card.querySelector(".asset-card__meta");
-    if (meta) meta.insertBefore(sourceBadge(a.source), meta.firstChild);
-
-    // A Consensus result is useless without a way to open it.
-    if (a.web_url) {
-      var title = card.querySelector(".asset-card__title");
-      if (title) {
-        var link = document.createElement("a");
-        link.href = a.web_url;
-        link.target = "_blank";
-        link.rel = "noopener";
-        link.textContent = title.textContent;
-        title.textContent = "";
-        title.appendChild(link);
+    if (meta) {
+      var anchor = meta.firstChild;
+      if (a.consensus_uuid && a.source !== "consensus") {
+        meta.insertBefore(platformBadge("consensus", consensusUrl(a)), anchor);
       }
+      meta.insertBefore(
+        platformBadge(a.source,
+                      a.source === "consensus" ? consensusUrl(a) : a.web_url),
+        meta.firstChild);
+    }
+
+    /* The name opens a details page inside the Hub, not the platform.
+     *
+     * Seb: "we should create a details page for each of those... behind a
+     * unique link so you can share this link internally". Serge: "when you
+     * click on the name, it should take you to the details page."
+     */
+    var title = card.querySelector(".asset-card__title");
+    if (title) {
+      var open = document.createElement("a");
+      open.href = "#/asset/" + encodeURIComponent(a.id);
+      open.className = "hub-detail-link";
+      open.textContent = title.textContent;
+      open.addEventListener("click", function (e) {
+        e.preventDefault();
+        openAssetDetail(a.id);
+      });
+      title.textContent = "";
+      title.appendChild(open);
     }
     return card;
+  }
+
+  /* A card has three doors and they lead to three different places.
+   *
+   *   play button  -> watch it here, in a popup, without leaving the Hub
+   *   the name     -> the details page
+   *   the platform -> that platform, as yourself
+   *
+   * The distinction between the first and the third is the one worth keeping
+   * straight. The preview plays a demo; the platform link puts the person in
+   * Consensus, signed in as themselves, where they can build a DemoBoard that
+   * is actually theirs. Sending the platform badge to the preview would look
+   * identical and quietly do the wrong thing.
+   */
+
+  //: Watch it here. A preview: no engagement is recorded, which Liwei
+  //: confirmed is acceptable for browsing.
+  function previewUrl(a) {
+    if (a.source === "consensus") return a.web_url;
+    return a.consensus_uuid
+      ? "https://play.goconsensus.com/" + a.consensus_uuid + "?preview=marketing"
+      : null;
+  }
+
+  /* Go to Consensus. The demo library with the title pre-searched, rather than
+   * a direct link to the demo, because arriving through the library means
+   * Consensus checks the licence: no licence, nothing found, and the Hub never
+   * had to ask who they are. Elio wanted exactly that automation and this gets
+   * it without a permissions lookup of our own.
+   *
+   * The cost is that a title is not an identifier. 17 titles are shared by
+   * more than one demo and 66 demos differ only by a language or version
+   * suffix, so about one in eight searches lands on a short list rather than a
+   * single result. A UUID-addressable library URL would be strictly better if
+   * one exists.
+   */
+  function consensusUrl(a) {
+    if (!a.consensus_uuid && a.source !== "consensus") return null;
+    return "https://app.goconsensus.com/demos/demo-library?query="
+         + encodeURIComponent(a.title || "");
   }
 
   /* ------------------------------------------------------------- filters UI */
@@ -894,6 +1043,227 @@
     renderAttachments(problems);
   }
 
+  /* ------------------------------------------------------- the details page */
+
+  /* Seb, 2026-09-02: "we should create a details page for each of those...
+   * behind a unique link so that you can also share this link internally. So
+   * you can tell someone, hey, look at this demo asset, and it brings them
+   * back to that exact demo details page."
+   *
+   * Elio's markup already contains the page -- #videoPreviewPage, with a
+   * player, title, meta, description and a Value Roadmap card. It was driven
+   * by his mock `videoData` object, so this fills it from the catalogue
+   * instead. Building a second one would have thrown away his layout for no
+   * gain.
+   *
+   * The unique link is `#/asset/<id>`, on the hash rather than the path,
+   * because the app is served as one static file: a real path would 404 on a
+   * hard refresh, and a link that only works if you arrive by clicking is not
+   * the shareable link Seb asked for.
+   */
+  var detailAsset = null;
+
+  function assetUrl(id) {
+    return location.origin + location.pathname + "#/asset/" + encodeURIComponent(id);
+  }
+
+  function durationLabel(seconds) {
+    if (!seconds) return "";
+    var m = Math.floor(seconds / 60), sec = seconds % 60;
+    return m + ":" + (sec < 10 ? "0" : "") + sec;
+  }
+
+  async function openAssetDetail(id) {
+    var asset;
+    try {
+      asset = await getJSON("/api/assets/" + encodeURIComponent(id));
+    } catch (err) {
+      console.error("[hub-api] could not load asset", id, err);
+      return;
+    }
+    detailAsset = asset;
+
+    var page = document.getElementById("videoPreviewPage");
+    if (!page) return;
+
+    setText("vpTitle", asset.title);
+    setText("vpDuration", durationLabel(asset.duration_seconds));
+
+    /* The meta row carries the platform badges, so the details page offers the
+     * same two doors as the card and nobody has to go back to find them. */
+    var meta = document.getElementById("vpMeta");
+    if (meta) {
+      meta.innerHTML = "";
+      meta.appendChild(platformBadge(
+        asset.source,
+        asset.source === "consensus" ? consensusUrl(asset) : asset.web_url));
+      if (asset.consensus_uuid && asset.source !== "consensus") {
+        meta.appendChild(platformBadge("consensus", consensusUrl(asset)));
+      }
+      [asset.type && (TYPE_CHIP[asset.type] || [])[1],
+       (asset.product_families || [])[0],
+       asset.segment, asset.funnel_stage].filter(Boolean).forEach(function (t) {
+        var chip = document.createElement("span");
+        chip.className = "orion-badge";
+        chip.textContent = t;
+        meta.appendChild(chip);
+      });
+    }
+
+    /* Facts, and only the ones we hold. An empty stats row beats a row of
+     * zeroes implying nobody has watched something we simply never counted. */
+    var facts = [];
+    if (asset.external_views) facts.push(asset.external_views + " views on Consensus");
+    if (asset.resource_count) facts.push(asset.resource_count + " files");
+    if (asset.video_count) facts.push(asset.video_count + " videos");
+    if (asset.uploaded_at) facts.push("Uploaded " + asset.uploaded_at);
+    if (asset.language && asset.language !== "en") facts.push(asset.language.toUpperCase());
+    setText("vpStats", facts.join(" \u00b7 "));
+
+    setText("vpDesc", asset.description
+      || "No description in " + (asset.source === "consensus" ? "Consensus" : "SharePoint")
+         + " for this one yet.");
+
+    var drivers = document.getElementById("vpValueDrivers");
+    if (drivers) {
+      drivers.innerHTML = "";
+      (asset.value_drivers || []).forEach(function (d) {
+        var chip = document.createElement("span");
+        chip.className = "value-driver-chip";
+        chip.textContent = d;
+        drivers.appendChild(chip);
+      });
+      if (!(asset.value_drivers || []).length) {
+        drivers.innerHTML = '<span class="hub-empty">Not indexed yet.</span>';
+      }
+    }
+
+    /* The Value Roadmap is the feature Serge called "very powerful", and
+     * nothing in the catalogue has been indexed -- 0 of 946. A placeholder
+     * rather than a hidden panel, because the panel is the point: Serge should
+     * see where it will be, and that it is empty for a reason rather than
+     * missing. Seb is going to show how AMP does the indexing; when that lands
+     * this branch stops being taken and nothing else changes.
+     */
+    var caps = document.getElementById("vpCapabilities");
+    var indexed = asset.value_roadmap && asset.value_roadmap.capabilities
+                  && asset.value_roadmap.capabilities.length;
+    if (caps && !indexed) {
+      caps.innerHTML =
+          '<div class="vr-placeholder">'
+        +   '<svg class="orion-ico"><use href="#i-target"/></svg>'
+        +   '<div><strong>Not indexed yet.</strong>'
+        +     '<div>The Value Roadmap index maps a demo onto the processes and '
+        +     'capabilities it demonstrates. Nothing in the catalogue carries '
+        +     'one yet &mdash; the indexing approach is being reused from AMP.</div>'
+        +   '</div>'
+        + '</div>';
+    }
+
+    // Share and Velocity are both hidden for the same reason the card's share
+    // button is: neither can act as the person pressing it.
+    ["vpShareBtn", "vpDsrBtn"].forEach(function (btnId) {
+      var b = document.getElementById(btnId);
+      if (b) b.style.display = "none";
+    });
+
+    // A copyable link to exactly this page -- the point of the whole page.
+    var actions = page.querySelector(".vp-actions");
+    if (actions && !document.getElementById("vpCopyLink")) {
+      var copy = document.createElement("button");
+      copy.className = "btn-ghost";
+      copy.id = "vpCopyLink";
+      copy.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-file-text"/></svg>Copy link';
+      copy.addEventListener("click", function () {
+        navigator.clipboard.writeText(assetUrl(detailAsset.id));
+        copy.textContent = "Copied";
+        setTimeout(function () { copy.innerHTML =
+          '<svg class="orion-ico--sm orion-ico"><use href="#i-file-text"/></svg>Copy link'; }, 1500);
+      });
+      actions.appendChild(copy);
+    }
+
+    // The player is a still: embedding the Consensus viewer is a separate
+    // decision, and a play button that does nothing would be a lie.
+    /* No still and nothing to play is 250px of black rectangle claiming to be
+     * a video. Most SharePoint kits are exactly that, so the player is only
+     * shown when it has something to be. */
+    var player = page.querySelector(".vp-player");
+    if (player) {
+      var playable = !!previewUrl(asset);
+      player.style.display = (asset.thumbnail_url || playable) ? "" : "none";
+      player.style.background = asset.thumbnail_url
+        ? "#000 url(" + JSON.stringify(asset.thumbnail_url) + ") center/contain no-repeat"
+        : "";
+      var play = player.querySelector(".vp-player__play");
+      if (play) {
+        var canPlay = !!previewUrl(asset);
+        play.style.display = canPlay ? "" : "none";
+        play.onclick = canPlay ? function () { openPreview(asset); } : null;
+        play.title = canPlay ? "Play preview" : "";
+      }
+    }
+
+    /* Showing the page is not enough: the catalogue has to be hidden, or the
+     * details render underneath it. Elio's own openRequestView() hides both
+     * the topbar and the thread, and this is the same kind of view. */
+    document.getElementById("requestViewPage").classList.remove("active");
+    var topbar = document.getElementById("mainTopbar");
+    var thread = document.getElementById("mainThread");
+    if (topbar) topbar.style.display = "none";
+    if (thread) thread.style.display = "none";
+    // Not setActiveNav(null): Elio's version does getElementById(id).classList
+    // with no guard, so a null id throws and takes the rest of this function
+    // with it -- the catalogue hid and the details page never appeared.
+    document.querySelectorAll(".orion-side .orion-navitem")
+      .forEach(function (n) { n.classList.remove("orion-navitem--active"); });
+
+    page.classList.add("active");
+    page.scrollTop = 0;
+    if (location.hash !== "#/asset/" + encodeURIComponent(id)) {
+      history.pushState(null, "", "#/asset/" + encodeURIComponent(id));
+    }
+  }
+
+  function setText(id, text) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = text || "";
+  }
+
+  /* Arriving on a link someone shared, and the back button, are the same
+   * thing: read the hash and show whatever it names. */
+  function routeFromHash() {
+    var match = /^#\/asset\/(.+)$/.exec(location.hash || "");
+    if (match) { openAssetDetail(decodeURIComponent(match[1])); return; }
+    closeAssetDetail();
+  }
+
+  function closeAssetDetail() {
+    var page = document.getElementById("videoPreviewPage");
+    if (page) page.classList.remove("active");
+    // Put the catalogue back, unless the request form is what is showing.
+    var request = document.getElementById("requestViewPage");
+    if (request && request.classList.contains("active")) return;
+    var topbar = document.getElementById("mainTopbar");
+    var thread = document.getElementById("mainThread");
+    if (topbar) topbar.style.display = "";
+    if (thread) thread.style.display = "";
+  }
+
+  function wireDetailPage() {
+    window.addEventListener("hashchange", routeFromHash);
+    // Elio's Back button clears the view; the hash has to follow, or the page
+    // reappears on the next refresh.
+    var back = document.querySelector("#videoPreviewPage .vp-back");
+    if (back) back.addEventListener("click", function () {
+      if (location.hash.indexOf("#/asset/") === 0) {
+        history.pushState(null, "", location.pathname + location.search);
+      }
+      closeAssetDetail();
+    });
+    routeFromHash();          // honour a link opened cold
+  }
+
   /* -------------------------------------------------- the request intake */
 
   /* submitAssetRequest() hid the form and showed the success card. No request
@@ -1242,7 +1612,9 @@
     document.getElementById("shareOrg").value = "";
     document.getElementById("shareOpp").value = "";
     document.getElementById("shareRecipientInput").value = "";
-    document.getElementById("shareIsTest").checked = true;
+    // Off by default now the control is hidden: a checkbox nobody can see
+    // must not decide that every share is a silent test.
+    document.getElementById("shareIsTest").checked = false;
     document.getElementById("shareResult").style.display = "none";
     shareError("");
     renderRecipients();
@@ -1757,6 +2129,7 @@
     takeOverControls();
     wireShareModal();
     wireRequestForm();
+    wireDetailPage();
     fillProductPills(facets);
     await buildSegmentNav();
     wireNav(facets);

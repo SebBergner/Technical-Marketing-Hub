@@ -391,18 +391,38 @@ def test_a_first_v1_sync_is_not_blocked(tmp_path):
 
 
 # ─────────────────────────────────────────── the link that actually plays
-def test_the_viewer_url_carries_the_preview_parameter():
-    """`?preview=sales` is load-bearing, not decoration.
+def test_the_viewer_url_carries_the_marketing_preview_parameter():
+    """The query is load-bearing, and which mode it names is too.
 
-    Bare play.goconsensus.com/<uuid> opens a viewer with nothing to watch. The
-    first version of viewer_url() dropped the query string even though its own
-    docstring recorded the correct value, and every Consensus play button in
-    the grid led somewhere dead until Liwei tried one.
+    Bare play.goconsensus.com/<uuid> opens a viewer with nothing to watch --
+    the first version dropped the query entirely and every play button led
+    somewhere dead. And `sales` is the wrong mode: it greets the visitor with
+    First Viewer / Second Viewer buttons, which Elio asked to be rid of on
+    2026-09-02. Verified in a browser: `marketing` has no viewer picker.
     """
     from backend.integrations.consensus_v2 import viewer_url
     url = viewer_url({"uuid": "abc-123"})
-    assert url.endswith("?preview=sales"), url
+    assert url.endswith("?preview=marketing"), url
+    assert "preview=sales" not in url
     assert "abc-123" in url
+
+
+def test_a_sales_preview_link_is_converted_to_the_marketing_one():
+    """V1 returns exactly one link per demo, always the sales preview.
+
+    The conversion is a string replacement rather than a `marketing/createlink`
+    call, which matters: that call is NOT idempotent -- two calls for one demo
+    returned two different hashes -- so using it would have meant creating and
+    storing a link per demo forever.
+    """
+    from backend.integrations.consensus_sync import marketing_view
+
+    assert marketing_view("https://play.goconsensus.com/u1?preview=sales")         == "https://play.goconsensus.com/u1?preview=marketing"
+    # Already marketing, or some other mode a future API returns: left alone.
+    assert marketing_view("https://x/u1?preview=marketing").endswith("marketing")
+    # No mode at all would open a viewer with nothing to play.
+    assert marketing_view("https://x/u1") == "https://x/u1?preview=marketing"
+    assert marketing_view(None) is None
 
 
 def test_no_uuid_means_no_viewer_url():
@@ -426,7 +446,7 @@ def test_the_real_preview_link_beats_the_reconstructed_one():
 
     # V1 unreachable: reconstruct, and the reconstruction must still play.
     without, _ = build_assets_v2([demo], {})
-    assert without[0].web_url.endswith("?preview=sales")
+    assert without[0].web_url.endswith("?preview=marketing")
     assert without[0].thumbnail_url is None
 
 

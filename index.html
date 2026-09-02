@@ -590,7 +590,7 @@ a:hover { text-decoration: underline; }
       <div class="hero-search">
         <div class="hero-search__field">
           <svg class="orion-ico ico-muted"><use href="#i-search"/></svg>
-          <input type="text" id="hubSearchInput" placeholder="Search by product, keyword, persona, or funnel stage…">
+          <input type="text" id="hubSearchInput" autocomplete="off" placeholder="Search by product, keyword, persona, or funnel stage…">
         </div>
         <label class="filter-pill">Type:
           <select id="hubFilterType">
@@ -1186,14 +1186,10 @@ a:hover { text-decoration: underline; }
         <span>Already registered in Consensus (<span class="orion-mono" id="shareAssetUuid">—</span>) — this generates a live DemoBoard link via the Consensus API. No re-upload needed.</span>
       </div>
 
-      <div class="form-row">
-        <label for="shareOrg">Account / Organization <span class="hub-req">required</span></label>
-        <input type="text" id="shareOrg" placeholder="The customer or prospect this board is for">
-      </div>
-      <div class="form-row">
-        <label for="shareOpp">Opportunity <span class="hub-opt">optional</span></label>
-        <input type="text" id="shareOpp" placeholder="e.g. Windchill AI Expansion FY26Q3">
-      </div>
+      <!-- Recipients first: Consensus fills the organisation in from the
+           recipient's email domain, so asking for it the other way round makes
+           people type something the platform was about to work out. Elio,
+           2026-09-02. -->
       <div class="form-row">
         <label for="shareRecipientInput">Recipients <span class="hub-req">required</span></label>
         <div class="chip-input" id="shareChips">
@@ -1203,10 +1199,29 @@ a:hover { text-decoration: underline; }
         <div class="hub-hint">Enter or comma to add. Each recipient gets their own
           tracked invite.</div>
       </div>
-      <label class="hub-testrow">
-        <input type="checkbox" id="shareIsTest" checked>
+      <!-- Not an account record: Consensus does not check this against any
+           customer database, so calling it "Account" invited people to expect
+           validation that does not exist. Elio asked for the honest name. -->
+      <div class="form-row">
+        <label for="shareOrg">DemoBoard name <span class="hub-req">required</span></label>
+        <input type="text" id="shareOrg" placeholder="The customer or prospect this board is for">
+        <div class="hub-hint">Filled in from the recipient's email domain where
+          Consensus can work it out. Not checked against any account record.</div>
+      </div>
+      <div class="form-row">
+        <label for="shareOpp">Opportunity <span class="hub-opt">optional</span></label>
+        <input type="text" id="shareOpp" placeholder="e.g. Windchill AI Expansion FY26Q3">
+      </div>
+      <!-- Test send is hidden, not removed. Elio asked for it gone from the UI
+           because a test board records no analytics, which is a foot-gun on a
+           real send; Seb asked that the capability stay for development. The
+           input remains so the JS that reads it needs no special case, and it
+           now defaults OFF -- a hidden checkbox must not silently make every
+           share a test. -->
+      <label class="hub-testrow" id="shareTestRow" hidden>
+        <input type="checkbox" id="shareIsTest">
         <span>Test send &mdash; creates the DemoBoard flagged as a test so it stays
-          out of Consensus reporting. Uncheck for a real send.</span>
+          out of Consensus reporting.</span>
       </label>
 
       <div class="share-error" id="shareError" style="display:none;"></div>
@@ -1922,6 +1937,49 @@ hubApplyFilters();
   /* One compact button per platform the asset is actually on. Nothing is
      rendered for platforms it is not on -- with three sources, labelling every
      absence would give each card a row of things it is not. */
+  /* A feature with no data yet, shown as a shape rather than hidden: the
+     panel is where Serge expects it, and says why it is empty. */
+  .vr-placeholder { display:flex; gap:12px; align-items:flex-start;
+    padding:14px 16px; border:1px dashed var(--orion-border-md);
+    border-radius:var(--orion-radius-sm); color:var(--orion-text-3);
+    font-size:12.5px; line-height:1.55; }
+  .vr-placeholder strong { color:var(--orion-text-2); display:block;
+    margin-bottom:2px; }
+  .vr-placeholder svg { flex:0 0 auto; margin-top:1px; }
+
+  /* The preview plays here, in a frame with no address bar. A browser popup
+     cannot hide the URL any more; an iframe never had one. */
+  .hub-preview { position:fixed; inset:0; z-index:1000; display:none;
+    align-items:center; justify-content:center; padding:24px;
+    background:rgba(10,12,15,.72); }
+  .hub-preview.open { display:flex; }
+  .hub-preview__box { width:min(1180px,96vw); height:min(760px,92vh);
+    display:flex; flex-direction:column; border-radius:10px; overflow:hidden;
+    background:var(--orion-surface); box-shadow:0 24px 64px rgba(0,0,0,.45); }
+  .hub-preview__bar { display:flex; align-items:center; gap:12px;
+    padding:10px 14px; border-bottom:1px solid var(--orion-border);
+    background:var(--orion-surface-2); }
+  .hub-preview__title { font-size:13.5px; font-weight:600;
+    color:var(--orion-text); overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap; }
+  .hub-preview__close { margin-left:auto; border:none; background:transparent;
+    font-size:22px; line-height:1; color:var(--orion-text-3); cursor:pointer;
+    padding:0 4px; }
+  .hub-preview__close:hover { color:var(--orion-text); }
+  .hub-preview__frame { flex:1; width:100%; border:none; background:#fff; }
+
+  /* Said plainly where there is nothing to show, rather than left blank —
+     an empty panel reads as broken, "not indexed yet" reads as honest. */
+  .hub-empty { color: var(--orion-text-3); font-size: 12.5px; font-style: italic; }
+
+  /* A platform badge that goes somewhere says so, quietly: the card is dense
+     and an underline on every one of them would be louder than the titles. */
+  .hub-source--link { text-decoration: none; cursor: pointer; }
+  .hub-source--link:hover { filter: brightness(.92); text-decoration: underline; }
+  /* The name opens the details page and must read as the primary action. */
+  .hub-detail-link { color: inherit; text-decoration: none; }
+  .hub-detail-link:hover { text-decoration: underline; }
+
   /* The platform that HOSTS the asset gets the verb; any other platform it
      also lives on gets just its mark. A Consensus demo exists to be shared, so
      it keeps the full share button -- in Consensus colours. A SharePoint kit

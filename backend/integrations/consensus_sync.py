@@ -163,7 +163,7 @@ def build_assets(demos: list[ConsensusDemo]) -> tuple[list[Asset], ConsensusSync
             language=(raw.get("language") or {}).get("code") or "en",
             duration_seconds=parsed["duration_seconds"],
             thumbnail_url=next(iter(raw.get("previewThumbs") or []), None),
-            web_url=raw.get("previewLink"),
+            web_url=marketing_view(raw.get("previewLink")),
             source_item_id=demo.uuid,
             consensus_uuid=demo.uuid,
             uploaded_at=demo.created_at.date() if demo.created_at else None,
@@ -200,6 +200,29 @@ def fingerprint(assets: list[Asset]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
+def marketing_view(link: str | None) -> str | None:
+    """Turn V1's `?preview=sales` link into the marketing one.
+
+    V1 returns exactly one link per demo and it is always the sales preview.
+    The marketing preview is the same URL with a different mode, so it costs a
+    string replacement rather than the `marketing/createlink` call it first
+    looked like it would — which matters, because that call is **not
+    idempotent**: two calls for one demo returned two different hashes, so
+    using it would have meant creating and caching a link per demo forever.
+
+    Why marketing: the sales preview greets the viewer with First Viewer /
+    Second Viewer buttons, which make sense when a named recipient opens a
+    DemoBoard and no sense at all on a link the Hub hands to a colleague.
+    """
+    if not link:
+        return None
+    if "preview=sales" in link:
+        return link.replace("preview=sales", "preview=marketing")
+    if "preview=" in link:
+        return link
+    return link + ("&" if "?" in link else "?") + "preview=marketing"
+
+
 def media_from_v1(client: ConsensusClient | None) -> dict[str, dict]:
     """uuid -> {thumbnail, preview_link}, borrowed from V1.
 
@@ -222,7 +245,7 @@ def media_from_v1(client: ConsensusClient | None) -> dict[str, dict]:
         return {
             d.uuid: {
                 "thumbnail": next(iter((d.raw or {}).get("previewThumbs") or []), None),
-                "preview_link": (d.raw or {}).get("previewLink"),
+                "preview_link": marketing_view((d.raw or {}).get("previewLink")),
             }
             for d in client.list_demos(limit=2000)
         }

@@ -320,7 +320,7 @@ class HttpConsensusClient:
 
     def __init__(self, base_url: str, api_key: str, api_secret: str,
                  user_email: str, source_name: str = "TDD Portal",
-                 viewer_url_template: str = "https://play.goconsensus.com/{hash}",
+                 viewer_url_template: str = "https://play.goconsensus.com/{hash}?preview=marketing",
                  timeout: float = 20.0,
                  transport: httpx.BaseTransport | None = None):
         self._base = base_url.rstrip("/")
@@ -586,9 +586,11 @@ class HttpConsensusClient:
         """Where a *recipient* opens a DemoBoard.
 
         Not the same URL as browsing the demo ourselves. `?preview=sales` puts
-        the viewer in internal preview mode, which is right for a card in our
-        own catalogue and wrong for something sent to a customer, so the query
-        is stripped here. Verified: the bare hash URL resolves 200.
+        `?preview=...` puts the viewer in a preview mode, which is right for
+        a card in our own catalogue and wrong for something sent to a customer
+        -- a preview records no engagement, which is the whole point of a
+        DemoBoard. The query is stripped here. Verified: the bare hash URL
+        resolves 200 and renders the real, unwatermarked player.
         """
         return self._viewer_url(hash_value).split("?")[0]
 

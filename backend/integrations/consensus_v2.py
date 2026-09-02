@@ -175,12 +175,25 @@ def viewer_url(demo: dict) -> str | None:
     the V2 schema entirely. Without reconstructing it every Consensus card in
     the grid is a dead end, which is most of what a Consensus result is for.
 
-    `?preview=sales` is not decoration. Bare
-    `play.goconsensus.com/<uuid>` opens a viewer that does not play: the demo
-    loads without the internal preview context and there is nothing to watch.
-    The first version of this function dropped the query string even though the
-    docstring above it recorded the correct value, which is how every Consensus
-    play button came to lead somewhere dead.
+    The query string is not decoration. Bare `play.goconsensus.com/<uuid>`
+    opens a viewer that does not play: the demo loads without a preview context
+    and there is nothing to watch. The first version of this function dropped
+    it even though the docstring above recorded the correct value, which is how
+    every Consensus play button came to lead somewhere dead.
+
+    **`marketing`, not `sales`.** Both are preview modes and neither records
+    engagement, but they differ in what the visitor sees, and Elio asked for
+    the marketing one on 2026-09-02. Verified in a browser the same day:
+
+        ?preview=sales      "viewing this DemoBoard in Preview Mode", and a
+                            welcome panel offering First Viewer / Second
+                            Viewer / I'm new here
+        ?preview=marketing  "viewing this Public Link in Preview Mode", and no
+                            viewer picker at all
+
+    The viewer picker is the objection. It belongs to a DemoBoard, where the
+    recipient identifies themselves; on a link the Hub hands out it is asking a
+    colleague to pretend to be someone's customer.
 
     Prefer the real `previewLink` from V1 where it can be had — see
     `media_from_v1` — and reach this only when it cannot.
@@ -189,7 +202,7 @@ def viewer_url(demo: dict) -> str | None:
     if not uuid:
         return None
     template = (settings.consensus_viewer_url_template
-                or "https://play.goconsensus.com/{hash}?preview=sales")
+                or "https://play.goconsensus.com/{hash}?preview=marketing")
     return template.format(hash=uuid)
 
 

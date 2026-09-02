@@ -423,3 +423,76 @@ def test_a_recipients_link_is_not_the_sales_preview_link():
         viewer_url_template="https://play.goconsensus.com/{hash}?preview=sales")
     assert client._viewer_url("abc") == "https://play.goconsensus.com/abc?preview=sales"
     assert client._share_url("abc") == "https://play.goconsensus.com/abc"
+
+
+# ─────────────────────────────────────── acting as the signed-in person
+def test_a_demoboard_is_created_as_the_signed_in_user():
+    """The api key and secret are organisation-wide; `user_email` selects which
+    Consensus user they act as, and the board is owned by that person.
+
+    Verified read-only against the live API on 2026-09-02: userInfo with a
+    colleague's address returns their profile, and an unknown address returns
+    401 rather than falling back to the configured account.
+    """
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        seen[request.url.path] = body
+        if request.url.path.endswith("/demo/search"):
+            return httpx.Response(200, json={"data": {"items": [DEMO_ITEM]},
+                                             "status": 200})
+        return httpx.Response(200, json={"status": 200, "data": {"item": {
+            "senddemo_uuid": "sd-1", "senddemo_hash": "h1", "isTest": True,
+            "recipients": [{"email": "buyer@acme.com"}]}}})
+
+    client_for(handler).create_share_link(
+        DEMO_ITEM["uuid"], organization="Acme", is_test=True,
+        recipients=[ShareRecipient(email="buyer@acme.com")],
+        as_user="colleague@ptc.com")
+
+    sent = seen["/api/integr/v1.0/sales/createsenddemo"]["auth"]
+    assert sent["user_email"] == "colleague@ptc.com"
+    # The credentials themselves are unchanged — only the acting identity.
+    assert sent["api_key"] == "k" and sent["api_secret"] == "s"
+
+
+def test_the_configured_account_is_used_when_nobody_is_signed_in():
+    """Locally there is no real identity, and inventing one would be worse
+    than falling back to the account in configuration."""
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen[request.url.path] = json.loads(request.content)
+        if request.url.path.endswith("/demo/search"):
+            return httpx.Response(200, json={"data": {"items": [DEMO_ITEM]},
+                                             "status": 200})
+        return httpx.Response(200, json={"status": 200, "data": {"item": {
+            "senddemo_uuid": "sd", "senddemo_hash": "h", "recipients": []}}})
+
+    client_for(handler).create_share_link(
+        DEMO_ITEM["uuid"], organization="Acme",
+        recipients=[ShareRecipient(email="b@acme.com")])
+    assert seen["/api/integr/v1.0/sales/createsenddemo"]["auth"]["user_email"] \
+        == "me@ptc.com"
+
+
+def test_an_unknown_acting_user_is_explained_not_reported_as_unauthorised():
+    """Consensus answers 401 when the acting user has no account. Passing that
+    through would send someone hunting an api key that is working fine."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/demo/search"):
+            return httpx.Response(200, json={"data": {"items": [DEMO_ITEM]},
+                                             "status": 200})
+        return httpx.Response(401, json={"message": "UNAUTHORIZED_ERROR",
+                                         "status": 401, "data": None})
+
+    with pytest.raises(ConsensusError) as caught:
+        client_for(handler).create_share_link(
+            DEMO_ITEM["uuid"], organization="Acme",
+            recipients=[ShareRecipient(email="b@acme.com")],
+            as_user="newjoiner@ptc.com")
+
+    message = str(caught.value)
+    assert "newjoiner@ptc.com" in message
+    assert "does not have a Consensus account" in message

@@ -46,6 +46,28 @@ still wrong.
 
 ---
 
+### Why this is load-bearing, not good practice
+
+The Consensus api key and secret are organisation-wide. `auth.user_email` is
+what selects which Consensus user they act as, and everything the call creates
+is owned by that person — so a DemoBoard sent through the Hub is created and
+owned by whoever pressed the button, not by the account in configuration. No
+per-user Consensus login is involved, which is just as well: their OAuth flow
+does not work, the client secret arriving as a bcrypt hash.
+
+Verified read-only on 2026-09-02: `info/userInfo` with a colleague's address
+returns *their* profile, and an address with no Consensus account returns 401
+rather than quietly falling back to the configured one. It either acts as the
+right person or it fails.
+
+Without a signed-in identity there is no address to act as, so every board
+would be attributed to one person and the per-recipient tracking a DemoBoard
+exists for would be meaningless. Letting the requester type their own address
+would be worse: anyone could send a DemoBoard in a colleague's name.
+
+One sentence for IT: *without this app registration, every Consensus DemoBoard
+sent from the team's tool is recorded against a single person.*
+
 ## 2. Point `DATA_DIR` at Azure Files
 
 App Service local disk does **not** survive a restart, a redeploy or a
@@ -103,7 +125,7 @@ a pointer rather than the secret itself, and rotation stops being a redeploy.
 | `CONSENSUS_BASE_URL` | `https://app.goconsensus.com` |
 | `CONSENSUS_API_KEY` | |
 | `CONSENSUS_API_SECRET` | **secret** |
-| `CONSENSUS_USER_EMAIL` | the account DemoBoards are created as |
+| `CONSENSUS_USER_EMAIL` | the fallback acting account. A DemoBoard is created as the **signed-in user**; this is only used when there is no identity, i.e. locally |
 | `CONSENSUS_SOURCE_NAME` | `TDD Portal` |
 | `CONSENSUS_VIEWER_URL_TEMPLATE` | `https://play.goconsensus.com/{hash}?preview=sales` — the query string is load-bearing; without it the viewer opens with nothing to play |
 

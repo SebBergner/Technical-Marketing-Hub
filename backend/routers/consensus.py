@@ -237,6 +237,13 @@ def share_to_consensus(
             opportunity=body.opportunity,
             title=body.title or asset.title,
             is_test=body.is_test,
+            # The board belongs to whoever is signed in, not to the account in
+            # configuration. A DemoBoard records who sent it and that has to be
+            # true; the api key is organisation-wide and `user_email` is what
+            # selects the acting person, so this is one field, not a per-user
+            # login. The dev principal is a local stand-in and never acts as
+            # anyone -- locally that means the configured account, as before.
+            as_user=None if user.is_dev_principal else user.email,
         )
     except ConsensusSchemaUnknown as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc

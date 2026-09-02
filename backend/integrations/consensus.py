@@ -190,7 +190,8 @@ class ConsensusClient(Protocol):
                           recipients: list[ShareRecipient] | None = None,
                           opportunity: str | None = None,
                           title: str | None = None,
-                          is_test: bool = False) -> ShareLink: ...
+                          is_test: bool = False,
+                          as_user: str | None = None) -> ShareLink: ...
     # No create_demo / upload — Consensus cannot do it.
 
 
@@ -279,7 +280,8 @@ class StubConsensusClient:
                           recipients: list[ShareRecipient] | None = None,
                           opportunity: str | None = None,
                           title: str | None = None,
-                          is_test: bool = False) -> ShareLink:
+                          is_test: bool = False,
+                          as_user: str | None = None) -> ShareLink:
         demo = self.get_demo(uuid)
         if demo is None:
             raise ConsensusError(f"demo {uuid} is not registered in Consensus")
@@ -340,9 +342,23 @@ class HttpConsensusClient:
         return True
 
     # -------------------------------------------------------------- plumbing
-    def _post(self, path: str, body: dict[str, Any] | None = None) -> Any:
-        """POST with the auth block injected, retrying 429 and 5xx."""
-        payload = {"auth": self._auth, **(body or {})}
+    def _post(self, path: str, body: dict[str, Any] | None = None,
+              *, as_user: str | None = None) -> Any:
+        """POST with the auth block injected, retrying 429 and 5xx.
+
+        `as_user` swaps the acting identity for this one call. The api key and
+        secret are organisation-wide credentials; `user_email` is what selects
+        which Consensus user they act as, and everything the call produces is
+        owned by that person.
+
+        Verified read-only on 2026-09-02: `info/userInfo` with a colleague's
+        address returns *their* profile, and an address with no Consensus
+        account returns 401 UNAUTHORIZED_ERROR rather than falling back to the
+        configured account. So this cannot silently act as the wrong person —
+        it either acts as them or fails.
+        """
+        auth = dict(self._auth, user_email=as_user) if as_user else self._auth
+        payload = {"auth": auth, **(body or {})}
         last: Exception | None = None
 
         for attempt in range(3):
@@ -585,8 +601,13 @@ class HttpConsensusClient:
                           recipients: list[ShareRecipient] | None = None,
                           opportunity: str | None = None,
                           title: str | None = None,
-                          is_test: bool = False) -> ShareLink:
+                          is_test: bool = False,
+                          as_user: str | None = None) -> ShareLink:
         """Produce a link for a demo.
+
+        `as_user` is the signed-in person's address. The board is created and
+        owned by them, not by the account in configuration -- what a DemoBoard
+        records is who sent it, and that has to be true.
 
         `trackable=True` creates a DemoBoard via `sales/createsenddemo`, which
         the spec marks `organization` as **required** for — it is the customer
@@ -609,7 +630,8 @@ class HttpConsensusClient:
                 people = [ShareRecipient(email=recipient)]
             return self._create_send_demo(
                 demo, organization=organization, recipients=people,
-                opportunity=opportunity, title=title, is_test=is_test)
+                opportunity=opportunity, title=title, is_test=is_test,
+                as_user=as_user)
 
         try:
             return self.create_marketing_link(uuid)
@@ -636,7 +658,8 @@ class HttpConsensusClient:
 
     def _create_send_demo(self, demo: ConsensusDemo, *, organization: str | None,
                           recipients: list[ShareRecipient], opportunity: str | None,
-                          title: str | None, is_test: bool) -> ShareLink:
+                          title: str | None, is_test: bool,
+                          as_user: str | None = None) -> ShareLink:
         """`sales/createsenddemo` -> a trackable DemoBoard.
 
         The spec lists `auth` and `organization` as the only required fields;
@@ -663,7 +686,19 @@ class HttpConsensusClient:
         if recipients:
             body["share_to"] = [r.to_payload() for r in recipients]
 
-        payload = self._post(PATHS["send_demo"], body)
+        try:
+            payload = self._post(PATHS["send_demo"], body, as_user=as_user)
+        except ConsensusAPIError as exc:
+            # 401 here means the ACTING USER is unknown to Consensus, not that
+            # our credentials are wrong -- they were fine a moment ago when the
+            # demo was fetched. Saying "unauthorised" would send someone
+            # hunting the api key.
+            if as_user and exc.status == 401:
+                raise ConsensusError(
+                    f"{as_user} does not have a Consensus account, so a DemoBoard "
+                    f"cannot be created in their name. Ask for one, or share the "
+                    f"demo link directly.") from exc
+            raise
         item = self._item(payload)
 
         send_hash = item.get("senddemo_hash")

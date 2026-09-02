@@ -21,14 +21,16 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from backend.auth import CurrentUser, require_authenticated
 from backend.config import settings
 from backend.deps import get_repo
 from backend.integrations.graph.client import get_graph_client
 from backend.integrations.graph.requests_list import (
-    RequestWriteError, build_fields, create_request_item,
+    ATTACHMENT_FOLDER, ATTACHMENT_LIBRARY, MAX_ATTACHMENT_BYTES,
+    RequestWriteError, attachment_rejection, build_fields, create_request_item,
+    upload_attachment,
 )
 from backend.models import AssetRequest, AssetRequestCreate
 from backend.repositories.base import AssetRepository
@@ -44,15 +46,47 @@ class RequestAccepted(AssetRequest):
     "recorded, not yet visible to the team" rather than "sent".
     """
     warning: str | None = None
+    #: Files that reached the library, by name.
+    attachments: list[str] = []
+    #: Files that did not, each with the reason. Never silent: a dropped
+    #: attachment the requester does not hear about is the whole failure this
+    #: feature was added to stop.
+    attachments_rejected: list[str] = []
 
 
 @router.post("", response_model=RequestAccepted, status_code=201)
-def submit_request(
+async def submit_request(
     body: AssetRequestCreate,
     repo: AssetRepository = Depends(get_repo),
     user: CurrentUser = Depends(require_authenticated),
 ) -> RequestAccepted:
     """Record a request locally, then push it to SharePoint."""
+    return await _submit(body, [], repo, user)
+
+
+@router.post("/with-files", response_model=RequestAccepted, status_code=201)
+async def submit_request_with_files(
+    request: str = Form(...),
+    files: list[UploadFile] = File(default=[]),
+    repo: AssetRepository = Depends(get_repo),
+    user: CurrentUser = Depends(require_authenticated),
+) -> RequestAccepted:
+    """The same submission, with attachments.
+
+    A separate route rather than one that accepts either shape: multipart and
+    JSON need different parsing, and a single endpoint doing both would have
+    to guess. The request itself arrives as a JSON string in one form field,
+    so the model still validates it exactly as the JSON route does.
+    """
+    try:
+        body = AssetRequestCreate.model_validate_json(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=422,
+                            detail=f"The request could not be read: {exc}") from exc
+    return await _submit(body, files, repo, user)
+
+
+async def _submit(body: AssetRequestCreate, files: list, repo, user) -> RequestAccepted:
     now = datetime.now(timezone.utc)
     # Readable in the list and sortable by eye: the date, then enough randomness
     # that two people submitting in the same second cannot collide.
@@ -78,6 +112,19 @@ def submit_request(
         if getattr(user, "name", None):
             record.requester_name = record.requester_name or user.name
 
+    # Read and screen the files first, so what was rejected is known before
+    # anything is written and can travel with the record rather than being
+    # discovered afterwards.
+    accepted: list[tuple[str, bytes]] = []
+    rejected: list[str] = []
+    for upload in files or []:
+        content = await upload.read()
+        reason = attachment_rejection(upload.filename or "attachment", len(content))
+        if reason:
+            rejected.append(reason)
+        else:
+            accepted.append((upload.filename or "attachment", content))
+
     # Irreplaceable, so it lands before anything that can fail.
     repo.save_request(record)
 
@@ -86,8 +133,11 @@ def submit_request(
         log.warning("request %s stored locally; Graph is not configured", request_id)
         return RequestAccepted(
             **record.model_dump(),
+            attachments_rejected=rejected,
             warning="Recorded, but Microsoft Graph is not configured here, so it "
-                    "has not reached the SharePoint list the team works from.")
+                    "has not reached the SharePoint list the team works from."
+                    + (" Attachments were not stored either."
+                       if accepted else ""))
 
     try:
         site = client.resolve_site(settings.graph_site_url)
@@ -97,6 +147,7 @@ def submit_request(
         log.exception("request %s could not reach SharePoint", request_id)
         return RequestAccepted(
             **record.model_dump(),
+            attachments_rejected=rejected,
             warning=f"{exc} It is saved here and can be pushed again once the "
                     f"problem is fixed; nothing has been lost.")
     except Exception as exc:                                  # noqa: BLE001
@@ -104,6 +155,7 @@ def submit_request(
                       request_id)
         return RequestAccepted(
             **record.model_dump(),
+            attachments_rejected=rejected,
             warning=f"Recorded here, but writing to SharePoint failed "
                     f"unexpectedly ({exc}). Nothing has been lost.")
 
@@ -111,7 +163,26 @@ def submit_request(
     record.sharepoint_item_id = created["id"]
     record.synced = True
     log.info("request %s written to SharePoint as item %s", request_id, created["id"])
-    return RequestAccepted(**record.model_dump())
+
+    # Attachments go up AFTER the item exists, so a file can never be orphaned
+    # under a request id that was never recorded. A failure here costs the
+    # file, not the request, and the requester is told which.
+    stored: list[str] = []
+    for filename, content in accepted:
+        try:
+            item = upload_attachment(client, site.site_id, request_id,
+                                     filename, content)
+            stored.append(item.get("name") or filename)
+        except RequestWriteError as exc:
+            log.warning("request %s: attachment failed: %s", request_id, exc)
+            rejected.append(str(exc))
+
+    warning = None
+    if rejected:
+        warning = ("The request is recorded. Some files were not stored: "
+                   + " ".join(rejected))
+    return RequestAccepted(**record.model_dump(), attachments=stored,
+                           attachments_rejected=rejected, warning=warning)
 
 
 @router.get("/unsynced", response_model=list[AssetRequest])

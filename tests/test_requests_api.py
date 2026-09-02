@@ -109,3 +109,52 @@ def test_the_store_is_append_only_across_submissions(tmp_path):
     for n in range(3):
         repo.save_request(make(id=f"REQ-{n}", products=["Creo"]))
     assert len(repo.unsynced_requests()) == 3
+
+
+# ───────────────────────────────────────────────────────────── attachments
+def test_a_filename_can_never_become_a_path():
+    """A name is a name here, never a path. The only reason one would contain
+    a separator is to try to be one."""
+    from backend.integrations.graph.requests_list import safe_attachment_name
+
+    for hostile in ["../../etc/passwd", r"..\..\windows\system32\x.txt",
+                    "/absolute/brief.docx", "....//brief.docx"]:
+        clean = safe_attachment_name(hostile)
+        assert "/" not in clean and "\\" not in clean
+        assert not clean.startswith(".")
+
+
+def test_sharepoint_illegal_characters_are_replaced_not_passed_on():
+    from backend.integrations.graph.requests_list import safe_attachment_name
+    clean = safe_attachment_name('a"b*c:d<e>f?g|h#i%j.txt')
+    assert not any(ch in clean for ch in '"*:<>?|#%')
+
+
+def test_an_empty_name_still_yields_a_usable_one():
+    from backend.integrations.graph.requests_list import safe_attachment_name
+    assert safe_attachment_name("") == "attachment"
+    assert safe_attachment_name("...") == "attachment"
+
+
+def test_executables_are_refused_whatever_they_claim_to_be():
+    """An intake form open to the whole org, writing into a shared library, is
+    a distribution channel for whatever it will store."""
+    from backend.integrations.graph.requests_list import attachment_rejection
+
+    for name in ["payload.exe", "run.BAT", "script.ps1", "installer.msi",
+                 "thing.jar", "x.sh"]:
+        assert attachment_rejection(name, 100), f"{name} should be refused"
+
+    for name in ["brief.docx", "screens.png", "deck.pptx", "notes.md", "a.pdf"]:
+        assert attachment_rejection(name, 100) is None, f"{name} should be allowed"
+
+
+def test_the_size_limit_is_the_one_graph_can_actually_take():
+    """Graph's simple upload tops out at 4 MB; past that it needs a resumable
+    session. Refusing with a reason beats a truncated file nobody notices."""
+    from backend.integrations.graph.requests_list import (
+        MAX_ATTACHMENT_BYTES, attachment_rejection)
+
+    assert attachment_rejection("big.mp4", MAX_ATTACHMENT_BYTES + 1)
+    assert attachment_rejection("ok.mp4", MAX_ATTACHMENT_BYTES) is None
+    assert attachment_rejection("empty.txt", 0), "an empty file is a mistake"

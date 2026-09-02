@@ -22,8 +22,10 @@ Two consequences follow, and both are implemented rather than hoped for:
 from __future__ import annotations
 
 import logging
+import os
 from datetime import date
 from typing import Any
+from urllib.parse import quote
 
 from backend.integrations.graph.client import GraphClient, GraphError
 
@@ -146,3 +148,88 @@ def create_request_item(client: GraphClient, site_id: str,
             "SharePoint accepted the write but returned no item id, so the "
             "request cannot be confirmed as recorded.")
     return created
+
+# ------------------------------------------------------------- attachments
+
+#: Where a requester's files go. A document library, not the list item:
+#: Graph v1.0 cannot write list-item attachments at all, and a library gives
+#: the team a normal SharePoint link to open, share and version.
+ATTACHMENT_LIBRARY = "Documents"
+ATTACHMENT_FOLDER = "Demo Requests"
+
+#: Graph's simple upload tops out at 4 MB; past that it needs a resumable
+#: session. A brief, a slide, a screen grab all fit comfortably. Rejecting a
+#: larger file with a clear reason beats a truncated upload nobody notices.
+MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024
+
+#: Extensions we will not accept, whatever they claim to be. This is an
+#: intake form open to the whole org writing into a shared library; a form
+#: that will store anything is a distribution channel for anything.
+BLOCKED_EXTENSIONS = frozenset({
+    ".exe", ".dll", ".scr", ".com", ".bat", ".cmd", ".ps1", ".psm1", ".vbs",
+    ".js", ".jse", ".wsf", ".wsh", ".msi", ".msp", ".hta", ".cpl", ".jar",
+    ".reg", ".lnk", ".iso", ".img", ".sh",
+})
+
+
+def safe_attachment_name(name: str) -> str:
+    """A filename that cannot escape its folder or break SharePoint.
+
+    Path separators and `..` are stripped rather than escaped: a name is a
+    name here, never a path, and the only reason one would contain a
+    separator is to try to be one.
+    """
+    name = os.path.basename(str(name or "").replace("\\", "/"))
+    for ch in '"*:<>?/|#%':                     # SharePoint rejects these
+        name = name.replace(ch, "-")
+    name = name.strip(" .") or "attachment"
+    return name[:128]
+
+
+def attachment_rejection(name: str, size: int) -> str | None:
+    """Why this file will not be stored, or None if it will be."""
+    clean = safe_attachment_name(name)
+    ext = os.path.splitext(clean)[1].lower()
+    if ext in BLOCKED_EXTENSIONS:
+        return f"{clean}: {ext} files are not accepted here."
+    if size > MAX_ATTACHMENT_BYTES:
+        return (f"{clean}: {size / 1_048_576:.1f} MB is over the "
+                f"{MAX_ATTACHMENT_BYTES // 1_048_576} MB limit. "
+                f"Link it in the notes instead.")
+    if size == 0:
+        return f"{clean}: the file is empty."
+    return None
+
+
+def upload_attachment(client: GraphClient, site_id: str, request_id: str,
+                      filename: str, content: bytes) -> dict:
+    """Put one file under Documents/Demo Requests/<request id>/.
+
+    A folder per request, so the library stays navigable and two people
+    attaching `brief.docx` on the same day cannot overwrite each other —
+    which `@microsoft.graph.conflictBehavior: rename` alone would only
+    disguise by appending a number.
+    """
+    drive = _library(client, site_id, ATTACHMENT_LIBRARY)
+    path = f"{ATTACHMENT_FOLDER}/{request_id}/{safe_attachment_name(filename)}"
+    try:
+        return client._request(
+            "PUT",
+            f"/drives/{drive}/root:/{quote(path)}:/content"
+            "?@microsoft.graph.conflictBehavior=rename",
+            content=content,
+            headers={"Content-Type": "application/octet-stream"},
+        )
+    except GraphError as exc:
+        raise RequestWriteError(
+            f"{safe_attachment_name(filename)} could not be uploaded: {exc}"
+        ) from exc
+
+
+def _library(client: GraphClient, site_id: str, name: str) -> str:
+    for drive in client.list_drives(site_id):
+        if drive.name == name:
+            return drive.drive_id
+    raise RequestWriteError(
+        f"The '{name}' document library was not found on this site, so there "
+        f"is nowhere to put attachments.")

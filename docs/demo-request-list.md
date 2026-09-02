@@ -99,6 +99,29 @@ failure mode this list exists to prevent.
 
 ---
 
+## Attachments
+
+Files go to **`Documents/Demo Requests/<request id>/`**, not onto the list
+item: Graph v1.0 cannot write list-item attachments at all, and a library
+gives the team a normal SharePoint link to open, share and version. A folder
+per request keeps the library navigable and stops two people attaching
+`brief.docx` on the same day from colliding.
+
+Screened on both sides — the browser so nobody fills in a form before learning
+their 30 MB video is too large, the server because that is the actual
+boundary:
+
+* **4 MB** per file. Graph's simple upload stops there; past it needs a
+  resumable session, and a brief, a deck or a screen grab all fit.
+* Executable and script extensions are refused outright. An intake form open
+  to the whole org, writing into a shared library, is a distribution channel
+  for whatever it will store.
+* Filenames are reduced to names — separators and `..` stripped, not escaped —
+  and SharePoint's illegal characters replaced.
+
+A rejected file is always named in the response. A dropped attachment the
+requester never hears about is the failure this replaced.
+
 ## What the Hub needs afterwards
 
 Two things, neither of which is written yet:

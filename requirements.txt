@@ -5,3 +5,6 @@ sqlalchemy>=2.0
 pydantic-settings
 httpx
 msal
+# Required by FastAPI to parse multipart form data — the request
+# intake's file uploads. Without it that endpoint fails at import.
+python-multipart

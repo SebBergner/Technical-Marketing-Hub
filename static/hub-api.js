@@ -803,6 +803,87 @@
     });
   }
 
+  /* Files the requester chose, kept as File objects until submission.
+   *
+   * The original handler rendered a chip and then cleared the input, which
+   * discarded every File — the whole point of holding them here. Nothing left
+   * the browser and the chip made it look attached.
+   *
+   * They are screened client-side against the same limits the server applies.
+   * That is not the security boundary — the server's check is — it is so
+   * someone learns their 30 MB video is too large before they fill in the
+   * rest of the form, rather than after.
+   */
+  var MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
+  var BLOCKED_EXTENSIONS = [
+    ".exe", ".dll", ".scr", ".com", ".bat", ".cmd", ".ps1", ".psm1", ".vbs",
+    ".js", ".jse", ".wsf", ".wsh", ".msi", ".msp", ".hta", ".cpl", ".jar",
+    ".reg", ".lnk", ".iso", ".img", ".sh"
+  ];
+  var pendingFiles = [];
+
+  function attachmentProblem(file) {
+    var dot = file.name.lastIndexOf(".");
+    var ext = dot === -1 ? "" : file.name.slice(dot).toLowerCase();
+    if (BLOCKED_EXTENSIONS.indexOf(ext) !== -1) {
+      return ext + " files are not accepted.";
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      return (file.size / 1048576).toFixed(1) + " MB is over the 4 MB limit — "
+           + "link it in the notes instead.";
+    }
+    if (!file.size) return "the file is empty.";
+    return null;
+  }
+
+  function renderAttachments(problems) {
+    var list = document.getElementById("attachmentList");
+    if (!list) return;
+    list.innerHTML = "";
+
+    pendingFiles.forEach(function (file, index) {
+      var chip = document.createElement("span");
+      chip.className = "chip";
+      chip.innerHTML = '<svg class="orion-ico orion-ico--sm"><use href="#i-file-text"/></svg> '
+        + escapeHtml(file.name)
+        + ' <span class="attach-size">' + (file.size / 1024).toFixed(0) + ' KB</span>';
+      var x = document.createElement("button");
+      x.type = "button";
+      x.className = "chip__x";
+      x.textContent = "\u00d7";
+      x.title = "Remove " + file.name;
+      x.addEventListener("click", function () {
+        pendingFiles.splice(index, 1);
+        renderAttachments([]);
+      });
+      chip.appendChild(x);
+      list.appendChild(chip);
+    });
+
+    (problems || []).forEach(function (message) {
+      var warn = document.createElement("span");
+      warn.className = "attach-warn";
+      warn.textContent = message;
+      list.appendChild(warn);
+    });
+  }
+
+  function takeAttachments(input) {
+    var problems = [];
+    Array.prototype.forEach.call(input.files, function (file) {
+      var problem = attachmentProblem(file);
+      if (problem) { problems.push(file.name + ": " + problem); return; }
+      var duplicate = pendingFiles.some(function (f) {
+        return f.name === file.name && f.size === file.size;
+      });
+      if (!duplicate) pendingFiles.push(file);
+    });
+    // Clearing the input is what lets the same file be chosen again after
+    // being removed; the File objects are safe in pendingFiles by now.
+    input.value = "";
+    renderAttachments(problems);
+  }
+
   /* -------------------------------------------------- the request intake */
 
   /* submitAssetRequest() hid the form and showed the success card. No request
@@ -890,11 +971,22 @@
     if (button) { button.disabled = true; button.textContent = "Submitting\u2026"; }
 
     try {
-      var response = await fetch("/api/requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
+      var response;
+      if (pendingFiles.length) {
+        // multipart: the request itself travels as one JSON field, so the
+        // server validates it against exactly the same model either way.
+        var form = new FormData();
+        form.append("request", JSON.stringify(body));
+        pendingFiles.forEach(function (f) { form.append("files", f, f.name); });
+        response = await fetch("/api/requests/with-files",
+                               { method: "POST", body: form });
+      } else {
+        response = await fetch("/api/requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+      }
       var data = await response.json();
       if (!response.ok) {
         requestProblem(data.detail
@@ -910,12 +1002,22 @@
        * requester has nothing to quote when they chase it. */
       var note = document.getElementById("reqOutcome");
       if (note) {
-        note.textContent = data.synced
-          ? "Reference " + data.id + ". It is in the team's Demo Requests list."
-          : "Reference " + data.id + ". " + (data.warning || "")
-            + " Nothing has been lost — the team will pick it up.";
-        note.className = "req-outcome" + (data.synced ? "" : " req-outcome--warn");
+        var lines = ["Reference " + data.id + "."];
+        lines.push(data.synced
+          ? "It is in the team's Demo Requests list."
+          : (data.warning || "") + " Nothing has been lost — the team will pick it up.");
+        var stored = (data.attachments || []).length;
+        if (stored) {
+          lines.push(stored + " file" + (stored === 1 ? "" : "s") + " attached.");
+        }
+        // A dropped attachment is never left for the requester to discover.
+        (data.attachments_rejected || []).forEach(function (r) { lines.push(r); });
+        note.textContent = lines.join(" ");
+        note.className = "req-outcome"
+          + ((data.synced && !(data.attachments_rejected || []).length)
+             ? "" : " req-outcome--warn");
       }
+      pendingFiles = [];
       document.getElementById("requestViewPage").scrollTop = 0;
     } catch (err) {
       requestProblem("Could not reach the Hub: " + err.message
@@ -930,6 +1032,7 @@
    * and had to be cloned to drop their handlers. */
   function wireRequestForm() {
     window.submitAssetRequest = submitRequest;
+    window.handleAttachmentFiles = takeAttachments;
   }
 
   /* ---------------------------------------------------- the share modal */

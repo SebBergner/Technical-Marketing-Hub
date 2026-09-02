@@ -551,6 +551,7 @@ class SqlAssetRepository(AssetRepository):
             duration_seconds=src.duration_seconds, thumbnail_url=src.thumbnail_url,
             web_url=src.web_url, source_item_id=src.drive_item_id, brightcove_id=src.brightcove_id,
             consensus_uuid=src.consensus_uuid,
+            internal_title=getattr(src, 'internal_title', None),
             resource_count=src.resource_count or 0, video_count=src.video_count or 0,
             resource_counts=src.resource_counts or {},
             stats=AssetStats(

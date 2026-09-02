@@ -424,8 +424,20 @@
    */
   function consensusUrl(a) {
     if (!a.consensus_uuid && a.source !== "consensus") return null;
+    /* Search by internalTitle, not title.
+     *
+     * `title` is the friendly display name and it is not unique: three
+     * separate demos are called "Benefits of Mathcad Prime". The Consensus
+     * library lists and searches by the pipe-delimited convention --
+     * "Role-Based Demonstration | Mathcad Prime | Capabilities Playlist |
+     * Select a Role" -- so a query built from the friendly name found nothing
+     * at all. Liwei hit exactly that.
+     *
+     * Falls back to the title for the 41 Consensus demos whose internalTitle
+     * is empty, and for a SharePoint kit, which has no internal title to use.
+     */
     return "https://app.goconsensus.com/demos/demo-library?query="
-         + encodeURIComponent(a.title || "");
+         + encodeURIComponent(a.internal_title || a.title || "");
   }
 
   /* ------------------------------------------------------------- filters UI */
@@ -2000,6 +2012,21 @@
    */
   var segmentIndex = {};       // key -> the /api/segments row
 
+  /* The page shows a spinner until this succeeds, and Elio's placeholder cards
+   * are never revealed -- Liwei's rule: a blank screen is fine, the mock-up is
+   * not, not even for a frame. Placeholder data is indistinguishable from real
+   * data to anyone who has not read the source, and a tile claiming 1,204
+   * views is worse than an empty page.
+   *
+   * So a failure has to SAY so. Every early return in boot() lands here. */
+  function bootFailed(message) {
+    var boot = document.getElementById("hubBoot");
+    var text = document.getElementById("hubBootMessage");
+    if (boot) boot.classList.add("hub-boot--failed");
+    if (text) text.textContent = message;
+    console.error("[hub-api] boot failed:", message);
+  }
+
   function escapeHtml(text) {
     var d = document.createElement("div");
     d.textContent = text == null ? "" : String(text);
@@ -2179,7 +2206,8 @@
       // in place and letting everyone believe the data is live.
       console.error("[hub-api] videoAssetFromData() not found — index.html has "
                   + "changed shape. The page is showing hardcoded data.");
-      report("Showing sample data — could not attach to the page", true);
+      bootFailed("The page could not be wired to the catalogue. "
+               + "index.html has changed shape — see the console.");
       return;
     }
 
@@ -2189,12 +2217,12 @@
       facets = await getJSON("/api/taxonomy");
     } catch (err) {
       console.error("[hub-api] could not load the catalogue", err);
-      report("Showing sample data — " + err.message, true);
-      return;   // Elio's static cards remain; the page still works.
+      bootFailed("The catalogue could not be loaded: " + err.message);
+      return;
     }
 
     if (!assets.length) {
-      report("The catalogue is empty — run a sync from /debug", true);
+      bootFailed("The catalogue is empty. Run a sync to fill it.");
       return;
     }
 

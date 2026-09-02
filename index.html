@@ -647,6 +647,13 @@ a:hover { text-decoration: underline; }
       <div class="hub-noresults" id="hubNoResults">No assets match these filters. Try clearing one.</div>
     </div>
 
+    <!-- Shown until the catalogue has loaded, so Elio's placeholder cards
+         never appear. See the #mainThread rule above. -->
+    <div class="hub-boot" id="hubBoot">
+      <div class="hub-boot__spinner"></div>
+      <div id="hubBootMessage">Loading the catalogue&hellip;</div>
+    </div>
+
     <div class="orion-thread" id="mainThread">
 
       <!-- Segment landing page: rendered by hub-api.js when a segment is on -->
@@ -1963,18 +1970,31 @@ hubApplyFilters();
     line-height:1.5; }
 
   /* Elio's markup ships static demo cards so his file stands alone in a
-     browser. hub-api.js replaces them once the catalogue has loaded, which
-     left them visible for a beat on every refresh -- Liwei saw the mock-up
-     flash past. The thread starts hidden and is revealed when real content is
-     in place.
+     browser, and hub-api.js replaces them once the catalogue has loaded. They
+     were visible for a beat on every refresh.
 
-     The fallback matters more than the hiding: if hub-api.js fails to load at
-     all, `hub-ready` never arrives, so the rule is written to reveal after a
-     couple of seconds regardless. A blank page is a worse failure than a
-     glimpse of placeholder content. */
-  #mainThread { animation: hub-reveal 0s 2s forwards; opacity: 0; }
-  body.hub-ready #mainThread { animation: none; opacity: 1; }
-  @keyframes hub-reveal { to { opacity: 1; } }
+     The first attempt hid them and revealed on a timer, so a failed script
+     showed something rather than nothing. Liwei's answer: a blank screen is
+     fine, the mock-up is not, not even for a frame. That is the right call —
+     placeholder data is indistinguishable from real data to anyone who has not
+     seen the code, and a demo tile claiming 1,204 views is worse than an empty
+     page.
+
+     So: hidden with no timer, a spinner while it loads, and an explicit
+     failure message if it never arrives. The mock is never shown. */
+  #mainThread { display: none; }
+  body.hub-ready #mainThread { display: block; }
+
+  .hub-boot { display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 14px; padding: 80px 20px; text-align: center;
+    color: var(--orion-text-3); font-size: 13px; }
+  body.hub-ready .hub-boot { display: none; }
+  .hub-boot__spinner { width: 26px; height: 26px; border-radius: 50%;
+    border: 2px solid var(--orion-border-md); border-top-color: var(--orion-indigo);
+    animation: hub-spin .8s linear infinite; }
+  @keyframes hub-spin { to { transform: rotate(360deg); } }
+  .hub-boot--failed .hub-boot__spinner { display: none; }
+  .hub-boot--failed { color: #c2410c; }
 
   /* The preview plays here, in a frame with no address bar. A browser popup
      cannot hide the URL any more; an iframe never had one. */

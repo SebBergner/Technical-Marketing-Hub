@@ -181,6 +181,15 @@ class AssetBase(BaseModel):
     source_item_id: str | None = None         # SharePoint list item
     brightcove_id: str | None = None          # where the stream comes from
     consensus_uuid: str | None = None         # how it goes out externally
+    #: What the demo is called inside Consensus, which is not `title`.
+    #:
+    #: `title` is the friendly display name and it is NOT unique -- three
+    #: separate demos are called "Benefits of Mathcad Prime". `internalTitle`
+    #: is the pipe-delimited convention the Consensus library lists and
+    #: searches by ("Role-Based Demonstration | Mathcad Prime | Capabilities
+    #: Playlist | Select a Role"), so a search built from `title` can miss the
+    #: demo entirely.
+    internal_title: str | None = None
 
     stats: AssetStats = Field(default_factory=AssetStats)
     #: Views recorded by the SOURCE platform, not by us.

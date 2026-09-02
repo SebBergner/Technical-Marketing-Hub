@@ -37,6 +37,10 @@ class AssetQuery:
     #: The product filter that reaches both platforms. `products` matches the
     #: specific module and so is effectively SharePoint-only.
     product_families: list[str] = field(default_factory=list)
+    #: The eight umbrella families the navigation browses by. Separate from
+    #: `product_families` because they answer different questions: this one
+    #: takes you somewhere, that one narrows where you are.
+    umbrella_families: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
     customer_facing: bool | None = None
     has_narrated_audio: bool | None = None

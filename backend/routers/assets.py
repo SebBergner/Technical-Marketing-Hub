@@ -28,6 +28,11 @@ def list_assets(
         description="product family — the only product filter that reaches every "
                     "platform. SharePoint records the specific module "
                     "('Windchill PDMLink'), Consensus the brand ('Windchill')."),
+    umbrella: list[str] = Query(
+        default=[],
+        description="umbrella product family — the eight the navigation browses "
+                    "by, decided by the team rather than derived. An asset can "
+                    "be in none of them and still be searchable."),
     customer_facing: bool | None = None,
     has_narrated_audio: bool | None = None,
     has_consensus_uuid: bool | None = None,
@@ -45,7 +50,8 @@ def list_assets(
     return repo.list(AssetQuery(
         text=q, types=type, products=product, funnel_stages=stage, segments=segment,
         industries=industry, value_drivers=driver, languages=language, content_depths=depth,
-        sources=source, product_families=family, tags=tag,
+        sources=source, product_families=family,
+        umbrella_families=umbrella, tags=tag,
         customer_facing=customer_facing, has_narrated_audio=has_narrated_audio,
         has_consensus_uuid=has_consensus_uuid, rail=rail, editor_picks_only=editor_picks,
         sort=sort, limit=limit, offset=offset,

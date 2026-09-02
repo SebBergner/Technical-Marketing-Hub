@@ -104,6 +104,15 @@ class AssetResource(BaseModel):
     extension: str | None = None
     has_audio: bool | None = None      # only when the filename says so
 
+    #: Straight off the driveItem, both of them free: Graph returns `size` and
+    #: a `video` facet in the same children listing the sync already makes, so
+    #: this costs no extra request. Seb said in the review that duration,
+    #: resolution and frame rate were in the file metadata; they are.
+    size_bytes: int | None = None
+    duration_seconds: int | None = None
+    width: int | None = None
+    height: int | None = None
+
 
 class AssetStats(BaseModel):
     views: int = 0
@@ -132,7 +141,15 @@ class AssetBase(BaseModel):
     #: card -- colouring a cover, grouping a grid -- and a client that
     #: re-derives it from the product strings gets it wrong: "KEPServerEX" is
     #: Kepware and says so nowhere in its name. One rule, in one place.
+    #:
+    #: These are DERIVED families, nineteen of them, and they are what the
+    #: secondary product filter narrows by.
     product_families: list[str] = Field(default_factory=list)
+    #: The umbrella families the team browses by -- eight, decided rather than
+    #: derived (taxonomy.PRODUCT_FAMILIES). Empty is a real answer: 200 assets
+    #: sit in no umbrella and are still searchable, which is the whole reason
+    #: the two lists are separate.
+    umbrella_families: list[str] = Field(default_factory=list)
     funnel_stage: FunnelStage | None = None
     content_depth: ContentDepth | None = None
     language: str = "en"
@@ -295,6 +312,9 @@ class Facets(BaseModel):
     #: the specific module ("Windchill PDMLink") and Consensus the brand
     #: ("Windchill"); only the family is common to both.
     product_families: list[FacetValue] = Field(default_factory=list)
+    #: The eight umbrellas the navigation browses by, in the team's order,
+    #: including any at zero. Drives Browse by Product.
+    umbrella_families: list[FacetValue] = Field(default_factory=list)
     #: Consensus's hand-maintained labels. Kept as their own facet rather than
     #: folded into the others, because a tag can mean anything and pretending
     #: otherwise would put unrelated content behind a filter.

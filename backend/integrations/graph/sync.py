@@ -75,6 +75,8 @@ def _field(fields: dict, key: str):
 class SyncResult:
     assets: int = 0
     resources: int = 0
+    #: Folders skipped because they demo a product PTC no longer owns.
+    divested: int = 0
     skipped_no_demo_type: int = 0
     orphan_files: int = 0
     delta_token: str | None = None
@@ -101,6 +103,7 @@ class SyncResult:
             skipped={"no_demo_type": self.skipped_no_demo_type},
             details={
                 "resources": self.resources,
+                "divested": self.divested,
                 "orphan_files": self.orphan_files,
                 "full_resync": self.full_resync,
                 "retired_seed": self.retired_seed,
@@ -197,7 +200,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
             result.orphan_files += 1      # under a folder with no Demo Type
             continue
         filename = m.clean_text(item.get("name")) or ""
-        owner["resources"].append(m.build_resource(filename, subfolder))
+        owner["resources"].append(m.build_resource(filename, subfolder, item))
         result.resources += 1
 
     for asset in assets.values():

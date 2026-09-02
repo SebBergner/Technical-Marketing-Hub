@@ -183,7 +183,15 @@ class JsonAssetRepository(AssetRepository):
                 # The filename IS the source system, which is what lets a
                 # collision be resolved rather than merely detected.
                 source = name[:-len(".json")]
-                tagged.extend((source, record) for record in cached[1])
+                # Divested products are dropped HERE, at the single funnel every
+                # read passes through -- list, get, facets, search, the lot.
+                # Filtering at each call site would work until one of them
+                # forgot, and "PTC no longer owns this" is not a rule to enforce
+                # in fourteen places. The sync also declines to index them, so
+                # this is the guarantee rather than the mechanism: it holds even
+                # against a mirror written by an older build.
+                tagged.extend((source, record) for record in cached[1]
+                              if not taxonomy.is_excluded(record.get("products")))
         identity = self._load("identity")
         # Retired items keep their identity row but leave the catalogue.
         live = [(src, r) for src, r in tagged
@@ -234,6 +242,11 @@ class JsonAssetRepository(AssetRepository):
             if query.product_families and not (
                     set(taxonomy.families_of(record.get("products")))
                     & set(query.product_families)):
+                return False
+
+            if query.umbrella_families and not (
+                    set(taxonomy.umbrellas_of(record.get("products")))
+                    & set(query.umbrella_families)):
                 return False
 
             if query.customer_facing is not None \
@@ -345,6 +358,9 @@ class JsonAssetRepository(AssetRepository):
         family_counts = Counter(
             f for r in rows_for("product_families")
             for f in taxonomy.families_of(r.get("products")))
+        umbrella_counts = Counter(
+            f for r in rows_for("umbrella_families")
+            for f in taxonomy.umbrellas_of(r.get("products")))
 
         return Facets(
             types=scalar("type", "types"),
@@ -359,6 +375,13 @@ class JsonAssetRepository(AssetRepository):
             tags=multi("tags", "tags"),
             product_families=[FacetValue(value=v, count=n)
                               for v, n in sorted(family_counts.items())],
+            # In the team's own order, and including the ones with nothing yet:
+            # IPE is on the list because its demos are being made now, and a
+            # family that silently vanished until content arrived would look
+            # like a bug rather than a plan.
+            umbrella_families=[
+                FacetValue(value=f, count=umbrella_counts.get(f, 0))
+                for f in taxonomy.PRODUCT_FAMILIES],
             total=len(full),
         )
 
@@ -704,6 +727,7 @@ class JsonAssetRepository(AssetRepository):
             web_url=record.get("web_url"),
             products=record.get("products") or [],
             product_families=taxonomy.families_of(record.get("products")),
+            umbrella_families=taxonomy.umbrellas_of(record.get("products")),
             funnel_stage=record.get("funnel_stage"),
             content_depth=record.get("content_depth"),
             language=record.get("language") or "en",

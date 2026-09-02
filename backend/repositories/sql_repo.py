@@ -99,6 +99,16 @@ class SqlAssetRepository(AssetRepository):
 
         # JSON-array facets, filtered in Python — see module docstring.
         def matches(src, curation) -> bool:
+            # Divested products first: a rule about what PTC no longer owns
+            # must hold on every backend, not just the one in use. The JSON
+            # repository drops these at its read funnel; this is the same
+            # guarantee, expressed where this one reads.
+            if taxonomy.is_excluded(src.products):
+                return False
+            if query.umbrella_families and not (
+                    set(taxonomy.umbrellas_of(src.products))
+                    & set(query.umbrella_families)):
+                return False
             for field_name, wanted in (("products", query.products),
                                        ("value_drivers", query.value_drivers)):
                 if wanted and not (set(getattr(src, field_name) or []) & set(wanted)):
@@ -141,6 +151,12 @@ class SqlAssetRepository(AssetRepository):
         src = self.s.get(AssetSource, asset_id)
         if src is None:
             return None
+        # get() addresses by id and so bypasses _rows entirely. Without this
+        # the one route that needs no search, no filter and no browsing --
+        # someone's saved link -- was the one route a divested product stayed
+        # reachable by.
+        if taxonomy.is_excluded(src.products):
+            return None
         stats = self.s.get(AssetStatsRow, asset_id)
         curation = self.s.get(AssetCuration, asset_id)
         roadmap = self.s.get(AssetValueRoadmap, asset_id)
@@ -171,11 +187,11 @@ class SqlAssetRepository(AssetRepository):
         base = dataclasses.replace(query, limit=10 ** 9, offset=0)             if query is not None else None
 
         def unfiltered() -> list:
-            return self.s.execute(
+            return [r for r in self.s.execute(
                 select(AssetSource)
                 .join(AssetIdentity, AssetIdentity.asset_id == AssetSource.asset_id)
                 .where(AssetIdentity.retired_at.is_(None))
-            ).scalars().all()
+            ).scalars().all() if not taxonomy.is_excluded(r.products)]
 
         # Reuse the listing's own filtering so a facet count can never disagree
         # with the number of results clicking it produces.
@@ -526,7 +542,8 @@ class SqlAssetRepository(AssetRepository):
             id=src.asset_id, type=src.type, source=src.source_system,
             title=src.title, description=src.description,
             products=src.products or [],
-            product_families=taxonomy.families_of(src.products), funnel_stage=src.funnel_stage,
+            product_families=taxonomy.families_of(src.products),
+            umbrella_families=taxonomy.umbrellas_of(src.products), funnel_stage=src.funnel_stage,
             content_depth=src.content_depth, language=src.language, segment=src.segment,
             industry=src.industry, value_drivers=src.value_drivers or [],
             customer_facing=src.customer_facing, has_narrated_audio=src.has_narrated_audio,

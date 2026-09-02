@@ -62,6 +62,7 @@ def get_facets(
     type: list[str] = Query(default=[]),
     product: list[str] = Query(default=[]),
     family: list[str] = Query(default=[]),
+    umbrella: list[str] = Query(default=[]),
     stage: list[str] = Query(default=[]),
     segment: list[str] = Query(default=[]),
     language: list[str] = Query(default=[]),
@@ -83,12 +84,13 @@ def get_facets(
     """
     query = AssetQuery(
         text=q, types=type, products=product, product_families=family,
+        umbrella_families=umbrella,
         funnel_stages=stage, segments=segment, languages=language,
         content_depths=depth, sources=source, tags=tag,
         customer_facing=customer_facing,
     )
-    any_filter = any([q, type, product, family, stage, segment, language,
-                      depth, source, tag]) or customer_facing is not None
+    any_filter = any([q, type, product, family, umbrella, stage, segment,
+                      language, depth, source, tag]) or customer_facing is not None
     return repo.facets(query if any_filter else None)
 
 

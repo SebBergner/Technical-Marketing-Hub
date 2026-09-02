@@ -506,6 +506,19 @@
    * real catalogue of 382 and 491 those are not merely stale, they contradict
    * what the same page shows two panels away. Numbers nobody can reconcile are
    * worse than no numbers, so each one is either corrected or removed. */
+  /* Which group a nav item sits under: walk back to the nearest .orion-group,
+   * because the sidebar is a flat list of siblings rather than nested. */
+  function inNoCountGroup(item) {
+    var node = item.previousElementSibling;
+    while (node) {
+      if (node.classList.contains("orion-group")) {
+        return NO_COUNT_GROUPS.indexOf(node.textContent.trim().toLowerCase()) !== -1;
+      }
+      node = node.previousElementSibling;
+    }
+    return false;
+  }
+
   function fillSidebarCounts(facets) {
     if (!baselineFacets) baselineFacets = facets;
 
@@ -544,6 +557,7 @@
     document.querySelectorAll(".orion-navitem").forEach(function (item) {
       var label = item.querySelector(".label");
       if (!label) return;
+      if (inNoCountGroup(item)) return;
 
       /* The Funnel Stage items ship without a .count element at all, so they
        * were skipped and sat there numberless beside four groups that all show
@@ -608,6 +622,10 @@
    * ten cards already in the rail above it. Both default to recency otherwise,
    * and the overlap was exactly 10 of 10. */
   var sortOverride = null;
+  /* The umbrella family the nav has taken you to. Not a dropdown, because
+   * there is no umbrella control in the filter bar -- Browse by Product is the
+   * only way in, and the reset button is the way out. */
+  var umbrellaFilter = null;
 
   function val(id) {
     var el = document.getElementById(id);
@@ -625,6 +643,7 @@
     var cf = val("hubFilterCf");
     if (cf === "yes") params.set("customer_facing", "true");
     if (cf === "no") params.set("customer_facing", "false");
+    if (umbrellaFilter) params.append("umbrella", umbrellaFilter);
     return params;
   }
 
@@ -707,6 +726,7 @@
       while (node) {
         if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
           node.textContent = sortOverride === "recent" ? " Latest uploads "
+                           : umbrellaFilter ? " All " + umbrellaFilter + " assets "
                            : seg ? " All " + seg + " assets "
                            : " All Assets ";
           break;
@@ -770,6 +790,7 @@
       if (el) el.value = "";
     });
     sortOverride = null;
+    umbrellaFilter = null;
     applyFilters();
   }
 
@@ -797,10 +818,12 @@
   var navTargets = {};   // nav label -> {control, value, page}
 
   function wireNav(facets) {
-    var families = {}, stages = {}, segments = {};
+    var families = {}, stages = {}, umbrellas = {};
     (facets.product_families || []).forEach(function (f) { families[f.value] = 1; });
     (facets.funnel_stages || []).forEach(function (f) { stages[f.value] = 1; });
-    (facets.segments || []).forEach(function (f) { segments[f.value] = 1; });
+    // Every umbrella, including the ones at zero: IPE has no demos yet and
+    // must still be clickable, or it looks broken rather than empty.
+    (facets.umbrella_families || []).forEach(function (f) { umbrellas[f.value] = 1; });
 
     navTargets = {};
     document.querySelectorAll(".orion-navitem").forEach(function (item) {
@@ -809,10 +832,10 @@
       if (name === "Home") target = { control: null };
       else if (name === "Latest Uploads") target = { control: null, sort: "recent" };
       else if (NAV_TYPE[name]) target = { control: "hubFilterType", value: NAV_TYPE[name] };
-      // A segment is a destination, not a filter toggle: it opens a page and
-      // clears everything else, because that is what a nav item promises.
-      else if (segments[name]) target = { control: "hubFilterSegment", value: name,
-                                          page: true };
+      // A product family is a destination, not a filter toggle: it clears
+      // everything else, because that is what a nav item promises.
+      else if (umbrellas[name]) target = { control: "umbrella", value: name,
+                                           page: true };
       else if (families[name]) target = { control: "hubFilterProduct", value: name };
       else if (stages[name]) target = { control: "hubFilterStage", value: name };
       if (!target) return;              // Favorites, Request New Asset, ...
@@ -824,7 +847,7 @@
           clearAll();
           if (target.sort) { sortOverride = target.sort; applyFilters(); }
         }
-        else if (target.page) { openSegment(target.value); }
+        else if (target.page) { openFamily(target.value); }
         else {
           // Re-read the control every time: takeOverControls() replaces these
           // nodes to drop Elio's listeners, so a captured reference would be
@@ -851,6 +874,10 @@
    * Two are empty categories and may fill up later; three need data nobody
    * collects yet. Either way the honest state is visible rather than implied.
    */
+  //: Nav items whose count is deliberately absent, so fillSidebarCounts leaves
+  //: them alone rather than clearing an element that was never there.
+  var NO_COUNT_GROUPS = ["browse by product"];
+
   var UNAVAILABLE = {
     "Favorites": "Favourites need a per-user store, which the Hub does not have yet",
     "Most Viewed": "No view counts for SharePoint assets yet, so any ranking "
@@ -867,6 +894,10 @@
     Object.keys(NAV_TYPE).forEach(function (label) {
       if (live[NAV_TYPE[label]]) live[label] = 1;
     });
+    // Every umbrella counts as live, including the empty ones. IPE is on the
+    // list because its demos are being made now, so dimming it would report a
+    // plan as a fault.
+    (facets.umbrella_families || []).forEach(function (f) { live[f.value] = 1; });
 
     document.querySelectorAll(".orion-navitem").forEach(function (item) {
       var name = navLabel(item);
@@ -899,7 +930,7 @@
    * is correct however the filter was chosen -- nav, dropdown, or product
    * tile. Home lights up when nothing is filtered at all. */
   function markNavActive() {
-    var anyOn = !!sortOverride || CONTROLS.some(function (id) {
+    var anyOn = !!sortOverride || !!umbrellaFilter || CONTROLS.some(function (id) {
       var el = document.getElementById(id);
       return el && el.value;
     });
@@ -907,6 +938,9 @@
       var target = navTargets[navLabel(item)];
       var on = false;
       if (target && !target.control) on = !anyOn;                  // Home
+      else if (target && target.control === "umbrella") {
+        on = umbrellaFilter === target.value;
+      }
       else if (target) {
         var el = document.getElementById(target.control);
         on = !!el && el.value === target.value;
@@ -1124,6 +1158,8 @@
       || "No description in " + (asset.source === "consensus" ? "Consensus" : "SharePoint")
          + " for this one yet.");
 
+    renderFileList(page, asset);
+
     var drivers = document.getElementById("vpValueDrivers");
     if (drivers) {
       drivers.innerHTML = "";
@@ -1160,12 +1196,50 @@
         + '</div>';
     }
 
-    // Share and Velocity are both hidden for the same reason the card's share
-    // button is: neither can act as the person pressing it.
+    /* Velocity is hidden — it cannot act as the person pressing it — and so
+     * is our own Share modal. What replaces them are two plain links out to
+     * the platform, where the person is signed in as themselves:
+     *
+     *   Go to SharePoint / Go to Consensus   the asset where it lives
+     *   Create DemoBoard                     Consensus's own creation page,
+     *                                        pre-loaded with this demo
+     *
+     * The DemoBoard link is the interim answer to the identity problem Serge
+     * proposed in the review: three steps instead of one, and every board
+     * belongs to whoever made it.
+     */
     ["vpShareBtn", "vpDsrBtn"].forEach(function (btnId) {
       var b = document.getElementById(btnId);
       if (b) b.style.display = "none";
     });
+
+    var actions = page.querySelector(".vp-actions");
+    if (actions) {
+      actions.querySelectorAll(".vp-platform").forEach(function (b) { b.remove(); });
+
+      var platformHref = asset.source === "consensus"
+        ? consensusUrl(asset) : asset.web_url;
+      if (platformHref) {
+        actions.insertBefore(
+          linkButton("btn-primary-sm vp-platform",
+                     asset.source === "consensus" ? "Go to Consensus"
+                                                  : "Go to SharePoint",
+                     platformHref,
+                     asset.source === "consensus" ? "i-send" : "i-file-text"),
+          actions.firstChild);
+      }
+
+      // Only where a DemoBoard is possible: it needs a Consensus demo behind it.
+      if (asset.consensus_uuid) {
+        actions.appendChild(linkButton(
+          "btn-ghost vp-platform", "Create DemoBoard",
+          "https://app.goconsensus.com/link/custom/create?demo="
+            + encodeURIComponent(asset.consensus_uuid),
+          "i-send",
+          "Opens Consensus's own DemoBoard page for this demo. You will be "
+          + "signed in as yourself, so the board is yours."));
+      }
+    }
 
     // A copyable link to exactly this page -- the point of the whole page.
     var actions = page.querySelector(".vp-actions");
@@ -1223,6 +1297,96 @@
     if (location.hash !== "#/asset/" + encodeURIComponent(id)) {
       history.pushState(null, "", "#/asset/" + encodeURIComponent(id));
     }
+  }
+
+  var FILE_ICON = { video: "i-video", document: "i-file-text", image: "i-panel",
+                   cad: "i-box", dataset: "i-grid", other: "i-file-text" };
+
+  function fileSize(bytes) {
+    if (!bytes) return "";
+    return bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + " MB"
+                            : Math.max(1, Math.round(bytes / 1024)) + " KB";
+  }
+
+  /* What is actually in the folder.
+   *
+   * Liwei asked for this on the SharePoint page: an asset is a folder, and
+   * knowing whether it holds a script and a 60 MB video or forty CAD parts is
+   * most of what you want before opening it.
+   *
+   * Size and duration come free with the sync -- Graph returns `size` and a
+   * `video` facet on every file it lists -- so a row says how long a video
+   * runs and how big it is without a single extra request.
+   *
+   * CAD is counted but not listed. It is 42% of the catalogue by file count
+   * and nobody picks a `part.prt.1` out of a list; the counts line says how
+   * many there are.
+   */
+  function renderFileList(page, asset) {
+    var existing = page.querySelector(".vp-files");
+    if (existing) existing.remove();
+
+    var files = asset.resources || [];
+    var counts = asset.resource_counts || {};
+    if (!files.length && !asset.resource_count) return;
+
+    var box = document.createElement("div");
+    box.className = "vp-card vp-files";
+
+    var summary = Object.keys(counts).sort().map(function (kind) {
+      return counts[kind] + " " + kind + (counts[kind] === 1 ? "" : "s");
+    }).join(" \u00b7 ");
+
+    box.innerHTML = '<div class="vp-card__head"><div class="vp-card__head-title">'
+      + '<svg class="orion-ico"><use href="#i-file-text"/></svg>Files in this folder'
+      + '</div><span class="vp-files__summary">' + escapeHtml(summary) + '</span></div>';
+
+    var list = document.createElement("div");
+    list.className = "vp-files__list";
+    files.forEach(function (f) {
+      var facts = [f.extension && f.extension.toUpperCase(),
+                   f.duration_seconds && durationLabel(f.duration_seconds),
+                   fileSize(f.size_bytes),
+                   f.width && f.height && (f.width + "\u00d7" + f.height),
+                   f.audience === "customer_facing" ? "customer-facing"
+                     : f.audience === "internal" ? "internal" : null,
+                   f.subfolder].filter(Boolean).join(" \u00b7 ");
+      var row = document.createElement("div");
+      row.className = "vp-file";
+      row.innerHTML =
+          '<svg class="orion-ico orion-ico--sm ico-muted"><use href="#'
+        +   (FILE_ICON[f.kind] || "i-file-text") + '"/></svg>'
+        + '<span class="vp-file__name">' + escapeHtml(f.name) + '</span>'
+        + '<span class="vp-file__facts">' + escapeHtml(facts) + '</span>';
+      list.appendChild(row);
+    });
+    box.appendChild(list);
+
+    // Only counted, never listed, and said so rather than left as a gap
+    // between "9 files" and four rows.
+    var hidden = (asset.resource_count || 0) - files.length;
+    if (hidden > 0) {
+      var note = document.createElement("div");
+      note.className = "vp-files__note";
+      note.textContent = hidden + " more file" + (hidden === 1 ? "" : "s")
+        + " not listed \u2014 mostly CAD parts, which are counted rather than "
+        + "browsed. Open the folder in SharePoint to see everything.";
+      box.appendChild(note);
+    }
+
+    page.appendChild(box);
+  }
+
+  function linkButton(className, label, href, icon, title) {
+    var a = document.createElement("a");
+    a.className = className;
+    a.href = href;
+    a.target = "_blank";
+    a.rel = "noopener";
+    if (title) a.title = title;
+    a.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#' + icon
+                + '"/></svg>' + escapeHtml(label);
+    return a;
   }
 
   function setText(id, text) {
@@ -1771,12 +1935,11 @@
                                       clearSearchOnly(); applyFilters(); } });
       }
     });
-    (baselineFacets.segments || []).forEach(function (f) {
-      if (f.count >= SUGGEST_MIN && namesCategory(query, f.value)
-          && (!seg || seg.value !== f.value)) {
+    (baselineFacets.umbrella_families || []).forEach(function (f) {
+      if (f.count >= SUGGEST_MIN && namesCategory(query, f.value)) {
         out.push({ rank: 2, size: f.value.length, label: f.value,
-                   text: "Go to the " + f.value + " page",
-                   page: true, run: function () { openSegment(f.value); } });
+                   text: "Browse all " + f.count + " " + f.value,
+                   page: true, run: function () { openFamily(f.value); } });
       }
     });
     (baselineFacets.types || []).forEach(function (f) {
@@ -1843,44 +2006,64 @@
     return d.innerHTML;
   }
 
-  async function buildSegmentNav() {
+  /* Browse by Product, from the umbrella list.
+   *
+   * This replaces Browse by Segment, which all three of them asked for in the
+   * review -- Elio "I would remove the segment", Seb "I would do it by
+   * product", Serge "I agree, remove the segment". The objection that sent us
+   * to segments in the first place was that nineteen derived families have a
+   * tail of ones and twos; a curated list of eight answers it, which is why
+   * the reversal is coherent rather than a change of mind.
+   *
+   * Built from the API in the team's own order, including families at zero:
+   * IPE is on the list because its demos are being made now, and a family
+   * that appeared only once content landed would look like a bug.
+   */
+  async function buildFamilyNav(facets) {
     var heading = null;
     document.querySelectorAll(".orion-group").forEach(function (g) {
-      if (g.textContent.trim().toLowerCase() === "browse by product") heading = g;
+      var t = g.textContent.trim().toLowerCase();
+      if (t === "browse by product" || t === "browse by segment") heading = g;
     });
-    if (!heading) return null;
+    if (!heading) return;
 
-    var payload;
-    try { payload = await getJSON("/api/segments"); }
-    catch (err) {
-      console.error("[hub-api] segments unavailable, leaving the nav alone", err);
-      return null;
-    }
-    segmentIndex = {};
-    (payload.segments || []).forEach(function (sg) { segmentIndex[sg.key] = sg; });
+    var families = facets.umbrella_families || [];
+    if (!families.length) return;      // keep the markup rather than empty it
 
-    // Drop the product items that followed the heading, then insert segments.
     var node = heading.nextElementSibling;
     while (node && node.classList.contains("orion-navitem")) {
       var next = node.nextElementSibling;
       node.remove();
       node = next;
     }
-    heading.textContent = "Browse by Segment";
+    heading.textContent = "Browse by Product";
 
     var anchor = heading;
-    (payload.segments || []).forEach(function (sg) {
+    families.forEach(function (f) {
       var item = document.createElement("div");
       item.className = "orion-navitem";
-      // No icon. Six identical marks in a column carry no information and
-      // read as noise; the product group had distinct logos, which is what
-      // made icons worth having there.
-      item.innerHTML = '<span class="label">' + escapeHtml(sg.label) + '</span>'
-        + '<span class="count">' + sg.total + '</span>';
+      /* No count, deliberately.
+       *
+       * There are two honest numbers for "Creo" and they disagree: 422 as an
+       * umbrella (Mathcad rolls into it) and 379 as a derived family. The
+       * sidebar was showing the second while the results showed the first,
+       * because fillSidebarCounts looks a label up across several facets and
+       * `product_families` came first in that list.
+       *
+       * Fixing the lookup would have made the number right and still left it
+       * confusing: these counts are scoped to the active filters, so choosing
+       * Codebeamer correctly showed Creo as 0 — "Creo AND Codebeamer" really
+       * is empty — which reads as though Creo had emptied out. A navigation
+       * group is a set of destinations, and a destination does not need a
+       * quantity. The results heading already says how many are there.
+       *
+       * No icon either: eight identical marks in a column carry no
+       * information, and only four of the eight products have a logo.
+       */
+      item.innerHTML = '<span class="label">' + escapeHtml(f.value) + '</span>';
       anchor.after(item);
       anchor = item;
     });
-    return payload;
   }
 
   /* Opening a segment clears every other filter. That is the whole difference
@@ -1888,123 +2071,24 @@
    * narrows where you already are. Choosing Creo and then Windchill in the nav
    * used to leave you the intersection, which is not what a sidebar promises.
    */
-  function openSegment(key) {
+  function openFamily(name) {
     CONTROLS.forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.value = "";
     });
-    var sel = document.getElementById("hubFilterSegment");
-    if (sel) sel.value = key;
+    umbrellaFilter = name;
     applyFilters();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  /* The page header: derived facts always, editorial content only when a
-   * person has actually written it. An unwritten description renders as a
-   * visible gap rather than a plausible sentence nobody stands behind -- a
-   * hand-typed number already lied on this page once, claiming Creo had 24
-   * demos against a real 382. */
-  async function renderSegmentHeader() {
+  /* The segment landing page is gone. All three of them asked for segments
+   * to stop being the way in, and a page for a dimension nobody browses by is
+   * a page nobody opens. What it did well -- a description and an owner --
+   * belongs on whatever replaces it, and /api/segments still serves both.
+   */
+  function renderSegmentHeader() {
     var host = document.getElementById("hubSegmentPage");
-    if (!host) return;
-    var sel = document.getElementById("hubFilterSegment");
-    var key = sel ? sel.value : "";
-    if (!key) { host.style.display = "none"; host.innerHTML = ""; return; }
-
-    /* Once someone starts searching inside a segment they are looking for a
-     * result, not reading the introduction, and a full-height header pushes
-     * every result below the fold. Collapse to a single line they can reopen.
-     * Re-render only when the segment itself changes, so typing does not
-     * rebuild ten cards on every keystroke. */
-    var searching = !!val("hubSearchInput");
-    if (host.dataset.segment === key) {
-      host.classList.toggle("hub-seg--collapsed", searching && !host.dataset.pinned);
-      return;
-    }
-    host.dataset.segment = key;
-    delete host.dataset.pinned;
-
-    var sg;
-    try { sg = await getJSON("/api/segments/" + encodeURIComponent(key)); }
-    catch (err) { host.style.display = "none"; return; }
-
-    var families = (sg.families || []).slice()
-      .sort(function (a, b) { return b.count - a.count; }).slice(0, 4);
-    var byType = {};
-    (sg.types || []).forEach(function (t) { byType[t.value] = t.count; });
-    var kits = (byType.ldk || 0) + (byType.vdk || 0);
-
-    var ed = sg.editorial || {};
-    var blurb = ed.blurb
-      ? '<p class="hub-seg__blurb">' + escapeHtml(ed.blurb) + '</p>'
-      : '<p class="hub-seg__blurb hub-seg__blurb--empty">No description written '
-        + 'yet &mdash; whoever owns ' + escapeHtml(sg.label) + ' should add one '
-        + 'so this page says what the segment is for.</p>';
-
-    var owner = ed.owner
-      ? '<strong>' + escapeHtml(ed.owner.name) + '</strong>'
-        + (ed.owner.email ? ' <a href="mailto:' + escapeHtml(ed.owner.email)
-            + '">' + escapeHtml(ed.owner.email) + '</a>' : '')
-      : '<span class="hub-seg__empty">no owner recorded</span>';
-
-    var stamp = ed.updated_at
-      ? '<span class="hub-seg__stamp">updated ' + escapeHtml(ed.updated_at)
-        + (ed.updated_by ? ' by ' + escapeHtml(ed.updated_by) : '') + '</span>'
-      : '';
-
-    host.innerHTML =
-        '<button class="hub-seg__toggle" id="hubSegToggle" aria-expanded="true">'
-      +   '<svg class="orion-ico orion-ico--sm"><use href="#i-chevron-right"/></svg>'
-      +   '<span class="hub-seg__toggle-label">' + escapeHtml(sg.label) + '</span>'
-      +   '<span class="hub-seg__toggle-count">' + sg.total + '</span></button>'
-      + '<button class="hub-seg__back" id="hubSegBack">'
-      +   '<svg class="orion-ico orion-ico--sm"><use href="#i-chevron-right"/></svg>'
-      +   ' All demos</button>'
-      + '<div class="hub-seg__head">'
-      +   '<h2 class="hub-seg__title">' + escapeHtml(sg.label) + '</h2>'
-      +   '<span class="hub-seg__count">' + sg.total + ' assets'
-      +     (byType.video ? ' &middot; ' + byType.video + ' videos' : '')
-      +     (kits ? ' &middot; ' + kits + ' kits' : '') + '</span>'
-      + '</div>'
-      + blurb
-      + '<div class="hub-seg__foot">'
-      +   '<span class="hub-seg__fams">'
-      +     families.map(function (f) {
-              return '<button class="hub-seg__fam" data-family="'
-                + escapeHtml(f.value) + '">' + escapeHtml(f.value)
-                + ' <em>' + f.count + '</em></button>'; }).join('')
-      +   '</span>'
-      +   '<span class="hub-seg__contact">Contact: ' + owner + stamp + '</span>'
-      + '</div>'
-      + '<div class="hub-seg__latest"><h3>Latest in ' + escapeHtml(sg.label)
-      +   '</h3><div class="asset-row" id="hubSegLatest"></div></div>';
-    host.style.display = "";
-
-    var back = document.getElementById("hubSegBack");
-    if (back) back.addEventListener("click", clearAll);
-
-    /* Reopening it while searching pins it open: the collapse is a default,
-     * not a rule, and someone who deliberately expands it should not have it
-     * shut again by their next keystroke. */
-    var toggle = document.getElementById("hubSegToggle");
-    if (toggle) toggle.addEventListener("click", function () {
-      var collapsed = host.classList.toggle("hub-seg--collapsed");
-      toggle.setAttribute("aria-expanded", String(!collapsed));
-      if (collapsed) delete host.dataset.pinned; else host.dataset.pinned = "1";
-    });
-
-    host.classList.toggle("hub-seg--collapsed", !!val("hubSearchInput"));
-
-    host.querySelectorAll(".hub-seg__fam").forEach(function (b) {
-      b.addEventListener("click", function () {
-        var el = document.getElementById("hubFilterProduct");
-        if (el) el.value = b.dataset.family;
-        applyFilters();
-      });
-    });
-
-    var rail = document.getElementById("hubSegLatest");
-    (sg.latest || []).forEach(function (a) { rail.appendChild(buildCard(a)); });
+    if (host) { host.style.display = "none"; host.innerHTML = ""; }
   }
 
   /* --------------------------------------------------- browse-by-product */
@@ -2131,11 +2215,15 @@
     wireRequestForm();
     wireDetailPage();
     fillProductPills(facets);
-    await buildSegmentNav();
+    await buildFamilyNav(facets);
     wireNav(facets);
     markUnavailable(facets);
     markNavActive();
     fillProductTiles();
+
+    // Real content is in place: reveal the thread. See the #mainThread rule in
+    // index.html for why it also reveals itself on a timer.
+    document.body.classList.add("hub-ready");
 
     var bySource = assets.reduce(function (acc, a) {
       acc[a.source] = (acc[a.source] || 0) + 1;

@@ -18,6 +18,8 @@ import os
 from datetime import date
 
 import pytest
+
+from backend.services import taxonomy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -32,11 +34,23 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEED = os.path.join(ROOT, "data", "seed", "assets.json")
 
 with open(SEED, encoding="utf-8") as _fh:
-    SEED_RECORDS = json.load(_fh)
+    SEED_FILE_RECORDS = json.load(_fh)
+
+#: What the catalogue actually serves from the seed.
+#:
+#: Not len(the file): assets touching a divested product are dropped at the
+#: read funnel, so 452 rows on disk become 366 in the catalogue. Computed
+#: rather than hardcoded, because the divested list is a business decision that
+#: will change and a hardcoded 366 would make an ordinary edit look like a
+#: regression.
+SEED_RECORDS = [r for r in SEED_FILE_RECORDS
+                if not taxonomy.is_excluded(r.get("products"))]
 SEED_COUNT = len(SEED_RECORDS)
 
-#: A product that genuinely appears, rather than a hardcoded guess.
-SAMPLE_PRODUCT = next(p for r in SEED_RECORDS for p in r["products"])
+#: A product that genuinely appears — and survives the exclusion, or every
+#: assertion built on it would be about an asset the catalogue does not carry.
+SAMPLE_PRODUCT = next(p for r in SEED_RECORDS for p in r["products"]
+                      if not taxonomy.is_excluded([p]))
 
 
 @pytest.fixture(params=["json", "sql"])
@@ -129,7 +143,8 @@ def test_sync_of_one_source_leaves_another_alone(empty_repo):
 def test_seed_is_the_real_catalogue(repo):
     """Pinned deliberately: the seed is committed data imported from SharePoint,
     and a silent change would invalidate every count below."""
-    assert SEED_COUNT == 452, "regenerate with scripts/import_sharepoint.py"
+    assert len(SEED_FILE_RECORDS) == 452,         "regenerate with scripts/import_sharepoint.py"
+    assert SEED_COUNT < len(SEED_FILE_RECORDS),         "the seed carries divested products; the catalogue must not serve them"
     assert repo.list(AssetQuery(limit=1000)).total == SEED_COUNT
 
 
@@ -751,3 +766,79 @@ def test_a_modest_shrink_is_not_second_guessed(empty_repo):
     empty_repo.replace_source_rows(full, "sharepoint")
     empty_repo.replace_source_rows(full[:18], "sharepoint")   # no flag needed
     assert empty_repo.count_source_rows("sharepoint") == 18
+
+
+# ─────────────────────────────────── products PTC no longer owns
+def test_a_divested_product_is_not_reachable_by_any_route(empty_repo):
+    """PTC does not own these any more, so the Hub does not carry them.
+
+    Not a navigation preference — a demo of a product the company no longer
+    sells has no business in a catalogue the company hands to customers. So
+    every route has to come back empty, not just the browse list: search, the
+    facet counts, an explicit filter, and the asset's own id.
+    """
+    from backend.models import Asset, AssetType
+
+    empty_repo.replace_source_rows([
+        Asset(id="keep", type=AssetType.LDK, title="Creo Assembly Kit",
+              products=["Creo Parametric"]),
+        Asset(id="gone", type=AssetType.LDK, title="ThingWorx Navigate Kit",
+              products=["ThingWorx Navigate"]),
+    ], "sharepoint")
+
+    ids = [a.id for a in empty_repo.list(AssetQuery(limit=100)).items]
+    assert ids == ["keep"]
+
+    # By search, by its own name.
+    assert empty_repo.list(AssetQuery(text="ThingWorx", limit=100)).total == 0
+    # By its own id.
+    assert empty_repo.get("gone") is None
+    # By an explicit filter for it — asking directly must not be a way round.
+    assert empty_repo.list(
+        AssetQuery(products=["ThingWorx Navigate"], limit=100)).total == 0
+    # And it appears in no count anywhere.
+    facets = empty_repo.facets()
+    assert facets.total == 1
+    assert all("ThingWorx" not in f.value for f in facets.products)
+    assert all("ThingWorx" not in f.value for f in facets.product_families)
+
+
+def test_one_divested_product_excludes_the_whole_asset(empty_repo):
+    """ANY, not ALL.
+
+    Five assets in the live catalogue carry a divested product alongside a
+    current one, and a demo showing Creo *and* a divested product is still
+    showing a divested product.
+    """
+    from backend.models import Asset, AssetType
+
+    empty_repo.replace_source_rows([
+        Asset(id="mixed", type=AssetType.VDK, title="Digital Engineering Overview",
+              products=["Creo", "ThingWorx"]),
+    ], "sharepoint")
+
+    assert empty_repo.list(AssetQuery(limit=10)).total == 0
+    # Not even under the product it legitimately also demonstrates.
+    assert empty_repo.list(AssetQuery(products=["Creo"], limit=10)).total == 0
+
+
+def test_a_specific_module_cannot_slip_through_under_another_name(empty_repo):
+    """Matched on the derived family, not the literal string: "KEPServerEX" is
+    Kepware and says so nowhere in its name."""
+    from backend.models import Asset, AssetType
+
+    empty_repo.replace_source_rows([
+        Asset(id="kep", type=AssetType.LDK, title="Connectivity Kit",
+              products=["KEPServerEX"]),
+    ], "sharepoint")
+    assert empty_repo.list(AssetQuery(limit=10)).total == 0
+
+
+def test_an_asset_with_no_product_tag_is_kept(empty_repo):
+    """66 assets carry no product at all. Untagged is not divested."""
+    from backend.models import Asset, AssetType
+
+    empty_repo.replace_source_rows([
+        Asset(id="untagged", type=AssetType.VIDEO, title="Product Companies Rely on PTC"),
+    ], "sharepoint")
+    assert [a.id for a in empty_repo.list(AssetQuery(limit=10)).items] == ["untagged"]

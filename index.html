@@ -1947,6 +1947,35 @@ hubApplyFilters();
     margin-bottom:2px; }
   .vr-placeholder svg { flex:0 0 auto; margin-top:1px; }
 
+  /* What is in the folder. An asset IS a folder, so this is most of what
+     someone wants before opening it. */
+  .vp-files__summary { margin-left:auto; font-size:12px; color:var(--orion-text-3);
+    font-variant-numeric:tabular-nums; }
+  .vp-files__list { display:flex; flex-direction:column; }
+  .vp-file { display:flex; align-items:center; gap:9px; padding:7px 0;
+    border-bottom:1px solid var(--orion-border); font-size:12.5px; }
+  .vp-file:last-child { border-bottom:none; }
+  .vp-file__name { color:var(--orion-text); overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+  .vp-file__facts { margin-left:auto; flex:0 0 auto; color:var(--orion-text-3);
+    font-variant-numeric:tabular-nums; }
+  .vp-files__note { margin-top:10px; font-size:12px; color:var(--orion-text-3);
+    line-height:1.5; }
+
+  /* Elio's markup ships static demo cards so his file stands alone in a
+     browser. hub-api.js replaces them once the catalogue has loaded, which
+     left them visible for a beat on every refresh -- Liwei saw the mock-up
+     flash past. The thread starts hidden and is revealed when real content is
+     in place.
+
+     The fallback matters more than the hiding: if hub-api.js fails to load at
+     all, `hub-ready` never arrives, so the rule is written to reveal after a
+     couple of seconds regardless. A blank page is a worse failure than a
+     glimpse of placeholder content. */
+  #mainThread { animation: hub-reveal 0s 2s forwards; opacity: 0; }
+  body.hub-ready #mainThread { animation: none; opacity: 1; }
+  @keyframes hub-reveal { to { opacity: 1; } }
+
   /* The preview plays here, in a frame with no address bar. A browser popup
      cannot hide the URL any more; an iframe never had one. */
   .hub-preview { position:fixed; inset:0; z-index:1000; display:none;

@@ -233,3 +233,105 @@ def classify_tags(tags: list[str] | None) -> dict:
         elif out[field] is None:
             out[field] = value
     return out
+
+# ─────────────────────────────────────── the umbrella list, decided not derived
+# Seb supplied this from the PTC NEXT booth list and the team settled the gaps
+# on 2026-09-02. It replaces the derived families as the primary way to browse:
+# derivation produced nineteen, with a tail of ones and twos that made a
+# navigation item per product absurd. Seb, in the review: "maybe we call it
+# product family and not just product... and then just add another filter
+# called product family". So this is the top level and `products` stays as the
+# filter underneath it, which is why nothing below disappears from search.
+#
+# Order is theirs, and it is the order the navigation shows.
+PRODUCT_FAMILIES = (
+    "Creo", "Codebeamer", "Windchill", "PTC Jetstream", "IPE",
+    "ServiceMax", "PTC Orbit", "Servigistics",
+)
+
+#: On the list, deliberately, with nothing behind it yet: IPE demos are being
+#: made now. It shows as an empty family until they land, which is the same
+#: state the sidebar already renders honestly for anything at zero.
+#:
+#: Onshape and Arena were on Seb's list too and are held back until they have
+#: content — a family with no demos and none coming is an empty room.
+HIDDEN_FAMILIES = ("Onshape", "Arena")
+
+#: Products that roll up into an umbrella. Elio gave the shape of this in the
+#: review — "not even Arbortext, that's a Windchill product" — and the rest was
+#: settled the same day. The asset keeps its specific product, so a Mathcad
+#: demo is still findable as Mathcad in the secondary filter; only its family
+#: changes.
+FAMILY_ROLLUP = {
+    "Mathcad": "Creo",
+    "Arbortext": "Windchill",
+    "PTC Modeler": "Codebeamer",
+    # Not rollups -- the same product spelled two ways. Seb's list carries the
+    # brand prefix and SharePoint's Product column does not, so without these
+    # both families read zero while 6 assets each sit in the catalogue.
+    "Jetstream": "PTC Jetstream",
+    "Orbit": "PTC Orbit",
+}
+
+#: Products PTC no longer owns (decided 2026-09-02).
+#:
+#: These are **divested**, which is why the rule is absolute rather than a
+#: navigation preference. A demo of a product the company does not sell has no
+#: business being in a catalogue the company hands to customers, so an asset
+#: touching one of these is not in the Hub at all — not in search, not in a
+#: facet count, not behind a filter, not reachable by its own id.
+#:
+#: The rule is ANY, not ALL: five assets carry a divested product alongside a
+#: current one, and a demo showing Creo *and* a divested product is still
+#: showing a divested product. 139 assets in total, 946 down to 807.
+#:
+#: Enforced twice on purpose — see `is_excluded`.
+DIVESTED_PRODUCTS = frozenset({
+    "ThingWorx", "Integrity", "Kepware", "Vuforia", "Connected Work Cell",
+    "Digital Performance Management", "Asset Monitoring & Utilization",
+    "Real-Time Production Performance Monitoring", "Consensus Introduction",
+})
+
+
+def is_excluded(products: list[str] | None) -> bool:
+    """Does this asset touch a product PTC no longer owns?
+
+    Matched on the derived family, not the raw string, so a specific module
+    cannot slip through under a name the list does not spell out: "KEPServerEX"
+    is Kepware and says so nowhere.
+    """
+    for product in products or []:
+        family = family_of(product)
+        if family and family in DIVESTED_PRODUCTS:
+            return True
+    return False
+
+
+def umbrella_of(product_or_family: str | None) -> str | None:
+    """The umbrella family this belongs to, or None if the Hub has no home for it.
+
+    Takes either a raw product or an already-derived family, because callers
+    have one or the other and the answer is the same.
+    """
+    if not product_or_family:
+        return None
+    family = family_of(product_or_family) or product_or_family.strip()
+    family = FAMILY_ROLLUP.get(family, family)
+    if family in HIDDEN_FAMILIES or family in DIVESTED_PRODUCTS:
+        return None
+    return family if family in PRODUCT_FAMILIES else None
+
+
+def umbrellas_of(products: list[str] | None) -> list[str]:
+    """Every umbrella a list of products maps to, de-duplicated.
+
+    Empty is a real answer: an asset can be in no umbrella and still belong in
+    the catalogue. 66 assets carry no product tag at all and 134 carry only
+    excluded ones, and all of them are still searchable.
+    """
+    out: list[str] = []
+    for product in products or []:
+        umbrella = umbrella_of(product)
+        if umbrella and umbrella not in out:
+            out.append(umbrella)
+    return out

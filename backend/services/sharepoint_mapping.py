@@ -204,9 +204,16 @@ def pick_main_video(videos: list[dict]) -> str | None:
     return customer_facing[0]["name"] if len(customer_facing) == 1 else None
 
 
-def build_resource(filename: str, subfolder: str | None = None) -> dict:
+def build_resource(filename: str, subfolder: str | None = None,
+                   item: dict | None = None) -> dict:
+    """One resource row, plus whatever the driveItem already told us.
+
+    `item` is optional so the many tests that build a resource from a name
+    alone keep working. When it is present, size and the video facet come along
+    free — Graph returns both in the children listing the sync already makes.
+    """
     kind, ext = classify(filename)
-    return {
+    row = {
         "name": filename,
         "kind": kind,
         "audience": audience_of(filename),
@@ -214,6 +221,24 @@ def build_resource(filename: str, subfolder: str | None = None) -> dict:
         "extension": ext,
         "has_audio": audio_of(filename),
     }
+    if not item:
+        return row
+
+    if isinstance(item.get("size"), int):
+        row["size_bytes"] = item["size"]
+
+    video = item.get("video") or {}
+    if isinstance(video, dict):
+        # Graph reports duration in milliseconds; everything else here is
+        # seconds, and mixing the two silently is how a 7-minute video becomes
+        # a 466,000-second one.
+        millis = video.get("duration")
+        if isinstance(millis, (int, float)) and millis > 0:
+            row["duration_seconds"] = int(round(millis / 1000))
+        for key in ("width", "height"):
+            if isinstance(video.get(key), int):
+                row[key] = video[key]
+    return row
 
 
 def derive_video_facts(asset: dict) -> None:
@@ -230,9 +255,25 @@ def derive_video_facts(asset: dict) -> None:
     asset["resources"] = [r for r in all_resources if r["kind"] in BROWSABLE]
 
     videos = [r for r in asset["resources"] if r["kind"] == "video"]
+
+
     asset["resource_count"] = len(all_resources)
     asset["video_count"] = len(videos)
     asset["main_video"] = pick_main_video(videos)
+
+    # Serge, in the review: "I would want to see it right there in the tile.
+    # I don't want to go even to the detail page. I want to see, is it a
+    # 30-second video." SharePoint held nothing, and Graph had it all along --
+    # the `video` facet arrives with every file listing.
+    #
+    # Taken from the MAIN video only. Summing a folder's videos would report a
+    # total runtime as though it were one clip, and picking the longest would be
+    # a guess dressed as a fact; pick_main_video already declines to choose
+    # where a human should.
+    if asset.get("main_video"):
+        main = next((v for v in videos if v["name"] == asset["main_video"]), None)
+        if main and main.get("duration_seconds"):
+            asset["duration_seconds"] = main["duration_seconds"]
 
     if videos:
         if any(v["audience"] == "customer_facing" for v in videos):

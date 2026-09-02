@@ -394,8 +394,18 @@
     var updated = 0, cleared = 0;
     document.querySelectorAll(".orion-navitem").forEach(function (item) {
       var label = item.querySelector(".label");
+      if (!label) return;
+
+      /* The Funnel Stage items ship without a .count element at all, so they
+       * were skipped and sat there numberless beside four groups that all show
+       * one. Create the element rather than skip: the number exists, and an
+       * inconsistent sidebar reads as a bug in the data. */
       var count = item.querySelector(".count");
-      if (!label || !count) return;
+      if (!count) {
+        count = document.createElement("span");
+        count.className = "count";
+        item.appendChild(count);
+      }
       // Some labels carry a sub-caption -- "LDKs Live Demo Kits" -- so the
       // full textContent matches nothing. Take the first text node, which is
       // the name itself.

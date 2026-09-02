@@ -1,4 +1,30 @@
 <title>Technical Marketing Hub</title>
+<!-- ============================================================
+     Hoisted deliberately, and it has to stay here.
+
+     This file has no <head>: the markup begins immediately and the main style
+     block sits 2.5 MB further down, AFTER the sidebar and the card rails it
+     would hide. The browser parses those, paints them, and only then reaches
+     the rule — which is precisely the flash of Elio's placeholder data Liwei
+     kept seeing. A rule has to precede what it hides.
+
+     What is hidden is what hub-api.js rewrites from the live catalogue: the
+     centre rails, and the sidebar navigation with its hardcoded product list,
+     logos and counts. Both are revealed together once real content is in
+     place, and never otherwise — a blank screen is an honest failure, whereas
+     placeholder data is indistinguishable from real data to anyone who has not
+     read the source, and a tile claiming 1,204 views is worse than an empty
+     page.
+
+     The brand lockup and the PTC mark are outside .orion-side__body, so the
+     column keeps its shape and nothing jumps when it appears.
+     ============================================================ -->
+<style>
+  #mainThread { display: none; }
+  body.hub-ready #mainThread { display: block; }
+  .orion-side__body { visibility: hidden; }
+  body.hub-ready .orion-side__body { visibility: visible; }
+</style>
 <style>
 /* ============================================================
    ORION UI STYLE — PTC enterprise agentic design system (inlined)
@@ -1969,21 +1995,6 @@ hubApplyFilters();
   .vp-files__note { margin-top:10px; font-size:12px; color:var(--orion-text-3);
     line-height:1.5; }
 
-  /* Elio's markup ships static demo cards so his file stands alone in a
-     browser, and hub-api.js replaces them once the catalogue has loaded. They
-     were visible for a beat on every refresh.
-
-     The first attempt hid them and revealed on a timer, so a failed script
-     showed something rather than nothing. Liwei's answer: a blank screen is
-     fine, the mock-up is not, not even for a frame. That is the right call —
-     placeholder data is indistinguishable from real data to anyone who has not
-     seen the code, and a demo tile claiming 1,204 views is worse than an empty
-     page.
-
-     So: hidden with no timer, a spinner while it loads, and an explicit
-     failure message if it never arrives. The mock is never shown. */
-  #mainThread { display: none; }
-  body.hub-ready #mainThread { display: block; }
 
   .hub-boot { display: flex; flex-direction: column; align-items: center;
     justify-content: center; gap: 14px; padding: 80px 20px; text-align: center;

@@ -105,7 +105,8 @@ def test_removed_item_is_retired_not_deleted(empty_repo):
     repo.replace_source_rows([make_asset("a1"), make_asset("a2")], "sharepoint")
     assert repo.list(AssetQuery()).total == 2
 
-    repo.replace_source_rows([make_asset("a1")], "sharepoint")
+    # Deliberately shrinking: the guard asks, and this test means it.
+    repo.replace_source_rows([make_asset("a1")], "sharepoint", allow_shrink=True)
     assert repo.list(AssetQuery()).total == 1
 
     repo.replace_source_rows([make_asset("a1"), make_asset("a2", title="Reused?")],
@@ -118,7 +119,7 @@ def test_sync_of_one_source_leaves_another_alone(empty_repo):
     repo = empty_repo
     repo.replace_source_rows([make_asset("sp1")], "sharepoint")
     repo.replace_source_rows([make_asset("seed1")], "seed")
-    repo.replace_source_rows([make_asset("sp2")], "sharepoint")
+    repo.replace_source_rows([make_asset("sp2")], "sharepoint", allow_shrink=True)
 
     ids = {a.id for a in repo.list(AssetQuery()).items}
     assert ids == {"seed1", "sp2"}, "seed source should be untouched by a sharepoint sync"
@@ -381,7 +382,7 @@ def test_no_asset_id_appears_twice_across_source_systems(repo):
 
     same = [Asset(id="a1", type=AssetType.LDK, title="A Kit",
                   source_item_id="sites/x/A Kit")]
-    repo.replace_source_rows(same, "seed")
+    repo.replace_source_rows(same, "seed", allow_shrink=True)
     repo.replace_source_rows(
         [Asset(id="a1", type=AssetType.LDK, title="A Kit", source_item_id="01GRAPHID")],
         "sharepoint")
@@ -394,7 +395,8 @@ def test_count_source_rows_reports_each_source_separately(repo):
     from backend.models import Asset, AssetType
 
     repo.replace_source_rows(
-        [Asset(id=f"s{n}", type=AssetType.LDK, title=f"S{n}") for n in range(3)], "seed")
+        [Asset(id=f"s{n}", type=AssetType.LDK, title=f"S{n}") for n in range(3)],
+        "seed", allow_shrink=True)
     repo.replace_source_rows(
         [Asset(id=f"g{n}", type=AssetType.VDK, title=f"G{n}") for n in range(5)],
         "sharepoint")
@@ -408,10 +410,11 @@ def test_replacing_a_source_with_nothing_empties_only_that_source(repo):
     """How the seed is retired: it must not touch the other source."""
     from backend.models import Asset, AssetType
 
-    repo.replace_source_rows([Asset(id="s1", type=AssetType.LDK, title="S")], "seed")
+    repo.replace_source_rows([Asset(id="s1", type=AssetType.LDK, title="S")],
+                             "seed", allow_shrink=True)
     repo.replace_source_rows([Asset(id="g1", type=AssetType.VDK, title="G")], "sharepoint")
 
-    repo.replace_source_rows([], "seed")
+    repo.replace_source_rows([], "seed", allow_shrink=True)
 
     assert repo.count_source_rows("seed") == 0
     assert repo.count_source_rows("sharepoint") == 1
@@ -428,15 +431,17 @@ def test_an_asset_that_moves_between_sources_is_not_retired_with_the_old_one(rep
     """
     from backend.models import Asset, AssetType
 
+    # allow_shrink: this fixture arrives holding the whole seed catalogue, and
+    # standing in one asset for it is what the test is about.
     repo.replace_source_rows(
         [Asset(id="a1", type=AssetType.LDK, title="A Kit",
-               source_item_id="sites/x/A Kit")], "seed")
+               source_item_id="sites/x/A Kit")], "seed", allow_shrink=True)
     # The same asset, now coming from Graph with a real item id.
     repo.replace_source_rows(
         [Asset(id="a1", type=AssetType.LDK, title="A Kit",
                source_item_id="01GRAPHID")], "sharepoint")
 
-    repo.replace_source_rows([], "seed")        # retire the stand-in
+    repo.replace_source_rows([], "seed", allow_shrink=True)   # retire the stand-in
 
     surviving = [a.id for a in repo.list(AssetQuery(limit=10)).items]
     assert surviving == ["a1"], "the asset is still provided by sharepoint"
@@ -450,7 +455,7 @@ def test_the_stable_slug_survives_the_move(repo):
 
     repo.replace_source_rows(
         [Asset(id="a1", type=AssetType.LDK, title="A Kit", source_item_id="old/path")],
-        "seed")
+        "seed", allow_shrink=True)
     repo.replace_source_rows(
         [Asset(id="a1", type=AssetType.LDK, title="A Kit", source_item_id="01NEWID")],
         "sharepoint")
@@ -682,3 +687,67 @@ def test_both_syncs_emit_the_identical_report_shape():
     assert graph["examined"] == 750, "assets plus those rejected for no Demo Type"
     assert consensus["examined"] == 637
     assert graph["skipped_total"] == 295 and consensus["skipped_total"] == 146
+
+
+# ───────────────────────────── the guard on a partial result mistaken for all
+def test_a_replacement_cannot_quietly_discard_most_of_a_source(repo_factory):
+    """The bug this exists for, reproduced.
+
+    Json-only: the guard lives in JsonAssetRepository, because the SQL backend
+    has not been used since the file-backed one became the default and putting
+    a tripwire in dead code would only make it look maintained.
+
+    A Graph delta sync returns only what changed. `replace_source_rows`
+    replaces the mirror wholesale, which is right when the caller enumerated
+    everything and catastrophic when it did not. On 2026-09-02 a delta handed
+    over its 316 changed items and 455 SharePoint assets became 308 — reported
+    as a successful sync, with nothing in the result mentioning the 147 that
+    had gone.
+
+    The mirror is rebuildable, so this is a tripwire rather than a
+    data-integrity guarantee. But a catalogue that silently loses a third of
+    itself is worse than a sync that refuses to run.
+    """
+    from backend.models import Asset, AssetType
+    from backend.repositories.json_repo import (
+        JsonAssetRepository, WouldShrinkMirror,
+    )
+
+    empty_repo = repo_factory()
+    if not isinstance(empty_repo, JsonAssetRepository):
+        pytest.skip("the shrink guard is a JsonAssetRepository behaviour")
+
+    full = [Asset(id=f"a{n}", type=AssetType.LDK, title=f"Kit {n}")
+            for n in range(20)]
+    empty_repo.replace_source_rows(full, "sharepoint")
+    assert empty_repo.count_source_rows("sharepoint") == 20
+
+    with pytest.raises(WouldShrinkMirror) as caught:
+        empty_repo.replace_source_rows(full[:3], "sharepoint")
+
+    message = str(caught.value)
+    assert "20" in message and "3" in message, "say what would be lost"
+    # And nothing was written.
+    assert empty_repo.count_source_rows("sharepoint") == 20
+
+
+def test_a_source_is_still_allowed_to_shrink_when_the_caller_means_it(empty_repo):
+    """Content really does get deleted, so this is a question, not a ban."""
+    from backend.models import Asset, AssetType
+
+    full = [Asset(id=f"a{n}", type=AssetType.LDK, title=f"Kit {n}")
+            for n in range(20)]
+    empty_repo.replace_source_rows(full, "sharepoint")
+    empty_repo.replace_source_rows(full[:3], "sharepoint", allow_shrink=True)
+    assert empty_repo.count_source_rows("sharepoint") == 3
+
+
+def test_a_modest_shrink_is_not_second_guessed(empty_repo):
+    """A few deletions between syncs is ordinary and must not need a flag."""
+    from backend.models import Asset, AssetType
+
+    full = [Asset(id=f"a{n}", type=AssetType.LDK, title=f"Kit {n}")
+            for n in range(20)]
+    empty_repo.replace_source_rows(full, "sharepoint")
+    empty_repo.replace_source_rows(full[:18], "sharepoint")   # no flag needed
+    assert empty_repo.count_source_rows("sharepoint") == 18

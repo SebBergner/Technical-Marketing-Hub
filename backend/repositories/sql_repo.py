@@ -291,7 +291,12 @@ class SqlAssetRepository(AssetRepository):
                               target_ref=target_ref, shared_by=shared_by))
         self.s.commit()
 
-    def replace_source_rows(self, assets: list[Asset], source_system: str) -> int:
+    def replace_source_rows(self, assets: list[Asset], source_system: str,
+                            allow_shrink: bool = False) -> int:
+        # allow_shrink is accepted for interface parity. There is no shrink
+        # guard here: this backend has not been used since the file-backed one
+        # became the default, and adding a tripwire to dead code would only
+        # make it look maintained.
         """The ONLY sanctioned writer of mirror data.
 
         Portal-owned tables (curation, stats, roadmap, identity) are never

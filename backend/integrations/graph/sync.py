@@ -246,6 +246,15 @@ def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
                     unchanged=True,
                     assets=counter(SOURCE_SYSTEM) if counter else 0,
                     delta_token=page.delta_token or delta_token)
+            # Something changed, so enumerate everything. This is what the
+            # docstring above has always promised and what the code did NOT
+            # do: it kept the delta page and handed those few items to
+            # replace_source_rows, which replaces the mirror wholesale. A
+            # delta returning 316 changed items rewrote the catalogue as 308
+            # assets and silently dropped the other 147.
+            log.info("graph sync: %d change(s) since the last run — "
+                     "re-enumerating", len(page.items))
+            full = True
         except DeltaTokenExpired:
             log.warning("graph delta token expired — full resync")
             full = True
@@ -281,7 +290,9 @@ def _retire_seed(repo) -> int:
         return 0
     existing = getattr(repo, "count_source_rows", None)
     before = existing(SEED_SOURCE) if existing else 0
-    repo.replace_source_rows([], source_system=SEED_SOURCE)
+    # Emptying it is the entire point, so the shrink guard is answered rather
+    # than tripped.
+    repo.replace_source_rows([], source_system=SEED_SOURCE, allow_shrink=True)
     if before:
         log.info("graph sync: retired %d seed rows -- real data supersedes them", before)
     return before

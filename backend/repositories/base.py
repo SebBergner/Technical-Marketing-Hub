@@ -94,7 +94,8 @@ class AssetRepository(ABC):
     def increment_stat(self, asset_id: str, stat: str, amount: int = 1) -> None: ...
 
     @abstractmethod
-    def replace_source_rows(self, assets: list[Asset], source_system: str) -> int:
+    def replace_source_rows(self, assets: list[Asset], source_system: str,
+                            allow_shrink: bool = False) -> int:
         """Wholesale-replace the mirror for one source system.
 
         Resolves or creates the stable identity for each item, so slugs survive

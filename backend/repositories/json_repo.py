@@ -128,6 +128,16 @@ def _dedupe_by_id(tagged: list[tuple[str, dict]]) -> list[dict]:
     return [record for _, record in seen.values()]
 
 
+class WouldShrinkMirror(RuntimeError):
+    """A mirror replacement would discard most of what a source holds.
+
+    Almost always a partial result mistaken for a complete one. The mirror is
+    rebuildable, so the cost is a confusing catalogue rather than lost data —
+    but a catalogue that quietly loses a third of itself is worse than a sync
+    that refuses to run.
+    """
+
+
 class JsonAssetRepository(AssetRepository):
     #: Guards read-modify-write within the process. See the module docstring on
     #: why this is not sufficient across processes.
@@ -428,12 +438,40 @@ class JsonAssetRepository(AssetRepository):
             rows = [json.loads(line) for line in fh if line.strip()]
         return [AssetRequest(**r) for r in rows if not r.get("synced")]
 
-    def replace_source_rows(self, assets: list[Asset], source_system: str) -> int:
+    #: A replacement may not silently discard most of a source.
+    #:
+    #: The mirror is replaced wholesale, which is right when the caller has
+    #: enumerated everything and catastrophic when it has not. A Graph delta
+    #: sync did exactly that on 2026-09-02: it passed the 316 changed items to
+    #: this method, which dutifully rewrote 455 SharePoint assets as 308 and
+    #: reported success. Nothing in the result said 147 assets had gone.
+    #:
+    #: So a shrink past this fraction is refused. It is not a data-integrity
+    #: guarantee — the mirror is rebuildable — it is a tripwire on the one
+    #: mistake that looks like a normal run.
+    _SHRINK_FLOOR = 0.5
+
+    def replace_source_rows(self, assets: list[Asset], source_system: str,
+                            allow_shrink: bool = False) -> int:
         """The ONLY sanctioned writer of mirror data.
 
         Rewrites one source's mirror file and maintains identity. Everything
         under owned/ is left completely alone — that is the whole point.
+
+        Raises `WouldShrinkMirror` when the replacement holds less than half of
+        what is already there, unless `allow_shrink` says the caller means it.
+        A source really can shrink — content gets deleted — so this is a
+        question, not a prohibition.
         """
+        previous = self.count_source_rows(source_system)
+        if (not allow_shrink and previous
+                and len(assets) < previous * self._SHRINK_FLOOR):
+            raise WouldShrinkMirror(
+                f"a sync of {source_system!r} would replace {previous} assets "
+                f"with {len(assets)}, discarding "
+                f"{previous - len(assets)}. That is what a partial page looks "
+                f"like when it is mistaken for a full enumeration. Re-run with "
+                f"allow_shrink=True if the source really did lose them.")
         with self._lock:
             identity = self._load("identity")
             now = utcnow().isoformat(timespec="seconds")

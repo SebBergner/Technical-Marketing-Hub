@@ -468,3 +468,68 @@ def test_an_unchanged_run_still_reports_the_standing_total():
     assert body["unchanged"] is True
     assert body["indexed"] == 455, "a total, read from the index"
     assert body["examined"] == 0, "nothing was examined, and that is honest"
+
+
+def test_a_delta_with_changes_re_enumerates_instead_of_replacing_with_the_page():
+    """The bug, and the only test that would have caught it.
+
+    The docstring on sync_catalogue has always said "any change triggers a full
+    enumeration", because a partial page cannot rebuild folder membership — a
+    file may move between assets and the page would not contain the folders
+    needed to attribute it. The code did not do that. It kept the delta page
+    and handed those few items to replace_source_rows, which replaces the
+    mirror wholesale.
+
+    On the live tenant, 2026-09-02: a delta returned 316 changed items and 455
+    SharePoint assets became 308. Reported as a successful sync.
+
+    So: a delta that finds changes must ask for everything, and the request it
+    makes must carry no token.
+    """
+    calls = []
+
+    def handler(request):
+        path = request.url.path
+        if ":/sites/" in path:
+            return httpx.Response(200, json={"id": SITE_ID, "webUrl": SITE_URL})
+        if path.endswith("/drives"):
+            return httpx.Response(200, json={
+                "value": [{"id": DRIVE_ID, "name": "Demo Catalog"}]})
+        if "delta" in path:
+            calls.append(str(request.url))
+            if len(calls) == 1:
+                # The delta: two items changed, and nothing else.
+                return httpx.Response(200, json={
+                    "value": [folder("Changed Kit")],
+                    "@odata.deltaLink": "https://x/delta?token=fresh"})
+            # The re-enumeration: everything.
+            return httpx.Response(200, json={
+                "value": [folder("Changed Kit"), folder("Untouched Kit"),
+                          folder("Also Untouched")],
+                "@odata.deltaLink": "https://x/delta?token=fresh"})
+        return httpx.Response(200, json={"value": []})
+
+    class Repo:
+        written = None
+        def replace_source_rows(self, assets, source_system, allow_shrink=False):
+            if source_system == "seed":
+                return 0
+            self.written = [a.title for a in assets]
+            return len(assets)
+        def record_sync(self, source, fingerprint=None): pass
+        def count_source_rows(self, source): return 0
+
+    repo = Repo()
+    result = sync_catalogue(client_for(handler), repo, drive_name="Demo Catalog",
+                            delta_token="previous")
+
+    assert len(calls) == 2, "a delta that found changes must ask again for everything"
+    assert "token=previous" in calls[0], "the first call is the delta"
+    assert "token" not in calls[1], "the second must be unconditional"
+    assert result.full_resync is True
+
+    assert repo.written is not None
+    assert len(repo.written) == 3, \
+        f"the mirror was written from the delta page, not the full library: {repo.written}"
+    assert "Untouched Kit" in repo.written, \
+        "an asset that did not change must survive the sync"

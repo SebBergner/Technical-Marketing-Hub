@@ -2318,6 +2318,18 @@ hubApplyFilters();
     color: #c2410c; }
   .attach-size { color: var(--orion-text-3); font-variant-numeric: tabular-nums; }
 
+  /* "Load more" under the results grid. A brand-new class Elio's file has no
+     opinion on, so no ordering trap here the way the colour tokens had --
+     nothing in the document sets .hub-load-more before this, and the button
+     is only ever created by hub-api.js, after this stylesheet has already
+     been parsed. */
+  .hub-load-more { display: flex; justify-content: center; padding: 20px 0 4px; }
+  .hub-load-more__btn { padding: 9px 24px; border-radius: var(--orion-radius-sm);
+    border: 1px solid var(--orion-border-md); background: var(--orion-surface);
+    color: var(--orion-text); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .hub-load-more__btn:hover { background: var(--orion-surface-2); }
+  .hub-load-more__btn:disabled { opacity: .6; cursor: default; }
+
 </style>
 <div id="hubApiStatus" class="hub-api-status"></div>
 <script src="/static/hub-api.js" defer></script>

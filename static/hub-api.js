@@ -639,7 +639,11 @@
                   "hubFilterSegment", "hubFilterStage", "hubFilterCf"];
   var LANDING = ["continueSection", "latestUploadsSection", "mostViewedSection",
                  "browseByProductSection", "editorsPicksSection"];
-  var RESULT_LIMIT = 200;        // the API's own ceiling, and plenty to scroll
+  //: One request's ceiling, enforced server-side (`le=200` in assets.py) --
+  //: not a UI choice, so raising it here would just get clamped back. A
+  //: filter or a search that matches more than this needs a second request,
+  //: which is what `loadMoreState` below is for.
+  var RESULT_LIMIT = 200;
   var inFlight = 0;
   var baselineFacets = null;     // whole-catalogue counts, for when all clear
   /* An explicit sort, when something other than the default is wanted -- the
@@ -651,6 +655,18 @@
    * there is no umbrella control in the filter bar -- Browse by Product is the
    * only way in, and the reset button is the way out. */
   var umbrellaFilter = null;
+
+  /* What "Load more" repeats. Liwei asked about this one filtering Creo down
+   * to "showing 200 of 422" with no way to reach the other 222 -- the grid
+   * fetched exactly one page and stopped, silently, with nothing on screen
+   * saying more existed.
+   *
+   * `baseParams` is the filter/search query alone, WITHOUT limit or offset, so
+   * every subsequent page asks the same question with a moving offset. Reset
+   * to null whenever applyFilters() runs for a new filter, search or nav
+   * click, so a stale click on an old button can never append the wrong
+   * asset's next page onto a grid that has since changed underneath it. */
+  var loadMoreState = null;
 
   function val(id) {
     var el = document.getElementById(id);
@@ -734,6 +750,8 @@
         rescoreSelect("hubFilterStage", baselineFacets.funnel_stages);
         fillSidebarCounts(baselineFacets);
       }
+      loadMoreState = null;
+      hideLoadMoreBar();
       return;
     }
     if (all) all.style.display = "";
@@ -777,11 +795,17 @@
     }
 
     var count = document.getElementById("allAssetsCount");
-    if (count) {
-      count.textContent = page.total > page.items.length
-        ? "(showing " + page.items.length + " of " + page.total + ")"
-        : "(" + page.total + ")";
-    }
+    if (count) count.textContent = formatAssetCount(page.items.length, page.total);
+
+    // The next page repeats this exact question with a moving offset, so what
+    // is saved is the query BEFORE limit/sort were added to it, not
+    // assetParams itself. sort lives separately because "" is a real value
+    // here (recency, the default) and URLSearchParams.get() cannot tell an
+    // absent key from an empty one.
+    loadMoreState = page.total > page.items.length
+      ? { baseParams: params, sort: sort || "", offset: page.items.length, total: page.total }
+      : null;
+    updateLoadMoreBar();
 
     // Scoped counts: this is what makes the panel honest once anything is on.
     rescoreSelect("hubFilterType", facets.types);
@@ -795,6 +819,100 @@
 
     var none = document.querySelector(".hub-noresults");
     if (none) none.classList.toggle("show", page.total === 0);
+  }
+
+  function formatAssetCount(shown, total) {
+    return shown < total ? "(showing " + shown + " of " + total + ")" : "(" + total + ")";
+  }
+
+  /* Injected rather than added to Elio's markup: this control exists nowhere
+   * in his file, so it goes in ours rather than turning a merge with his next
+   * revision into a place to remember what to keep. Created once and reused,
+   * the same shape as renderFileList()'s box. */
+  function ensureLoadMoreBar() {
+    var bar = document.getElementById("hubLoadMoreBar");
+    if (bar) return bar;
+    var grid = document.getElementById("allAssetsGrid");
+    if (!grid) return null;
+    bar = document.createElement("div");
+    bar.className = "hub-load-more";
+    bar.id = "hubLoadMoreBar";
+    bar.style.display = "none";
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "hubLoadMoreBtn";
+    btn.className = "hub-load-more__btn";
+    btn.textContent = "Load more";
+    btn.addEventListener("click", loadMoreAssets);
+    bar.appendChild(btn);
+    grid.parentNode.insertBefore(bar, grid.nextSibling);
+    return bar;
+  }
+
+  function hideLoadMoreBar() {
+    var bar = document.getElementById("hubLoadMoreBar");
+    if (bar) bar.style.display = "none";
+  }
+
+  function updateLoadMoreBar() {
+    var bar = ensureLoadMoreBar();
+    if (!bar) return;
+    if (!loadMoreState) { bar.style.display = "none"; return; }
+    bar.style.display = "flex";
+    var btn = document.getElementById("hubLoadMoreBtn");
+    if (btn) {
+      btn.disabled = false;
+      var remaining = loadMoreState.total - loadMoreState.offset;
+      btn.textContent = "Load " + Math.min(remaining, RESULT_LIMIT) + " more";
+    }
+  }
+
+  /* Appends the next page onto the grid already on screen -- it does not
+   * re-render, so scroll position and everything already loaded survive.
+   *
+   * `ticket` is read, not incremented: applyFilters() owns `inFlight` and
+   * bumps it the moment a filter, search box or nav click changes, which is
+   * synchronous and happens before this function's await ever resolves. So a
+   * filter changed mid-fetch is caught the same way an overlapping
+   * applyFilters() call already was, with no separate flag to keep in sync. */
+  async function loadMoreAssets() {
+    if (!loadMoreState) return;
+    var ticket = inFlight;
+    var btn = document.getElementById("hubLoadMoreBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Loading…"; }
+
+    var params = new URLSearchParams(loadMoreState.baseParams);
+    params.set("limit", RESULT_LIMIT);
+    params.set("offset", loadMoreState.offset);
+    if (loadMoreState.sort) params.set("sort", loadMoreState.sort);
+
+    var page;
+    try {
+      page = await getJSON("/api/assets?" + params);
+    } catch (err) {
+      console.error("[hub-api] load more failed", err);
+      report("Could not load more - " + err.message, true);
+      if (btn) { btn.disabled = false; btn.textContent = "Load more"; }
+      return;
+    }
+    if (ticket !== inFlight || !loadMoreState) return;   // the filter moved on
+
+    var grid = document.getElementById("allAssetsGrid");
+    page.items.forEach(function (a) { grid.appendChild(buildCard(a)); });
+
+    loadMoreState.offset += page.items.length;
+    loadMoreState.total = page.total;
+    if (!page.items.length || loadMoreState.offset >= loadMoreState.total) {
+      loadMoreState = null;
+    }
+
+    var count = document.getElementById("allAssetsCount");
+    if (count) {
+      count.textContent = loadMoreState
+        ? formatAssetCount(loadMoreState.offset, loadMoreState.total)
+        : "(" + page.total + ")";
+    }
+    updateLoadMoreBar();
   }
 
   function debounce(fn, ms) {

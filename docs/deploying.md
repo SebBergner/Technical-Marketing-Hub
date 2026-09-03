@@ -1,5 +1,11 @@
 # Deploying to Azure App Service
 
+> **See also `docs/HANDOVER-DEPLOYMENT.md`** (written 2026-09-03). This file is
+> the *reference* for each Azure setting and why it exists. That one is the
+> *current state and running order*: what is live today, the PR to merge, the
+> sequence to follow, and the verification steps. Read that one to deploy;
+> read this one to understand a setting.
+
 Merging to `main` triggers `.github/workflows/main_technical-marketing-hub.yml`,
 which builds and deploys immediately. Two things must be true **before** that
 merge, and a third is worth doing the same day.
@@ -127,7 +133,7 @@ a pointer rather than the secret itself, and rotation stops being a redeploy.
 | `CONSENSUS_API_SECRET` | **secret** |
 | `CONSENSUS_USER_EMAIL` | the fallback acting account. A DemoBoard is created as the **signed-in user**; this is only used when there is no identity, i.e. locally |
 | `CONSENSUS_SOURCE_NAME` | `TDD Portal` |
-| `CONSENSUS_VIEWER_URL_TEMPLATE` | `https://play.goconsensus.com/{hash}?preview=sales` — the query string is load-bearing; without it the viewer opens with nothing to play |
+| `CONSENSUS_VIEWER_URL_TEMPLATE` | `https://play.goconsensus.com/{hash}?preview=marketing` — the query string is load-bearing; without it the viewer opens with nothing to play. It was `preview=sales` until 2026-09-02, when Elio asked for the marketing view instead: the sales preview shows "Viewer 1"-style usernames and lets a customer be handed a raw preview link, which loses usage tracking |
 
 ### Only needed to re-sync Consensus
 

@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TDD Portal — data inspector (dev)</title>
+<style>
+  /* Deliberately plain. This is a developer tool, not the product UI —
+     index.html is where the real design lives. Nothing here should ever be
+     mistaken for a design proposal. */
+  :root {
+    --ink:#1f2329; --muted:#6b727a; --faint:#9aa0a8; --line:#dcdfe3;
+    --bg:#ffffff; --panel:#f6f7f9; --accent:#2f6b1f; --warn:#9a6a16; --bad:#c0392b;
+    /* One colour per platform. A demo kit to run and a recording to send are
+       different things, so a reader must never have to guess which they got. */
+    --sharepoint:#1a5fa8; --sharepoint-bg:#e8f0f9;
+    --consensus:#c25a10;  --consensus-bg:#fbeee3;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:13px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
+         color:var(--ink); background:var(--bg); }
+  header { background:#2b2f33; color:#fff; padding:10px 16px; display:flex;
+           gap:16px; align-items:baseline; flex-wrap:wrap; }
+  header b { font-size:14px; }
+  header .note { color:#9aa6ae; font-size:11px; }
+  header .pill { background:#3a4045; border-radius:10px; padding:2px 8px; font-size:11px; }
+  main { padding:16px; display:grid; grid-template-columns:minmax(0,1fr) 420px;
+         gap:16px; align-items:start; }
+  @media (max-width:1100px){ main { grid-template-columns:minmax(0,1fr); } }
+
+  fieldset { border:1px solid var(--line); border-radius:6px; padding:10px 12px;
+             margin:0 0 12px; }
+  legend { color:var(--muted); font-size:11px; text-transform:uppercase;
+           letter-spacing:.08em; padding:0 4px; }
+  label { color:var(--muted); font-size:11px; display:block; margin-bottom:2px; }
+  input, select { font:inherit; padding:4px 6px; border:1px solid var(--line);
+                  border-radius:4px; background:#fff; width:100%; }
+  .controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+              gap:8px; }
+  button { font:inherit; padding:4px 10px; border:1px solid var(--line);
+           border-radius:4px; background:#fff; cursor:pointer; }
+  button:hover { background:var(--panel); }
+
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th { text-align:left; color:var(--muted); font-weight:600; border-bottom:1px solid var(--line);
+       padding:6px 8px; position:sticky; top:0; background:#fff; cursor:pointer;
+       white-space:nowrap; }
+  td { padding:5px 8px; border-bottom:1px solid #eef0f2; vertical-align:top; }
+  tbody tr:hover { background:var(--panel); }
+  tbody tr.sel { background:#e6f4df; }
+  .tblwrap { max-height:62vh; overflow:auto; border:1px solid var(--line); border-radius:6px; }
+
+  .tag { display:inline-block; padding:0 5px; border-radius:3px; background:var(--panel);
+         color:var(--muted); font-size:11px; }
+  .yes { color:var(--accent); font-weight:700; }
+  .no  { color:var(--faint); }
+  .warn { color:var(--warn); }
+  .bad { color:var(--bad); }
+  .muted { color:var(--muted); }
+  pre { background:var(--panel); border:1px solid var(--line); border-radius:6px;
+        padding:10px; overflow:auto; max-height:340px; font-size:11.5px;
+        white-space:pre-wrap; word-break:break-word; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .kv { display:grid; grid-template-columns:130px minmax(0,1fr); gap:2px 10px; font-size:12px; }
+  .kv div:nth-child(odd){ color:var(--muted); }
+  .count { color:var(--muted); font-size:11px; }
+  .cap { border:1px solid var(--line); border-radius:5px; padding:6px 8px; margin-top:6px; }
+</style>
+</head>
+<body>
+<header>
+  <b>TDD Portal — data inspector</b>
+  <span class="note">Developer tool. Not the product UI — that is index.html, owned by Elio.</span>
+  <span class="pill" id="hBackend">storage: …</span>
+  <span class="pill" id="hConsensus">consensus: …</span>
+  <span class="pill" id="hTotal">assets: …</span>
+</header>
+
+<main>
+  <section>
+    <fieldset>
+      <legend>Filters</legend>
+      <div class="controls">
+        <div><label>search</label><input id="fq" placeholder="title or description"></div>
+        <div><label>type</label><select id="fType"></select></div>
+        <div><label>product</label><select id="fProduct"></select></div>
+        <div><label>funnel stage</label><select id="fStage"></select></div>
+        <div><label>segment</label><select id="fSegment"></select></div>
+        <div><label>source</label><select id="fSource"></select></div>
+        <div><label>product family</label><select id="fFamily"></select></div>
+        <div><label>language</label><select id="fLang"></select></div>
+        <div><label>consensus uuid</label>
+          <select id="fUuid"><option value="">any</option>
+            <option value="true">has one</option>
+            <option value="false">missing — cannot share</option></select></div>
+        <div><label>sort</label>
+          <select id="fSort"><option value="recent">recent</option>
+            <option value="most_viewed">most viewed</option>
+            <option value="title">title</option></select></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="bReset">reset</button>
+        <button id="bPicks">editor's picks only</button>
+        <span class="count" id="resultCount"></span>
+      </div>
+    </fieldset>
+
+    <div class="tblwrap">
+      <table>
+        <thead><tr>
+          <th data-k="type">type</th><th data-k="title">title</th>
+          <th data-k="products">product</th><th data-k="funnel_stage">stage</th>
+          <th data-k="language">lang</th><th data-k="duration_seconds">dur</th>
+          <th title="Consensus UUID — required to share externally">CX</th>
+          <th title="Value Roadmap indexed">VR</th>
+          <th title="Thumbnail">TH</th>
+          <th data-k="views">views</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <aside>
+    <fieldset>
+      <legend>Selected asset</legend>
+      <div id="detail" class="muted">Click a row.</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Facets</legend>
+      <div id="facets" class="muted">…</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Sources</legend>
+      <div id="sources" class="muted">…</div>
+      <div class="row" style="margin-top:8px">
+        <button id="bSyncGraph">sync SharePoint</button>
+        <button id="bSyncConsensus">sync Consensus</button>
+        <label style="display:flex;gap:4px;align-items:center;margin:0">
+          <input type="checkbox" id="fFull" style="width:auto">
+          <span>full re-read</span></label>
+      </div>
+      <div id="syncOut" style="margin-top:8px" class="muted">
+        Nothing refreshes the mirror on its own yet &mdash; the catalogue is a
+        snapshot from the last sync, and searching never calls either API.
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Metadata proposals</legend>
+      <div class="row">
+        <button id="bPropose">generate proposals</button>
+        <button id="bLoadProps">refresh</button>
+        <span class="count" id="propSummary"></span>
+      </div>
+      <div id="proposals" style="margin-top:8px" class="muted">
+        Nothing generated yet. Proposals are suggestions only &mdash; accepting one
+        queues it for SharePoint, it does not change the asset.
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Write-back to SharePoint</legend>
+      <div class="row">
+        <button id="bDryRun">dry run</button>
+        <button id="bWrite">write for real</button>
+        <span class="count" id="wbBacklog"></span>
+      </div>
+      <div id="writeback" style="margin-top:8px" class="muted">
+        Pushes <b>accepted</b> proposals into the SharePoint column. Dry run first
+        &mdash; it reports exactly what would change without writing. An item whose
+        column already holds a different value is reported as a conflict and left
+        alone; it is never overwritten.
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Consensus</legend>
+      <div class="row">
+        <button id="bReconcile">run reconciliation</button>
+        <button id="bRails">rails</button>
+      </div>
+      <div id="consensus" style="margin-top:8px"></div>
+    </fieldset>
+  </aside>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const dur = s => s == null ? "—" : `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+const flag = (ok, good="Y", bad="—") =>
+  ok ? `<span class="yes">${good}</span>` : `<span class="no">${bad}</span>`;
+
+async function api(path) {
+  const r = await fetch(path);
+  if (!r.ok) throw new Error(`${r.status} ${path}`);
+  return r.json();
+}
+
+let assets = [];
+
+function query() {
+  const p = new URLSearchParams();
+  const add = (k, el) => { const v = $(el).value; if (v) p.append(k, v); };
+  add("q", "#fq"); add("type", "#fType"); add("product", "#fProduct");
+  add("stage", "#fStage"); add("segment", "#fSegment"); add("language", "#fLang");
+  add("source", "#fSource"); add("family", "#fFamily");
+  const u = $("#fUuid").value;
+  if (u) p.append("has_consensus_uuid", u);
+  p.append("sort", $("#fSort").value);
+  if (picksOnly) p.append("editor_picks", "true");
+  p.append("limit", "200");
+  return p.toString();
+}
+
+let picksOnly = false;
+
+const SOURCE_STYLE = {
+  sharepoint: ["SP", "var(--sharepoint)", "var(--sharepoint-bg)"],
+  consensus:  ["CS", "var(--consensus)",  "var(--consensus-bg)"],
+};
+function sourceBadge(source) {
+  const [label, fg, bg] = SOURCE_STYLE[source] || ["?", "var(--muted)", "var(--panel)"];
+  return `<span class="tag" title="${esc(source || "unknown")}" style="color:${fg};`
+       + `background:${bg};border-color:${fg};margin-right:4px">${label}</span>`;
+}
+
+async function load() {
+  const data = await api("/api/assets?" + query());
+  assets = data.items;
+  $("#resultCount").textContent = `${data.total} of ${data.total} shown (limit 200)`;
+  $("#rows").innerHTML = assets.map((a, i) => `
+    <tr data-i="${i}">
+      <td>${sourceBadge(a.source)}<span class="tag">${esc(a.type)}</span></td>
+      <td>${a.web_url
+             ? `<a href="${esc(a.web_url)}" target="_blank" rel="noopener">${esc(a.title)}</a>`
+             : esc(a.title)}</td>
+      <td>${esc((a.products || []).join(", ")) || "<span class=no>—</span>"}</td>
+      <td>${esc(a.funnel_stage) || "<span class=no>—</span>"}</td>
+      <td>${esc(a.language)}</td>
+      <td>${dur(a.duration_seconds)}</td>
+      <td>${flag(a.consensus_uuid)}</td>
+      <td>${flag(a.has_roadmap)}</td>
+      <td>${flag(a.thumbnail_url)}</td>
+      <td>${a.stats.views}</td>
+    </tr>`).join("");
+
+  document.querySelectorAll("#rows tr").forEach(tr =>
+    tr.onclick = () => select(Number(tr.dataset.i), tr));
+}
+
+async function select(i, tr) {
+  document.querySelectorAll("#rows tr").forEach(r => r.classList.remove("sel"));
+  tr.classList.add("sel");
+  const full = await api(`/api/assets/${assets[i].id}`);
+
+  const roadmap = full.value_roadmap
+    ? `<div style="margin-top:8px"><b>Value Roadmap</b>
+         <div class="muted">${esc(full.value_roadmap.description || "")}</div>
+         <div style="margin-top:4px">${(full.value_roadmap.value_drivers || [])
+           .map(d => `<span class="tag">${esc(d)}</span>`).join(" ")}</div>
+         ${(full.value_roadmap.capabilities || []).map(c => `
+           <div class="cap"><b>${esc(c.phase)}</b> — ${esc(c.title)}<br>
+             <span class="muted">${(c.chips || []).map(esc).join(" · ")}</span></div>`).join("")}
+       </div>`
+    : `<div style="margin-top:8px" class="warn">No Value Roadmap — not indexed yet.
+         Deliberately null rather than fabricated.</div>`;
+
+  const shareable = full.consensus_uuid && full.customer_facing;
+  $("#detail").innerHTML = `
+    <div class="kv">
+      <div>id</div><div>${esc(full.id)}</div>
+      <div>title</div><div>${esc(full.title)}</div>
+      <div>type</div><div>${esc(full.type)}</div>
+      <div>products</div><div>${esc((full.products || []).join(", ")) || "—"}</div>
+      <div>stage / depth</div><div>${esc(full.funnel_stage || "—")} / ${esc(full.content_depth || "—")}</div>
+      <div>segment</div><div>${esc(full.segment || "—")}</div>
+      <div>industry</div><div>${esc(full.industry || "—")}</div>
+      <div>language</div><div>${esc(full.language)}</div>
+      <div>uploaded</div><div>${esc(full.uploaded_at || "—")}</div>
+      <div>duration</div><div>${dur(full.duration_seconds)}</div>
+      <div>narrated audio</div><div>${full.has_narrated_audio === null ? "unknown" : full.has_narrated_audio}</div>
+      <div>customer facing</div><div>${full.customer_facing}</div>
+      <div>consensus uuid</div><div>${esc(full.consensus_uuid || "—")}</div>
+      <div>brightcove id</div><div>${esc(full.brightcove_id || "—")}</div>
+      <div>rails</div><div>${esc((full.rails || []).join(", ")) || "—"}</div>
+      <div>editor pick</div><div>${full.is_editor_pick}</div>
+      <div>stats</div><div>${full.stats.views} views · ${full.stats.shares} shares</div>
+    </div>
+    <div style="margin-top:8px">${shareable
+      ? '<span class="yes">Can be shared externally via Consensus.</span>'
+      : '<span class="bad">Cannot be shared externally — no Consensus UUID, or internal-only.</span>'}</div>
+    ${roadmap}
+    <details style="margin-top:8px"><summary class="muted">raw JSON</summary>
+      <pre>${esc(JSON.stringify(full, null, 2))}</pre></details>`;
+}
+
+function fillSelect(el, values, label) {
+  $(el).innerHTML = `<option value="">all ${label}</option>` +
+    values.map(v => `<option value="${esc(v.value)}">${esc(v.value)} (${v.count})</option>`).join("");
+}
+
+async function boot() {
+  const [facets, backend, cx] = await Promise.all([
+    api("/api/taxonomy"), api("/api/debug/backend"), api("/api/consensus/status"),
+  ]);
+
+  $("#hBackend").textContent = `storage: ${backend.storage_backend}`;
+  $("#hConsensus").textContent = `consensus: ${cx.mode}`;
+  $("#hTotal").textContent = `assets: ${facets.total}`;
+
+  fillSelect("#fType", facets.types, "types");
+  fillSelect("#fProduct", facets.products, "products");
+  fillSelect("#fStage", facets.funnel_stages, "stages");
+  fillSelect("#fSegment", facets.segments, "segments");
+  fillSelect("#fSource", facets.sources, "sources");
+  fillSelect("#fFamily", facets.product_families, "families");
+  fillSelect("#fLang", facets.languages, "languages");
+
+  // Default to English. Without it, a search like "codebeamer" returns the six
+  // language variants of one PTC NEXT recording as the top six hits and buries
+  // everything else. The API deliberately does NOT apply this itself -- a
+  // filter that hides 105 items without being asked is not an honest default,
+  // it is just an invisible one. Clients choose; the API stays literal.
+  if (facets.languages.some(l => l.value === "en")) $("#fLang").value = "en";
+
+  $("#facets").innerHTML = ["sources","types","product_families","products","funnel_stages",
+                            "segments","industries","value_drivers","languages","content_depths"]
+    .map(k => `<div style="margin-bottom:4px"><span class="muted">${k}</span><br>` +
+      (facets[k].length
+        ? facets[k].map(f => `<span class="tag">${esc(f.value)} ${f.count}</span>`).join(" ")
+        : '<span class="no">none</span>') + "</div>").join("");
+
+  ["#fq","#fType","#fProduct","#fStage","#fSegment","#fSource","#fFamily","#fLang",
+   "#fUuid","#fSort"]
+    .forEach(s => $(s).addEventListener($(s).tagName === "INPUT" ? "input" : "change", load));
+
+  $("#bReset").onclick = () => {
+    ["#fq","#fType","#fProduct","#fStage","#fSegment","#fSource","#fFamily","#fUuid"]
+      .forEach(s => $(s).value = "");
+    // Reset restores the English default rather than clearing it -- the reason
+    // it exists does not go away when you press reset.
+    $("#fLang").value = "en";
+    $("#fSort").value = "recent"; picksOnly = false; load();
+  };
+  $("#bPicks").onclick = () => { picksOnly = !picksOnly; load(); };
+  $("#bRails").onclick = async () => {
+    const rails = await api("/api/taxonomy/rails");
+    $("#consensus").innerHTML = `<pre>${esc(JSON.stringify(rails, null, 2))}</pre>`;
+  };
+  $("#bReconcile").onclick = async () => {
+    $("#consensus").innerHTML = '<span class="muted">running…</span>';
+    try {
+      const r = await api("/api/consensus/reconcile");
+      $("#consensus").innerHTML =
+        `<div class="kv">${Object.entries(r.summary)
+          .map(([k, v]) => `<div>${k}</div><div>${v}</div>`).join("")}</div>
+         ${r.proposals.length ? `<div style="margin-top:8px"><b>proposals</b>${r.proposals
+           .map(p => `<div class="cap">${p.confidence} — ${esc(p.asset_title)}<br>
+             <span class="muted">→ ${esc(p.demo_title)}</span></div>`).join("")}</div>` : ""}
+         ${r.conflicts.length ? `<div style="margin-top:8px"><b class="bad">conflicts</b>${r.conflicts
+           .map(p => `<div class="cap">${esc(p.asset_title)}<br>
+             <span class="muted">→ ${esc(p.demo_title)}</span></div>`).join("")}</div>` : ""}`;
+    } catch (e) {
+      $("#consensus").innerHTML = `<span class="bad">${esc(e.message)}</span>`;
+    }
+  };
+
+  $("#bPropose").onclick = async () => {
+    $("#proposals").innerHTML = '<span class="muted">matching against Consensus…</span>';
+    try {
+      const r = await fetch("/api/curation/propose", { method: "POST" });
+      if (!r.ok) throw new Error(`${r.status}`);
+      await loadProposals();
+    } catch (e) {
+      $("#proposals").innerHTML = `<span class="bad">${esc(e.message)}</span>`;
+    }
+  };
+  $("#bLoadProps").onclick = loadProposals;
+  await loadProposals();
+
+  await loadSources();
+  $("#bSyncGraph").onclick = () => runSync("graph", "SharePoint");
+  $("#bSyncConsensus").onclick = () => runSync("consensus", "Consensus");
+
+  $("#bDryRun").onclick = () => runWriteback(true);
+  $("#bWrite").onclick = () => {
+    // The one irreversible action on this page. SharePoint has no undo for it,
+    // so it does not happen on a single stray click.
+    if (confirm("This writes to the real SharePoint library. Run the dry run "
+                + "first and read it.\n\nProceed?")) runWriteback(false);
+  };
+  await loadBacklog();
+
+  await load();
+}
+
+function ago(stamp) {
+  if (!stamp) return '<span class="bad">never synced</span>';
+  const mins = Math.round((Date.now() - new Date(stamp + "Z")) / 60000);
+  const text = mins < 1 ? "just now"
+             : mins < 60 ? `${mins}m ago`
+             : mins < 1440 ? `${Math.round(mins / 60)}h ago`
+             : `${Math.round(mins / 1440)}d ago`;
+  // Staleness is the failure mode here, so it is called out rather than shown
+  // as a neutral timestamp.
+  return mins > 1440 ? `<span class="warn">${text}</span>` : text;
+}
+
+async function loadSources() {
+  const [g, c] = await Promise.all([
+    api("/api/graph/status"), api("/api/consensus/status"),
+  ]);
+  const line = (name, colour, st, extra) => `
+    <div class="row" style="justify-content:space-between;margin-bottom:3px">
+      <span><span class="tag" style="color:${colour};border:1px solid ${colour}">${name}</span>
+        ${st.indexed ?? 0} indexed</span>
+      <span class="muted">${st.configured ? ago(st.last_sync) : `<span class="bad">${extra}</span>`}</span>
+    </div>`;
+  $("#sources").innerHTML =
+      line("SharePoint", "var(--sharepoint)", g, "no credentials")
+    + line("Consensus", "var(--consensus)", c, "stub mode");
+}
+
+async function runSync(which, label) {
+  $("#syncOut").innerHTML = `<span class="muted">syncing ${esc(label)}… `
+                          + `this calls the live API and may take a while</span>`;
+  const full = $("#fFull").checked ? "?full=true" : "";
+  const r = await fetch(`/api/${which}/sync${full}`, { method: "POST" });
+  const body = await r.json();
+  if (!r.ok) {
+    $("#syncOut").innerHTML = `<span class="bad">${esc(body.detail || r.status)}</span>`;
+    return;
+  }
+  const skipped = Object.entries(body.skipped || {})
+    .filter(([, n]) => n)
+    .map(([why, n]) => `${n} ${esc(why.replace(/_/g, " "))}`).join(", ");
+  const details = Object.entries(body.details || {})
+    .filter(([, v]) => v !== null && v !== "" && !(Array.isArray(v) && !v.length))
+    .map(([k, v]) => `<span class="tag">${esc(k.replace(/_/g, " "))} ${esc(String(v))}</span>`)
+    .join(" ");
+
+  // "indexed" is a TOTAL, not a delta -- that ambiguity is what made the old
+  // report unreadable -- so the wording says so outright.
+  $("#syncOut").innerHTML = `
+    <div class="row" style="justify-content:space-between">
+      <b>${esc(label)}</b>
+      ${body.unchanged
+        ? '<span class="yes">nothing changed</span>'
+        : '<span class="warn">updated</span>'}
+    </div>
+    <div style="margin-top:4px"><b>${body.indexed}</b> now in the index
+      <span class="muted">&mdash; a total, not a change count</span></div>
+    <div class="muted" style="font-size:11px;margin-top:2px">
+      looked at ${body.examined} upstream${skipped ? `, skipped ${skipped}` : ""}</div>
+    <div class="cap" style="margin-top:6px">${details}</div>`;
+  await Promise.all([loadSources(), load(), loadBacklog()]);
+}
+
+async function loadBacklog() {
+  try {
+    const b = await api("/api/graph/writeback/backlog");
+    $("#wbBacklog").textContent =
+      `${b.writable_now} ready · ${b.blocked_until_synced} waiting on a sync`;
+  } catch (e) { $("#wbBacklog").textContent = ""; }
+}
+
+const WB_CLASS = { written: "yes", would_write: "yes", already_correct: "muted",
+                   conflict: "bad", failed: "bad", missing: "bad", not_synced: "muted" };
+
+async function runWriteback(dry) {
+  $("#writeback").innerHTML = `<span class="muted">${dry ? "checking" : "writing"}…</span>`;
+  const r = await fetch(`/api/graph/writeback?dry_run=${dry}`, { method: "POST" });
+  const body = await r.json();
+
+  if (!r.ok) {
+    // 503 not configured, 409 setup problem, 403 not a curator — all of these
+    // carry an instruction, so show it rather than just the status code.
+    $("#writeback").innerHTML = `<span class="bad">${esc(body.detail || r.status)}</span>`;
+    return;
+  }
+
+  const counts = Object.entries(body.counts || {})
+    .map(([k, v]) => `${v} ${k.replace(/_/g, " ")}`).join(" · ") || "nothing to do";
+  $("#writeback").innerHTML =
+    `<div class="row"><b>${dry ? "Dry run" : "Written"}</b>
+       <span class="tag">${esc(counts)}</span></div>`
+    + (body.items || []).map(i => `<div class="cap" style="margin-top:6px">
+        <div class="row" style="justify-content:space-between">
+          <b>${esc(i.asset_title || i.asset_id)}</b>
+          <span class="${WB_CLASS[i.outcome] || "muted"}">${esc(i.outcome)}</span></div>
+        <div class="muted" style="font-size:11px;margin-top:3px">${esc(i.detail || "")}</div>
+      </div>`).join("");
+
+  await Promise.all([loadProposals(), loadBacklog()]);
+}
+
+async function loadProposals() {
+  const [summary, page] = await Promise.all([
+    api("/api/curation/summary"),
+    api("/api/curation/proposals?limit=40"),
+  ]);
+  $("#propSummary").textContent =
+    `${summary.total} total · ${summary.pending_writeback} awaiting write-back to SharePoint`;
+
+  if (!page.total) {
+    $("#proposals").innerHTML = '<span class="muted">No proposals. Click generate.</span>';
+    return;
+  }
+
+  $("#proposals").innerHTML = page.items.map(p => {
+    const warn = /SHARED UUID|CONFLICT|AMBIGUOUS/.test(p.evidence || "");
+    const decided = p.state !== "pending";
+    return `<div class="cap">
+      <div class="row" style="justify-content:space-between">
+        <b>${esc(p.asset_title || p.asset_id)}</b>
+        <span class="tag">${(p.confidence ?? 0).toFixed(2)}</span>
+      </div>
+      <div class="muted" style="font-size:11px">${esc(p.field)} &rarr;
+        <span style="color:var(--ink)">${esc(p.proposed_value || "—")}</span></div>
+      <div class="${warn ? "bad" : "muted"}" style="font-size:11px;margin-top:3px">
+        ${esc(p.evidence || "")}</div>
+      <div class="row" style="margin-top:6px">
+        ${decided
+          ? `<span class="${p.state === "accepted" ? "yes" : "no"}">${esc(p.state)}${
+              p.decided_by ? " by " + esc(p.decided_by) : ""}</span>`
+          : `<button data-a="${esc(p.asset_id)}" data-f="${esc(p.field)}" data-d="accept">accept</button>
+             <button data-a="${esc(p.asset_id)}" data-f="${esc(p.field)}" data-d="reject">reject</button>`}
+      </div></div>`;
+  }).join("");
+
+  document.querySelectorAll("#proposals button[data-d]").forEach(b => {
+    b.onclick = async () => {
+      await fetch(`/api/curation/proposals/${encodeURIComponent(b.dataset.a)}/`
+                  + `${encodeURIComponent(b.dataset.f)}/${b.dataset.d}`, { method: "POST" });
+      await loadProposals();
+    };
+  });
+}
+
+boot().catch(e => document.body.insertAdjacentHTML("afterbegin",
+  `<pre class="bad">boot failed: ${esc(e.message)}</pre>`));
+</script>
+</body>
+</html>

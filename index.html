@@ -1,4 +1,30 @@
 <title>Technical Marketing Hub</title>
+<!-- ============================================================
+     Hoisted deliberately, and it has to stay here.
+
+     This file has no <head>: the markup begins immediately and the main style
+     block sits 2.5 MB further down, AFTER the sidebar and the card rails it
+     would hide. The browser parses those, paints them, and only then reaches
+     the rule — which is precisely the flash of Elio's placeholder data Liwei
+     kept seeing. A rule has to precede what it hides.
+
+     What is hidden is what hub-api.js rewrites from the live catalogue: the
+     centre rails, and the sidebar navigation with its hardcoded product list,
+     logos and counts. Both are revealed together once real content is in
+     place, and never otherwise — a blank screen is an honest failure, whereas
+     placeholder data is indistinguishable from real data to anyone who has not
+     read the source, and a tile claiming 1,204 views is worse than an empty
+     page.
+
+     The brand lockup and the PTC mark are outside .orion-side__body, so the
+     column keeps its shape and nothing jumps when it appears.
+     ============================================================ -->
+<style>
+  #mainThread { display: none; }
+  body.hub-ready #mainThread { display: block; }
+  .orion-side__body { visibility: hidden; }
+  body.hub-ready .orion-side__body { visibility: visible; }
+</style>
 <style>
 /* ============================================================
    ORION UI STYLE — PTC enterprise agentic design system (inlined)
@@ -267,7 +293,14 @@ a:hover { text-decoration: underline; }
   padding: 7px 14px; border-radius: var(--orion-radius-pill); border: 1px solid var(--orion-border-md);
   font-size: 12.5px; font-weight: 500; cursor: pointer; color: var(--orion-text-2); background: var(--orion-surface);
 }
-.stage-pill--active { background: var(--orion-text); color: #fff; border-color: var(--orion-text); font-weight: 600; }
+/* A selected pill inverts, and inverting means BOTH halves flip. The original
+   painted the background with --orion-text -- a foreground token -- and left
+   the label a literal #fff. That reads correctly in light mode by luck, since
+   --orion-text is near-black there; in dark mode it is near-white, so the
+   label vanished into its own background. Pairing it with --orion-surface
+   keeps the contrast in both themes with no theme-specific rule. */
+.stage-pill--active { background: var(--orion-text); color: var(--orion-surface);
+  border-color: var(--orion-text); font-weight: 600; }
 
 /* ============================================================
    REQUEST ASSET FORM
@@ -290,8 +323,19 @@ a:hover { text-decoration: underline; }
 .upload-drop__sub { font-size: 12px; color: var(--orion-text-3); }
 .attachment-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .attachment-list:empty { display: none; }
-.derived-output { border: 1px solid var(--orion-indigo); background: var(--orion-indigo-soft); border-radius: var(--orion-radius-sm); padding: 10px 14px; }
+/* --orion-indigo-soft is a light-mode tint with no dark counterpart, and the
+   value inside uses --orion-text, which follows the theme. In dark mode that
+   put near-white text on a near-white panel: the derived scope was invisible.
+   A translucent wash of the indigo keeps the accent in both themes, because
+   it takes its lightness from whatever is behind it. */
+.derived-output { border: 1px solid var(--orion-indigo);
+  background: color-mix(in srgb, var(--orion-indigo) 12%, transparent);
+  border-radius: var(--orion-radius-sm); padding: 10px 14px; }
+/* indigo-strong is dark enough to disappear against the dark app background,
+   so the label lightens with the theme rather than staying put. */
 .derived-output__label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--orion-indigo-strong); margin-bottom: 3px; }
+:root:not([data-theme="light"]) .derived-output__label,
+:root[data-theme="dark"] .derived-output__label { color: #a5adff; }
 .derived-output__value { font-size: 14px; font-weight: 600; color: var(--orion-text); }
 
 /* ============================================================
@@ -324,7 +368,14 @@ a:hover { text-decoration: underline; }
 
 .form-row { display: flex; flex-direction: column; gap: 5px; }
 .form-row label { font-size: 12px; font-weight: 600; color: var(--orion-text-2); }
-.form-row input { padding: 8px 10px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); font: inherit; font-size: 13px; width: 100%; }
+/* No background or colour was set, so date and file inputs fell through to the
+   browser default -- white box, black text -- in dark mode. */
+.form-row input { padding: 8px 10px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); font: inherit; font-size: 13px; width: 100%;
+  background: var(--orion-surface); color: var(--orion-text); }
+.form-row input::placeholder { color: var(--orion-text-3); }
+/* The native calendar and file glyphs are dark-on-dark otherwise. */
+:root:not([data-theme="light"]) .form-row input,
+:root[data-theme="dark"] .form-row input { color-scheme: dark; }
 .chip-input { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); padding: 7px 8px; }
 .chip-input .chip { display: flex; align-items: center; gap: 5px; background: var(--orion-surface-2); border-radius: var(--orion-radius-pill); padding: 3px 9px; font-size: 12px; }
 .chip-input input { border: none; outline: none; flex: 1; min-width: 120px; font: inherit; font-size: 13px; padding: 3px 4px; }
@@ -473,7 +524,34 @@ a:hover { text-decoration: underline; }
   <symbol id="logo-creo-mark" viewBox="0.00 0.00 397.21 449.90"><path d="M183.44 237.95 0 132.2 0 343.99 183.44 449.9 183.44 237.95Z" fill="#3D4647"/><path d="M198.6 211.68 381.89 105.82 198.6 0 15.14 105.92 198.6 211.68Z" fill="#3D4647"/><path d="M213.77 237.95 213.77 449.9 397.21 343.99 397.21 131.99 213.77 237.95Z" fill="#40AA1D"/></symbol>
   <symbol id="logo-servicemax-mark" viewBox="0.00 0.00 71.14 82.15"><path d="M35.57 10.46 71.14 30.99 71.14 20.53 35.57 0 35.57 0 0 20.54 9.06 25.77 35.57 10.46" stroke-width="0" fill="#40AA1D"/><path d="M35.57 71.68 0 51.15 0 61.61 35.57 82.15 35.57 82.15 71.14 61.61 62.08 56.38 35.57 71.69" stroke-width="0" fill="#3D4647"/><path d="M35.57 50.76 0 30.22 0 40.68 35.57 61.22 35.57 61.22 53.02 51.15 43.96 45.92 35.57 50.76" stroke-width="0" fill="#3D4647"/><path d="M35.57 31.38 71.14 51.92 71.14 41.46 35.57 20.92 35.57 20.92 18.12 30.99 27.18 36.22 35.57 31.38" stroke-width="0" fill="#40AA1D"/></symbol>
   <symbol id="logo-codebeamer-mark" viewBox="0.00 0.00 261.71 300.76"><path d="M0.09 75.16 130.61 0 168.27 21.27 37.21 96.74 37.21 203.92 130.61 257.85 130.61 258.05 130.78 257.95 261.71 182.62 261.71 225.33 130.61 300.76 0 225.33 0.09 75.16Z" stroke-width="0" fill="#3D4647" fill-rule="evenodd"/><path d="M130.61 85.94 205.59 42.77 242.91 64.27 130.61 128.92 130.61 85.94Z" stroke-width="0" fill="#40AA1D" fill-rule="evenodd"/><path d="M130.61 171.91 261.63 96.48 261.71 139.43 130.61 214.9 130.61 171.91Z" stroke-width="0" fill="#40AA1D" fill-rule="evenodd"/></symbol>
-  <symbol id="logo-seismic" viewBox="0 0 300 300"><polygon points="104,78 233,52 230,153 104,126" fill="#FF5000"/><polygon points="69,146 195,173 195,221 66,247" fill="#FF5000"/></symbol>
+  <symbol id="logo-consensus" viewBox="0 0 40 40">
+<mask id="cns-mask" maskUnits="userSpaceOnUse" x="8" y="6" width="24" height="28" style="mask-type: alpha;"><path d="M18.7443 15.5534C18.2037 15.2413 17.5279 15.6315 17.5279 16.2557V23.6231C17.5279 24.2473 18.2037 24.6375 18.7443 24.3254L22.6202 22.0583C23.1224 21.7646 23.7434 21.7624 24.2476 22.0524L31.5617 26.2593C32.1032 26.5708 32.104 27.3518 31.5632 27.6643L21.187 33.6612C20.6852 33.9512 20.0668 33.9513 19.5648 33.6616L8.81113 27.4554C8.30921 27.1657 7.99999 26.6303 8 26.0508V13.828C7.99999 13.2485 8.30921 12.713 8.81113 12.4234L19.5648 6.21714C20.0668 5.92744 20.6852 5.92763 21.187 6.21764L31.5632 12.2145C32.104 12.527 32.1032 13.308 31.5617 13.6194L24.2476 17.8264C23.7434 18.1164 23.1224 18.1142 22.6202 17.8205L18.7443 15.5534Z" fill="black"/></mask>
+<g mask="url(#cns-mask)">
+<rect x="20.0605" y="19.8477" width="14.099" height="17.7244" fill="url(#cns-p0)"/>
+<path d="M20.0605 5.64648H32.4349V18.5873H20.0605V5.64648Z" fill="url(#cns-p1)"/>
+<path d="M6.63988 21.6626L7.28813 12.9025L20.0402 20.2467L8.02761 27.199L6.63988 21.6626Z" fill="url(#cns-p2)"/>
+<rect x="6.22449" y="-0.697266" width="14.099" height="20.7457" fill="url(#cns-p3)"/>
+<path d="M6.63988 21.268L7.28813 12.5079L20.0402 19.8522L8.02761 26.8045L6.63988 21.268Z" fill="url(#cns-p4)"/>
+<path d="M20.8909 34.5492L7.79125 26.9286L17.6643 21.2249L30.5085 28.9096L20.8909 34.5492Z" fill="url(#cns-p5)"/>
+<path d="M20.3236 5.64648H32.698V18.5873H20.3236V5.64648Z" fill="url(#cns-p6)"/>
+<rect x="20.3236" y="19.8477" width="14.099" height="17.7244" fill="url(#cns-p7)"/>
+<g opacity="0.3" style="mix-blend-mode: multiply;"><path d="M14.2427 8.74152L20.3416 12.2428L7.2184 19.8067L-3.5568 12.2415L8.67883 4.96523L14.2427 8.74152Z" fill="#FE4A4A"/></g>
+<g opacity="0.3" style="mix-blend-mode: multiply;"><path d="M23.6089 21.4318L33.5789 27.0462L30.0793 28.9596L20.3359 23.3452L23.6089 21.4318Z" fill="#FE4A4A"/></g>
+<g opacity="0.1" style="mix-blend-mode: plus-lighter;"><path d="M17.5531 26.1399L26.2769 31.1501L20.2974 34.5993L11.5233 29.6269L17.5531 26.1399Z" fill="#FFF2DE"/></g>
+<g opacity="0.1" style="mix-blend-mode: plus-lighter;"><path d="M20.327 5.16768L26.7057 8.54137L20.317 12.2315L14.067 8.6169L20.327 5.16768Z" fill="#FFF2DE"/></g>
+</g>
+<defs>
+<linearGradient id="cns-p0" x1="21.2586" y1="23.4731" x2="28.308" y2="32.1605" gradientUnits="userSpaceOnUse"><stop stop-color="#FFB352"/><stop offset="0.52" stop-color="#FC6839"/><stop offset="1" stop-color="#EB2E24"/></linearGradient>
+<linearGradient id="cns-p1" x1="28.5199" y1="19.7108" x2="7.30834" y2="-0.224896" gradientUnits="userSpaceOnUse"><stop stop-color="#FFBF52"/><stop offset="0.52" stop-color="#FC6839"/><stop offset="1" stop-color="#EB2E24"/></linearGradient>
+<linearGradient id="cns-p2" x1="-5.45759" y1="27.2899" x2="5.01215" y2="6.30466" gradientUnits="userSpaceOnUse"><stop stop-color="#FFB352"/><stop offset="0.52" stop-color="#FC6839"/><stop offset="1" stop-color="#EB2E24"/></linearGradient>
+<linearGradient id="cns-p3" x1="13.049" y1="0.66231" x2="23.5331" y2="24.3955" gradientUnits="userSpaceOnUse"><stop stop-color="#FFB352"/><stop offset="1" stop-color="#FC6839"/></linearGradient>
+<linearGradient id="cns-p4" x1="-5.45759" y1="26.8954" x2="5.01215" y2="5.91013" gradientUnits="userSpaceOnUse"><stop stop-color="#FFB352"/><stop offset="0.52" stop-color="#FC6839"/><stop offset="1" stop-color="#EB2E24"/></linearGradient>
+<linearGradient id="cns-p5" x1="20.7169" y1="16.4219" x2="-6.07121" y2="50.0581" gradientUnits="userSpaceOnUse"><stop stop-color="#FFBF52"/><stop offset="0.52" stop-color="#FC6839"/><stop offset="1" stop-color="#EB2E24"/></linearGradient>
+<linearGradient id="cns-p6" x1="28.783" y1="19.7108" x2="7.5714" y2="-0.224896" gradientUnits="userSpaceOnUse"><stop stop-color="#FFBF52"/><stop offset="0.52" stop-color="#FC6839"/><stop offset="1" stop-color="#EB2E24"/></linearGradient>
+<linearGradient id="cns-p7" x1="21.5217" y1="23.4731" x2="28.571" y2="32.1605" gradientUnits="userSpaceOnUse"><stop stop-color="#FFB352"/><stop offset="0.52" stop-color="#FC6839"/><stop offset="1" stop-color="#EB2E24"/></linearGradient>
+</defs>
+</symbol>
+<symbol id="logo-seismic" viewBox="0 0 300 300"><polygon points="104,78 233,52 230,153 104,126" fill="#FF5000"/><polygon points="69,146 195,173 195,221 66,247" fill="#FF5000"/></symbol>
 
 </svg>
 
@@ -538,7 +616,7 @@ a:hover { text-decoration: underline; }
       <div class="hero-search">
         <div class="hero-search__field">
           <svg class="orion-ico ico-muted"><use href="#i-search"/></svg>
-          <input type="text" id="hubSearchInput" placeholder="Search by product, keyword, persona, or funnel stage…">
+          <input type="text" id="hubSearchInput" autocomplete="off" placeholder="Search by product, keyword, persona, or funnel stage…">
         </div>
         <label class="filter-pill">Type:
           <select id="hubFilterType">
@@ -591,10 +669,21 @@ a:hover { text-decoration: underline; }
         </label>
         <button class="hub-reset-cta" id="hubResetBtn" onclick="hubResetFilters()" style="display:none;">Reset filters</button>
       </div>
+      <div class="hub-suggest" id="hubSuggest" style="display:none;"></div>
       <div class="hub-noresults" id="hubNoResults">No assets match these filters. Try clearing one.</div>
     </div>
 
+    <!-- Shown until the catalogue has loaded, so Elio's placeholder cards
+         never appear. See the #mainThread rule above. -->
+    <div class="hub-boot" id="hubBoot">
+      <div class="hub-boot__spinner"></div>
+      <div id="hubBootMessage">Loading the catalogue&hellip;</div>
+    </div>
+
     <div class="orion-thread" id="mainThread">
+
+      <!-- Segment landing page: rendered by hub-api.js when a segment is on -->
+      <div class="section hub-seg" id="hubSegmentPage" style="display:none;"></div>
 
       <!-- All Assets (filtered results) -->
       <div class="section" id="allAssetsSection" style="display:none;">
@@ -920,6 +1009,7 @@ a:hover { text-decoration: underline; }
         </div>
       </div>
 
+      <div class="req-error" id="reqError" style="display:none;"></div>
       <div id="requestFormCard" style="display:flex; flex-direction:column; gap:22px; margin-top:18px;">
 
         <div class="section" style="margin-bottom:0;">
@@ -962,7 +1052,7 @@ a:hover { text-decoration: underline; }
         <div class="section" style="margin-bottom:0;">
           <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-message-square"/></svg> Narrative angle</div>
           <div class="form-section">
-            <div class="stage-row">
+            <div class="stage-row" id="narrativeAngleRow">
               <span class="stage-pill stage-pill--active" onclick="pillSelect(this)">Value proposition-led</span>
               <span class="stage-pill" onclick="pillSelect(this)">Features &amp; functions-led</span>
               <span class="stage-pill" onclick="pillSelect(this)">Mix of both</span>
@@ -975,7 +1065,7 @@ a:hover { text-decoration: underline; }
           <div class="form-section">
             <div class="form-row">
               <label>Desired length</label>
-              <div class="stage-row">
+              <div class="stage-row" id="desiredLengthRow">
                 <span class="stage-pill" onclick="pillSelect(this)">&lt; 1 min</span>
                 <span class="stage-pill stage-pill--active" onclick="pillSelect(this)">1–3 min</span>
                 <span class="stage-pill" onclick="pillSelect(this)">3–5 min</span>
@@ -1094,6 +1184,7 @@ a:hover { text-decoration: underline; }
       <div class="share-result" id="requestSuccessCard" style="display:none; margin-top:18px;">
         <div class="share-result__label"><svg class="orion-ico orion-ico--sm"><use href="#i-check"/></svg> Request submitted</div>
         <div class="share-result__meta">The Technical Marketing team will review your request and follow up by email.</div>
+        <div class="req-outcome" id="reqOutcome"></div>
         <div style="margin-top:12px;"><button class="btn-ghost" style="flex:none;" onclick="closeRequestView()">Back to Technical Marketing Hub</button></div>
       </div>
     </div>
@@ -1128,30 +1219,53 @@ a:hover { text-decoration: underline; }
         <span>Already registered in Consensus (<span class="orion-mono" id="shareAssetUuid">—</span>) — this generates a live DemoBoard link via the Consensus API. No re-upload needed.</span>
       </div>
 
+      <!-- Recipients first: Consensus fills the organisation in from the
+           recipient's email domain, so asking for it the other way round makes
+           people type something the platform was about to work out. Elio,
+           2026-09-02. -->
       <div class="form-row">
-        <label for="shareOrg">Account / Organization</label>
-        <input type="text" id="shareOrg" value="Bobcat">
-      </div>
-      <div class="form-row">
-        <label for="shareOpp">Opportunity</label>
-        <input type="text" id="shareOpp" value="Bobcat – Windchill AI Expansion FY26Q3">
-      </div>
-      <div class="form-row">
-        <label>Recipients</label>
-        <div class="chip-input">
-          <span class="chip">j.render@bobcat.com</span>
-          <span class="chip">m.alvarez@bobcat.com</span>
-          <input type="text" placeholder="Add email…">
+        <label for="shareRecipientInput">Recipients <span class="hub-req">required</span></label>
+        <div class="chip-input" id="shareChips">
+          <input type="text" id="shareRecipientInput"
+                 placeholder="name@company.com, or Jane Doe &lt;jane@company.com&gt;">
         </div>
+        <div class="hub-hint">Enter or comma to add. Each recipient gets their own
+          tracked invite.</div>
       </div>
+      <!-- Not an account record: Consensus does not check this against any
+           customer database, so calling it "Account" invited people to expect
+           validation that does not exist. Elio asked for the honest name. -->
+      <div class="form-row">
+        <label for="shareOrg">DemoBoard name <span class="hub-req">required</span></label>
+        <input type="text" id="shareOrg" placeholder="The customer or prospect this board is for">
+        <div class="hub-hint">Filled in from the recipient's email domain where
+          Consensus can work it out. Not checked against any account record.</div>
+      </div>
+      <div class="form-row">
+        <label for="shareOpp">Opportunity <span class="hub-opt">optional</span></label>
+        <input type="text" id="shareOpp" placeholder="e.g. Windchill AI Expansion FY26Q3">
+      </div>
+      <!-- Test send is hidden, not removed. Elio asked for it gone from the UI
+           because a test board records no analytics, which is a foot-gun on a
+           real send; Seb asked that the capability stay for development. The
+           input remains so the JS that reads it needs no special case, and it
+           now defaults OFF -- a hidden checkbox must not silently make every
+           share a test. -->
+      <label class="hub-testrow" id="shareTestRow" hidden>
+        <input type="checkbox" id="shareIsTest">
+        <span>Test send &mdash; creates the DemoBoard flagged as a test so it stays
+          out of Consensus reporting.</span>
+      </label>
+
+      <div class="share-error" id="shareError" style="display:none;"></div>
 
       <div class="share-result" id="shareResult" style="display:none;">
-        <div class="share-result__label"><svg class="orion-ico orion-ico--sm"><use href="#i-check"/></svg> DemoBoard link ready</div>
+        <div class="share-result__label"><svg class="orion-ico orion-ico--sm"><use href="#i-check"/></svg> <span id="shareResultLabel">DemoBoard created</span></div>
         <div class="share-result__link">
-          <span id="shareLinkText">play.goconsensus.com/9f3ab2e1</span>
+          <span id="shareLinkText">—</span>
           <button onclick="copyShareLink()" id="copyBtn">Copy</button>
         </div>
-        <div class="share-result__meta">Sent to 2 recipients · view engagement anytime in Consensus Reports</div>
+        <div class="share-result__meta" id="shareResultMeta"></div>
       </div>
     </div>
     <div class="modal__foot">
@@ -1656,21 +1770,28 @@ function computeProductScope() {
 function onStartingMaterialsChange(el) {
   document.getElementById('attachmentsSection').style.display = el.dataset.value === 'have' ? '' : 'none';
 }
+/* Replaced at runtime by hub-api.js, which keeps the File objects and uploads
+   them. This version used to render a chip and then clear the input,
+   discarding every file; it now refuses rather than pretending, for the case
+   where that script fails to load. */
 function handleAttachmentFiles(input) {
   var list = document.getElementById('attachmentList');
-  Array.from(input.files).forEach(function(f) {
-    var chip = document.createElement('span');
-    chip.className = 'chip';
-    chip.innerHTML = '<svg class="orion-ico orion-ico--sm"><use href="#i-file-text"/></svg> ' + f.name;
-    list.appendChild(chip);
-  });
   input.value = '';
+  list.innerHTML = '<span class="attach-warn">The Hub could not be reached, so '
+    + 'files cannot be attached. Reload the page and try again.</span>';
 }
+/* Replaced at runtime by hub-api.js, which actually posts the answers. This
+   remains as the fallback for the case where that script fails to load: it is
+   better to say the Hub is unavailable than to show a success screen for a
+   request that went nowhere, which is what this function used to do. */
 function submitAssetRequest(e) {
   e.preventDefault();
-  document.getElementById('requestFormCard').style.display = 'none';
-  document.getElementById('requestSuccessCard').style.display = '';
-  document.getElementById('requestViewPage').scrollTop = 0;
+  var box = document.getElementById('reqError');
+  if (box) {
+    box.textContent = 'The Hub could not be reached, so this was not submitted. '
+                    + 'Please reload the page and try again.';
+    box.style.display = '';
+  }
 }
 
 function escAttr(s) { return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
@@ -1793,3 +1914,311 @@ document.getElementById('hubSearchInput').addEventListener('input', hubApplyFilt
 hubApplyFilters();
 
 </script>
+
+<!-- ===================================================================
+     Live data. Everything above is Elio's, unchanged.
+
+     The integration is deliberately one script tag: it lives in
+     static/hub-api.js so his file stays a one-line diff and his next
+     revision merges without a fight. If the API is unreachable the
+     hardcoded cards above simply remain, and the badge says so.
+     =================================================================== -->
+<style>
+  .hub-api-status { position:fixed; bottom:10px; right:12px; z-index:9999;
+    font:11px/1.4 ui-monospace,Consolas,monospace; color:#6b727a;
+    background:rgba(255,255,255,.94); border:1px solid #dcdfe3;
+    border-radius:4px; padding:3px 8px; pointer-events:none; }
+  .hub-api-status:empty { display:none; }
+  .hub-api-status--error { color:#c0392b; border-color:#c0392b; }
+  /* !important because hubApplyFilters() rewrites style.display on these
+     sections whenever no filter is active. */
+  .hub-hidden { display:none !important; }
+
+  /* --- fixes reported from use --------------------------------------- */
+
+  /* The search input set background:transparent but never a colour, so it
+     fell back to the browser default black. Invisible on the dark theme,
+     where everything around it is light-on-dark. */
+  .hero-search__field input { color: var(--orion-text); }
+
+  /* The chevron is a sibling of the <select>, so clicking it hit the label
+     and nothing opened -- only the select's own narrow box worked. Widening
+     the select to run underneath the arrow, and making the arrow ignore
+     pointer events, means the whole pill opens the menu.
+     The padding is the second half of the report: the text sat hard against
+     the border on both sides. */
+  .filter-pill { position: relative; padding-right: 0 !important; }
+  /* The select has to reach the pill's right edge, or the arrow sits beyond it
+     in the padding and clicks there land on the label instead. The pill gives
+     up its right padding and the select takes it over, so the arrow ends up
+     inside the select's own box. */
+  .filter-pill select {
+    flex: 1; padding: 2px 30px 2px 6px !important; text-overflow: ellipsis;
+  }
+  .filter-pill > svg { position: absolute; right: 11px; pointer-events: none; }
+  /* The dropdown list itself renders with the OS palette unless told the
+     surface it sits on, which on the dark theme gives black-on-black. */
+  .filter-pill select, .filter-pill option {
+    background: var(--orion-surface); color: var(--orion-text);
+  }
+  /* One colour per platform. A kit you run and a recording you send are
+     different things; a card that does not say which makes you guess. */
+  .hub-source { margin-right:6px; font-size:10px; }
+  .hub-source--sharepoint { color:#1a5fa8; border-color:#1a5fa8; background:#e8f0f9; }
+  .hub-source--consensus  { color:#c25a10; border-color:#c25a10; background:#fbeee3; }
+
+  /* One compact button per platform the asset is actually on. Nothing is
+     rendered for platforms it is not on -- with three sources, labelling every
+     absence would give each card a row of things it is not. */
+  /* A feature with no data yet, shown as a shape rather than hidden: the
+     panel is where Serge expects it, and says why it is empty. */
+  .vr-placeholder { display:flex; gap:12px; align-items:flex-start;
+    padding:14px 16px; border:1px dashed var(--orion-border-md);
+    border-radius:var(--orion-radius-sm); color:var(--orion-text-3);
+    font-size:12.5px; line-height:1.55; }
+  .vr-placeholder strong { color:var(--orion-text-2); display:block;
+    margin-bottom:2px; }
+  .vr-placeholder svg { flex:0 0 auto; margin-top:1px; }
+
+  /* What is in the folder. An asset IS a folder, so this is most of what
+     someone wants before opening it. */
+  .vp-files__summary { margin-left:auto; font-size:12px; color:var(--orion-text-3);
+    font-variant-numeric:tabular-nums; }
+  .vp-files__list { display:flex; flex-direction:column; }
+  .vp-file { display:flex; align-items:center; gap:9px; padding:7px 0;
+    border-bottom:1px solid var(--orion-border); font-size:12.5px; }
+  .vp-file:last-child { border-bottom:none; }
+  .vp-file__name { color:var(--orion-text); overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+  .vp-file__facts { margin-left:auto; flex:0 0 auto; color:var(--orion-text-3);
+    font-variant-numeric:tabular-nums; }
+  .vp-files__note { margin-top:10px; font-size:12px; color:var(--orion-text-3);
+    line-height:1.5; }
+
+
+  .hub-boot { display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 14px; padding: 80px 20px; text-align: center;
+    color: var(--orion-text-3); font-size: 13px; }
+  body.hub-ready .hub-boot { display: none; }
+  .hub-boot__spinner { width: 26px; height: 26px; border-radius: 50%;
+    border: 2px solid var(--orion-border-md); border-top-color: var(--orion-indigo);
+    animation: hub-spin .8s linear infinite; }
+  @keyframes hub-spin { to { transform: rotate(360deg); } }
+  .hub-boot--failed .hub-boot__spinner { display: none; }
+  .hub-boot--failed { color: #c2410c; }
+
+  /* The preview plays here, in a frame with no address bar. A browser popup
+     cannot hide the URL any more; an iframe never had one. */
+  .hub-preview { position:fixed; inset:0; z-index:1000; display:none;
+    align-items:center; justify-content:center; padding:24px;
+    background:rgba(10,12,15,.72); }
+  .hub-preview.open { display:flex; }
+  .hub-preview__box { width:min(1180px,96vw); height:min(760px,92vh);
+    display:flex; flex-direction:column; border-radius:10px; overflow:hidden;
+    background:var(--orion-surface); box-shadow:0 24px 64px rgba(0,0,0,.45); }
+  .hub-preview__bar { display:flex; align-items:center; gap:12px;
+    padding:10px 14px; border-bottom:1px solid var(--orion-border);
+    background:var(--orion-surface-2); }
+  .hub-preview__title { font-size:13.5px; font-weight:600;
+    color:var(--orion-text); overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap; }
+  .hub-preview__close { margin-left:auto; border:none; background:transparent;
+    font-size:22px; line-height:1; color:var(--orion-text-3); cursor:pointer;
+    padding:0 4px; }
+  .hub-preview__close:hover { color:var(--orion-text); }
+  .hub-preview__frame { flex:1; width:100%; border:none; background:#fff; }
+
+  /* Said plainly where there is nothing to show, rather than left blank —
+     an empty panel reads as broken, "not indexed yet" reads as honest. */
+  .hub-empty { color: var(--orion-text-3); font-size: 12.5px; font-style: italic; }
+
+  /* A platform badge that goes somewhere says so, quietly: the card is dense
+     and an underline on every one of them would be louder than the titles. */
+  .hub-source--link { text-decoration: none; cursor: pointer; }
+  .hub-source--link:hover { filter: brightness(.92); text-decoration: underline; }
+  /* The name opens the details page and must read as the primary action. */
+  .hub-detail-link { color: inherit; text-decoration: none; }
+  .hub-detail-link:hover { text-decoration: underline; }
+
+  /* The platform that HOSTS the asset gets the verb; any other platform it
+     also lives on gets just its mark. A Consensus demo exists to be shared, so
+     it keeps the full share button -- in Consensus colours. A SharePoint kit
+     that merely has a Consensus recording gets a 36px logo: real, secondary,
+     and still legible once a third platform appears beside it. */
+  .hub-platform { display:inline-flex; align-items:center; justify-content:center;
+    gap:6px; padding:5px 9px; }
+  .asset-card__actions { justify-content:flex-start; gap:6px; }
+  .hub-platform__logo { height:16px; width:16px; flex:0 0 auto; }
+
+  /* Cross-reference: the mark alone, on a neutral surface. It must not be
+     tinted -- the Consensus mark is a full-colour gradient. */
+  .hub-platform--ref { flex:0 0 auto; width:auto;
+    background: var(--orion-surface-2); border:1px solid var(--orion-border-md);
+    color: var(--orion-text); }
+  .hub-platform--ref:hover { border-color:#FC6839; }
+
+  /* Home platform: outline only. A filled gradient bar was the loudest thing
+     on a grid of 200 cards and drowned the titles it was meant to sit under.
+     A third of the tile is enough for the verb and leaves two thirds free for
+     whatever comes next -- a second platform, Add to Velocity, Favourite. */
+  .hub-platform--home { flex:0 0 33%; max-width:33%; background:transparent;
+    font-weight:600; font-size:10.5px; padding:4px 2px; letter-spacing:-.1px;
+    white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis; display:block; text-align:center; }
+  .hub-platform--home.hub-platform--consensus {
+    border:1px solid #FC6839; color:#FC6839; }
+  .hub-platform--home.hub-platform--consensus:hover {
+    background:rgba(252,104,57,.10); }
+
+  /* Elio's stats slot holds one short line; ours holds a description that runs
+     to 1194 characters at worst, which stretched cards from 286px to 709px.
+     Three lines, with the whole text on hover. */
+  .asset-card__stats.hub-desc {
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;
+    overflow:hidden; align-items:flex-start; }
+  /* Titles wrap to two lines at most for the same reason. No reserved height:
+     the cards in a row already stretch to the tallest, so the grid squares
+     itself up and forcing a minimum would only add dead space. */
+  .asset-card__title { display:-webkit-box; -webkit-box-orient:vertical;
+    -webkit-line-clamp:2; overflow:hidden; }
+
+  /* The type chip sat top-left, straight over the part of a thumbnail that
+     carries its title -- Consensus poster frames put their wordmark there, so
+     "Video" was covering "PERSONALIZED DEMO". The top edge is where a picture
+     says what it is; the bottom-left corner is empty on every card we build.
+
+     Except Elio's ranked cards, which put #1..#5 there, so those keep the
+     original position rather than stacking two pills in one corner. */
+  .asset-card__thumb:not(:has(.rank-chip)) .type-chip {
+    top:auto; bottom:8px; }
+
+  /* A derived cover for the 455 SharePoint assets that have no picture and no
+     way to make one. An identifier, not a photograph -- see paintCover(). */
+  .hub-cover { position:relative; overflow:hidden;
+    background:
+      linear-gradient(140deg,
+        hsl(var(--cover-hue) 42% 46% / .30) 0%,
+        hsl(var(--cover-hue) 42% 46% / .10) 62%,
+        transparent 100%),
+      var(--orion-surface-3); }
+  .hub-cover__mark { position:absolute; inset:0; display:flex;
+    align-items:center; justify-content:center; user-select:none; }
+  .hub-cover__mark svg { width:42px; height:42px; opacity:.55; }
+  /* No mark in the sprite for this family -- its name, which is still
+     distinctive and still scannable. */
+  .hub-cover__mark--text { font-size:15px; font-weight:650; letter-spacing:.2px;
+    padding:0 14px; text-align:center;
+    color:hsl(var(--cover-hue) 34% 46% / .62); }
+  :root:not([data-theme="light"]) .hub-cover__mark--text,
+  :root[data-theme="dark"] .hub-cover__mark--text {
+    color:hsl(var(--cover-hue) 42% 74% / .42); }
+  :root:not([data-theme="light"]) .hub-cover__mark svg,
+  :root[data-theme="dark"] .hub-cover__mark svg { opacity:.42; }
+
+  /* ------------------------------------------------- segment landing page */
+  .hub-seg { padding:18px 20px; border:1px solid var(--orion-border);
+    border-radius:var(--orion-radius); background:var(--orion-surface-2); }
+  /* Collapsed: one line with a chevron, so a search is not pushed below the
+     fold by an introduction nobody is reading at that moment. */
+  .hub-seg__toggle { display:none; align-items:center; gap:8px; width:100%;
+    border:none; background:transparent; color:var(--orion-text); font:inherit;
+    font-size:14px; font-weight:600; cursor:pointer; padding:0; text-align:left; }
+  .hub-seg__toggle svg { transform:rotate(90deg); transition:transform .15s;
+    color:var(--orion-text-3); }
+  .hub-seg__toggle-count { margin-left:auto; font-size:12px; font-weight:400;
+    color:var(--orion-text-3); font-variant-numeric:tabular-nums; }
+  .hub-seg--collapsed { padding:11px 20px; }
+  .hub-seg--collapsed .hub-seg__toggle { display:flex; }
+  .hub-seg--collapsed .hub-seg__toggle svg { transform:rotate(0deg); }
+  .hub-seg--collapsed > *:not(.hub-seg__toggle) { display:none; }
+
+  .hub-seg__back { display:inline-flex; align-items:center; gap:4px; border:none;
+    background:transparent; color:var(--orion-text-3); font:inherit;
+    font-size:12px; cursor:pointer; padding:0 0 8px; }
+  .hub-seg__back:hover { color:var(--orion-text); }
+  /* The chevron points forward in the sprite; this is a way back. */
+  .hub-seg__back svg { transform:rotate(180deg); }
+  .hub-seg__head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  .hub-seg__title { margin:0; font-size:22px; font-weight:650;
+    color:var(--orion-text); }
+  .hub-seg__count { font-size:12.5px; color:var(--orion-text-3);
+    font-variant-numeric:tabular-nums; }
+  .hub-seg__blurb { margin:8px 0 14px; font-size:13.5px; line-height:1.55;
+    color:var(--orion-text-2); max-width:70ch; }
+  /* Missing editorial content must look missing. A plausible sentence nobody
+     stands behind is worse than a visible gap. */
+  .hub-seg__blurb--empty { color:var(--orion-text-3); font-style:italic; }
+  .hub-seg__foot { display:flex; align-items:center; justify-content:space-between;
+    gap:14px; flex-wrap:wrap; padding-top:12px;
+    border-top:1px solid var(--orion-border); }
+  .hub-seg__fams { display:flex; gap:6px; flex-wrap:wrap; }
+  .hub-seg__fam { border:1px solid var(--orion-border-md); background:transparent;
+    color:var(--orion-text-2); border-radius:999px; padding:3px 10px;
+    font:inherit; font-size:12px; cursor:pointer; }
+  .hub-seg__fam:hover { border-color:var(--orion-accent, #5b6cff);
+    color:var(--orion-text); }
+  .hub-seg__fam em { font-style:normal; color:var(--orion-text-3);
+    font-variant-numeric:tabular-nums; }
+  .hub-seg__contact { font-size:12.5px; color:var(--orion-text-2); }
+  .hub-seg__empty { color:var(--orion-text-3); font-style:italic; }
+  .hub-seg__stamp { display:block; font-size:11px; color:var(--orion-text-3); }
+  .hub-seg__latest { margin-top:16px; }
+  .hub-seg__latest h3 { margin:0 0 10px; font-size:13.5px; font-weight:600;
+    color:var(--orion-text-2); }
+  .hub-seg__latest .asset-row { overflow-x:auto; }
+
+  /* A nav entry with nothing behind it. Dimmed rather than removed, because
+     the category is real and may fill up -- and because silently deleting
+     Elio's entries would hide the gap instead of showing it. */
+  .hub-nav--dead { opacity:.38; }
+  .hub-nav--dead:hover { background:transparent; }
+
+  /* ------------------------------------------------------ suggestion strip */
+  .hub-suggest { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .hub-suggest__btn { display:inline-flex; align-items:center; gap:6px;
+    border:1px solid var(--orion-border-md); background:var(--orion-surface);
+    color:var(--orion-text); border-radius:999px; padding:6px 12px;
+    font:inherit; font-size:12.5px; font-weight:550; cursor:pointer; }
+  .hub-suggest__btn:hover { border-color:var(--orion-accent, #5b6cff); }
+  .hub-suggest__btn--page { border-color:var(--orion-accent, #5b6cff);
+    color:var(--orion-accent, #5b6cff); }
+
+  /* ------------------------------------------------------- share modal */
+  .hub-req { font-size:10.5px; font-weight:600; text-transform:uppercase;
+    letter-spacing:.4px; color:#c25a10; margin-left:6px; }
+  .hub-opt { font-size:10.5px; font-weight:500; text-transform:uppercase;
+    letter-spacing:.4px; color:var(--orion-text-3); margin-left:6px; }
+  .hub-hint { font-size:11.5px; color:var(--orion-text-3); margin-top:5px; }
+  .chip-input .chip { display:inline-flex; align-items:center; gap:6px;
+    background:var(--orion-surface-3); border:1px solid var(--orion-border-md);
+    border-radius:var(--orion-radius-pill); padding:3px 6px 3px 10px;
+    font-size:12px; color:var(--orion-text); }
+  .chip__x { border:none; background:transparent; color:var(--orion-text-3);
+    cursor:pointer; font-size:14px; line-height:1; padding:0 2px; }
+  .chip__x:hover { color:var(--orion-text); }
+  .chip-input input { flex:1; min-width:170px; border:none; outline:none;
+    background:transparent; font:inherit; font-size:13px; color:var(--orion-text); }
+  /* A real send emails real people, so the safe option is the default and the
+     switch that arms it has to be visible rather than buried. */
+  .hub-testrow { display:flex; gap:9px; align-items:flex-start; margin-top:14px;
+    font-size:12px; color:var(--orion-text-2); line-height:1.45; cursor:pointer; }
+  .hub-testrow input { margin-top:2px; flex:0 0 auto; }
+  .share-error { margin-top:14px; padding:10px 12px; border-radius:6px;
+    border:1px solid #c2410c66; background:#c2410c14; color:#c2410c;
+    font-size:12.5px; line-height:1.5; white-space:pre-wrap; }
+
+  /* --------------------------------------------------- request intake */
+  .req-error { margin: 0 0 4px; padding: 10px 12px; border-radius: 6px;
+    border: 1px solid #c2410c66; background: #c2410c14; color: #c2410c;
+    font-size: 12.5px; line-height: 1.5; }
+  .req-outcome { margin-top: 10px; font-size: 13px; color: var(--orion-text-2); }
+  /* Recorded but not yet in SharePoint is not a failure and must not look
+     like one -- but it is not the plain success either. */
+  .req-outcome--warn { color: #c2410c; }
+
+  .attach-warn { display: block; font-size: 12px; line-height: 1.5;
+    color: #c2410c; }
+  .attach-size { color: var(--orion-text-3); font-variant-numeric: tabular-nums; }
+</style>
+<div id="hubApiStatus" class="hub-api-status"></div>
+<script src="/static/hub-api.js" defer></script>

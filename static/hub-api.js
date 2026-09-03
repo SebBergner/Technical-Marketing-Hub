@@ -442,6 +442,19 @@
 
   /* ------------------------------------------------------------- filters UI */
 
+  /* Segments the filter does not offer.
+   *
+   * IoT held 78 assets until the divested products left the catalogue on
+   * 2026-09-02; it now holds 1. An option that narrows 807 results to one is a
+   * dead end rather than a filter.
+   *
+   * This hides the control, not the content: the asset is still searchable,
+   * still counted in the facet, and still has a segment page. If the answer is
+   * that it should not be in the Hub at all, the fix belongs in
+   * backend/services/taxonomy.py, where one change reaches search, filters,
+   * pages and counts together. */
+  var HIDDEN_SEGMENTS = ["IoT"];
+
   /* Fill a <select> from a facet, keeping whatever "all" option is already
    * there as the first entry. Counts come along because "Creo (319)" tells you
    * whether a filter is worth clicking. */
@@ -704,7 +717,23 @@
     var all = document.getElementById("allAssetsSection");
     if (all) all.style.display = active ? "" : "none";
     if (!active) {
-      if (baselineFacets) fillSidebarCounts(baselineFacets);
+      // Put the dropdowns back to whole-catalogue counts as well, not just the
+      // sidebar. They carry SCOPED counts from whatever was last selected --
+      // browse Creo and the Segment list reads "CAD (399), ALM (0)" -- and
+      // clearing the filter used to leave those numbers sitting there,
+      // describing a slice the page is no longer showing.
+      //
+      // Latest Uploads never had the bug because a sort counts as active, so
+      // it takes the branch below and rescores on the way through. Home is the
+      // one path that clears everything and then returns early.
+      if (baselineFacets) {
+        rescoreSelect("hubFilterType", baselineFacets.types);
+        rescoreSelect("hubFilterProduct", baselineFacets.product_families
+                                       || baselineFacets.products);
+        rescoreSelect("hubFilterSegment", baselineFacets.segments);
+        rescoreSelect("hubFilterStage", baselineFacets.funnel_stages);
+        fillSidebarCounts(baselineFacets);
+      }
       return;
     }
     if (all) all.style.display = "";
@@ -898,6 +927,19 @@
     "Post-Sale": "No assets are tagged Post-Sale yet"
   };
 
+  /* Of the unavailable items, the ones removed outright rather than dimmed.
+   *
+   * Dimming says "not yet"; it is the right answer for Virtual Machines and
+   * Post-Sale, which are empty categories that will light up on their own the
+   * day something lands in them. These two are not waiting on the catalogue --
+   * Favorites needs a per-user store and Most Viewed needs SharePoint view
+   * counts, and neither is being built -- so a permanently greyed row is just
+   * a promise the sidebar cannot keep. Liwei's call, 2026-09-03.
+   *
+   * Remove a label from this list to get its dimmed version back; the reason
+   * text in UNAVAILABLE is kept either way. */
+  var HIDE_UNAVAILABLE = ["Most Viewed", "Favorites"];
+
   function markUnavailable(facets) {
     var live = {};
     ["types", "funnel_stages", "product_families", "segments"].forEach(function (k) {
@@ -917,6 +959,13 @@
       // Only dim it if the catalogue really has nothing -- if VMs appear
       // tomorrow the item must come back to life on its own.
       if (!reason || live[name]) return;
+      // An inline style, not a class: Elio's .orion-navitem sets its own
+      // display, and a stylesheet rule of equal specificity loses to whichever
+      // is declared later in a 2.5 MB file. Inline always wins.
+      if (HIDE_UNAVAILABLE.indexOf(name) !== -1) {
+        item.style.display = "none";
+        return;
+      }
       item.classList.add("hub-nav--dead");
       item.title = reason;
       item.style.cursor = "default";
@@ -2234,7 +2283,9 @@
     fillRails(assets);
 
     fillSelect("hubFilterProduct", facets.product_families || facets.products);
-    fillSelect("hubFilterSegment", facets.segments);
+    fillSelect("hubFilterSegment", (facets.segments || []).filter(function (f) {
+      return HIDDEN_SEGMENTS.indexOf(f.value) === -1;
+    }));
     fillSelect("hubFilterStage", facets.funnel_stages);
     fillSelect("hubFilterType", facets.types);
     fillSidebarCounts(facets);

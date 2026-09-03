@@ -858,6 +858,44 @@
                    "Virtual Machines": "vm" };
   var navTargets = {};   // nav label -> {control, value, page}
 
+  /* Leave whatever view is covering the catalogue, whoever opened it.
+   *
+   * Three separate reports in Seb's 2026-09-03 review turned out to be this
+   * one omission: the nav was never taken over from Elio the way the filter
+   * controls were, and only two of his seventeen nav items carry a handler at
+   * all.
+   *
+   *   <div class="orion-navitem orion-navitem--active" id="navHome"
+   *        onclick="closeRequestView();">
+   *
+   * - "the sidebar does not switch the page": Creo, Windchill and the other
+   *   fourteen have NO handler of Elio's. Ours set the filter underneath, but
+   *   #mainThread was still display:none from the details page, so a click
+   *   changed state nobody could see.
+   * - "the details page becomes half-size with home above it": Home's inline
+   *   onclick runs Elio's closeRequestView(), which restores the topbar and
+   *   the thread. It knows nothing about #videoPreviewPage, which our code
+   *   opened, so both ended up on screen at once.
+   * - "the highlight stays on Home": orion-navitem--active is written into
+   *   Home's markup, and markNavActive() was toggling `is-active`, a class
+   *   with no rule behind it anywhere in the stylesheet. The highlight was
+   *   never ours to move.
+   *
+   * Both closers run, because either view can be the one in front, and each
+   * is safe to call when its own view is already shut. */
+  function exitOverlays() {
+    if (typeof window.closeRequestView === "function") {
+      try { window.closeRequestView(); } catch (err) {
+        console.warn("[hub-api] closeRequestView threw", err);
+      }
+    }
+    closeAssetDetail();
+    // The hash has to follow, or a refresh reopens the page we just left.
+    if ((location.hash || "").indexOf("#/asset/") === 0) {
+      history.pushState(null, "", location.pathname + location.search);
+    }
+  }
+
   function wireNav(facets) {
     var families = {}, stages = {}, umbrellas = {};
     (facets.product_families || []).forEach(function (f) { families[f.value] = 1; });
@@ -883,7 +921,18 @@
 
       navTargets[name] = target;
       item.style.cursor = "pointer";
+
+      // Home's inline onclick is Elio's, and it half-restores the catalogue
+      // from underneath a details page. exitOverlays() below does the whole
+      // job, his half included. Request New Asset keeps its own onclick --
+      // that one opens a view we have no replacement for.
+      if (name === "Home") item.removeAttribute("onclick");
+
       item.addEventListener("click", function () {
+        // Every nav click leaves the details page. Seb asked for a sidebar
+        // that switches the page; the alternative -- an inert sidebar while a
+        // details page is open -- is the behaviour he reported as broken.
+        exitOverlays();
         if (!target.control) {
           clearAll();
           if (target.sort) { sortOverride = target.sort; applyFilters(); }
@@ -998,7 +1047,13 @@
     document.querySelectorAll(".orion-navitem").forEach(function (item) {
       var target = navTargets[navLabel(item)];
       var on = false;
-      if (target && !target.control) on = !anyOn;                  // Home
+      if (target && !target.control) {
+        // Home and Latest Uploads both have control:null, so one test used to
+        // cover both -- lighting the pair together on the home page, and
+        // neither once Latest Uploads set a sort. The sort is what tells them
+        // apart: Home is "nothing is on", Latest Uploads is "this sort is on".
+        on = target.sort ? sortOverride === target.sort : !anyOn;
+      }
       else if (target && target.control === "umbrella") {
         on = umbrellaFilter === target.value;
       }
@@ -1007,6 +1062,11 @@
         on = !!el && el.value === target.value;
       }
       item.classList.toggle("is-active", on);
+      // The class that actually shows. `is-active` is ours and has no rule
+      // behind it in 2.5 MB of stylesheet; orion-navitem--active is Elio's and
+      // is what draws the highlight. Toggling only ours meant the highlight
+      // sat wherever his markup left it, which was Home, for ever.
+      item.classList.toggle("orion-navitem--active", on);
     });
   }
 
@@ -1325,11 +1385,22 @@
      * shown when it has something to be. */
     var player = page.querySelector(".vp-player");
     if (player) {
-      var playable = !!previewUrl(asset);
-      player.style.display = (asset.thumbnail_url || playable) ? "" : "none";
+      // The page is reused for every asset, so last one's cover has to go
+      // before this one's is painted, or the marks stack up.
+      player.querySelectorAll(".hub-cover__mark")
+            .forEach(function (m) { m.remove(); });
+      player.classList.remove("hub-cover");
+      player.style.removeProperty("--cover-hue");
+
+      // Seb, 2026-09-03: give the assets with no thumbnail a placeholder here
+      // as well. It used to hide the player outright when there was neither a
+      // still nor anything to play -- true of most SharePoint kits -- so the
+      // details page opened straight onto the title with no header at all.
+      player.style.display = "";
       player.style.background = asset.thumbnail_url
         ? "#000 url(" + JSON.stringify(asset.thumbnail_url) + ") center/contain no-repeat"
         : "";
+      if (!asset.thumbnail_url) paintCoverInto(player, asset);
       var play = player.querySelector(".vp-player__play");
       if (play) {
         var canPlay = !!previewUrl(asset);
@@ -1898,7 +1969,13 @@
   }
 
   function paintCover(card, a) {
-    var thumb = card.querySelector(".asset-card__thumb");
+    paintCoverInto(card.querySelector(".asset-card__thumb"), a);
+  }
+
+  /* Split out from paintCover so the details page can use the same cover.
+   * Seb asked for the placeholder there too, and the alternative was a second
+   * implementation that would drift from this one. */
+  function paintCoverInto(thumb, a) {
     if (!thumb || a.thumbnail_url) return;      // a real picture always wins
 
     var family = coverFamily(a);

@@ -2219,6 +2219,89 @@ hubApplyFilters();
   .attach-warn { display: block; font-size: 12px; line-height: 1.5;
     color: #c2410c; }
   .attach-size { color: var(--orion-text-3); font-variant-numeric: tabular-nums; }
+
+  /* ==================================================================
+     Seb's review, 2026-09-03. This block sits at the end deliberately:
+     Elio's :root is 2.5 MB above, and equal specificity is settled by
+     source order, so overriding from the top of the file would need a
+     specificity hack instead.
+     ================================================================== */
+
+  /* PTC brand green in place of Elio's indigo, with the palette Seb attached.
+     The token names stay `--orion-indigo` -- they are threaded through
+     eighteen of his rules, and renaming them would turn a colour change into
+     a merge conflict on every future revision of his file.
+
+     Two greens rather than one, and which goes where was measured rather than
+     judged. Elio's file has a real dark theme, and no single green clears AA
+     on both of its grounds:
+
+                       on #ffffff      on #1c1f23
+       #40AA1D           3.01:1  x       5.51:1  ok
+       #00890B           4.58:1  ok      2.94:1  x
+
+     The brand palette happens to contain exactly the pair needed, so the
+     accent follows the theme: the secondary green on the light ground, the
+     primary green Seb pointed at on the dark one. Anything that fills a shape
+     behind WHITE text is pinned to #00890B in both themes -- white on the
+     primary green is 3.01:1, which is fine for a border and not for a 12.5px
+     button label. */
+  :root {
+    --orion-indigo:        #00890B;   /* PTC secondary green */
+    --orion-indigo-strong: #00650A;   /* hover / pressed */
+    --orion-indigo-soft:   #eaf5e5;
+    --orion-link:          #00890B;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --orion-indigo:      #40AA1D;   /* PTC primary green, PMS 2421C */
+      --orion-indigo-soft: #16301a;
+      --orion-link:        #40AA1D;
+    }
+  }
+  :root[data-theme="dark"] {
+    --orion-indigo:        #40AA1D;
+    --orion-indigo-soft:   #16301a;
+    --orion-link:          #40AA1D;
+  }
+  /* --orion-link is set with the tokens above. It was #2563eb, the most
+     saturated blue on Seb's screenshot -- the "Technical Demo Development"
+     breadcrumb -- so leaving it would have answered his note halfway. */
+
+  /* Pinned rather than tokenised: these three fill a shape and put white text
+     on it, so they need the green that carries white in BOTH themes. */
+  .play-btn, .btn-primary-sm, .vp-player__play { background: #00890B; }
+  .play-btn:hover, .btn-primary-sm:hover, .vp-player__play:hover {
+    background: #00650A;
+  }
+
+  /* Re-index is gone from the details page. Seb: it is an administrator's
+     action and a global one -- re-indexing from a single asset invites 807
+     people to trigger 807 partial runs, and the button implied a per-asset
+     scope the sync does not have. It belongs in the Admin area, which is not
+     built yet, so the honest state is no button rather than a disabled one. */
+  .vp-reindex { display: none !important; }
+
+  /* Back to the catalogue, made prominent. Seb's review left the details page
+     as the one view with no obvious exit: the link was 13px of secondary grey
+     with no affordance, in a layout where everything else that navigates is a
+     button. Now it reads as one. */
+  .vp-back { font-size: 13px; font-weight: 600; color: var(--orion-text);
+    border: 1px solid var(--orion-border-md); border-radius: 999px;
+    padding: 7px 15px 7px 11px; background: var(--orion-surface);
+    transition: background .12s, border-color .12s, color .12s; }
+  .vp-back:hover { color: var(--orion-indigo-strong); background: var(--orion-indigo-soft);
+    border-color: var(--orion-indigo); }
+  .vp-back svg { width: 16px; height: 16px; }
+
+  /* The placeholder cover on the details page, which Seb asked for.
+     Nothing new is invented: it is the same cover the cards already paint for
+     the 455 assets with no thumbnail, at the size this panel wants. The player
+     used to be hidden outright when there was neither a still nor anything to
+     play, so the page began abruptly at the title. */
+  .vp-player.hub-cover { background-color: var(--orion-frame); }
+  .vp-player .hub-cover__mark svg { width: 92px; height: 92px; opacity: .5; }
+  .vp-player .hub-cover__mark--text { font-size: 30px; letter-spacing: -.2px; }
 </style>
 <div id="hubApiStatus" class="hub-api-status"></div>
 <script src="/static/hub-api.js" defer></script>

@@ -1957,7 +1957,7 @@
         preview.type = "button";
         preview.className = "vp-file__preview";
         preview.title = "Preview";
-        preview.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg>';
+        preview.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg>Preview';
         preview.addEventListener("click", function () {
           openFilePreview(asset, previewable, previewable.indexOf(f));
         });
@@ -1974,7 +1974,7 @@
         docPreview.target = "_blank";
         docPreview.rel = "noopener";
         docPreview.href = filePreviewUrl(asset.id, f.item_id);
-        docPreview.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg>';
+        docPreview.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg>Preview';
         row.insertBefore(docPreview, row.lastChild);
       }
       list.appendChild(row);

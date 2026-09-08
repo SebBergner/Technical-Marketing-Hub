@@ -2138,12 +2138,20 @@ hubApplyFilters();
     white-space:nowrap; flex:0 0 auto; }
   .vp-files__download-all:hover { background:var(--orion-surface-2); }
   .vp-files__download-all svg { width:13px; height:13px; }
-  .vp-file__preview { flex:0 0 auto; display:flex; align-items:center;
-    justify-content:center; width:24px; height:24px; padding:0;
-    border:none; background:transparent; border-radius:var(--orion-radius-sm);
-    color:var(--orion-text-3); cursor:pointer; }
-  .vp-file__preview:hover { background:var(--orion-surface-2); color:var(--orion-text); }
-  .vp-file__preview svg { width:15px; height:15px; }
+  /* Liwei, 2026-09-08: the icon-only grey button "太过不明显" -- easy to miss
+     next to a filename. PTC green text and border at rest, so it reads as an
+     action rather than another muted fact in the row; solid green on hover,
+     the same #00890B every other filled button in this app pins to in both
+     themes (--orion-indigo itself is #40AA1D in dark mode, which carries
+     white text at only 3.01:1 -- fine for the idle text/border here, not
+     enough for a solid fill, so the fill is pinned rather than themed). */
+  .vp-file__preview { flex:0 0 auto; display:inline-flex; align-items:center;
+    gap:5px; padding:4px 10px; font-size:11.5px; font-weight:700;
+    color:var(--orion-indigo); background:var(--orion-indigo-soft);
+    border:1px solid var(--orion-indigo); border-radius:var(--orion-radius-pill);
+    cursor:pointer; white-space:nowrap; text-decoration:none; }
+  .vp-file__preview:hover { background:#00890B; border-color:#00890B; color:#fff; }
+  .vp-file__preview svg { width:12px; height:12px; }
 
 
   .hub-boot { display: flex; flex-direction: column; align-items: center;

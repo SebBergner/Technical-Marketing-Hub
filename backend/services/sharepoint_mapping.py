@@ -227,6 +227,9 @@ def build_resource(filename: str, subfolder: str | None = None,
     if isinstance(item.get("size"), int):
         row["size_bytes"] = item["size"]
 
+    if item.get("id"):
+        row["item_id"] = item["id"]
+
     video = item.get("video") or {}
     if isinstance(video, dict):
         # Graph reports duration in milliseconds; everything else here is

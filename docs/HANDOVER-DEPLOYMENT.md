@@ -362,14 +362,18 @@ values are in Azure.**
 | `CONSENSUS_API_SECRET` | **secret** |
 | `CONSENSUS_USER_EMAIL` | fallback acting account only. A DemoBoard is created as the **signed-in user**; this is used when there is no identity, i.e. locally |
 | `CONSENSUS_SOURCE_NAME` | `TDD Portal` |
-| `CONSENSUS_VIEWER_URL_TEMPLATE` | `https://play.goconsensus.com/{hash}?preview=marketing` |
+| `CONSENSUS_VIEWER_URL_TEMPLATE` | `https://play.goconsensus.com/{hash}?preview=sales` |
 
 > **The query string is load-bearing.** Without it the viewer opens and does not
-> play. It changed from `?preview=sales` to `?preview=marketing` on 2026-09-02
-> at Elio's request — the sales preview shows "Viewer 1"-style usernames and
-> lets a customer be handed a raw preview link, which loses usage tracking.
-> `backend/config.py` already defaults to `marketing`; an older revision of
-> `docs/deploying.md` said `sales` and was wrong. Corrected 2026-09-03.
+> play. It has flipped twice: `sales` → `marketing` on 2026-09-02 at Elio's
+> request (the sales preview shows "Viewer 1"-style usernames and lets a
+> customer be handed a raw preview link), then `marketing` → `sales` again on
+> 2026-09-08, also Elio, after reviewing the Hub with Seb — `marketing`
+> "performed poorly" in practice, no further detail given. `backend/config.py`
+> now defaults to `sales` again. The value is hardcoded in three places
+> (`config.py`'s default, `consensus_sync.py`'s `sales_view()`, and
+> `hub-api.js`'s `previewUrl()`) — a third flip is worth consolidating into
+> one setting the frontend reads too, rather than fixing three files again.
 
 #### Only needed to re-sync Consensus
 

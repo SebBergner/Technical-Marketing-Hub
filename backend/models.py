@@ -113,6 +113,15 @@ class AssetResource(BaseModel):
     width: int | None = None
     height: int | None = None
 
+    #: This file's own Graph item id, also free from the same children
+    #: listing. It is what a download link resolves at click time -- never
+    #: stored as a URL itself, because Graph's pre-authenticated download URL
+    #: expires in about an hour and a mirror can sit for weeks. None on
+    #: resources synced before this field existed, or on a Consensus asset,
+    #: which has no folder to point into; either way the file name renders as
+    #: plain text instead of a dead link.
+    item_id: str | None = None
+
 
 class AssetStats(BaseModel):
     views: int = 0

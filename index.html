@@ -684,7 +684,7 @@ a:hover { text-decoration: underline; }
       <div class="orion-group">Browse by Type</div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-video"/></svg> Videos</span> <span class="count">86</span></div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-box"/></svg> LDKs <span class="orion-subtle" style="font-size:11px;">Live Demo Kits</span></span> <span class="count">22</span></div>
-      <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-monitor"/></svg> VDKs <span class="orion-subtle" style="font-size:11px;">Video Demo Kits</span></span> <span class="count">9</span></div>
+      <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-monitor"/></svg> VDKs <span class="orion-subtle" style="font-size:11px;">Virtual Demo Kits</span></span> <span class="count">9</span></div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-monitor"/></svg> Virtual Machines</span> <span class="count">14</span></div>
 
       <div class="orion-group">Funnel Stage</div>
@@ -710,7 +710,7 @@ a:hover { text-decoration: underline; }
     <div class="orion-topbar" id="mainTopbar">
       <div class="orion-breadcrumb">Sales Enablement / <a>Technical Demo Development</a></div>
       <h1 class="orion-title">Technical Marketing Hub</h1>
-      <div class="orion-subtle">One home for Videos, LDKs, VDKs, and Virtual Machines — replacing the separate Demo Library, Demo Video Gallery, and VM pages.</div>
+      <div class="orion-subtle">One home for Videos, Live Demo Kits (LDKs), Virtual Demo Kits (VDKs), and Virtual Machines — replacing the separate Demo Library, Demo Video Gallery, and VM pages.</div>
       <div class="hero-search">
         <div class="hero-search__field">
           <svg class="orion-ico ico-muted"><use href="#i-search"/></svg>
@@ -2088,10 +2088,22 @@ hubApplyFilters();
   .vp-file:last-child { border-bottom:none; }
   .vp-file__name { color:var(--orion-text); overflow:hidden;
     text-overflow:ellipsis; white-space:nowrap; }
+  /* Only a real <a> gets these -- the plain-text fallback for a resource with
+     no item_id is a <span>, and text-decoration/cursor on it would promise a
+     click that does nothing. */
+  a.vp-file__name { text-decoration:none; cursor:pointer; }
+  a.vp-file__name:hover { text-decoration:underline; color:var(--orion-link); }
   .vp-file__facts { margin-left:auto; flex:0 0 auto; color:var(--orion-text-3);
     font-variant-numeric:tabular-nums; }
   .vp-files__note { margin-top:10px; font-size:12px; color:var(--orion-text-3);
     line-height:1.5; }
+  .vp-files__download-all { margin-left:10px; padding:5px 12px; font-size:12px;
+    font-weight:600; color:var(--orion-text); background:var(--orion-surface);
+    border:1px solid var(--orion-border-md); border-radius:var(--orion-radius-sm);
+    cursor:pointer; display:inline-flex; align-items:center; gap:5px;
+    white-space:nowrap; flex:0 0 auto; }
+  .vp-files__download-all:hover { background:var(--orion-surface-2); }
+  .vp-files__download-all svg { width:13px; height:13px; }
 
 
   .hub-boot { display: flex; flex-direction: column; align-items: center;

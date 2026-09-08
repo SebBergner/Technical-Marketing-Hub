@@ -181,9 +181,13 @@ def viewer_url(demo: dict) -> str | None:
     it even though the docstring above recorded the correct value, which is how
     every Consensus play button came to lead somewhere dead.
 
-    **`marketing`, not `sales`.** Both are preview modes and neither records
-    engagement, but they differ in what the visitor sees, and Elio asked for
-    the marketing one on 2026-09-02. Verified in a browser the same day:
+    **`sales`, not `marketing`.** Both are preview modes and neither records
+    engagement, but they differ in what the visitor sees. Elio asked for
+    `marketing` on 2026-09-02, to drop the viewer picker below, then asked to
+    go back on 2026-09-08 after reviewing the Hub with Seb: `marketing`
+    "performed poorly" in practice, no further detail given. Taken at face
+    value rather than re-verified, since it came from the person who owns
+    this content.
 
         ?preview=sales      "viewing this DemoBoard in Preview Mode", and a
                             welcome panel offering First Viewer / Second
@@ -191,9 +195,10 @@ def viewer_url(demo: dict) -> str | None:
         ?preview=marketing  "viewing this Public Link in Preview Mode", and no
                             viewer picker at all
 
-    The viewer picker is the objection. It belongs to a DemoBoard, where the
-    recipient identifies themselves; on a link the Hub hands out it is asking a
-    colleague to pretend to be someone's customer.
+    The viewer picker was the original objection to `sales` -- it belongs to a
+    DemoBoard, where the recipient identifies themselves, and reads oddly on a
+    link the Hub hands out cold. Whatever `marketing` cost in exchange
+    outweighed it.
 
     Prefer the real `previewLink` from V1 where it can be had — see
     `media_from_v1` — and reach this only when it cannot.
@@ -202,7 +207,7 @@ def viewer_url(demo: dict) -> str | None:
     if not uuid:
         return None
     template = (settings.consensus_viewer_url_template
-                or "https://play.goconsensus.com/{hash}?preview=marketing")
+                or "https://play.goconsensus.com/{hash}?preview=sales")
     return template.format(hash=uuid)
 
 

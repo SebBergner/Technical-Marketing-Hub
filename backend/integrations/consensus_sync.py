@@ -163,7 +163,7 @@ def build_assets(demos: list[ConsensusDemo]) -> tuple[list[Asset], ConsensusSync
             language=(raw.get("language") or {}).get("code") or "en",
             duration_seconds=parsed["duration_seconds"],
             thumbnail_url=next(iter(raw.get("previewThumbs") or []), None),
-            web_url=marketing_view(raw.get("previewLink")),
+            web_url=sales_view(raw.get("previewLink")),
             source_item_id=demo.uuid,
             consensus_uuid=demo.uuid,
             internal_title=(demo.raw or {}).get("internalTitle"),
@@ -201,27 +201,30 @@ def fingerprint(assets: list[Asset]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
-def marketing_view(link: str | None) -> str | None:
-    """Turn V1's `?preview=sales` link into the marketing one.
+def sales_view(link: str | None) -> str | None:
+    """Make sure V1's link carries `?preview=sales`.
 
-    V1 returns exactly one link per demo and it is always the sales preview.
-    The marketing preview is the same URL with a different mode, so it costs a
-    string replacement rather than the `marketing/createlink` call it first
-    looked like it would — which matters, because that call is **not
-    idempotent**: two calls for one demo returned two different hashes, so
-    using it would have meant creating and caching a link per demo forever.
+    V1 returns exactly one link per demo and it is already the sales preview,
+    so this is a no-op in the common case. It earns its keep on the two edge
+    cases: some other mode already on the link, or no mode at all, either of
+    which would open a viewer with the wrong screen or nothing to play.
 
-    Why marketing: the sales preview greets the viewer with First Viewer /
-    Second Viewer buttons, which make sense when a named recipient opens a
-    DemoBoard and no sense at all on a link the Hub hands to a colleague.
+    Was `marketing_view()`, doing the same job in the other direction, from
+    2026-09-02 to 2026-09-08. Elio asked for `marketing` first, to drop the
+    sales preview's First Viewer / Second Viewer picker on a link handed to a
+    colleague, then asked to revert after reviewing the Hub with Seb --
+    `marketing` "performed poorly" in practice. See `viewer_url()` in
+    consensus_v2.py for the fuller history; kept here as a function rather
+    than deleted because this is now the second time the same parameter has
+    flipped, which is a pattern, not a one-off.
     """
     if not link:
         return None
-    if "preview=sales" in link:
-        return link.replace("preview=sales", "preview=marketing")
+    if "preview=marketing" in link:
+        return link.replace("preview=marketing", "preview=sales")
     if "preview=" in link:
         return link
-    return link + ("&" if "?" in link else "?") + "preview=marketing"
+    return link + ("&" if "?" in link else "?") + "preview=sales"
 
 
 def media_from_v1(client: ConsensusClient | None) -> dict[str, dict]:
@@ -246,7 +249,7 @@ def media_from_v1(client: ConsensusClient | None) -> dict[str, dict]:
         return {
             d.uuid: {
                 "thumbnail": next(iter((d.raw or {}).get("previewThumbs") or []), None),
-                "preview_link": marketing_view((d.raw or {}).get("previewLink")),
+                "preview_link": sales_view((d.raw or {}).get("previewLink")),
             }
             for d in client.list_demos(limit=2000)
         }

@@ -133,7 +133,7 @@ a pointer rather than the secret itself, and rotation stops being a redeploy.
 | `CONSENSUS_API_SECRET` | **secret** |
 | `CONSENSUS_USER_EMAIL` | the fallback acting account. A DemoBoard is created as the **signed-in user**; this is only used when there is no identity, i.e. locally |
 | `CONSENSUS_SOURCE_NAME` | `TDD Portal` |
-| `CONSENSUS_VIEWER_URL_TEMPLATE` | `https://play.goconsensus.com/{hash}?preview=marketing` — the query string is load-bearing; without it the viewer opens with nothing to play. It was `preview=sales` until 2026-09-02, when Elio asked for the marketing view instead: the sales preview shows "Viewer 1"-style usernames and lets a customer be handed a raw preview link, which loses usage tracking |
+| `CONSENSUS_VIEWER_URL_TEMPLATE` | `https://play.goconsensus.com/{hash}?preview=sales` — the query string is load-bearing; without it the viewer opens with nothing to play. Flipped to `marketing` on 2026-09-02 (Elio: the sales preview shows "Viewer 1"-style usernames and lets a customer be handed a raw preview link), then back to `sales` on 2026-09-08 (Elio, after reviewing with Seb: `marketing` "performed poorly" in practice). Second flip in a week — if it moves again, worth making a single setting the frontend reads too, rather than a value hardcoded in three places |
 
 ### Only needed to re-sync Consensus
 

@@ -403,10 +403,14 @@
 
   //: Watch it here. A preview: no engagement is recorded, which Liwei
   //: confirmed is acceptable for browsing.
+  // `sales`, not `marketing` -- flipped 2026-09-08, Elio via Seb's review:
+  // marketing "performed poorly" after ten days live. This mirrors
+  // sales_view() in consensus_sync.py; if this parameter changes a third
+  // time, it is worth reading from one place instead of two.
   function previewUrl(a) {
     if (a.source === "consensus") return a.web_url;
     return a.consensus_uuid
-      ? "https://play.goconsensus.com/" + a.consensus_uuid + "?preview=marketing"
+      ? "https://play.goconsensus.com/" + a.consensus_uuid + "?preview=sales"
       : null;
   }
 
@@ -1481,17 +1485,26 @@
     }
 
     // A copyable link to exactly this page -- the point of the whole page.
+    //
+    // Labelled "Copy Internal Link", not "Copy link": Elio's note after
+    // Seb's review (2026-09-08) was that "Copy Link" reads as if it were
+    // fine to hand to a customer. It is not -- it opens the Hub itself, with
+    // no licence check and no watermark, unlike "Create DemoBoard" beside it.
+    // Keeping the verb "Copy" (that is still exactly what the button does,
+    // no dialog, no share flow) and disambiguating the noun said what Elio
+    // was after without implying an action the button doesn't take.
     var actions = page.querySelector(".vp-actions");
     if (actions && !document.getElementById("vpCopyLink")) {
       var copy = document.createElement("button");
       copy.className = "btn-ghost";
       copy.id = "vpCopyLink";
-      copy.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-file-text"/></svg>Copy link';
+      copy.title = "This opens the Hub itself -- for colleagues, not customers.";
+      copy.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-file-text"/></svg>Copy Internal Link';
       copy.addEventListener("click", function () {
         navigator.clipboard.writeText(assetUrl(detailAsset.id));
         copy.textContent = "Copied";
         setTimeout(function () { copy.innerHTML =
-          '<svg class="orion-ico--sm orion-ico"><use href="#i-file-text"/></svg>Copy link'; }, 1500);
+          '<svg class="orion-ico--sm orion-ico"><use href="#i-file-text"/></svg>Copy Internal Link'; }, 1500);
       });
       actions.appendChild(copy);
     }
@@ -1572,6 +1585,42 @@
    * and nobody picks a `part.prt.1` out of a list; the counts line says how
    * many there are.
    */
+  /* Where a file's own bytes come from -- resolved fresh by the server on
+   * every click via GraphClient.download_url(), never stored, because that
+   * URL is pre-authenticated and expires in about an hour. `item_id` is None
+   * on a resource synced before this field existed, or on anything that
+   * isn't a SharePoint folder in the first place; renderFileList() falls
+   * back to plain text in that case rather than linking to a 404. */
+  function fileDownloadUrl(assetId, itemId) {
+    return "/api/assets/" + encodeURIComponent(assetId) + "/files/"
+         + encodeURIComponent(itemId) + "/download";
+  }
+
+  /* Each file downloads through its own redirect, one browser tab per file,
+   * not a zip -- there is no server-side zip machinery in this app, and
+   * building one to bundle at most a handful of files is a lot of new
+   * surface for what Elio asked for "if possible" ahead of a Friday
+   * deadline. Staggered rather than fired at once: Chrome treats several
+   * downloads opened synchronously from one click as a popup flood and
+   * blocks all but the first, so this spaces them out enough that each looks
+   * like its own gesture. The prompt Chrome still shows once per site
+   * ("this site is trying to download multiple files") is expected, not a
+   * bug -- accepting it is a one-time step for whoever uses this first. */
+  function downloadAllFiles(assetId, files) {
+    files.filter(function (f) { return f.item_id; })
+        .forEach(function (f, i) {
+      setTimeout(function () {
+        var a = document.createElement("a");
+        a.href = fileDownloadUrl(assetId, f.item_id);
+        a.target = "_blank";
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }, i * 400);
+    });
+  }
+
   function renderFileList(page, asset) {
     var existing = page.querySelector(".vp-files");
     if (existing) existing.remove();
@@ -1591,6 +1640,21 @@
       + '<svg class="orion-ico"><use href="#i-file-text"/></svg>Files in this folder'
       + '</div><span class="vp-files__summary">' + escapeHtml(summary) + '</span></div>';
 
+    var downloadable = files.filter(function (f) { return f.item_id; });
+    // Redundant at one file -- that file's own link already does the job --
+    // so the button earns its place only once there is more than one.
+    if (downloadable.length > 1) {
+      var all = document.createElement("button");
+      all.type = "button";
+      all.className = "vp-files__download-all";
+      all.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-clock"/></svg>Download all';
+      all.title = "Opens each file in its own tab -- there is no single combined file.";
+      all.addEventListener("click", function () {
+        downloadAllFiles(asset.id, downloadable);
+      });
+      box.querySelector(".vp-card__head").appendChild(all);
+    }
+
     var list = document.createElement("div");
     list.className = "vp-files__list";
     files.forEach(function (f) {
@@ -1606,8 +1670,26 @@
       row.innerHTML =
           '<svg class="orion-ico orion-ico--sm ico-muted"><use href="#'
         +   (FILE_ICON[f.kind] || "i-file-text") + '"/></svg>'
-        + '<span class="vp-file__name">' + escapeHtml(f.name) + '</span>'
         + '<span class="vp-file__facts">' + escapeHtml(facts) + '</span>';
+
+      // A real <a>, not a string-built one: an href assigned as a DOM
+      // property needs no attribute-quote escaping, unlike the innerHTML
+      // this row otherwise builds with.
+      if (f.item_id) {
+        var link = document.createElement("a");
+        link.className = "vp-file__name";
+        link.href = fileDownloadUrl(asset.id, f.item_id);
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.title = "Download";
+        link.textContent = f.name;
+        row.insertBefore(link, row.lastChild);
+      } else {
+        var name = document.createElement("span");
+        name.className = "vp-file__name";
+        name.textContent = f.name;
+        row.insertBefore(name, row.lastChild);
+      }
       list.appendChild(row);
     });
     box.appendChild(list);

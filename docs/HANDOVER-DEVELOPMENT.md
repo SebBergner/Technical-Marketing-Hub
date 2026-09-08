@@ -421,23 +421,40 @@ Three doors on every card:
 | Platform logo | the source platform: SharePoint `web_url`, or the Consensus library searched by `internal_title` |
 
 Consensus sends no `X-Frame-Options` or `frame-ancestors`, so the iframe works.
-The marketing view is reached by rewriting the demo's own link:
+
+**The preview mode has flipped twice, and it is currently `sales`, not
+`marketing`.** Both are reached by rewriting the demo's own link, in
+`sales_view()` (`backend/integrations/consensus_sync.py`, renamed from
+`marketing_view()` on the second flip):
 
 ```javascript
-function marketing_view(link) {          // backend/integrations/consensus_sync.py
-  return link.replace("preview=sales", "preview=marketing");
+function sales_view(link) {              // backend/integrations/consensus_sync.py
+  return link.replace("preview=marketing", "preview=sales");
 }
 ```
 
-**Why not `marketing/createlink`?** It was tested against the live API. It is
-**not idempotent** (every call creates another link) and created links **cannot
-be listed back**, so caching them would mean an unbounded, unauditable pile of
-links in Consensus. `?preview=marketing` is free, needs no storage and gives
-the same view. Elio's two requirements were: use the marketing view, not the
-sales preview (which shows ugly "Viewer 1" usernames and lets customers get a
-raw preview link), and use a chrome-less popup rather than a new tab. Both are
-met. The trade-off Liwei explicitly accepted: no per-view tracking, and a
-watermark.
+History: Elio's original two requirements (2026-09-02) were to use the
+marketing view rather than the sales preview (which shows ugly "Viewer 1"
+usernames and lets customers get a raw preview link), and a chrome-less popup
+rather than a new tab — see `openPreview()`. On 2026-09-08, after reviewing
+the Hub with Seb, Elio asked to revert: `marketing` "performed poorly" in
+practice, no further detail given, taken at face value. The popup mechanism
+is unaffected, only the query string changed back.
+
+**Why not `marketing/createlink`?** Tested against the live API, both times.
+It is **not idempotent** (every call creates another link) and created links
+**cannot be listed back**, so caching them would mean an unbounded,
+unauditable pile of links in Consensus. Rewriting the query string on the real
+`previewLink` is free, needs no storage, and survives either direction of this
+flip with a one-line change.
+
+**The value is hardcoded in three independent places** — `config.py`'s
+`consensus_viewer_url_template` default, `consensus_sync.py`'s `sales_view()`,
+and `hub-api.js`'s `previewUrl()` — because the frontend has no way to read a
+server setting today. Missing one of the three on the first flip is exactly
+how a change like this ships half-done. If this parameter moves a third time,
+worth exposing it through an endpoint the frontend already calls (`/api/taxonomy`
+or similar) rather than fixing three files again.
 
 ### 5.5 Notable `hub-api.js` internals
 
@@ -724,10 +741,11 @@ and the operation says out loud what it did. See `graph/writeback.py` and
 
 ### Cleanup noticed but not done
 
-9. `docs/deploying.md` had a stale `CONSENSUS_VIEWER_URL_TEMPLATE` value
-   (`?preview=sales`); the code now defaults to `?preview=marketing`. Corrected
-   in this handover pass — mentioned so the discrepancy is not rediscovered as
-   a bug.
+9. The Consensus preview mode (`?preview=sales` vs `?preview=marketing`) has
+   flipped twice since this document was first written — see §5.4 for the
+   current value and the full history, and don't trust an older revision of
+   this note or of `docs/deploying.md` on this point without checking
+   `backend/config.py` directly first.
 
 ---
 

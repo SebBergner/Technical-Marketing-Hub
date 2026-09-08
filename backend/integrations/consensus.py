@@ -320,7 +320,7 @@ class HttpConsensusClient:
 
     def __init__(self, base_url: str, api_key: str, api_secret: str,
                  user_email: str, source_name: str = "TDD Portal",
-                 viewer_url_template: str = "https://play.goconsensus.com/{hash}?preview=marketing",
+                 viewer_url_template: str = "https://play.goconsensus.com/{hash}?preview=sales",
                  timeout: float = 20.0,
                  transport: httpx.BaseTransport | None = None):
         self._base = base_url.rstrip("/")

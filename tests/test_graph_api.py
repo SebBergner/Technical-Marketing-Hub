@@ -7,6 +7,7 @@ so its wiring — auth, status codes, the dry-run default — is pinned here.
 """
 from __future__ import annotations
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -15,12 +16,14 @@ from backend.auth import AuthMode
 from backend.config import settings
 from backend.deps import get_repo
 from backend.models import (
-    Asset, AssetType, MetadataProposal, ProposalOrigin, ProposalState,
+    Asset, AssetResource, AssetType, MetadataProposal, ProposalOrigin, ProposalState,
 )
 from backend.repositories.json_repo import JsonAssetRepository
 from backend.routers.graph import require_client
 from tests.test_auth import CURATOR_GROUP, easyauth_headers
-from tests.test_graph_writeback import ITEM_ID, UUID, client_for, make_handler
+from tests.test_graph_writeback import (
+    DRIVE_ID, ITEM_ID, SITE_ID, SITE_URL, UUID, client_for, make_handler,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -184,3 +187,77 @@ def test_the_audit_trail_names_the_curator_who_ran_it(client, repo, enforcing):
     entry = repo.metadata_edits()[0]
     assert "elio@ptc.com" in entry["changed_by"], "who accepted the value"
     assert "curator@ptc.com" in entry["changed_by"], "who pushed it"
+
+
+# ═══════════════════════════════ file download ═════════════════════════════
+# Lives here rather than a dedicated assets-router file because it reuses the
+# same Graph-mocking infrastructure as the tests above -- SITE_ID, DRIVE_ID,
+# client_for -- even though the route itself hangs off /api/assets.
+
+FILE_ITEM_ID = "01FILEXXXXXXXXXXXXXX"
+
+
+def download_handler(*, download_url="https://contoso.sharepoint.com/signed?x=1"):
+    """Answers exactly the three calls download_file() makes: resolve the
+    site, find the Demo Catalog drive, then get_item() for the download URL."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if ":/sites/" in path or path.endswith(f"/sites/{SITE_URL.split('/sites/')[1]}"):
+            return httpx.Response(200, json={
+                "id": SITE_ID, "displayName": "EXT-TDD", "webUrl": SITE_URL})
+        if path.endswith(f"/sites/{SITE_ID}/drives"):
+            return httpx.Response(200, json={
+                "value": [{"id": DRIVE_ID, "name": "Demo Catalog"}]})
+        if path.endswith(f"/drives/{DRIVE_ID}/items/{FILE_ITEM_ID}"):
+            return httpx.Response(200, json={
+                "id": FILE_ITEM_ID, "name": "Overview.mp4",
+                "@microsoft.graph.downloadUrl": download_url})
+        return httpx.Response(404, json={"error": {"message": f"unexpected {path}"}})
+    return handler
+
+
+@pytest.fixture()
+def repo_with_a_file(repo):
+    """The shared `repo` fixture again, but with one downloadable resource
+    added to "a-kit" -- a fresh replace_source_rows() call, not a mutation, so
+    it stays isolated to the tests that ask for it."""
+    repo.replace_source_rows([Asset(
+        id="a-kit", type=AssetType.LDK, title="A Kit", source_item_id=ITEM_ID,
+        resources=[AssetResource(name="Overview.mp4", kind="video",
+                                 item_id=FILE_ITEM_ID)],
+    )], "sharepoint")
+    return repo
+
+
+def test_a_listed_file_redirects_to_a_fresh_signed_url(client, repo_with_a_file):
+    with_graph(download_handler())
+
+    response = client.get(f"/api/assets/a-kit/files/{FILE_ITEM_ID}/download",
+                          follow_redirects=False)
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "https://contoso.sharepoint.com/signed?x=1"
+
+
+def test_an_item_id_not_on_this_asset_is_refused(client, repo_with_a_file):
+    """The point of checking membership at all: Graph would resolve any valid
+    id in the drive regardless of which asset it is nominally under."""
+    with_graph(download_handler())
+
+    response = client.get("/api/assets/a-kit/files/not-a-real-item/download",
+                          follow_redirects=False)
+
+    assert response.status_code == 404
+
+
+def test_download_of_an_unknown_asset_is_404(client, repo_with_a_file):
+    with_graph(download_handler())
+
+    response = client.get(f"/api/assets/no-such-asset/files/{FILE_ITEM_ID}/download")
+
+    assert response.status_code == 404
+
+
+def test_download_without_graph_configured_is_503(client, repo_with_a_file):
+    response = client.get(f"/api/assets/a-kit/files/{FILE_ITEM_ID}/download")
+    assert response.status_code == 503

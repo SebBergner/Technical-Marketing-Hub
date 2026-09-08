@@ -78,6 +78,33 @@ def record_view(asset_id: str, repo: AssetRepository = Depends(get_repo)):
     repo.increment_stat(asset_id, "views")
 
 
+def _require_listed_file(asset_id: str, item_id: str, repo: AssetRepository) -> None:
+    """Both file endpoints below need this same check: `item_id` must belong
+    to a resource actually listed on this asset. Graph would happily resolve
+    any valid item id in the drive regardless of which asset it is nominally
+    under, so without this an asset's detail page would double as a way to
+    fetch any file in the whole Demo Catalog by id -- not a secret today,
+    since the catalogue is public read, but a needless widening of what these
+    endpoints are for."""
+    asset = repo.get(asset_id)
+    if asset is None:
+        raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
+    if not any(r.item_id == item_id for r in asset.resources):
+        raise HTTPException(
+            status_code=404,
+            detail=f"'{item_id}' is not a file listed on asset '{asset_id}'")
+
+
+def _demo_catalog_drive(client: GraphClient):
+    site = client.resolve_site()
+    drive = client.find_drive(site.site_id, settings.graph_list_name)
+    if drive is None:
+        raise HTTPException(
+            status_code=502,
+            detail=f"no drive named {settings.graph_list_name!r} on {site.web_url}")
+    return drive
+
+
 @router.get("/{asset_id}/files/{item_id}/download")
 def download_file(asset_id: str, item_id: str,
                   repo: AssetRepository = Depends(get_repo),
@@ -89,29 +116,10 @@ def download_file(asset_id: str, item_id: str,
     (`GraphClient.download_url`'s own docstring: "resolve it at play time,
     never at list time"). That URL expires in about an hour, so it is never
     stored; this endpoint exists only to mint one on demand.
-
-    `item_id` must belong to a resource actually listed on this asset. Graph
-    would happily resolve any valid item id in the drive regardless of which
-    asset it is nominally under, so without this check an asset's detail page
-    would double as a way to fetch any file in the whole Demo Catalog by id --
-    not a secret today, since the catalogue is public read, but a needless
-    widening of what one endpoint is for.
     """
-    asset = repo.get(asset_id)
-    if asset is None:
-        raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
-    if not any(r.item_id == item_id for r in asset.resources):
-        raise HTTPException(
-            status_code=404,
-            detail=f"'{item_id}' is not a file listed on asset '{asset_id}'")
-
+    _require_listed_file(asset_id, item_id, repo)
     try:
-        site = client.resolve_site()
-        drive = client.find_drive(site.site_id, settings.graph_list_name)
-        if drive is None:
-            raise HTTPException(
-                status_code=502,
-                detail=f"no drive named {settings.graph_list_name!r} on {site.web_url}")
+        drive = _demo_catalog_drive(client)
         url = client.download_url(drive.drive_id, item_id)
     except GraphError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
@@ -120,4 +128,30 @@ def download_file(asset_id: str, item_id: str,
         raise HTTPException(
             status_code=502,
             detail="SharePoint did not return a download link for this file")
+    return RedirectResponse(url, status_code=302)
+
+
+@router.get("/{asset_id}/files/{item_id}/preview")
+def preview_file(asset_id: str, item_id: str,
+                 repo: AssetRepository = Depends(get_repo),
+                 client: GraphClient = Depends(require_client)):
+    """An embeddable viewer for a file, so it can be looked at before deciding
+    to download it.
+
+    Same shape as download_file() above, and the same reason to resolve it
+    fresh rather than cache it -- see GraphClient.preview()'s own docstring.
+    One endpoint for every kind: video, Word, PowerPoint and (untested but
+    presumably) PDF and images all resolve through the same Graph call.
+    """
+    _require_listed_file(asset_id, item_id, repo)
+    try:
+        drive = _demo_catalog_drive(client)
+        url = client.preview(drive.drive_id, item_id)
+    except GraphError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    if not url:
+        raise HTTPException(
+            status_code=502,
+            detail="SharePoint did not return a preview link for this file")
     return RedirectResponse(url, status_code=302)

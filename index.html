@@ -2138,6 +2138,12 @@ hubApplyFilters();
     white-space:nowrap; flex:0 0 auto; }
   .vp-files__download-all:hover { background:var(--orion-surface-2); }
   .vp-files__download-all svg { width:13px; height:13px; }
+  .vp-file__preview { flex:0 0 auto; display:flex; align-items:center;
+    justify-content:center; width:24px; height:24px; padding:0;
+    border:none; background:transparent; border-radius:var(--orion-radius-sm);
+    color:var(--orion-text-3); cursor:pointer; }
+  .vp-file__preview:hover { background:var(--orion-surface-2); color:var(--orion-text); }
+  .vp-file__preview svg { width:15px; height:15px; }
 
 
   .hub-boot { display: flex; flex-direction: column; align-items: center;
@@ -2171,6 +2177,26 @@ hubApplyFilters();
     padding:0 4px; }
   .hub-preview__close:hover { color:var(--orion-text); }
   .hub-preview__frame { flex:1; width:100%; border:none; background:#fff; }
+
+  /* The two pieces the file-preview modal adds below the frame that the
+     Consensus one doesn't need -- Elio, 2026-09-08: "the preview video on
+     top and description on bottom." */
+  .hub-file-preview__info { padding:10px 14px; font-size:12.5px;
+    color:var(--orion-text-3); border-top:1px solid var(--orion-border);
+    font-variant-numeric:tabular-nums; flex:0 0 auto; }
+  .hub-file-preview__nav { display:flex; align-items:center;
+    justify-content:space-between; padding:8px 14px;
+    border-top:1px solid var(--orion-border); background:var(--orion-surface-2);
+    flex:0 0 auto; }
+  .hub-file-preview__navbtn { display:inline-flex; align-items:center; gap:5px;
+    padding:6px 12px; font-size:12.5px; font-weight:600; color:var(--orion-text);
+    background:var(--orion-surface); border:1px solid var(--orion-border-md);
+    border-radius:var(--orion-radius-sm); cursor:pointer; }
+  .hub-file-preview__navbtn:hover:not(:disabled) { background:var(--orion-surface-2); }
+  .hub-file-preview__navbtn:disabled { opacity:.4; cursor:default; }
+  .hub-file-preview__navbtn svg { width:13px; height:13px; }
+  #hubFilePreviewPosition { font-size:12px; color:var(--orion-text-3);
+    font-variant-numeric:tabular-nums; }
 
   /* Said plainly where there is nothing to show, rather than left blank —
      an empty panel reads as broken, "not indexed yet" reads as honest. */

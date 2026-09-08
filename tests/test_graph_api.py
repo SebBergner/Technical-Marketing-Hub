@@ -261,3 +261,55 @@ def test_download_of_an_unknown_asset_is_404(client, repo_with_a_file):
 def test_download_without_graph_configured_is_503(client, repo_with_a_file):
     response = client.get(f"/api/assets/a-kit/files/{FILE_ITEM_ID}/download")
     assert response.status_code == 503
+
+
+# ════════════════════════════════ file preview ═════════════════════════════
+def preview_handler(*, preview_url="https://contoso.sharepoint.com/embed?x=1"):
+    """Answers exactly what preview_file() calls: resolve the site, find the
+    Demo Catalog drive, then POST .../preview for the embeddable viewer URL --
+    a POST, unlike download_file()'s GET on the item itself."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if ":/sites/" in path or path.endswith(f"/sites/{SITE_URL.split('/sites/')[1]}"):
+            return httpx.Response(200, json={
+                "id": SITE_ID, "displayName": "EXT-TDD", "webUrl": SITE_URL})
+        if path.endswith(f"/sites/{SITE_ID}/drives"):
+            return httpx.Response(200, json={
+                "value": [{"id": DRIVE_ID, "name": "Demo Catalog"}]})
+        if request.method == "POST" and path.endswith(
+                f"/drives/{DRIVE_ID}/items/{FILE_ITEM_ID}/preview"):
+            return httpx.Response(200, json={"getUrl": preview_url, "postUrl": None})
+        return httpx.Response(404, json={"error": {"message": f"unexpected {path}"}})
+    return handler
+
+
+def test_a_listed_file_previews_via_a_fresh_embed_url(client, repo_with_a_file):
+    with_graph(preview_handler())
+
+    response = client.get(f"/api/assets/a-kit/files/{FILE_ITEM_ID}/preview",
+                          follow_redirects=False)
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "https://contoso.sharepoint.com/embed?x=1"
+
+
+def test_preview_of_an_item_id_not_on_this_asset_is_refused(client, repo_with_a_file):
+    with_graph(preview_handler())
+
+    response = client.get("/api/assets/a-kit/files/not-a-real-item/preview",
+                          follow_redirects=False)
+
+    assert response.status_code == 404
+
+
+def test_preview_of_an_unknown_asset_is_404(client, repo_with_a_file):
+    with_graph(preview_handler())
+
+    response = client.get(f"/api/assets/no-such-asset/files/{FILE_ITEM_ID}/preview")
+
+    assert response.status_code == 404
+
+
+def test_preview_without_graph_configured_is_503(client, repo_with_a_file):
+    response = client.get(f"/api/assets/a-kit/files/{FILE_ITEM_ID}/preview")
+    assert response.status_code == 503

@@ -122,6 +122,15 @@ class AssetResource(BaseModel):
     #: plain text instead of a dead link.
     item_id: str | None = None
 
+    #: Also free from the same driveItem, for the per-file info panel the
+    #: preview modal shows (Seb's AMP screenshots, 2026-09-08, had a
+    #: Properties box with exactly these). `modified_by` is who touched it
+    #: last, not who created it -- more useful for "is this current" than
+    #: authorship is.
+    created_at: str | None = None
+    modified_at: str | None = None
+    modified_by: str | None = None
+
 
 class AssetStats(BaseModel):
     views: int = 0

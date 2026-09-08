@@ -472,6 +472,24 @@ class GraphClient:
         item = self.get_item(drive_id, item_id)
         return (item or {}).get("@microsoft.graph.downloadUrl")
 
+    def preview(self, drive_id: str, item_id: str) -> str | None:
+        """An embeddable viewer URL -- unlike download_url(), this one does not
+        force a download.
+
+        One mechanism for every file kind SharePoint holds: verified 2026-09-08
+        against a real .mp4, .docx and .pptx, all three return the same shape
+        of `_layouts/15/embed.aspx` URL, SharePoint's own hosted viewer. That
+        means no per-kind branching here or in the caller -- a `<video>` tag
+        would need one browser-native codec per video file and nothing at all
+        for a Word doc; this needs neither.
+
+        Short-lived like download_url(), for the same reason: resolve it when
+        someone asks to preview, never earlier.
+        """
+        payload = self._request("POST", f"/drives/{drive_id}/items/{item_id}/preview",
+                                json={})
+        return (payload or {}).get("getUrl")
+
     def thumbnails(self, drive_id: str, item_id: str) -> list[dict]:
         payload = self._request("GET", f"/drives/{drive_id}/items/{item_id}/thumbnails")
         return (payload or {}).get("value", [])

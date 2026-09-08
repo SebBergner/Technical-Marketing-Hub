@@ -72,7 +72,11 @@
       title: a.title || "",
       desc: a.description || statsLine(a),
       thumb: a.thumbnail_url || "",
-      duration: durationLabel(a.duration_seconds),
+      // Not for an LDK. Seb, in review: he'd assume a 13:15 badge means the
+      // demo takes 13:15, but that number is the recording's own length --
+      // a live demo can run well past it. Elio: hide it; time only matters
+      // for a customer-facing (i.e. actually-watched) video.
+      duration: a.type === "ldk" ? "" : durationLabel(a.duration_seconds),
       product: product,
       segment: a.segment || "",
       industry: a.industry || "",
@@ -1431,7 +1435,9 @@
     if (!page) return;
 
     setText("vpTitle", asset.title);
-    setText("vpDuration", durationLabel(asset.duration_seconds));
+    // Same call as the card's duration-chip, same reason to skip it for LDK
+    // -- see toCardData().
+    setText("vpDuration", asset.type === "ldk" ? "" : durationLabel(asset.duration_seconds));
 
     /* The meta row carries the platform badges, so the details page offers the
      * same two doors as the card and nobody has to go back to find them. */
@@ -1693,6 +1699,141 @@
     });
   }
 
+  /* Same free-form URL trick as fileDownloadUrl(): the endpoint itself does
+   * the redirect (302 to Graph's embeddable viewer), so an <iframe src> set
+   * to this URL just follows it -- no fetch, no JSON, nothing async here. */
+  function filePreviewUrl(assetId, itemId) {
+    return "/api/assets/" + encodeURIComponent(assetId) + "/files/"
+         + encodeURIComponent(itemId) + "/preview";
+  }
+
+  //: What gets a Preview button at all. Datasets (zip/rar) and CAD have
+  //: nothing Graph's viewer can usefully show -- verified 2026-09-08 that
+  //: Graph does not even error on a zip, it just returns a viewer for
+  //: something nobody asked to look at, so the honest answer is not to
+  //: offer the button rather than trust Graph's silence.
+  var PREVIEWABLE_KINDS = ["video", "document", "image"];
+
+  //: Of those, which actually render inside OUR iframe rather than opening
+  //: in a new tab. Found by testing, the hard way: a video and an image both
+  //: play inline once the iframe drops referrerpolicy="no-referrer" (see
+  //: ensureFilePreviewModal()). A Word or PowerPoint file does not, even
+  //: then -- the exact same URL opened as a top-level navigation renders
+  //: Office's own viewer perfectly, but framed by a different origin it
+  //: shows nothing, no error either side of the frame boundary. That is
+  //: Office Online's own anti-framing behaviour (it is how WOPI-based
+  //: editors avoid being embedded somewhere a user might mistake for the
+  //: real thing), not a bug in this app, and not something a header on our
+  //: side can turn off. So "document" gets a new tab instead of the modal --
+  //: still a preview before download, just not inside our chrome.
+  var MODAL_PREVIEWABLE_KINDS = ["video", "image"];
+
+  //: { asset, files, index } for whichever file is open in the modal, or
+  //: null. `files` is already filtered to MODAL_PREVIEWABLE_KINDS -- Prev/
+  //: Next only ever steps through things that actually render there.
+  var filePreviewState = null;
+
+  function ensureFilePreviewModal() {
+    var backdrop = document.getElementById("hubFilePreviewBackdrop");
+    if (backdrop) return backdrop;
+
+    // Same classes as the Consensus preview modal (hub-preview,
+    // hub-preview__box/__bar/__frame) -- same chrome, same open/close/Esc
+    // behaviour, so this looks like one feature with two content sources
+    // rather than two unrelated popups. The info row and Prev/Next bar are
+    // the only genuinely new pieces, added below the frame per Elio: "the
+    // preview video on top and description on bottom."
+    backdrop = document.createElement("div");
+    backdrop.id = "hubFilePreviewBackdrop";
+    backdrop.className = "hub-preview";
+    // Deliberately no referrerpolicy on the iframe below, unlike the
+    // Consensus one above. SharePoint's embed.aspx viewer renders
+    // completely blank with "no-referrer" set -- found by testing, not
+    // documented anywhere: the exact same URL opened directly in a tab
+    // played fine, the same URL in this iframe with no-referrer showed
+    // nothing, and removing the attribute was the entire fix. No console
+    // error on either side, because a cross-origin iframe's own script
+    // failures never reach the parent page's console -- without opening
+    // the URL standalone to compare, this would have looked like an
+    // unexplained silent failure in our own code.
+    backdrop.innerHTML =
+        '<div class="hub-preview__box">'
+      +   '<div class="hub-preview__bar">'
+      +     '<span class="hub-preview__title" id="hubFilePreviewTitle"></span>'
+      +     '<button class="hub-preview__close" title="Close">&times;</button>'
+      +   '</div>'
+      +   '<iframe class="hub-preview__frame" id="hubFilePreviewFrame"'
+      +     ' allow="fullscreen"></iframe>'
+      +   '<div class="hub-file-preview__info" id="hubFilePreviewInfo"></div>'
+      +   '<div class="hub-file-preview__nav">'
+      +     '<button type="button" class="hub-file-preview__navbtn" id="hubFilePreviewPrev">'
+      +       '<svg class="orion-ico--sm orion-ico"><use href="#i-chevron-left"/></svg>Prev</button>'
+      +     '<span id="hubFilePreviewPosition"></span>'
+      +     '<button type="button" class="hub-file-preview__navbtn" id="hubFilePreviewNext">'
+      +       'Next<svg class="orion-ico--sm orion-ico"><use href="#i-chevron-right"/></svg></button>'
+      +   '</div>'
+      + '</div>';
+    document.body.appendChild(backdrop);
+
+    var shut = function () {
+      backdrop.classList.remove("open");
+      // Blank the src on close, or a video keeps playing behind the page.
+      document.getElementById("hubFilePreviewFrame").src = "about:blank";
+      filePreviewState = null;
+    };
+    backdrop.querySelector(".hub-preview__close").addEventListener("click", shut);
+    backdrop.addEventListener("click", function (e) { if (e.target === backdrop) shut(); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && backdrop.classList.contains("open")) shut();
+    });
+
+    document.getElementById("hubFilePreviewPrev").addEventListener("click", function () {
+      if (filePreviewState && filePreviewState.index > 0) {
+        filePreviewState.index -= 1;
+        renderFilePreview();
+      }
+    });
+    document.getElementById("hubFilePreviewNext").addEventListener("click", function () {
+      if (filePreviewState && filePreviewState.index < filePreviewState.files.length - 1) {
+        filePreviewState.index += 1;
+        renderFilePreview();
+      }
+    });
+    return backdrop;
+  }
+
+  function renderFilePreview() {
+    var state = filePreviewState;
+    if (!state) return;
+    var f = state.files[state.index];
+
+    document.getElementById("hubFilePreviewFrame").src = filePreviewUrl(state.asset.id, f.item_id);
+    document.getElementById("hubFilePreviewTitle").textContent = f.name;
+
+    // The Properties box Seb's AMP screenshots showed, from what Graph
+    // actually gives us -- no invented fields (no Workfront ID, AMP has one
+    // and we have nothing to put there).
+    var info = [f.extension && f.extension.toUpperCase(),
+               f.duration_seconds && durationLabel(f.duration_seconds),
+               f.width && f.height && (f.width + "×" + f.height),
+               fileSize(f.size_bytes),
+               f.modified_at && ("Modified " + f.modified_at
+                 + (f.modified_by ? " by " + f.modified_by : "")),
+               f.subfolder].filter(Boolean).join(" · ");
+    setText("hubFilePreviewInfo", info);
+
+    document.getElementById("hubFilePreviewPrev").disabled = state.index <= 0;
+    document.getElementById("hubFilePreviewNext").disabled = state.index >= state.files.length - 1;
+    setText("hubFilePreviewPosition", (state.index + 1) + " of " + state.files.length);
+  }
+
+  function openFilePreview(asset, files, index) {
+    filePreviewState = { asset: asset, files: files, index: index };
+    ensureFilePreviewModal();
+    renderFilePreview();
+    document.getElementById("hubFilePreviewBackdrop").classList.add("open");
+  }
+
   function renderFileList(page, asset) {
     var existing = page.querySelector(".vp-files");
     if (existing) existing.remove();
@@ -1726,6 +1867,14 @@
       });
       box.querySelector(".vp-card__head").appendChild(all);
     }
+
+    // Prev/Next in the preview modal steps through this list, so it has to
+    // exist before any row's button is wired, not be recomputed per click.
+    // Only the modal-previewable kinds -- a "document" row gets its own
+    // new-tab link below and never joins this list.
+    var previewable = files.filter(function (f) {
+      return f.item_id && MODAL_PREVIEWABLE_KINDS.indexOf(f.kind) !== -1;
+    });
 
     var list = document.createElement("div");
     list.className = "vp-files__list";
@@ -1761,6 +1910,38 @@
         name.className = "vp-file__name";
         name.textContent = f.name;
         row.insertBefore(name, row.lastChild);
+      }
+
+      // Separate from the name: the name downloads (Content-Disposition
+      // forces that regardless of file type, verified 2026-09-08 against a
+      // real video -- there is no "click to play" available on that URL),
+      // so looking at a file before deciding to download it needs a control
+      // of its own. Inserted after the name, still before facts, so the row
+      // reads icon / name / preview / facts.
+      if (previewable.indexOf(f) !== -1) {
+        var preview = document.createElement("button");
+        preview.type = "button";
+        preview.className = "vp-file__preview";
+        preview.title = "Preview";
+        preview.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg>';
+        preview.addEventListener("click", function () {
+          openFilePreview(asset, previewable, previewable.indexOf(f));
+        });
+        row.insertBefore(preview, row.lastChild);
+      } else if (f.item_id && PREVIEWABLE_KINDS.indexOf(f.kind) !== -1) {
+        // In PREVIEWABLE_KINDS but not MODAL_PREVIEWABLE_KINDS -- today that
+        // is exactly "document" (Word/PowerPoint/PDF). A new tab, not the
+        // modal -- see MODAL_PREVIEWABLE_KINDS for why. A real <a>, same
+        // reasoning as the name link above about DOM-property hrefs needing
+        // no escaping.
+        var docPreview = document.createElement("a");
+        docPreview.className = "vp-file__preview";
+        docPreview.title = "Preview in a new tab";
+        docPreview.target = "_blank";
+        docPreview.rel = "noopener";
+        docPreview.href = filePreviewUrl(asset.id, f.item_id);
+        docPreview.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg>';
+        row.insertBefore(docPreview, row.lastChild);
       }
       list.appendChild(row);
     });

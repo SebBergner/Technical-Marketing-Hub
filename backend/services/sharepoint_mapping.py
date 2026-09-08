@@ -230,6 +230,14 @@ def build_resource(filename: str, subfolder: str | None = None,
     if item.get("id"):
         row["item_id"] = item["id"]
 
+    if item.get("createdDateTime"):
+        row["created_at"] = as_date(item["createdDateTime"])
+    if item.get("lastModifiedDateTime"):
+        row["modified_at"] = as_date(item["lastModifiedDateTime"])
+    modifier = ((item.get("lastModifiedBy") or {}).get("user") or {}).get("displayName")
+    if modifier:
+        row["modified_by"] = modifier
+
     video = item.get("video") or {}
     if isinstance(video, dict):
         # Graph reports duration in milliseconds; everything else here is

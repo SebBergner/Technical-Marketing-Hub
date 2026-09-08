@@ -2178,12 +2178,29 @@ hubApplyFilters();
   .hub-preview__close:hover { color:var(--orion-text); }
   .hub-preview__frame { flex:1; width:100%; border:none; background:#fff; }
 
-  /* The two pieces the file-preview modal adds below the frame that the
+  /* The pieces the file-preview modal adds below the frame that the
      Consensus one doesn't need -- Elio, 2026-09-08: "the preview video on
-     top and description on bottom." */
-  .hub-file-preview__info { padding:10px 14px; font-size:12.5px;
-    color:var(--orion-text-3); border-top:1px solid var(--orion-border);
-    font-variant-numeric:tabular-nums; flex:0 0 auto; }
+     top and description on bottom... similar layout and information" to
+     Seb's AMP screenshot. A capped, scrolling height on the whole body: the
+     video is the point of the modal, and neither a long description nor a
+     ten-row Properties table should be able to crush it down to nothing. */
+  .hub-file-preview__body { flex:0 0 auto; max-height:220px; overflow-y:auto;
+    padding:12px 14px; border-top:1px solid var(--orion-border); }
+  .hub-file-preview__desc { font-size:12.5px; color:var(--orion-text-2);
+    line-height:1.5; margin-bottom:12px; }
+  /* AMP's Properties box, as an actual label/value table rather than the one
+     bullet-separated line this used to be. A grid, not a vertical list: this
+     modal is wide and the panel sits under the video rather than beside it
+     the way AMP's own does, so laying rows out in columns uses that width
+     instead of turning the table into a tall scroll on its own. */
+  .hub-file-preview__table { display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:10px 20px; }
+  .hub-file-preview__row { display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .hub-file-preview__label { font-size:10.5px; font-weight:700; letter-spacing:.03em;
+    text-transform:uppercase; color:var(--orion-text-3); }
+  .hub-file-preview__value { font-size:12.5px; color:var(--orion-text);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    font-variant-numeric:tabular-nums; }
   .hub-file-preview__nav { display:flex; align-items:center;
     justify-content:space-between; padding:8px 14px;
     border-top:1px solid var(--orion-border); background:var(--orion-surface-2);

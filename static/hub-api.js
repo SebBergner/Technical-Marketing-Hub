@@ -1756,6 +1756,13 @@
     // failures never reach the parent page's console -- without opening
     // the URL standalone to compare, this would have looked like an
     // unexplained silent failure in our own code.
+    // Elio, 2026-09-08, on AMP's layout: "the preview video on top and
+    // description on bottom... make it look good, but similar layout and
+    // information." Video stays the full-width top section it already was;
+    // everything AMP put in its Properties box is now a genuine label/value
+    // table, not the one-line bullet list this used to be, in a capped-height
+    // scrolling strip so a long description or many rows cannot crush the
+    // video down to nothing.
     backdrop.innerHTML =
         '<div class="hub-preview__box">'
       +   '<div class="hub-preview__bar">'
@@ -1764,7 +1771,10 @@
       +   '</div>'
       +   '<iframe class="hub-preview__frame" id="hubFilePreviewFrame"'
       +     ' allow="fullscreen"></iframe>'
-      +   '<div class="hub-file-preview__info" id="hubFilePreviewInfo"></div>'
+      +   '<div class="hub-file-preview__body">'
+      +     '<div class="hub-file-preview__desc" id="hubFilePreviewDesc"></div>'
+      +     '<div class="hub-file-preview__table" id="hubFilePreviewInfo"></div>'
+      +   '</div>'
       +   '<div class="hub-file-preview__nav">'
       +     '<button type="button" class="hub-file-preview__navbtn" id="hubFilePreviewPrev">'
       +       '<svg class="orion-ico--sm orion-ico"><use href="#i-chevron-left"/></svg>Prev</button>'
@@ -1806,21 +1816,45 @@
     var state = filePreviewState;
     if (!state) return;
     var f = state.files[state.index];
+    var asset = state.asset;
 
-    document.getElementById("hubFilePreviewFrame").src = filePreviewUrl(state.asset.id, f.item_id);
+    document.getElementById("hubFilePreviewFrame").src = filePreviewUrl(asset.id, f.item_id);
     document.getElementById("hubFilePreviewTitle").textContent = f.name;
 
-    // The Properties box Seb's AMP screenshots showed, from what Graph
-    // actually gives us -- no invented fields (no Workfront ID, AMP has one
-    // and we have nothing to put there).
-    var info = [f.extension && f.extension.toUpperCase(),
-               f.duration_seconds && durationLabel(f.duration_seconds),
-               f.width && f.height && (f.width + "×" + f.height),
-               fileSize(f.size_bytes),
-               f.modified_at && ("Modified " + f.modified_at
-                 + (f.modified_by ? " by " + f.modified_by : "")),
-               f.subfolder].filter(Boolean).join(" · ");
-    setText("hubFilePreviewInfo", info);
+    // The demo's own description -- there is no per-video one in our data,
+    // and inventing a shorter "what this clip shows" summary would be a
+    // guess dressed as a fact, the exact thing this project keeps refusing
+    // to ship. Same fallback text as the details page for the same asset.
+    setText("hubFilePreviewDesc", asset.description
+      || "No description in " + (asset.source === "consensus" ? "Consensus" : "SharePoint")
+         + " for this one yet.");
+
+    // The Properties table AMP's screenshot showed, built from what Graph
+    // and the asset actually give us -- no invented rows (AMP has a
+    // Workfront ID and a Style Template; we have neither, so neither is
+    // here). Language is the asset's, not the file's -- AssetResource has
+    // no per-file language and every file in one folder is the same demo.
+    var rows = [];
+    function row(label, value) { if (value) rows.push([label, value]); }
+    row("Language", asset.language
+      && (LANGUAGE_LABEL[asset.language] || asset.language.toUpperCase()));
+    row("Type", f.extension && f.extension.toUpperCase());
+    row("Duration", f.duration_seconds && durationLabel(f.duration_seconds));
+    row("Resolution", f.width && f.height && (f.width + "×" + f.height));
+    row("Size", fileSize(f.size_bytes));
+    row("Created", f.created_at);
+    row("Created by", f.created_by);
+    row("Last modified", f.modified_at);
+    row("Modified by", f.modified_by);
+    row("Folder", f.subfolder);
+
+    var table = document.getElementById("hubFilePreviewInfo");
+    table.innerHTML = rows.map(function (r) {
+      return '<div class="hub-file-preview__row">'
+           +   '<span class="hub-file-preview__label">' + escapeHtml(r[0]) + '</span>'
+           +   '<span class="hub-file-preview__value">' + escapeHtml(r[1]) + '</span>'
+           + '</div>';
+    }).join("");
 
     document.getElementById("hubFilePreviewPrev").disabled = state.index <= 0;
     document.getElementById("hubFilePreviewNext").disabled = state.index >= state.files.length - 1;

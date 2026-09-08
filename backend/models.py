@@ -122,12 +122,13 @@ class AssetResource(BaseModel):
     #: plain text instead of a dead link.
     item_id: str | None = None
 
-    #: Also free from the same driveItem, for the per-file info panel the
-    #: preview modal shows (Seb's AMP screenshots, 2026-09-08, had a
-    #: Properties box with exactly these). `modified_by` is who touched it
-    #: last, not who created it -- more useful for "is this current" than
-    #: authorship is.
+    #: Also free from the same driveItem, for the Properties table the
+    #: preview modal shows (Seb's AMP screenshots, 2026-09-08, had exactly
+    #: these). Both who-fields, not just modified_by: AMP's own panel shows
+    #: "Created by" and separately implies "Last modified" -- one person can
+    #: differ from the other, and the table now has room for both.
     created_at: str | None = None
+    created_by: str | None = None
     modified_at: str | None = None
     modified_by: str | None = None
 

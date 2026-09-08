@@ -234,6 +234,9 @@ def build_resource(filename: str, subfolder: str | None = None,
         row["created_at"] = as_date(item["createdDateTime"])
     if item.get("lastModifiedDateTime"):
         row["modified_at"] = as_date(item["lastModifiedDateTime"])
+    creator = ((item.get("createdBy") or {}).get("user") or {}).get("displayName")
+    if creator:
+        row["created_by"] = creator
     modifier = ((item.get("lastModifiedBy") or {}).get("user") or {}).get("displayName")
     if modifier:
         row["modified_by"] = modifier

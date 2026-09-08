@@ -2421,8 +2421,16 @@ hubApplyFilters();
      is only ever created by hub-api.js, after this stylesheet has already
      been parsed. */
   /* The language tag a card gets when it isn't English -- see
-     addLanguageTag() in hub-api.js for why English itself is skipped. */
-  .hub-lang-tag { background: var(--orion-surface-3); color: var(--orion-text-2); }
+     addLanguageTag() in hub-api.js for why English itself is skipped, and
+     why it lives on the thumbnail (2026-09-08: it used to sit in
+     .asset-card__meta, a no-wrap flex row, and got silently clipped off the
+     card whenever the platform badge and product/funnel text already filled
+     the width). Same look as .type-chip, since it's the same kind of fact --
+     a small label ON the thumbnail -- just the opposite corner. */
+  .hub-lang-tag { position:absolute; top:8px; right:8px; z-index:1;
+    background:rgba(255,255,255,.94); border:1px solid var(--orion-border-md);
+    border-radius:var(--orion-radius-pill); padding:3px 9px; font-size:11px;
+    font-weight:600; color:var(--orion-text-2); }
 
   .hub-load-more { display: flex; justify-content: center; padding: 20px 0 4px; }
   .hub-load-more__btn { padding: 9px 24px; border-radius: var(--orion-radius-sm);

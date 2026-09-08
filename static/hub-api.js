@@ -123,12 +123,21 @@
    * Liwei, 2026-09-08. */
   function addLanguageTag(card, a) {
     if (!a.language || a.language === "en") return;
-    var meta = card.querySelector(".asset-card__meta");
-    if (!meta) return;
+    // On the thumbnail, not in .asset-card__meta -- that row is a flex line
+    // with no wrap, already sharing its width with the platform badge and
+    // the product/funnel text, and Liwei found it does exactly what a
+    // no-wrap row does when one more thing joins it: whatever runs out of
+    // room, silently clips against the card's own overflow:hidden. The
+    // thumbnail's top-right corner has nothing else on a real card --
+    // .new-dot lives at that same spot but only in Elio's static sample
+    // markup, never on a card built from real data -- so a fixed position
+    // there can never be squeezed out by how much other text a card has.
+    var thumb = card.querySelector(".asset-card__thumb");
+    if (!thumb) return;
     var tag = document.createElement("span");
-    tag.className = "orion-badge hub-lang-tag";
+    tag.className = "hub-lang-tag";
     tag.textContent = LANGUAGE_LABEL[a.language] || a.language.toUpperCase();
-    meta.appendChild(tag);
+    thumb.appendChild(tag);
   }
 
   function platformBadge(source, href) {

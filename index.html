@@ -684,7 +684,7 @@ a:hover { text-decoration: underline; }
       <div class="orion-group">Browse by Type</div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-video"/></svg> Videos</span> <span class="count">86</span></div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-box"/></svg> LDKs <span class="orion-subtle" style="font-size:11px;">Live Demo Kits</span></span> <span class="count">22</span></div>
-      <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-monitor"/></svg> VDKs <span class="orion-subtle" style="font-size:11px;">Virtual Demo Kits</span></span> <span class="count">9</span></div>
+      <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-monitor"/></svg> VDKs <span class="orion-subtle" style="font-size:11px;">Video Demo Kits</span></span> <span class="count">9</span></div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-monitor"/></svg> Virtual Machines</span> <span class="count">14</span></div>
 
       <div class="orion-group">Funnel Stage</div>
@@ -710,7 +710,14 @@ a:hover { text-decoration: underline; }
     <div class="orion-topbar" id="mainTopbar">
       <div class="orion-breadcrumb">Sales Enablement / <a>Technical Demo Development</a></div>
       <h1 class="orion-title">Technical Marketing Hub</h1>
-      <div class="orion-subtle">One home for Videos, Live Demo Kits (LDKs), Virtual Demo Kits (VDKs), and Virtual Machines — replacing the separate Demo Library, Demo Video Gallery, and VM pages.</div>
+      <!-- VDK reads "Video Demo Kit" here on purpose, not "Virtual Demo Kit".
+           SharePoint's own Demo_x0020_Type column literally says "Virtual
+           Demo Kit" -- checked directly against live data, every value
+           enumerated, no third option -- but Elio confirmed with Liwei on
+           2026-09-08 that "Video Demo Kit" is the term to show. Display text
+           only: TYPE_MAP, AssetType.VDK and the "vdk" filter value all stay
+           exactly as SharePoint defines them, untouched by this. -->
+      <div class="orion-subtle">One home for Videos, Live Demo Kits (LDKs), Video Demo Kits (VDKs), and Virtual Machines — replacing the separate Demo Library, Demo Video Gallery, and VM pages.</div>
       <div class="hero-search">
         <div class="hero-search__field">
           <svg class="orion-ico ico-muted"><use href="#i-search"/></svg>
@@ -733,6 +740,10 @@ a:hover { text-decoration: underline; }
             <option value="Creo">Creo</option>
             <option value="ServiceMax">ServiceMax</option>
             <option value="Codebeamer">Codebeamer</option>
+            <!-- fillSelect() keeps this label rather than the raw facet value
+                 "IPE" -- see UMBRELLA_DISPLAY in hub-api.js. Elio/Seb rename,
+                 2026-09-08; the backend still calls it IPE. -->
+            <option value="IPE">PTC Ignite</option>
           </select>
           <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
         </label>
@@ -754,6 +765,20 @@ a:hover { text-decoration: underline; }
             <option value="Consideration">Consideration</option>
             <option value="Decision">Decision</option>
             <option value="Post-Sale">Post-Sale</option>
+          </select>
+          <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
+        </label>
+        <label class="filter-pill">Language:
+          <select id="hubFilterLanguage">
+            <option value="">All</option>
+            <option value="en">English</option>
+            <option value="zh">Chinese</option>
+            <option value="de">German</option>
+            <option value="fr">French</option>
+            <option value="es">Spanish</option>
+            <option value="it">Italian</option>
+            <option value="ja">Japanese</option>
+            <option value="ko">Korean</option>
           </select>
           <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
         </label>
@@ -1081,12 +1106,16 @@ a:hover { text-decoration: underline; }
         </div>
       </div>
 
+      <!-- Liwei, 2026-09-08: the description is what the demo IS, not part
+           of how well it is indexed, so it lives here, under the stats line,
+           rather than inside the Value Roadmap box below. -->
+      <div class="vp-desc" id="vpDesc"></div>
+
       <div class="vp-card">
         <div class="vp-card__head">
           <div class="vp-card__head-title"><svg class="orion-ico"><use href="#i-target"/></svg>Value Roadmap index</div>
           <button class="vp-reindex"><svg class="orion-ico--sm orion-ico"><use href="#i-clock"/></svg>Re-index</button>
         </div>
-        <div class="vp-desc" id="vpDesc"></div>
         <div class="vp-label">Value Drivers</div>
         <div class="vp-value-drivers" id="vpValueDrivers"></div>
         <div class="vp-label">Processes &amp; Capabilities</div>
@@ -1999,7 +2028,12 @@ function hubApplyFilters() {
 
 function hubResetFilters() {
   document.getElementById('hubSearchInput').value = '';
-  ['hubFilterType', 'hubFilterProduct', 'hubFilterSegment', 'hubFilterStage', 'hubFilterCf'].forEach(function(id) {
+  // hubApplyFilters() is window.hubApplyFilters by the time this runs --
+  // hub-api.js points it at its own applyFilters() at boot -- so this
+  // function's own job is only clearing every control's value, and a new
+  // control needs adding here or Reset silently leaves it set.
+  ['hubFilterType', 'hubFilterProduct', 'hubFilterSegment', 'hubFilterStage',
+   'hubFilterLanguage', 'hubFilterCf'].forEach(function(id) {
     document.getElementById(id).value = '';
   });
   hubApplyFilters();
@@ -2335,6 +2369,10 @@ hubApplyFilters();
      nothing in the document sets .hub-load-more before this, and the button
      is only ever created by hub-api.js, after this stylesheet has already
      been parsed. */
+  /* The language tag a card gets when it isn't English -- see
+     addLanguageTag() in hub-api.js for why English itself is skipped. */
+  .hub-lang-tag { background: var(--orion-surface-3); color: var(--orion-text-2); }
+
   .hub-load-more { display: flex; justify-content: center; padding: 20px 0 4px; }
   .hub-load-more__btn { padding: 9px 24px; border-radius: var(--orion-radius-sm);
     border: 1px solid var(--orion-border-md); background: var(--orion-surface);

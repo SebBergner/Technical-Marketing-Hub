@@ -110,6 +110,23 @@
     sharepoint: ["SharePoint", "Open this demo kit's folder in SharePoint"]
   };
 
+  /* A language tag on the tile, so a French-only recording is not discovered
+   * by opening it. Skipped for English on purpose: 727 of 807 assets are
+   * English, and a badge on 90% of the grid would be repetition, not a
+   * signal -- the one non-English badge is what someone is actually
+   * scanning for. Same principle the detail page already applied to its own
+   * facts row (`language !== "en"`) before this tile-level tag existed.
+   * Liwei, 2026-09-08. */
+  function addLanguageTag(card, a) {
+    if (!a.language || a.language === "en") return;
+    var meta = card.querySelector(".asset-card__meta");
+    if (!meta) return;
+    var tag = document.createElement("span");
+    tag.className = "orion-badge hub-lang-tag";
+    tag.textContent = LANGUAGE_LABEL[a.language] || a.language.toUpperCase();
+    meta.appendChild(tag);
+  }
+
   function platformBadge(source, href) {
     var spec = PLATFORM_LABEL[source] || [source, "Open in " + source];
     // Without somewhere to go it stays a label; a link that goes nowhere is
@@ -349,11 +366,19 @@
     platformActions(card, a);
     clampDescription(card, a);
     paintCover(card, a);
+    addLanguageTag(card, a);
 
-    /* One badge per platform the asset is actually on, each linking there.
-     * A SharePoint kit that also has a Consensus recording gets both, which is
-     * the honest picture and replaces the small logo button that used to say
-     * the same thing less clearly. */
+    /* One badge per platform the asset is actually on. A SharePoint kit that
+     * also has a Consensus recording gets both, which is the honest picture
+     * and replaces the small logo button that used to say the same thing
+     * less clearly.
+     *
+     * Only the Consensus badge still links out. The SharePoint one stopped,
+     * 2026-09-08 (Liwei/Elio): with the detail page now the place to
+     * download the kit's files directly, a second door straight from the
+     * tile to the SharePoint page duplicated that journey rather than
+     * adding one. Consensus is untouched -- its badge is still the primary
+     * way to reach a recording that has no file list of its own. */
     var meta = card.querySelector(".asset-card__meta");
     if (meta) {
       var anchor = meta.firstChild;
@@ -362,7 +387,7 @@
       }
       meta.insertBefore(
         platformBadge(a.source,
-                      a.source === "consensus" ? consensusUrl(a) : a.web_url),
+                      a.source === "consensus" ? consensusUrl(a) : null),
         meta.firstChild);
     }
 
@@ -640,7 +665,8 @@
    */
 
   var CONTROLS = ["hubSearchInput", "hubFilterType", "hubFilterProduct",
-                  "hubFilterSegment", "hubFilterStage", "hubFilterCf"];
+                  "hubFilterSegment", "hubFilterStage", "hubFilterLanguage",
+                  "hubFilterCf"];
   var LANDING = ["continueSection", "latestUploadsSection", "mostViewedSection",
                  "browseByProductSection", "editorsPicksSection"];
   //: One request's ceiling, enforced server-side (`le=200` in assets.py) --
@@ -685,6 +711,7 @@
     if (val("hubFilterProduct")) params.append("family", val("hubFilterProduct"));
     if (val("hubFilterSegment")) params.append("segment", val("hubFilterSegment"));
     if (val("hubFilterStage")) params.append("stage", val("hubFilterStage"));
+    if (val("hubFilterLanguage")) params.append("language", val("hubFilterLanguage"));
     var cf = val("hubFilterCf");
     if (cf === "yes") params.set("customer_facing", "true");
     if (cf === "no") params.set("customer_facing", "false");
@@ -752,6 +779,7 @@
                                        || baselineFacets.products);
         rescoreSelect("hubFilterSegment", baselineFacets.segments);
         rescoreSelect("hubFilterStage", baselineFacets.funnel_stages);
+        rescoreSelect("hubFilterLanguage", baselineFacets.languages);
         fillSidebarCounts(baselineFacets);
       }
       loadMoreState = null;
@@ -789,7 +817,7 @@
       while (node) {
         if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
           node.textContent = sortOverride === "recent" ? " Latest uploads "
-                           : umbrellaFilter ? " All " + umbrellaFilter + " assets "
+                           : umbrellaFilter ? " All " + umbrellaDisplayName(umbrellaFilter) + " assets "
                            : seg ? " All " + seg + " assets "
                            : " All Assets ";
           break;
@@ -816,6 +844,7 @@
     rescoreSelect("hubFilterProduct", facets.product_families);
     rescoreSelect("hubFilterSegment", facets.segments);
     rescoreSelect("hubFilterStage", facets.funnel_stages);
+    rescoreSelect("hubFilterLanguage", facets.languages);
     // The sidebar shows the same three dimensions, so it takes the same
     // numbers. Leaving it on whole-catalogue counts would reintroduce, one
     // panel over, exactly the contradiction this is meant to remove.
@@ -980,6 +1009,33 @@
                    "Virtual Machines": "vm" };
   var navTargets = {};   // nav label -> {control, value, page}
 
+  /* Umbrella families the sidebar and dropdown show under a different name
+   * than the one the API, the URL query string and every facet count use.
+   * Keyed by the real value, so the API vocabulary stays the single source
+   * of truth and this is a display layer on top of it rather than a second
+   * copy of it. Same shape as the LDK/VDK relabelling on the Type filter --
+   * the option's value is the code, its text is whatever reads best.
+   *
+   * "PTC Ignite" -- Elio and Seb's rename of IPE, 2026-09-08. The backend
+   * still calls it "IPE" everywhere (taxonomy.py, the umbrella facet, the
+   * ?umbrella= query param); only the label changes here. */
+  var UMBRELLA_DISPLAY = { "IPE": "PTC Ignite" };
+  function umbrellaDisplayName(value) { return UMBRELLA_DISPLAY[value] || value; }
+  function umbrellaCanonicalName(label) {
+    for (var value in UMBRELLA_DISPLAY) {
+      if (UMBRELLA_DISPLAY[value] === label) return value;
+    }
+    return label;
+  }
+
+  /* Umbrella families hidden from the sidebar and the Product dropdown
+   * outright -- a business decision, not an empty-category one. IPE gets
+   * the opposite treatment for exactly that reason: it has zero assets
+   * today but demos are being made, so markUnavailable() keeps it visible
+   * and merely dims it if it goes quiet. Servigistics has assets; Elio and
+   * Seb asked for it gone regardless, 2026-09-08. */
+  var HIDDEN_UMBRELLAS = ["Servigistics"];
+
   /* Leave whatever view is covering the catalogue, whoever opened it.
    *
    * Three separate reports in Seb's 2026-09-03 review turned out to be this
@@ -1029,16 +1085,27 @@
     navTargets = {};
     document.querySelectorAll(".orion-navitem").forEach(function (item) {
       var name = navLabel(item);
+      // What the sidebar shows may not be what the API calls it -- see
+      // UMBRELLA_DISPLAY. Every lookup against facet data or a query value
+      // uses this; `name` itself is kept only for indexing navTargets and
+      // markNavActive(), which look a nav item up by what is on screen.
+      var canonical = umbrellaCanonicalName(name);
+
+      if (HIDDEN_UMBRELLAS.indexOf(canonical) !== -1) {
+        item.style.display = "none";
+        return;
+      }
+
       var target = null;
-      if (name === "Home") target = { control: null };
-      else if (name === "Latest Uploads") target = { control: null, sort: "recent" };
-      else if (NAV_TYPE[name]) target = { control: "hubFilterType", value: NAV_TYPE[name] };
+      if (canonical === "Home") target = { control: null };
+      else if (canonical === "Latest Uploads") target = { control: null, sort: "recent" };
+      else if (NAV_TYPE[canonical]) target = { control: "hubFilterType", value: NAV_TYPE[canonical] };
       // A product family is a destination, not a filter toggle: it clears
       // everything else, because that is what a nav item promises.
-      else if (umbrellas[name]) target = { control: "umbrella", value: name,
-                                           page: true };
-      else if (families[name]) target = { control: "hubFilterProduct", value: name };
-      else if (stages[name]) target = { control: "hubFilterStage", value: name };
+      else if (umbrellas[canonical]) target = { control: "umbrella", value: canonical,
+                                                page: true };
+      else if (families[canonical]) target = { control: "hubFilterProduct", value: canonical };
+      else if (stages[canonical]) target = { control: "hubFilterStage", value: canonical };
       if (!target) return;              // Favorites, Request New Asset, ...
 
       navTargets[name] = target;
@@ -1465,8 +1532,13 @@
       if (platformHref) {
         actions.insertBefore(
           linkButton("btn-primary-sm vp-platform",
+                     // Consensus keeps its wording; SharePoint's changed
+                     // 2026-09-08 -- Liwei/Elio: with the file list now
+                     // downloadable right here, "Download Kit" says what
+                     // pressing it actually gets you, better than sending
+                     // someone to SharePoint to do the same thing manually.
                      asset.source === "consensus" ? "Go to Consensus"
-                                                  : "Go to SharePoint",
+                                                  : "Download Kit",
                      platformHref,
                      asset.source === "consensus" ? "i-send" : "i-file-text"),
           actions.firstChild);
@@ -1486,25 +1558,25 @@
 
     // A copyable link to exactly this page -- the point of the whole page.
     //
-    // Labelled "Copy Internal Link", not "Copy link": Elio's note after
-    // Seb's review (2026-09-08) was that "Copy Link" reads as if it were
-    // fine to hand to a customer. It is not -- it opens the Hub itself, with
-    // no licence check and no watermark, unlike "Create DemoBoard" beside it.
-    // Keeping the verb "Copy" (that is still exactly what the button does,
-    // no dialog, no share flow) and disambiguating the noun said what Elio
-    // was after without implying an action the button doesn't take.
+    // "Share Internally", not "Copy link" -- Elio's note after Seb's review
+    // (2026-09-08): "Copy Link" reads as if it were fine to hand to a
+    // customer. It is not -- it opens the Hub itself, with no licence check
+    // and no watermark, unlike "Create DemoBoard" beside it. Briefly
+    // labelled "Copy Internal Link" the same day, on the reasoning that the
+    // verb should still say "copy" since that's the only thing the button
+    // does; Liwei's final call was Elio's original wording.
     var actions = page.querySelector(".vp-actions");
     if (actions && !document.getElementById("vpCopyLink")) {
       var copy = document.createElement("button");
       copy.className = "btn-ghost";
       copy.id = "vpCopyLink";
       copy.title = "This opens the Hub itself -- for colleagues, not customers.";
-      copy.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-file-text"/></svg>Copy Internal Link';
+      copy.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-file-text"/></svg>Share Internally';
       copy.addEventListener("click", function () {
         navigator.clipboard.writeText(assetUrl(detailAsset.id));
         copy.textContent = "Copied";
         setTimeout(function () { copy.innerHTML =
-          '<svg class="orion-ico--sm orion-ico"><use href="#i-file-text"/></svg>Copy Internal Link'; }, 1500);
+          '<svg class="orion-ico--sm orion-ico"><use href="#i-file-text"/></svg>Share Internally'; }, 1500);
       });
       actions.appendChild(copy);
     }
@@ -2234,6 +2306,14 @@
   var TYPE_LABELS = { video: "Videos", ldk: "LDKs", vdk: "VDKs",
                       vm: "Virtual Machines" };
 
+  //: The eight codes LANG_MAP (sharepoint_mapping.py) and Consensus's
+  //: `language.code` both produce, measured against the live catalogue --
+  //: not a guess at what languages might exist. A code missing from here
+  //: still shows, just as itself (see languageBadge()'s fallback).
+  var LANGUAGE_LABEL = { en: "English", zh: "Chinese", de: "German",
+                        fr: "French", es: "Spanish", it: "Italian",
+                        ja: "Japanese", ko: "Korean" };
+
   //: Below this a suggestion is noise. "Show all 1 Consensus Introduction
   //: demos" costs a click to learn nothing; the results already show it.
   var SUGGEST_MIN = 5;
@@ -2274,9 +2354,11 @@
       }
     });
     (baselineFacets.umbrella_families || []).forEach(function (f) {
-      if (f.count >= SUGGEST_MIN && namesCategory(query, f.value)) {
-        out.push({ rank: 2, size: f.value.length, label: f.value,
-                   text: "Browse all " + f.count + " " + f.value,
+      if (HIDDEN_UMBRELLAS.indexOf(f.value) !== -1) return;
+      var label = umbrellaDisplayName(f.value);
+      if (f.count >= SUGGEST_MIN && namesCategory(query, label)) {
+        out.push({ rank: 2, size: label.length, label: label,
+                   text: "Browse all " + f.count + " " + label,
                    page: true, run: function () { openFamily(f.value); } });
       }
     });
@@ -2393,6 +2475,10 @@
 
     var anchor = heading;
     families.forEach(function (f) {
+      // A business decision, not a data one -- Servigistics has assets.
+      // See HIDDEN_UMBRELLAS.
+      if (HIDDEN_UMBRELLAS.indexOf(f.value) !== -1) return;
+
       var item = document.createElement("div");
       item.className = "orion-navitem";
       /* No count, deliberately.
@@ -2413,7 +2499,7 @@
        * No icon either: eight identical marks in a column carry no
        * information, and only four of the eight products have a logo.
        */
-      item.innerHTML = '<span class="label">' + escapeHtml(f.value) + '</span>';
+      item.innerHTML = '<span class="label">' + escapeHtml(umbrellaDisplayName(f.value)) + '</span>';
       anchor.after(item);
       anchor = item;
     });
@@ -2559,11 +2645,13 @@
     window.HUB_ASSET_POOL = assets.map(buildCard);
     fillRails(assets);
 
-    fillSelect("hubFilterProduct", facets.product_families || facets.products);
+    fillSelect("hubFilterProduct", (facets.product_families || facets.products || [])
+      .filter(function (f) { return HIDDEN_UMBRELLAS.indexOf(f.value) === -1; }));
     fillSelect("hubFilterSegment", (facets.segments || []).filter(function (f) {
       return HIDDEN_SEGMENTS.indexOf(f.value) === -1;
     }));
     fillSelect("hubFilterStage", facets.funnel_stages);
+    fillSelect("hubFilterLanguage", facets.languages);
     fillSelect("hubFilterType", facets.types);
     fillSidebarCounts(facets);
     takeOverControls();

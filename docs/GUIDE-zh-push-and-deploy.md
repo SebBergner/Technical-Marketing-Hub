@@ -233,11 +233,15 @@ cd /mnt/data && unzip /home/mnt-data-initial.zip
 它记录每个资产的 `first_seen_at` 和退役历史，删了重建不出来。
 真要动之前先下载一份备份。
 
-### 3.4 填 segments.json
+### 3.4 填 segments.json（2026-09-08 更新：优先级降低了）
 
-六个 segment 页面现在都显示"No description written yet"。这是设计如此
-（接口拒绝编造内容），但需要人去填。在 `/mnt/data/owned/segments.json`
-新建这个文件，**不需要部署**，重启即可：
+这条本来是"待办第一条"，但 segment 落地页后来被 Seb/Elio/Serge 三个人在评审时
+各自独立提出"应该按产品浏览，不要按 segment"，已经从左边导航拿掉了（现在导航
+走的是"Browse by Product"）。`/api/segments` 接口还在、还能用，但**现在没有
+入口能点到这个页面**，所以填不填这个文件影响很小。除非以后又把 segment 页面
+接回导航，否则不用优先做这个。
+
+格式留档以防以后用得上：
 
 ```json
 {
@@ -246,14 +250,9 @@ cd /mnt/data && unzip /home/mnt-data-initial.zip
     "owner": { "name": "某某", "email": "someone@ptc.com" },
     "updated_by": "Liwei Chen",
     "updated_at": "2026-09-03"
-  },
-  "PLM": { "...": "同上" }
+  }
 }
 ```
-
-六个 key：`CAD`(402) · `PLM`(250) · `ALM`(102) · `IoT`(78) · `SLM`(35) ·
-`SCO`(1)。SCO 只有 1 个资产，约定的规则是**页面需要的是负责人，不是数量** ——
-如果没人负责 SCO，它就不该是一个页面。
 
 ---
 
@@ -366,24 +365,40 @@ git diff --cached --name-only
 |---|---|
 | 线上打不开 | Azure → Log stream；然后 `/health` |
 | 打开了但没数据 | `/api/debug/backend`，看仓储和凭据；再看 `/mnt/data` 有没有东西 |
-| 数据是旧的 | 没人跑 sync。`POST /api/graph/sync` |
+| 数据是旧的 | **`POST /api/graph/sync` 在线上现在会被拒绝**（2026-09-08 起）——没人有 curator 权限（`AUTH_CURATOR_GROUPS` 还是空的）。现在唯一的刷新方式是：本地跑 sync → 把 `data/runtime/mirror/*.json` 传到 Azure Files 的 `mirror/` 目录 → 重启 App Service。见 §3 |
 | 一闪而过 Elio 的 mock-up | `index.html` 顶部的 `<style>` 块被动了 |
 | 改了代码本地没生效 | 完全停掉服务器重启，不要靠 `--reload` |
 | sync 报 `WouldShrinkMirror` | **这是保护机制在起作用**，不是 bug。说明这次拉到的数据不到原来的一半，通常是分页被当成了全量。查清楚再说，别直接加 `allow_shrink=True` |
 | Consensus 的 tag 突然全没了 | `CONSENSUS_V2_TOKEN` 过期了。去 `https://app.goconsensus.com/api/v2/docs/portal/` 重新复制一个 |
 | 部署失败 | `gh run view <id> --log-failed` |
+| 视频/图片预览弹窗一片空白 | 检查 iframe 有没有 `referrerpolicy="no-referrer"`——SharePoint 的播放页没有 referrer 就渲染不出东西，这个属性是从 Consensus 那个弹窗抄过来的坑 |
+| Word/PPT 预览弹窗一片空白 | **这个改不了**——微软 Office 在线查看器自己拒绝在任何跨域 iframe 里运行，同一个链接单独开标签页是好的。这就是为什么文档类文件走"新标签页打开"而不是弹窗 |
 
 ---
 
-## 9. 还没做的事（按可以马上动手的顺序）
+## 9. 还没做的事（2026-09-08 更新）
 
-1. **填 `segments.json`** —— §3.4，不用部署
-2. **开 Easy Auth** —— 见 `HANDOVER-DEPLOYMENT.md` §4 步骤 1。做完之后把
-   `static/hub-api.js` 里的 `SHARE_BUTTON_HIDDEN` 改成 `false`
-3. **加定时同步** —— Azure Timer 调那两个接口
-4. **在 workflow 里加测试步骤** —— 一行，能挡住坏代码上线
-5. **View All Requests 列表**（Serge 要的）
-6. **Admin 区域**
+上次这里排第一的"填 segments.json"已经降低优先级了——segment 页面被拿掉了
+导航入口，见 §3.4。Load More、文件下载/预览、Servigistics 隐藏、IPE 改名、
+Language 筛选、LDK 时长隐藏这些都已经上线，不再是待办。
 
-被别人卡住的：customer-facing 标签（没有数据源）、Value Roadmap（等 Seb 演示
-AMP 的做法）、Consensus tag 长期可用（等 Consensus 支持回复）。
+1. **开 Easy Auth 的"Require authentication"**（平台层，不是 App Setting 那个
+   `AUTH_MODE=easyauth`）——现在只是应用层信任了 EasyAuth 的 header，Azure
+   平台本身没有强制登录，所以匿名也能读到全部数据。同时要把某个 Entra 用户组
+   填进 `AUTH_CURATOR_GROUPS`，不然登录了也没人有 curator 权限，`/api/graph/sync`
+   照样会被拒绝
+2. 做完①之后：
+   - 把 `static/hub-api.js` 里的 `SHARE_BUTTON_HIDDEN` 改成 `false`
+   - 就能配一个有 curator 权限的账号/服务主体，加定时同步（Azure Timer 调
+     `/api/graph/sync` 和 `/api/consensus/sync`）
+3. **在 workflow 里加测试步骤** —— 一行，能挡住坏代码上线（部署了 11 次都是
+   靠人肉跑测试再推的，还没出过事，但迟早的事）
+4. **View All Requests 列表**（Serge 要的）
+5. **Admin 区域**
+6. **Request New Asset 表单的产品按钮里还有 Servigistics** —— 隐藏 Servigistics
+   时漏了这一处，是完全独立的一段代码（`fillProductPills()`）
+
+被别人卡住的：customer-facing 标签（没有数据源）、Value Roadmap（**已经不是
+"等 Seb 演示做法"了**——已经定了是 Seb 那边出一个 AMP 分析出来的 json 文件，
+放进每个 demo 文件夹里，我们直接读文件，等他交付）、Consensus tag 长期可用
+（等 Consensus 支持回复那个 bcrypt 密钥问题）。

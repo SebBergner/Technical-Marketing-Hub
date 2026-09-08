@@ -84,7 +84,7 @@ scale-out. Everything under `DATA_DIR/owned/` is irreplaceable:
 | `identity.json` | the stable asset ids. Cannot be rebuilt — every link and every curation reference is keyed on them |
 | `curation.json` | editors' picks and rails |
 | `stats.json` | view, share and download counters |
-| `segments.json` | the segment page descriptions and owners |
+| `segments.json` | segment descriptions and owners — `/api/segments` still serves this, but segment pages have had no nav entry point since 2026-09-08 (see `docs/HANDOVER-DEVELOPMENT.md` §8.3), so this file does not currently exist and filling it is low priority |
 | `requests.jsonl` | the local copy of intake submissions |
 
 Requests reach SharePoint immediately, so losing `requests.jsonl` costs only

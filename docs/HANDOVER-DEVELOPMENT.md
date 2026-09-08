@@ -1,22 +1,39 @@
 # Development Handover — TDD Portal / Technical Marketing Hub
 
-**Written 2026-09-03 for a successor developer or AI assistant with no prior
-context on this project.** Everything here was verified against the working
-tree and the live data on that date; where a number appears, it was measured,
-not estimated. Where something is unverified, it says so.
+**Written 2026-09-03, substantially revised 2026-09-08** for a successor
+developer or AI assistant with no prior context on this project. Everything
+here was verified against the working tree and the live data as of the
+revision date; where a number appears, it was measured, not estimated. Where
+something is unverified, it says so. Five feature commits landed between the
+two dates (Load More, file download and preview, Servigistics/IPE/Language
+nav work, LDK duration hiding, the Preview button redesign) — §4.2, §5.5,
+§5.6 and §8.6 are new or substantially rewritten as of this revision; §8.3
+was corrected because the design it originally described (segment landing
+pages) was later reverted, before this document's previous revision, and had
+gone uncorrected until now.
 
-> 中文导读：本文档是**开发**交接。第 1 节是必读的“别踩这些坑”；第 2 节是数据流；
-> 第 4 节是每个文件的作用；第 9 节是待办清单（按可以立刻动手的顺序排列）。
-> 部署相关的一切在 `docs/HANDOVER-DEPLOYMENT.md`。
+> 中文导读：本文档是**开发**交接，2026-09-08 做过一次大幅修订。第 1 节是必读的
+> "别踩这些坑"；第 2 节是数据流；第 4 节是每个文件的作用；§5.6 是这次新加的
+> 文件下载/预览功能；§8.6 是这次新加的显示层改名/隐藏/配色决定；第 9 节是
+> 待办清单（已按最新进度更新，几项旧的"待办"已经上线）。
+> 部署相关的一切在 `docs/HANDOVER-DEPLOYMENT.md`（同样已同步更新）。
 
-Companion documents, all current:
+Companion documents, all current as of 2026-09-08:
 
 | Document | What it holds |
 |---|---|
-| `docs/HANDOVER-DEPLOYMENT.md` | git state, Azure state, what still has to be created |
+| `docs/HANDOVER-DEPLOYMENT.md` | git state, Azure state, the routine deploy process, what's still open |
+| `docs/GUIDE-zh-push-and-deploy.md` | Chinese step-by-step for Liwei's own future pushes |
 | `docs/ARCHITECTURE.md` (922 lines) | the reasoning behind each decision, in the order it was made, with the measurements |
 | `README.md` | how to run it, how to wire each integration |
 | `docs/demo-request-list.md` | the SharePoint list contract for the intake form |
+
+Also check this session's saved memory (`tdd-portal-*` and
+`product-landing-pages-proposal` files) for context that is genuinely too
+fresh or too small to belong in a document — most recently, an exact
+agreement with Seb on how Value Roadmap data will eventually arrive
+(`tdd-portal-value-roadmap-amp`) and a scoped next task for the file-preview
+modal (`tdd-portal-file-preview-properties-table`, now **done** as of §5.6).
 
 `ARCHITECTURE.md` is the long-form record and is **not** superseded by this
 file. Read this one to start working; read that one before changing a
@@ -210,7 +227,7 @@ Fields worth understanding rather than guessing at:
 | `segment` | CAD / PLM / ALM / SLM / IoT (+ SCO, 1 asset). For Consensus this is derived from the `internalTitle` pipe convention, which only **64 %** of demos follow |
 | `customer_facing` | **field exists, data does not.** 96–100 % `True`, i.e. a default rather than a signal. Do not build a filter on it until it has a real source |
 | `external_views` | Consensus only (472 of 491 have it). SharePoint has none |
-| `resources[]` | the files inside the asset folder. `size_bytes`, `duration_seconds`, `width`, `height` all come free from the Graph children listing |
+| `resources[]` | the files inside the asset folder. `size_bytes`, `duration_seconds`, `width`, `height`, `item_id`, `created_at`, `created_by`, `modified_at`, `modified_by` all come free from the Graph children listing -- no extra call for any of them. `item_id` is what §5.6's download/preview endpoints resolve at click time; the four date/name fields feed the preview modal's Properties table |
 | `main_video` | the resource the asset's own duration comes from |
 | `consensus_uuid` | the join to Consensus, where one exists |
 
@@ -224,7 +241,10 @@ answer different questions.
   filter*: "narrow where I am".
 - **`umbrella_families`** — the **8 curated families** Seb gave in the
   2026-09-02 review, used by the left-nav *browse* affordance: "take me
-  somewhere".
+  somewhere". Backend still counts all 8; the nav shows 7 of them and calls
+  one by a different name — Servigistics is hidden and IPE reads "PTC Ignite"
+  at the display layer only, added 2026-09-08. See §8.6, not this section, for
+  that: nothing here changed.
 
 ```python
 PRODUCT_FAMILIES = ("Creo", "Codebeamer", "Windchill", "PTC Jetstream",
@@ -318,12 +338,15 @@ GET  /health
 GET  /api/assets                the main query. AssetQuery as query params
 GET  /api/assets/{id}
 POST /api/assets/{id}/view
+GET  /api/assets/{id}/files/{item_id}/download   302 to a fresh Graph download_url()
+GET  /api/assets/{id}/files/{item_id}/preview    302 to a fresh GraphClient.preview() (§5.6)
 
 GET  /api/taxonomy              facets for the filter bar
 GET  /api/taxonomy/video-levels
 GET  /api/taxonomy/rails
 
-GET  /api/segments              landing pages: derived + editorial, kept apart
+GET  /api/segments              derived + editorial, kept apart -- still works,
+                                but no longer linked from the nav (§8.3)
 GET  /api/segments/{key}
 
 POST /api/requests              intake form, JSON
@@ -463,11 +486,79 @@ or similar) rather than fixing three files again.
 | `SHARE_BUTTON_HIDDEN = true` | the DemoBoard share flow is built and works, but is hidden pending the Easy Auth decision (§7.1). Flip to `false` once auth is on |
 | `paintCover()` | generates a coloured cover with the product mark for the **455 assets with no thumbnail**. Earlier version used title initials, which collided ("NOV" ×3) |
 | `consensusUrl()` | must use `a.internal_title \|\| a.title` — see §3 |
-| `buildFamilyNav()` | rewrites `.orion-side__body`. Counts were deliberately **removed** from Browse-by-Product (see §8.2) |
+| `buildFamilyNav()` | rewrites `.orion-side__body` fresh on every load from `facets.umbrella_families` — Elio's own static markup for this group is never shown, only 4 of its 8 sample items even exist there. Skips `HIDDEN_UMBRELLAS`, relabels via `UMBRELLA_DISPLAY` (§8.6). Counts were deliberately **removed** from Browse-by-Product (see §8.2) |
+| `UMBRELLA_DISPLAY` / `HIDDEN_UMBRELLAS` | the display-layer rename/hide for umbrella families (IPE → "PTC Ignite", Servigistics hidden) — see §8.6. The backend never learns of either; both are presentation only |
+| `HIDDEN_SEGMENTS = ["IoT"]` | same pattern, older and separately introduced (before this doc's 09-03 revision, undocumented until now): IoT held 78 assets before the divested-products cut (§1.4) and 1 after, so it is filtered out of the Segment dropdown at the `fillSelect("hubFilterSegment", ...)` call site. The segment itself and its data are untouched -- this hides one dropdown option, nothing else |
 | `rescoreSelect()` | keeps facet counts honest as filters change |
 | `clampDescription()` | Consensus descriptions run to 1194 characters and made tiles absurdly tall |
 | `autocomplete="off"` | on the search box, because the browser restored stale text across navigation |
 | `MAX_ATTACHMENT_BYTES` | 4 MB, matching `requests_list.py`. Keep the two in step |
+| `loadMoreState` / `RESULT_LIMIT` | the grid fetches 200 at a time (the API's own ceiling) and appends more on click — added 2026-09-08 after a filter down to "showing 200 of 422" had no way to reach the rest. See §5.6 is unrelated to this; look here in `renderFileList`'s neighbourhood instead |
+| `addLanguageTag()` | a corner badge on the thumbnail (not `.asset-card__meta` — that flex row has no wrap and silently clips whatever does not fit, which is exactly what happened to this tag before it moved). Skips English on purpose: 727 of 808 assets are English, a badge on 90% of the grid is noise, not signal |
+| `asset.type === "ldk"` gates on `toCardData()`'s `duration` and `openAssetDetail()`'s `vpDuration` | an LDK's duration number is the recording's own length, not how long the live demo actually runs — Seb's review, 2026-09-08. Hidden for LDK, shown for everything else |
+
+### 5.6 File download and preview (added 2026-09-08)
+
+Two new endpoints on `backend/routers/assets.py`, both redirecting rather
+than proxying bytes, both resolving fresh on every call rather than caching
+anything — the same reasoning `GraphClient.download_url()`'s docstring
+already gave for video preview, extended to cover every file in a folder:
+
+```
+GET /api/assets/{asset_id}/files/{item_id}/download   -> 302 to Graph's download_url()
+GET /api/assets/{asset_id}/files/{item_id}/preview     -> 302 to GraphClient.preview()
+```
+
+Both share `_require_listed_file()` (item_id must belong to a resource
+actually on that asset — otherwise the endpoint doubles as "fetch any file in
+the Demo Catalog by id") and `_demo_catalog_drive()` (resolve site + drive,
+same two calls `sync_catalogue()` already makes).
+
+`AssetResource` grew five fields for this, all free from the same driveItem
+the sync already lists — no extra Graph call for any of them:
+`item_id`, `created_at`, `created_by`, `modified_at`, `modified_by`. All are
+`None` on a resource synced before the relevant field existed; the frontend
+falls back to plain text or omits the row rather than showing a gap.
+
+**Two constraints, found by testing rather than documented anywhere, that any
+future preview work needs to respect:**
+
+1. **The iframe must not carry `referrerpolicy="no-referrer"`.** SharePoint's
+   `embed.aspx` viewer (what `GraphClient.preview()` returns) renders
+   completely blank without a referrer, with no error on either side of the
+   frame boundary. Found by comparing the identical URL opened standalone
+   (worked) against the same URL in an iframe with that attribute (blank) —
+   the Consensus iframe two sections up needs the opposite, so this is a
+   real, easy mistake to copy forward.
+2. **Word and PowerPoint files never render inside any iframe on this app,
+   full stop — no header on our side changes it.** Confirmed by opening the
+   identical `/preview` URL as a top-level navigation (renders Word Online
+   correctly, every time) versus in an iframe (blank, no console error on
+   either side). This is Office Online's own anti-framing behaviour, the same
+   category of defence that stops a WOPI-based editor being embedded
+   somewhere a user might mistake for the real SharePoint. Consequence:
+   `MODAL_PREVIEWABLE_KINDS = ["video", "image"]` get the in-modal viewer with
+   Prev/Next; the "document" kind gets a plain `target="_blank"` link instead,
+   pointed at the identical `/preview` URL — a preview before download either
+   way, just not inside the app's own chrome for Office files.
+
+The preview modal's Properties table (redesigned 2026-09-08 to match a
+screenshot Seb shared of AMP, PTC's own video-analysis tool, per the
+`tdd-portal-file-preview-properties-table` memory) shows Language (the
+**asset's**, not the file's — `AssetResource` has no per-file language),
+Type, Duration, Resolution, Size, Created, Created by, Last modified, Modified
+by. Rows with no value are omitted, not shown blank. AMP's own panel also has
+a Workfront ID and a Style Template row; neither has a source on this side,
+so neither exists here — don't invent one.
+
+The per-row Preview button itself was redesigned the same day from an
+icon-only grey button (Liwei: "太过不明显", too easy to miss) to a PTC-green
+pill with the word "Preview". The fill colour on hover is pinned to `#00890B`
+literally rather than the theme-following `--orion-indigo` token — that
+token is `#40AA1D` in dark mode, which carries white text at only 3.01:1,
+fine for the idle text/border at this size but not enough once the whole
+background goes green. Same pinned value `.play-btn`/`.btn-primary-sm` already
+use for the identical reason (§8.6 has the fuller contrast history).
 
 ---
 
@@ -659,23 +750,36 @@ first), and with self-exclusion applied, clicking Codebeamer sent Creo to 0 —
 factually correct and completely confusing. Numbers removed; the nav is now
 navigation.
 
-### 8.3 Segment landing pages, not product filter toggles
+### 8.3 Segment landing pages — shipped, then deliberately removed
 
-Liwei's proposal, refined across the 2026-09-02 meeting. The left nav *goes
+Liwei's original proposal, from the 2026-09-02 meeting: the left nav *goes
 somewhere*; the filter bar *narrows what you have*. Six segment pages instead
-of nineteen product pages. Editorial content deliberately shrunk to a short
-description plus an owner contact — release announcements have a shelf life
-measured in weeks and reach people through the demo itself and by email.
+of nineteen product pages, editorial content shrunk to a short description
+plus an owner contact.
 
-`/api/segments` keeps derived and editorial content **strictly apart**: derived
-is recomputed per request from the same repository call the filters use, so a
-page can never promise a number the grid then fails to deliver.
+**This shipped, then Seb, Elio and Serge each independently said in a later
+review to navigate by product instead** — commit `5f1dded` replaced the
+segment nav with the umbrella Browse-by-Product nav §3.1 describes, and
+`renderSegmentHeader()` in `hub-api.js` now unconditionally hides the segment
+header with a comment recording exactly this. **If you find "six segment
+pages" described as the current nav anywhere — an older doc, your own memory
+of this project, a stale comment — it is describing this since-reverted
+design, not what ships today.**
 
-The search box offers whichever category the query names — a segment gets a
-link to its page, a family gets "show all N", a type gets a filter. One
-mechanism. This also avoids a silent failure: **ThingWorx genuinely split 64
-IoT / 44 PLM**, so routing a product name to a segment page would have hidden
-44 assets.
+`/api/segments` **still exists** and still serves derived + editorial content,
+kept strictly apart the way it always was — nothing links to it from the nav
+any more, but the endpoint itself was not removed, and nothing stops it being
+reattached to a UI later if segments come back into favour. See §9 for why
+filling in `owned/segments.json` is consequently no longer the priority it
+once was.
+
+The search-suggestion mechanism this section originally justified — "a
+segment gets a link to its page, a family gets 'show all N'" — checked
+against the current code rather than assumed: `suggestionsFor()` has **no
+segment branch at all** any more. `baselineFacets.segments` is referenced
+exactly once in `hub-api.js` today, to keep the Segment filter dropdown's own
+counts honest (`rescoreSelect`) — not for suggestions, not for a nav, not for
+a page. Segments are a plain filter now, nothing more.
 
 ### 8.4 Asset requests originate in SharePoint
 
@@ -696,56 +800,120 @@ Accepted metadata proposals are pushed to SharePoint only into empty fields,
 and the operation says out loud what it did. See `graph/writeback.py` and
 `ARCHITECTURE.md` §"write-back never overwrites".
 
+### 8.6 Display-layer renames stay display-layer (2026-09-08)
+
+Two unrelated asks from the same Elio/Seb review, both resolved the same way:
+change what a person reads, never what the backend or a query string calls
+the thing.
+
+**Servigistics hidden, IPE relabelled "PTC Ignite."** Both are umbrella
+families in `PRODUCT_FAMILIES` (`backend/services/taxonomy.py`) and the
+backend never hears about either change — `taxonomy.py`, the `umbrella_facet`
+values, and the `?umbrella=` query string all still say "IPE". The frontend's
+`UMBRELLA_DISPLAY` (value → label) and `HIDDEN_UMBRELLAS` (values hidden
+outright) sit in `hub-api.js` and translate at render time, in
+`buildFamilyNav()` (nav), the `fillSelect("hubFilterProduct", ...)` call site
+(dropdown), and `suggestionsFor()`'s umbrella branch (search). Hiding
+Servigistics is a **business decision, not a data one** — it still has an
+asset, unlike IPE, which is kept visible at zero on the deliberate logic that
+its demos are being made now and dimming it would report a plan as a fault.
+**Known residual:** the Request-a-New-Asset form's product pills
+(`fillProductPills()`) are a separate code path from all three of the above
+and still offer "Servigistics" — flagged when found, not fixed, since it was
+outside what was actually asked.
+
+**VDK's display expansion flip-flopped once, worth knowing if it moves
+again.** Checked directly against live SharePoint (`Demo_x0020_Type`, every
+value in the column enumerated, not sampled): the only two values are
+"Live Demo Kit" and "Virtual Demo Kit" — "Video Demo Kit" appears nowhere in
+the actual data. Liwei confirmed with Elio directly that "Video Demo Kit" is
+still the term to show regardless, with an explicit instruction: if fixing
+the wording would touch internal logic, touch only the wording. So the hero
+subtitle and the "VDKs" nav item's subtitle read "Video Demo Kits" — display
+text only. `TYPE_MAP`, `AssetType.VDK`, the `"vdk"` filter value, and every
+place SharePoint's own Demo Type column is read all still say "Virtual Demo
+Kit" internally and are untouched. If someone asks again which is "correct",
+both answers are true at once on purpose: the data is verified as saying
+Virtual, the page is instructed to say Video.
+
+**Two shades of PTC green, and which goes where is measured, not chosen by
+eye.** Elio's file has a real dark theme, and no single green clears WCAG AA
+on both of its grounds: `#40AA1D` (the brand's primary) carries white text at
+3.01:1 on white and 5.51:1 on the dark surface `#1c1f23`; `#00890B` (the
+brand's secondary) is the exact reverse, 4.58:1 and 2.94:1. So `--orion-indigo`
+(the token name stays, only its value changed, since eighteen of Elio's rules
+already reference it) follows the theme — secondary green in light mode,
+primary in dark — while anything that fills a shape and puts **white text**
+on it (`.play-btn`, `.btn-primary-sm`, the Preview pill's hover state) is
+pinned to the literal `#00890B` in both themes rather than following the
+token, because the primary green fails white text specifically in dark mode.
+Get this backwards — as the first attempt did, hoisting the whole override
+block above Elio's own `:root` — and the page does not flash the wrong colour
+for a beat, it stays wrong everywhere: two `:root` rules setting the same
+custom property resolve by source order, later wins, regardless of which one
+is "supposed" to be more specific. Proved in the browser before shipping
+either direction, both times.
+
 ---
 
 ## 9. Backlog, in the order it can be picked up
 
+*(Revised 2026-09-08 — several items below were "ready now" on 2026-09-03 and
+have since shipped: Load More, file download and preview, the Servigistics/
+IPE/Language nav work, LDK duration hiding. This list is what remains.)*
+
 ### Ready now, no dependencies
 
-1. **Fill in `owned/segments.json`.** Every segment page renders "No
-   description written yet" and "no owner recorded". That is the designed
-   state, but it is only defensible while somebody is about to fill it in. Six
-   segments: CAD (402), PLM (250), ALM (102), IoT (78), SLM (35), SCO (1). No
-   deploy needed:
+1. **`View All Requests` table** (asked for by Serge). Filterable by
+   requester, status and expected delivery. Note §8.4: SharePoint is the
+   store of record, so this reads the list, it does not read
+   `requests.jsonl`. Also note the open item in `docs/demo-request-list.md`
+   — the list has no `Status`, `TriageNotes` or `DeliveredAsset` columns yet,
+   and without them it is a suggestion box rather than a queue.
 
-   ```json
-   { "PLM": { "blurb": "...",
-              "owner": {"name": "...", "email": "..."},
-              "updated_by": "...", "updated_at": "2026-09-03" } }
-   ```
-
-   Settle while filling it in: SCO has one asset, and the agreed rule is that a
-   page needs an *owner*, not a count — if nobody owns SCO it should stop being
-   a page.
-
-2. **Scheduled sync.** Promised in the meeting, still manual. Shape: an Azure
-   timer (WebJob or Function) calling the two sync endpoints, plus a manual
-   button in `/debug` for troubleshooting. Respect the different costs (§2).
-
-3. **View All Requests table** (asked for by Serge). Filterable by requester,
-   status and expected delivery. Note §8.4: SharePoint is the store of record,
-   so this reads the list, it does not read `requests.jsonl`. Also note the
-   open item in `docs/demo-request-list.md` — the list has no `Status`,
-   `TriageNotes` or `DeliveredAsset` columns yet, and without them it is a
-   suggestion box rather than a queue.
-
-4. **Admin area** for uploads and settings. Scoped in the meeting, not
+2. **Admin area** for uploads and settings. Scoped in the meeting, not
    started.
+
+3. **`fillProductPills()` still offers "Servigistics"** on the
+   Request-a-New-Asset form (§8.6) — a residual gap in a code path separate
+   from the nav/dropdown hiding, noticed but out of scope when that shipped.
+
+4. ~~**Fill in `owned/segments.json`.**~~ **No longer the priority it was** —
+   segments have no nav entry point any more (§8.3), so nobody currently
+   reaches a segment page to read the description on it. `/api/segments`
+   still works and this is still worth doing if segments ever get a UI home
+   again, but it is not blocking anything today the way it looked like it
+   would on 2026-09-03.
 
 ### Blocked on a person
 
 5. **Customer-facing vs internal-only tag** — blocked on a data source (§7.3).
-6. **Value Roadmap indexing** — blocked on Seb's AMP walkthrough.
-7. **Turning the share button on** — blocked on Easy Auth (§7.1).
+6. **Value Roadmap indexing.** Not blocked on *finding* the approach any
+   more — Seb confirmed 2026-09-08 it will arrive as **a JSON file per demo
+   folder**, written by AMP, read like any other resource in the sync, not an
+   API integration. Still blocked on Seb actually producing and handing off
+   that JSON for the catalogue's ~950 assets. See the
+   `tdd-portal-value-roadmap-amp` memory for the full detail, including one
+   still-open question (does AMP analyse per video or per asset folder —
+   matters for where the data attaches) that needs confirming when the
+   handoff happens, not assumed from this note.
+7. **Turning the share button on** — blocked on Easy Auth (§7.1), which is
+   itself blocked on the curator-role gap now documented in
+   `docs/HANDOVER-DEPLOYMENT.md` §1.
 8. **Consensus tags surviving long-term** — blocked on Consensus support (§7.2).
 
-### Cleanup noticed but not done
+### Scheduled sync — now blocked twice over, not once
 
-9. The Consensus preview mode (`?preview=sales` vs `?preview=marketing`) has
-   flipped twice since this document was first written — see §5.4 for the
-   current value and the full history, and don't trust an older revision of
-   this note or of `docs/deploying.md` on this point without checking
-   `backend/config.py` directly first.
+**Not built**, as it has been throughout — an Azure timer (WebJob or
+Function) calling the two sync endpoints, hourly for SharePoint (it has a
+delta token) and once or twice daily for Consensus (it does not), plus a
+manual button in `/debug`. But building it is no longer sufficient by
+itself: as of 2026-09-08 the sync endpoints require the curator role
+(`require_curator` in `backend/routers/graph.py` and `consensus.py`), and
+nobody holds it on the deployed app (`AUTH_CURATOR_GROUPS` is empty). A timer
+built today would need a service principal with that role, which does not
+exist yet either. Until then, data on Azure only ever updates by hand — see
+`docs/HANDOVER-DEPLOYMENT.md` §5a for exactly how that is currently done.
 
 ---
 

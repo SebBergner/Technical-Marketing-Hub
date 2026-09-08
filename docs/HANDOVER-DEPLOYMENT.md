@@ -1,35 +1,56 @@
 # Deployment Handover — TDD Portal / Technical Marketing Hub
 
-**Written 2026-09-03.** Every git and GitHub fact below was read from the live
-repository on that date. Azure facts that could not be read from this machine
-are marked **[verify in portal]** — the Azure CLI is not installed here, so
-they come from the workflow file, the GitHub secret names and the project
-record rather than from the Azure API.
+**Written 2026-09-03, revised 2026-09-08.** The backend described in the
+original version of this document as "sitting in PR #1, not yet merged" has
+since been merged and deployed **many times** — every commit landed by
+pushing to `liwei-backend-dev`, merging to `main`, and letting the existing
+GitHub Actions workflow redeploy automatically, exactly once per push, no
+manual gate. That is now the **routine deploy process**, not a one-time event
+— see §4 for how it actually works today, and
+`docs/GUIDE-zh-push-and-deploy.md` for the Chinese step-by-step Liwei uses.
 
-> 中文导读：**先读 §2**（现在 Azure 上跑的是什么 —— 不是你在本地看到的东西）。
-> 然后 §4 是必须按顺序执行的部署步骤，**顺序是有安全含义的**，跳步会开一个
-> 匿名写 SharePoint 的口子。§3 是唯一不可重建的数据。
+Everything below was re-verified against the **live app** on 2026-09-08 by
+calling it directly (`/api/debug/backend`, `/api/auth/me`, `/api/graph/status`
+etc.) — not assumed from the 09-03 state. Where something could only be
+learned from the Azure portal (which this machine has no CLI access to), it
+is still marked **[verify in portal]**.
+
+> 中文导读：这份文档最初写于 PR 还没合并的时候，现在**已经合并、已经上线、
+> 之后又部署了十几次**。§2 是现在的真实状态，§4 是往后每次改代码要走的流程
+> （已经不是"一次性部署步骤"了）。§7 是"线上现在到底能用什么、不能用什么"，
+> 每次功能更新后我都在维护这张表。
 
 ---
 
-## 1. TL;DR — the state in six lines
+## 1. TL;DR — the state today
 
-1. What is **live on Azure** is Elio's UI-only mock-up. The entire Python
-   backend is **not deployed**.
-2. The backend sits in **PR #1**, open and `MERGEABLE` / `mergeStateStatus:
-   CLEAN`. Merging it to `main` deploys it automatically, within about a
-   minute.
-3. **Do not merge first.** Three things must exist in Azure before the merge,
-   and one of them (Easy Auth) is a security precondition, not a nicety.
-4. Nothing has been created in Azure yet for this backend: no storage account,
-   no file share, no path mapping, no app settings, no identity provider.
-5. All credentials are on Liwei's laptop in `.env` (gitignored) and in
-   `C:\Work\TDD Hub\AZURE_APP_SETTINGS_fill_then_delete.md`, which is
-   **outside the repository** and holds three live secrets. **Delete that file
-   after pasting the values into Azure.**
-6. `C:\Work\TDD Hub\technical-marketing-hub\technical-marketing-hub\data\runtime\`
-   holds the only copy of `owned/identity.json`. Back it up before anything
-   else (§3).
+1. **Live and working.** `https://technical-marketing-hub-c8gxg4fagycjh5dz.eastus-01.azurewebsites.net`
+   serves the real backend — federated search, file download and preview,
+   the Request form writing to SharePoint, all of it. Confirmed by calling it
+   directly, not assumed.
+2. **Deploying is now routine**, not a one-time migration: push to
+   `liwei-backend-dev` → merge to `main` → GitHub Actions redeploys in about a
+   minute, no manual gate. Done this way roughly a dozen times since the
+   original merge. See §4.
+3. **Easy Auth is on at the app-settings level (`AUTH_MODE=easyauth`) but not
+   enforced at the platform level.** Reads are public — anyone can browse the
+   catalogue with no login. Writes need the curator role, and **nobody has
+   it** (`AUTH_CURATOR_GROUPS` is still empty) — every curation endpoint and
+   both sync endpoints (`/api/graph/sync`, `/api/consensus/sync`) refuse
+   everyone, including a real Entra login. This is the single most important
+   open gap; see §7.
+4. **`DATA_DIR` is Azure Files and durable** — confirmed
+   (`storage_is_durable: true` from `/api/debug/backend`). A redeploy no
+   longer wipes `owned/`.
+5. **There is still no scheduled sync**, and because of point 3, the live app
+   **cannot sync itself at all right now** — a curator login would be refused
+   even if one existed to try. The only way data on Azure gets refreshed today
+   is **Liwei manually copying local `mirror/*.json` files onto the Azure
+   Files share** and restarting the App Service. This has happened several
+   times already; see §5a for exactly how.
+6. Local credentials are in `.env` (gitignored). The one-time fill-in doc
+   (`AZURE_APP_SETTINGS_fill_then_delete.md`) should already be deleted per
+   its own name — if it still exists, delete it now.
 
 ---
 
@@ -40,45 +61,40 @@ record rather than from the Azure API.
 ```
 Repository   git@github.com:SebBergner/Technical-Marketing-Hub.git
 Default      main
-Working br.  liwei-backend-dev  (clean, in sync with origin)
-HEAD         bb2732a  fix: the hiding rule sat 2.5 MB after the markup it hides
+Working br.  liwei-backend-dev
 ```
 
-Branches:
+`main` and `liwei-backend-dev` are **at the same commit** as of 2026-09-08 —
+every push since the original merge has gone: commit on `liwei-backend-dev` →
+push → merge into `main` (fast-forward, since `main` is never worked on
+directly) → push `main` → GitHub Actions deploys. Nobody works on `main`
+itself; `Elio-UI-Development` is Elio's own branch for his markup changes and
+gets merged in separately when he has a revision.
 
-| Branch | Head | What it is |
-|---|---|---|
-| `main` | `e23b12f` | **what is deployed.** Elio's UI only |
-| `origin/Elio-UI-Development` | `e23b12f` | Elio's working branch — currently identical to `main` |
-| `liwei-backend-dev` | `bb2732a` | the whole backend, 25 commits ahead in substance |
+**PR #1** (`TDD Portal PoC: federated catalogue over SharePoint and
+Consensus`) is **MERGED** — this was the original squash merge that first put
+the backend on `main`. Every commit since then merged straight in without a
+PR, since it is Liwei driving both sides of the merge locally.
 
-**`main` contains exactly five files:**
+One git wrinkle worth knowing if you hit it: the *first* merge back onto
+`liwei-backend-dev` after that squash merge conflicted (92 files, "add/add",
+because the squash commit has no shared history with the branch it came
+from). Fixed once with `git merge -s ours origin/main` (records the ancestry
+without touching any file — verified with an empty `git diff`) and has not
+recurred since, because `main` and the branch stayed in lockstep from then on.
 
-```
-.github/workflows/main_technical-marketing-hub.yml
-README.md
-app.py            ← 14 lines: FastAPI serving index.html and nothing else
-index.html
-requirements.txt
-```
-
-The diff to merge: **92 files changed, 61,986 insertions, 35 deletions.**
-
-`main` is currently **behind** the local `main` ref's tracking by 4 commits
-because Elio pushed after the last local fetch — harmless, but `git fetch`
-before doing anything.
-
-### 2.2 The pull request
+### 2.2 The pull request (history)
 
 ```
 PR #1   TDD Portal PoC: federated catalogue over SharePoint and Consensus
         liwei-backend-dev -> main
-        OPEN · MERGEABLE · mergeStateStatus: CLEAN
+        MERGED 2026-09-03
         https://github.com/SebBergner/Technical-Marketing-Hub/pull/1
 ```
 
-No conflicts. Merging triggers the deploy immediately — there is no manual gate
-between the merge button and production.
+This section is kept for the record of what the *first* deploy actually was
+(92 files, 61,986 insertions) — it is not a live TODO. See §4 for how a
+change actually ships today, which no longer goes through a PR at all.
 
 ### 2.3 The deploy pipeline
 
@@ -109,18 +125,28 @@ unilaterally.
 
 ### 2.4 Deploy history
 
-| When | Result | What |
-|---|---|---|
-| 2026-08-13 03:06 | success | Add reset controls to Home filters — **this is what is live** |
-| 2026-08-12 10:54 | success | Add Demo Video Gallery to Discover nav |
-| 2026-08-07 13:34 | success | Move Product scope ahead of Distribution plan |
-| 2026-08-07 11:36 | success | Add Request New Asset intake form |
-| 2026-08-03 20:12 | success | Add the workflow config |
-| 2026-08-03 19:25 | **failure** | Add minimal FastAPI app |
-| 2026-08-03 19:24 | **failure** | Add the workflow config |
+The two failures on 2026-08-03 were the initial workflow setup, before the
+publish profile secret existed. **Every deploy since — eleven of them,
+including the original backend merge and every fix and feature since — has
+succeeded.** The most recent, current as of this revision:
 
-The two failures are from the initial setup, before the publish profile secret
-existed. Everything since has succeeded.
+| When | What |
+|---|---|
+| 2026-09-08 20:46 | fix: the language tag was getting clipped off the card, not just crowded |
+| 2026-09-08 20:34 | style: a green Preview pill, not a grey icon nobody noticed |
+| 2026-09-08 20:20 | feat: the preview modal now looks like AMP's Properties box, not a bullet line |
+| 2026-09-08 19:56 | feat: preview files before downloading them, and hide misleading LDK duration |
+| 2026-09-08 16:59 | feat: hide Servigistics, rename IPE, language filter, and detail-page cleanup |
+| 2026-09-08 15:48 | feat: file downloads, and three text/config fixes from Elio's review |
+| 2026-09-03 20:25 | feat: a Load More button, so results past 200 are reachable |
+| 2026-09-03 19:31 | fix: the PTC green flashed blue on every load, same bug as the mock-up |
+| 2026-09-03 19:09 | fix: the nav was never taken over from Elio, and three reports followed |
+| 2026-09-03 15:54 | fix: Home cleared the filters but left the counts describing the old slice |
+| 2026-09-03 15:20 | **the original merge** — TDD Portal: federated catalogue over SharePoint and Consensus |
+
+`gh run list --limit 15` reproduces this; `docs/HANDOVER-DEVELOPMENT.md` has
+the reasoning and the measurements behind each one, not just the one-line
+summary.
 
 ### 2.5 GitHub repository secrets
 
@@ -142,24 +168,25 @@ which is the better practice (no long-lived profile to rotate).
 exposed, regenerate it in the portal (App Service → Overview → Download publish
 profile → *Reset publish profile credentials*) and update the GitHub secret.
 
-### 2.6 Azure resources **[verify in portal]**
+### 2.6 Azure resources
 
-Known from the workflow and secret names:
+Confirmed live 2026-09-08 by calling the app directly — no CLI access to the
+portal from this machine, so exact resource/resource-group names are still
+**[verify in portal]**, but functional state is not guesswork:
 
 | | |
 |---|---|
 | App Service name | `Technical-Marketing-Hub` |
 | Slot | `Production` |
 | Runtime | Python on Linux (Oryx build) |
-| Likely URL | `https://technical-marketing-hub.azurewebsites.net` — **confirm; the portal may have appended a region suffix** |
-| Resource group | unknown from here |
-| Subscription | unknown from here (a subscription-id secret exists) |
-| App settings | **assumed to be only `SCM_DO_BUILD_DURING_DEPLOYMENT`** — none of the app's own variables have been set |
-| Authentication | **not configured** |
-| Path mappings | **none** |
-| Storage account | **does not exist** |
-
-**Nothing in the list below has been created.** That is the whole of §4.
+| **URL** | `https://technical-marketing-hub-c8gxg4fagycjh5dz.eastus-01.azurewebsites.net` — confirmed from a deploy log; **not** the plain `technical-marketing-hub.azurewebsites.net` guessed in the original version of this doc |
+| Resource group / Subscription | unknown from here [verify in portal] |
+| `DATA_DIR` | `/mnt/data`, an Azure Files mount — `storage_is_durable: true` confirmed via `/api/debug/backend` |
+| `AUTH_MODE` | `easyauth`, confirmed set |
+| `AUTH_CURATOR_GROUPS` | **still empty** — confirmed via `/api/auth/me`'s own warning. Nobody can curate or trigger a sync |
+| Authentication (platform-level "Require authentication") | **not enforced** — anonymous `curl` reaches `/` and every `/api/assets` route with a 200, no redirect. Reads are effectively public regardless of `AUTH_MODE` |
+| `GRAPH_*` / `CONSENSUS_*` | all set — `graph_configured: true`, `consensus_configured: true` |
+| Path mappings | the one Azure Files mount above; nothing else |
 
 ---
 
@@ -234,11 +261,44 @@ nothing. It preserves the history, and it means the ids already in
 
 ---
 
-## 4. The deployment sequence
+## 4. Deploying a change
 
-**The order is load-bearing.** Steps 1–3 before the merge in step 4.
+### 4a. The routine, as it actually works today
 
-Here is why, because it is not obvious and getting it wrong opens a real hole:
+There is no PR step any more and no manual gate. Every change since the
+original merge has shipped this way, roughly a dozen times:
+
+```bash
+git add -A
+git commit -m "..."
+git push origin liwei-backend-dev
+git checkout main
+git pull origin main
+git merge liwei-backend-dev
+git push origin main
+git checkout liwei-backend-dev
+```
+
+Push to `main` triggers the same GitHub Actions workflow (§2.3), which
+redeploys in about a minute. `gh run watch` follows it. Full Chinese
+walkthrough, including the secret-sweep habit and the rollback commands, is
+`docs/GUIDE-zh-push-and-deploy.md` — written for Liwei to run this without
+needing this file open at all.
+
+**One thing this routine will not do for you: refresh the data on Azure.**
+There is no scheduled sync, and nobody currently holds the curator role
+`/api/graph/sync` and `/api/consensus/sync` require (§1, point 3) — so a code
+deploy alone never updates what the catalogue shows. See §5a.
+
+### 4b. The one-time setup this replaced (already done, kept for reference)
+
+Everything in Steps 1–4 below happened once, in early September, to take the
+app from "not deployed at all" to what §2.6 now describes as live. It is
+**not a live TODO** — re-read it only if standing this app up again from
+scratch (a new environment, disaster recovery), or to understand *why* the
+current settings are what they are. The ordering constraint below was real
+and is worth knowing even in hindsight, because the same trap exists for
+anyone recreating this setup:
 
 - The app's dangerous state is **Graph credentials present + `AUTH_MODE`
   absent**. `AUTH_MODE` defaults to `disabled`, which hands every caller a dev
@@ -404,73 +464,71 @@ Move the three secrets to Key Vault and reference them as
 rather than the secret itself, and rotation stops being a redeploy. Fine as
 plain settings for a PoC.
 
-### Step 4 — Merge PR #1
+### Step 4 — Merge PR #1 (this already happened — see §4a for what replaced it)
 
-```bash
-gh pr merge 1 --squash --repo SebBergner/Technical-Marketing-Hub
-```
+This was the one-time squash merge that first put the backend on `main`
+(2026-09-03). Every change since goes straight from `liwei-backend-dev` to
+`main` with no PR, per §4a.
 
-Or the green button on
-https://github.com/SebBergner/Technical-Marketing-Hub/pull/1.
+### Step 5 — Verify after any deploy (still the right checklist today)
 
-Squash is the right choice: 25 commits of PoC iteration land as one reviewable
-change on `main`, and Elio's branch history stays clean.
-
-The workflow starts on push and takes about a minute.
-
-```bash
-gh run watch --repo SebBergner/Technical-Marketing-Hub
-```
-
-### Step 5 — Verify, in this order
-
-1. **`/api/debug/backend`** — read this first. It reports which repository is
+1. **`/api/debug/backend`** — read this first. Reports which repository is
    active, whether Graph and Consensus are configured, and the security
-   warnings.
-2. **`/api/auth/me`** — confirms Easy Auth is actually in front of the app.
-   `warnings` must be empty and `is_dev_principal` must be `false`.
-3. **`/health`** — should have been fine all along; a plain liveness check.
+   warnings — currently just the one about `AUTH_CURATOR_GROUPS`.
+2. **`/api/auth/me`** — anonymously, this correctly shows
+   `is_authenticated: false` and `enforcing: true`. That does **not** mean the
+   platform is blocking anonymous traffic — it means the *app* would trust
+   Easy Auth headers if App Service actually sent them, which it currently
+   does not for a plain visitor, because "Require authentication" was never
+   turned on at the platform level (§2.6). Reads stay public either way.
+3. **`/health`** — plain liveness check.
 4. **`/api/graph/verify`** — proves the Graph credentials and, separately, the
    site-level grant. A valid token with 403 on every call means the
-   `Sites.Selected` **site grant** (step 2 of the two-step grant) is missing —
-   the app registration permission alone grants nothing. Azure also lists two
-   different APIs each exposing a permission named `Sites.Selected`; the
-   **Microsoft Graph** one is the right one, and granting the SharePoint one
-   looks identical in the portal and does nothing.
-5. **`POST /api/graph/sync`** then **`POST /api/consensus/sync`**. Nothing runs
-   on a schedule, so a fresh instance serves whatever `DATA_DIR` holds.
-   Expected: 455 SharePoint rows, 491 Consensus rows in the mirror, **807
-   assets served** after divested products are filtered out (369 SharePoint +
-   438 Consensus).
-6. **`/`** — the UI. Check the left nav shows the eight umbrella families
-   (Creo, Codebeamer, Windchill, PTC Jetstream, IPE, ServiceMax, PTC Orbit,
-   Servigistics) and **not** Elio's product list with logos. If you see the
-   logo version, even for a frame, read §5.2–5.3 of
-   `docs/HANDOVER-DEVELOPMENT.md` before touching the CSS.
-7. **A Consensus play button** — should open a chrome-less popup that actually
-   plays.
+   `Sites.Selected` **site grant** is missing — the app registration
+   permission alone grants nothing.
+5. **`POST /api/graph/sync`** / **`POST /api/consensus/sync`** — **will 401/403
+   for everyone right now**, curator or not, because nobody holds the
+   curator role (§1). This is expected, not a bug to chase. See §5a for how
+   data actually gets refreshed today instead.
+6. **`/`** — the UI. Left nav should show **Creo, Codebeamer, Windchill, PTC
+   Jetstream, PTC Ignite, ServiceMax, PTC Orbit** — seven items, not eight:
+   **Servigistics is deliberately hidden** (Elio/Seb, 2026-09-08) and **IPE
+   displays as "PTC Ignite"** (same date; the backend still calls it "IPE"
+   internally). If you see "IPE" or "Servigistics" in the sidebar, or Elio's
+   old logo-based mock-up flashes even for a frame, read §3.2 and §5.3 of
+   `docs/HANDOVER-DEVELOPMENT.md`.
+7. **A file's Preview button** on an asset detail page — green pill, opens a
+   modal with the video/image playing and a Properties table below it, or (for
+   a Word/PowerPoint file) a new tab. See `docs/HANDOVER-DEVELOPMENT.md` §5.6
+   for the two non-obvious constraints this depends on.
 8. **`/debug`** — the plain data inspector, for anything the UI obscures.
 
-If a sync refuses with `WouldShrinkMirror`, that is the tripwire working: it
-means the run returned less than half the previous count, which is what a
-partial page looks like when mistaken for a full enumeration. Investigate
-before passing `allow_shrink=True`.
+If a sync you *can* trigger (locally, or once curator access exists) refuses
+with `WouldShrinkMirror`, that is the tripwire working, not a bug — it means
+the run returned less than half the previous count, which is what a partial
+page looks like when mistaken for a full enumeration.
 
-### Step 6 — Same-day follow-ups
+### Step 6 — Still open, not "same-day" any more
 
-- **Flip `SHARE_BUTTON_HIDDEN` to `false`** in `static/hub-api.js` once auth is
-  verified. It is `true` only because attribution was untrustworthy.
-- **Delete `C:\Work\TDD Hub\AZURE_APP_SETTINGS_fill_then_delete.md`.**
-- **Clean up the Consensus test artefacts** Liwei still needs to remove from
-  the Consensus admin UI:
-  - 6 test DemoBoards (created with `isTest: true`)
-  - 1 real DemoBoard, `b3f1f173f`
-  - 2 test marketing links, `u01a022b1` and `aaedcc830`
-- **Add a test step to the workflow** (§2.3) — one line, and it stops a broken
-  backend reaching production.
-- **Fill in `owned/segments.json`** on the mounted share, or every segment page
-  reads "No description written yet". No deploy needed; format is in
-  `docs/HANDOVER-DEVELOPMENT.md` §9.
+These were written as same-day follow-ups on 2026-09-03 and are **still not
+done** as of 2026-09-08 — carried forward rather than re-dated, so a future
+reader does not mistake "still open" for "just noticed":
+
+- **`SHARE_BUTTON_HIDDEN` is still `true`** in `static/hub-api.js`. Flipping
+  it needs the curator/Easy-Auth gap (§1, point 3) closed first — enabling it
+  before then would mean every DemoBoard is attributed to whatever fallback
+  account `CONSENSUS_USER_EMAIL` names, not the person who clicked Share.
+- **`C:\Work\TDD Hub\AZURE_APP_SETTINGS_fill_then_delete.md` still exists** on
+  Liwei's machine, three live secrets, outside the repo. Delete it.
+- **Consensus test artefacts** — unverified whether Liwei has cleaned these up
+  since 2026-09-02: 6 test DemoBoards (`isTest: true`), 1 real DemoBoard
+  (`b3f1f173f`), 2 test marketing links (`u01a022b1`, `aaedcc830`).
+- **No test step in the deploy workflow** (§2.3) — still just
+  `pip install`, no `pytest`. One line would stop a broken backend reaching
+  production; eleven deploys have gone out without this net so far.
+- **`owned/segments.json` still does not exist** on the Azure Files share —
+  every segment page still reads "No description written yet". Format is in
+  `docs/HANDOVER-DEVELOPMENT.md` §9. No deploy needed to fix, just an upload.
 
 ---
 
@@ -492,6 +550,48 @@ that goes with it — keep it that way.
 
 Every commit on this branch was preceded by a sweep for known secret values.
 Worth continuing.
+
+---
+
+## 5a. How data on Azure actually gets refreshed today
+
+There is no scheduled sync (still true, see `docs/HANDOVER-DEVELOPMENT.md`
+§9), and the two sync endpoints on the live app require the curator role,
+which nobody has (§1, point 3). So a `POST /api/graph/sync` against the live
+URL just gets refused — that is not a bug to chase, it is the actual current
+state. **The only way data on Azure has been refreshed since the original
+deploy is Liwei running a sync locally and copying the resulting files onto
+the Azure Files share by hand.** This has happened several times already, most
+recently to pick up new `AssetResource` fields (`item_id`, `created_at`,
+`created_by`, `modified_at`, `modified_by`) that a fresh sync populates and an
+old mirror file does not have.
+
+The steps, every time:
+
+1. **Locally**, with real Graph/Consensus credentials in `.env`:
+   ```bash
+   python -m uvicorn app:app --port 8000
+   curl -X POST http://localhost:8000/api/graph/sync
+   curl -X POST http://localhost:8000/api/consensus/sync
+   ```
+2. This rewrites `data/runtime/mirror/sharepoint.json` and
+   `.../consensus.json` locally.
+3. **Azure Portal → the storage account → the file share → `mirror/`** —
+   upload those two files, overwriting the ones there. `owned/` almost never
+   needs re-uploading this way; it already lives durably on the same share
+   and sync never touches it (§3).
+4. **App Service → Overview → Restart.** Required every time: the JSON
+   repository caches each mirror file by its on-disk modification time, and a
+   portal upload does not go through the code path that would invalidate that
+   cache on its own.
+
+**One consequence worth knowing:** `/api/graph/status` and
+`/api/consensus/status` report `last_sync` from `owned/sync_state.json`,
+which this manual workflow does **not** update (it is not part of what gets
+uploaded). So those timestamps can read as if the data is much older than it
+actually is — trust `git log` on the docs and this section's own history
+over what `/api/*/status` reports, until curator access exists and a real
+sync can run end to end on Azure itself.
 
 ---
 
@@ -521,38 +621,62 @@ redeploy a previous package, but the git route is more predictable.
 
 ---
 
-## 7. What "deployed" will and will not mean
+## 7. What "deployed" means today (kept current after every feature commit)
 
-Set expectations honestly with Seb and Elio when this goes up.
+Set expectations honestly with Seb and Elio. This section is rewritten each
+time something moves from one list to the other — if it disagrees with what
+you see live, trust the live app and fix this section, in that order.
 
-**Working after step 5:**
+**Working, confirmed live 2026-09-08:**
 
-federated search over 807 assets · faceted filters that can be left as well as
-entered · eight-family browse nav · six segment landing pages (with empty
-editorial copy) · asset detail pages with SharePoint file listings and metadata
-· Consensus marketing-preview playback in a popup · platform buttons to
-SharePoint and the Consensus library · the Request a New Asset form writing to
-the SharePoint `Demo Requests` list with attachments · curation proposals and
-Graph write-back · role-gated curation endpoints.
+federated search over ~808 assets, with **Load More** past the API's 200-item
+page ceiling · faceted filters that can be left as well as entered · a
+seven-family Browse by Product nav (Creo, Codebeamer, Windchill, PTC
+Jetstream, PTC Ignite, ServiceMax, PTC Orbit — **Servigistics is deliberately
+hidden**, and IPE displays as "PTC Ignite") · a Language filter and a
+per-tile language tag for anything not English · asset detail pages with
+SharePoint file listings, metadata, **file download**, and **file preview**
+(video/image inline in a modal with a Properties table; Word/PowerPoint in a
+new tab — Office's own viewer refuses to render inside any iframe, ours
+included, so this split is permanent, not a gap — see
+`docs/HANDOVER-DEVELOPMENT.md` §5.6) · Consensus **sales**-preview playback in
+a popup (flipped from `marketing` back to `sales` 2026-09-08 at Elio's
+request) · platform buttons to SharePoint and the Consensus library ·
+misleading duration hidden on LDK cards and detail pages · the Request a New
+Asset form writing to the SharePoint `Demo Requests` list with attachments ·
+curation proposals and Graph write-back · role-gated curation endpoints
+(though nobody currently holds the role — §1).
+
+**Segment landing pages were built, then deliberately removed** (commit
+`5f1dded`, before this doc's previous revision) — Seb, Elio and Serge all
+independently said in review to navigate by product instead. If you find a
+reference to "six segment pages" in an older document or your own memory of
+this project, it is describing a design that shipped and was then reverted;
+`/api/segments` still exists and still serves derived + editorial data, it is
+simply not linked to from the nav any more.
 
 **Not working, and known:**
 
 | Gap | Why |
 |---|---|
-| No scheduled sync | not built. Manual `POST` only. **The catalogue will go stale silently** |
-| Share button hidden | pending Easy Auth verification |
-| Segment pages have no copy | `owned/segments.json` does not exist yet |
+| No scheduled sync | still not built. The live app cannot sync itself at all right now regardless — see §1 point 3 and §5a |
+| Share button hidden | pending the same curator/Easy-Auth gap |
 | No View All Requests table | not built (asked for by Serge) |
 | No Admin area | not built |
 | No customer-facing filter | the field is 96–100 % `True` — a default, not data |
-| Value Roadmap is a placeholder | 0 of 946 assets have one; Seb to show the AMP approach |
+| Value Roadmap is a placeholder | intentionally, for now — Seb will hand off an AMP-produced JSON per demo folder later; see the `tdd-portal-value-roadmap-amp` memory. Not an API integration, don't build one |
+| File-preview Properties table is one-line, not AMP's table format | **done** 2026-09-08 (`cbf1c12`) — kept here crossed out as of this revision so a stale copy of this doc doesn't claim it is still open |
 | Most Viewed omits SharePoint | 0 of 455 SharePoint assets have any view count |
 | Consensus tags will vanish one day | `CONSENSUS_V2_TOKEN` expires; sync falls back to V1, which has no tags |
 | 19 Consensus assets have order-dependent ids | duplicate titles, positional collision suffix — §3.1 |
+| Request-a-New-Asset form still offers "Servigistics" | its product pills (`fillProductPills()`) are a separate code path from the nav/dropdown hiding — flagged, not fixed, when Servigistics was hidden elsewhere |
 | Brightcove / Seismic | access and API existence still unconfirmed |
 
-The scheduled sync is the one that will bite first, because it fails by looking
-fine. Shape when you build it: an Azure timer (WebJob or Function) calling the
-two endpoints — **hourly for SharePoint** (it has a delta token, so an
-unchanged check is nearly free) and **once or twice daily for Consensus** (no
-delta; it re-pulls everything) — plus a manual button in `/debug`.
+The scheduled sync is still the one that will bite hardest, and now for two
+reasons rather than one: it was never built, *and* even if it were, nobody
+holds the curator role the sync endpoints require. Shape when you build both:
+an Azure timer (WebJob or Function) calling the two endpoints — **hourly for
+SharePoint** (it has a delta token, so an unchanged check is nearly free) and
+**once or twice daily for Consensus** (no delta; it re-pulls everything) —
+running as a principal that has the curator role, plus a manual button in
+`/debug` for troubleshooting.

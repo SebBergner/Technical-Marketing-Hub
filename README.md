@@ -78,6 +78,12 @@ the same parametrised tests, so switching is a config change.
 
 ## Status
 
+**This table is out of date past the "early project" stage — see
+`docs/HANDOVER-DEVELOPMENT.md` §0, §5–§9 and
+`docs/HANDOVER-DEPLOYMENT.md` §7 for what is actually true today, kept
+current after every feature commit. This one is left as a record of where
+the project started, not corrected in place.**
+
 | | |
 |---|---|
 | Frontend | Mockup split into static files. **Not** API-driven yet — Elio is still iterating on `index.html`, so it is deliberately untouched. |
@@ -89,6 +95,13 @@ the same parametrised tests, so switching is a config change.
 | Write-back | Accepted proposals push to SharePoint columns. Dry run by default; never overwrites an existing value. |
 | Consensus | Client, matching and reconciliation built. Running on the stub until credentials are set. |
 | Auth | App Service Easy Auth (Entra ID), with viewer / curator roles. Off locally by default. |
+
+**As of 2026-09-08, for real:** the frontend is fully API-driven and
+deployed live; Graph and Consensus credentials have been set for weeks and
+both sources sync (manually — no scheduler yet); Easy Auth is set at the
+app-settings level but not enforced at the platform level, so reads are
+public and writes need the curator role, which nobody currently holds. Full
+detail in the two documents linked above.
 
 ### Keeping the index fresh
 

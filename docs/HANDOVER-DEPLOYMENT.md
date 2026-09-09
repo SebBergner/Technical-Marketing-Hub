@@ -126,12 +126,14 @@ unilaterally.
 ### 2.4 Deploy history
 
 The two failures on 2026-08-03 were the initial workflow setup, before the
-publish profile secret existed. **Every deploy since — fifteen of them,
+publish profile secret existed. **Every deploy since — seventeen of them,
 including the original backend merge and every fix and feature since — has
 succeeded.** The most recent, current as of this revision:
 
 | When | What |
 |---|---|
+| 2026-09-09 23:18 | fix: Product Scope and the Product dropdown still read "Jetstream"/"Orbit" |
+| 2026-09-09 (same evening) | fix: anonymous visitors could not submit an asset request at all |
 | 2026-09-09 20:11 | fix: the homepage rails' "View all" links did nothing |
 | 2026-09-09 19:33 | docs: mention CAD Models in the homepage subtitle |
 | 2026-09-09 (same push) | fix: an unauthenticated viewer saw a blank tile instead of the cover |
@@ -651,6 +653,19 @@ sidebar's own "Latest Uploads" destination. `Most Viewed`'s equivalent link
 is deliberately hidden rather than fixed the same way — see
 `docs/HANDOVER-DEVELOPMENT.md` §9 item 5 for why (its backend sort key ranks
 by a counter nothing increments).
+
+**Asset requests can be submitted again.** `POST /api/requests` had depended
+on a real sign-in, and since "Require authentication" is not enforced at the
+platform level (§2.6), every visitor arrives as ANONYMOUS — meaning this
+endpoint was refusing 100% of submissions, not gating them by role, since the
+form went live. Fixed the same evening: an anonymous submission now keeps
+whatever `Name`/`Email` the requester typed in the form's own "Your details"
+fields, same as before Easy Auth existed. Also fixed the same evening,
+smaller: the Request form's Product Scope pills and the filter bar's Product
+dropdown now both read "PTC Ignite"/"PTC Jetstream"/"PTC Orbit" consistently
+with the rest of the app, and "eStore" is gone from Distribution plan. See
+`docs/HANDOVER-DEVELOPMENT.md`'s "Request-a-New-Asset fixes, 2026-09-09
+evening" for the full detail on all four.
 
 federated search over ~808 assets, with **Load More** past the API's 200-item
 page ceiling · faceted filters that can be left as well as entered · a

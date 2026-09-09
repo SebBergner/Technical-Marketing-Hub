@@ -126,12 +126,16 @@ unilaterally.
 ### 2.4 Deploy history
 
 The two failures on 2026-08-03 were the initial workflow setup, before the
-publish profile secret existed. **Every deploy since — eleven of them,
+publish profile secret existed. **Every deploy since — fourteen of them,
 including the original backend merge and every fix and feature since — has
 succeeded.** The most recent, current as of this revision:
 
 | When | What |
 |---|---|
+| 2026-09-09 19:33 | docs: mention CAD Models in the homepage subtitle |
+| 2026-09-09 (same push) | fix: an unauthenticated viewer saw a blank tile instead of the cover |
+| 2026-09-09 (same push) | fix: CAD Model thumbnails were breaking every Demo card's gradient cover |
+| 2026-09-09 (same push) | feat: ingest standalone CAD Model folders as a new asset type |
 | 2026-09-08 20:46 | fix: the language tag was getting clipped off the card, not just crowded |
 | 2026-09-08 20:34 | style: a green Preview pill, not a grey icon nobody noticed |
 | 2026-09-08 20:20 | feat: the preview modal now looks like AMP's Properties box, not a bullet line |
@@ -627,7 +631,18 @@ Set expectations honestly with Seb and Elio. This section is rewritten each
 time something moves from one list to the other — if it disagrees with what
 you see live, trust the live app and fix this section, in that order.
 
-**Working, confirmed live 2026-09-08:**
+**Working, confirmed live 2026-09-09:**
+
+**280 standalone CAD Model assets** (`docs/HANDOVER-DEVELOPMENT.md` §9's
+"CAD datasets" plan), browsable and filterable via `Type: CAD Model` —
+confirmed on the live app with real data (`GET /api/assets?type=cad_model`
+returns 280, matching the local count exactly), with an unauthenticated
+viewer correctly falling back to the generated colour cover rather than a
+blank tile when SharePoint's own thumbnail can't be reached. **One thing
+worth knowing:** `/api/graph/status`'s `last_sync` still reads
+`2026-09-02`, which is known-stale (§5a) — the CAD Model data being live
+means the mirror on Azure Files was refreshed by hand more recently than
+that field shows, not that the field is now trustworthy.
 
 federated search over ~808 assets, with **Load More** past the API's 200-item
 page ceiling · faceted filters that can be left as well as entered · a

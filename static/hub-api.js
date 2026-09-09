@@ -166,7 +166,8 @@
     video: ["i-video", "Video"],
     ldk:   ["i-box", "LDK"],
     vdk:   ["i-monitor", "VDK"],
-    vm:    ["i-monitor", "Virtual Machine"]
+    vm:    ["i-monitor", "Virtual Machine"],
+    cad_model: ["i-layers", "CAD Model"]
   };
 
   function retypeCard(card, a) {
@@ -2528,7 +2529,7 @@
    * satisfy the search box.
    */
   var TYPE_LABELS = { video: "Videos", ldk: "LDKs", vdk: "VDKs",
-                      vm: "Virtual Machines" };
+                      vm: "Virtual Machines", cad_model: "CAD Models" };
 
   //: The eight codes LANG_MAP (sharepoint_mapping.py) and Consensus's
   //: `language.code` both produce, measured against the live catalogue --

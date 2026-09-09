@@ -367,6 +367,46 @@ def test_files_under_a_folder_with_no_demo_type_are_orphans():
     assert result.resources == 0
 
 
+def test_cad_model_folders_become_cad_model_assets():
+    """A folder with no Demo Type but ContentType 'CAD Model' is a standalone
+    CAD dataset, not a demo -- measured 2026-09-09, 280 of them in the real
+    catalogue, previously all falling into skipped_no_demo_type."""
+    items = [
+        folder("Adirondack Chair", demo_type=None, ContentType="CAD Model",
+               CAD_x0020_Product="ProENGINEER Wildfire",
+               Description="Complete assembly and drawings for a wooden chair."),
+    ]
+    assets, result = build_assets(items)
+
+    assert len(assets) == 1
+    asset = assets[0]
+    assert asset.type.value == "cad_model"
+    assert asset.title == "Adirondack Chair"
+    assert asset.products == ["ProENGINEER Wildfire"]
+    assert asset.description == "Complete assembly and drawings for a wooden chair."
+    assert result.skipped_no_demo_type == 0
+
+
+def test_a_folder_with_neither_demo_type_nor_cad_model_is_still_skipped():
+    items = [folder("Mystery Folder", demo_type=None, ContentType="Folder")]
+    assets, result = build_assets(items)
+
+    assert assets == []
+    assert result.skipped_no_demo_type == 1
+
+
+def test_cad_model_files_are_attributed_as_resources():
+    items = [
+        folder("Adirondack Chair", demo_type=None, ContentType="CAD Model"),
+        file_item("Adirondack Chair.zip", "/Adirondack Chair"),
+    ]
+    assets, result = build_assets(items)
+    asset = assets[0]
+
+    assert result.resources == 1
+    assert asset.resource_count == 1
+
+
 def test_columns_map_through_shared_logic():
     items = [folder("Kit v.1", Product="30;#Creo Parametric;#42;#Windchill PDMLink",
                     Segment="IoT,PLM", Language="Chinese (People's Republic of China)")]

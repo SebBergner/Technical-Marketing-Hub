@@ -1,6 +1,8 @@
 # Development Handover — TDD Portal / Technical Marketing Hub
 
-**Written 2026-09-03, substantially revised 2026-09-08** for a successor
+**Written 2026-09-03, substantially revised 2026-09-08, appended 2026-09-09**
+(new §9 subsection recording five unscoped asks from an Elio review — no
+other section changed) for a successor
 developer or AI assistant with no prior context on this project. Everything
 here was verified against the working tree and the live data as of the
 revision date; where a number appears, it was measured, not estimated. Where
@@ -861,6 +863,375 @@ either direction, both times.
 *(Revised 2026-09-08 — several items below were "ready now" on 2026-09-03 and
 have since shipped: Load More, file download and preview, the Servigistics/
 IPE/Language nav work, LDK duration hiding. This list is what remains.)*
+
+### New asks — Elio review, 2026-09-09 (not yet scoped)
+
+Five requests from Liwei's 2026-09-09 meeting with Elio. None has an
+implementation plan yet — recorded here in the order Liwei raised them, so
+they are not lost before the next scoping pass. Each links back to what is
+already known from earlier sections rather than starting from nothing.
+
+1. **Add a Comment feature.** Where a comment is stored was explicitly **not**
+   decided in the meeting — on an asset, on a resource, backed by a
+   SharePoint list, or `owned/` — and needs a follow-up discussion before this
+   is scoped. Whatever the answer, §1.1 applies directly: a comment is
+   Portal-authored data, so it belongs in `owned/` (a new file, e.g.
+   `owned/comments.jsonl`, following the `share_events.jsonl` append-only
+   pattern) or in a SharePoint list on the §8.4 model — never in `mirror/`,
+   since a sync must never be able to destroy it.
+
+2. **Bring CAD datasets and VM assets into the Hub as first-class content.**
+   Today the Hub only surfaces Video, LDK and VDK. Two things already
+   measured are directly relevant and worth re-reading before scoping this
+   (`ARCHITECTURE.md` §2a):
+   - SharePoint has a **second document library, "Virtual Machine Catalog,"
+     with 139 items** — a completely separate library from Demo Catalog. The
+     old mock-up only ever claimed 14 VMs.
+   - `Asset.resources[]` already models `dataset` (.zip) and CAD
+     (`.creo`/`.prt.N`) as a resource *kind nested inside* an asset folder —
+     that is not the same thing as a VM or a CAD dataset being its own
+     browsable asset. This needs the same kind of definitional call §2a made
+     for Demo Catalog ("an asset is a top-level folder carrying a Demo
+     Type") — applied to a library that has never been enumerated this way.
+
+3. **Surface LDK "Supporting Documents" on the asset detail page.** ~~Liwei's
+   working guess was~~ **Measured 2026-09-09 against the live site via Graph**
+   (read-only `GET`s with the existing app-only credentials; nothing written)
+   — the mechanism is more specific, and less finished, than a guess would
+   have suggested:
+
+   - The two example URLs Liwei supplied are **Site Pages**, not Demo Catalog
+     folder metadata. `SitePages` is a real Graph-addressable list
+     (`GET /sites/{siteId}/lists/Site Pages`, id `8b8e848f-…`) that is
+     **excluded from `GET /sites/{siteId}/lists`'s own enumeration** (it
+     carries a `system` facet) but is directly addressable by name — worth
+     remembering if a future Graph call silently "can't see" it. Its 549
+     items (§2a of `ARCHITECTURE.md`) are one profile page per LDK/VM, each
+     with its own metadata columns (`Demo_x0020_Type`, `Product`, `Segment`,
+     `Priority`, `Availability`, a `Preview` thumbnail, etc.) — `CanvasContent1`
+     is empty on both pages checked, so these are **not** modern drag-and-drop
+     canvas pages; whatever assembles the page's own layout is a shared
+     template outside anything Graph v1.0 exposes.
+   - There **is** a purpose-built link between the two catalogues: the
+     **Virtual Machine Catalog** library has a `Supported Demos` column —
+     confirmed via its column definition to be a multi-value **Lookup**
+     pointing at `Title` in the `Site Pages` list. This is clearly the schema
+     "Supporting Demo Environment" is meant to read. **It is entirely
+     unpopulated: 0 of 139 VM Catalog items have any value in it** (full
+     population, not a sample).
+   - The reverse direction also exists and is equally unused in practice:
+     Demo Catalog **files** (not just the top-level asset folder) carry a
+     `Required Virtual Machine Link` hyperlink field. Sampled 30 asset
+     folders / 136 files: present on only **3 of 136**, and all three point
+     at the generic Virtual Machine Catalog **library root**, never a
+     specific VM. A `SetVMLink` field (present on 50 of 136, ~37%) turned out
+     to be a link to a SharePoint Designer/Nintex **workflow status page**
+     (`wrkstat.aspx?...WorkflowInstanceName=...`, reported "Stage 1" on the
+     two sampled) — i.e. there is an actual workflow meant to populate the
+     real per-asset VM link, and on this evidence it does not appear to be
+     completing. Graph does not expose workflow internals, so this could not
+     be investigated further from here.
+   - **What is genuinely rich and already free:** a `Demo Category` choice
+     column set **per file** (not per asset), present on 125 of 136 sampled
+     files (92%), with values README · Setup · Battlecard · CAD Data ·
+     Datasheet · Demo Data · Outline · Picks · Presentation · Preview Video ·
+     Talk Track · VM Software BOM · Webcast Recording · Video · Audio · Cover
+     Sheet · TBD. This is the same Graph children listing the sync already
+     performs (§3, the way `resources[]` fields are free today) — no extra
+     call needed. There is no LDK-level "Documentation" subfolder to speak
+     of — the one asset folder inspected in depth was flat (a .pptx, an
+     .mp4, two .docx).
+   - **Correction, same day, after Liwei checked a live page directly.** The
+     `Supported Demos` = 0/139 finding above is real but was measured against
+     the wrong VM — Liwei pasted the actual rendered content of
+     `.../Virtual Machines/Windchill-13.1.4.1---Virtual-Machine.aspx`, and its
+     "Supported Demos" section lists **~70 real LDK/VDK entries, each with a
+     person's name and a date** (e.g. "Jetstream VDK V.1 — Aug 25, 2026 —
+     Thompson, Scott"), spanning 2024 through 2026. So the feature is live
+     and populated for at least this VM — the earlier "unused infrastructure"
+     conclusion does not hold in general and should not be repeated as
+     written above.
+   - Chasing this down further **the Virtual Machine Catalog document
+     library has no folder for "Windchill 13.1.4.1" at all** — its newest
+     Windchill folder is `Windchill 13.0.1.1 Rev 1.0`, from 2024. Its own
+     `Supported Demos` lookup column is real but appears to belong to a
+     library that has stopped receiving new VM folders, while the "Virtual
+     Machines" folder under **Site Pages** is the one still being kept
+     current. Practical consequence for new-ask item 2 (VM ingestion): the
+     139-item Virtual Machine Catalog library **cannot be treated as the
+     current VM inventory** — Site Pages' `Virtual Machines/` folder needs to
+     be the source, or at least cross-checked against it, or newer VMs like
+     this one are invisible to the Hub.
+   - The Site Pages list itself was checked column-by-column (82 columns) and
+     **has no `Supported Demos` (or similarly named) column at all** — so
+     the ~70-row list on the live page is not a field stored on that page's
+     own item either. Checked and ruled out as the source: `VM - Related
+     Demos` (still 1 row, unchanged since 2026-08-14), `VM/Demo Issue
+     Tracking` (a bug tracker — "Reported/Fixed In - VM/Demo" columns, not a
+     supported-demos log). Graph's drive full-text search
+     (`/drives/{id}/root/search(q=...)`) was tried as a shortcut to locate
+     whatever field actually names "13.1.4.1" and **returned HTTP 500 on
+     every query, including a trivial one** — this app registration or this
+     drive does not support that endpoint, so a brute-force text search is
+     not available from here either.
+   - **Net position: the real mechanism is still not identified**, and
+     evidence now points at something the Graph endpoints tried so far don't
+     surface at all — most likely a search-index-backed web part (PnP Modern
+     Search / Content Search Web Part) reading a field this investigation
+     has not found yet, or a log-like list not yet spotted in the site's
+     `/lists` enumeration. Two ways to close this, neither tried yet: (a) the
+     classic SharePoint `_api/web/...` REST API can read a page's actual web
+     part configuration, but needs a SharePoint-audience token, which this
+     app's Graph-scoped credentials do not have; (b) simply asking Elio, who
+     commissioned this content and very likely knows whether it is a
+     Power Automate flow, a Nintex workflow, or a custom web part.
+   - **What still stands from the first pass, unaffected by this
+     correction:** `Demo Category` remains a real, populated, per-file
+     column (125/136 sampled, free in the same Graph call the sync already
+     makes) and is still the practical, buildable basis for a "Supporting
+     Documents" section on our own detail page — that recommendation does
+     not depend on ever resolving the "Supported Demos" mystery above, which
+     is a separate, harder problem (VM-to-demo linkage) worth keeping
+     distinct from "show me this asset's supporting files."
+   - **Second correction, same day, from screenshots of the reverse
+     direction.** Liwei also showed the LDK's own page —
+     `SitePages/Demo Catalog/Snowmobile - Windchill Risk and Reliability.aspx`
+     — which carries the *reciprocal* widget, "View Supporting Demo
+     Environment", showing **VMs that support this LDK** (not the other way
+     round). Its "See all" page listed exactly 4 cards: `Windchill 13.1.4.1`,
+     `13.1.2.0`, `13.0.1.1`, `11.1 M020-CPS08` — all Virtual Machines, in
+     **exact descending-Modified order** (Aug 2026 → Nov 2025 → Aug 2024 →
+     Jul 2024). Checked this LDK's own Site Page fields: `Product Group` =
+     Windchill, `Segment` = PLM — matching every one of the 4 VMs shown. That
+     is consistent with a **computed, not stored**, relationship: a
+     Highlighted-Content-style web part filtering the Virtual Machines pages
+     by the current page's own `Product Group` (and/or `Segment`), sorted by
+     `Modified` descending, capped at 4 — which would explain why no stored
+     join field was ever found, on either side.
+   - **That hypothesis does not fully survive contact with the other
+     direction, though.** The VM's own ~70-row "Supported Demos" list (first
+     correction, above) spans product families that are not all "Windchill"
+     — Jetstream, MedDev, FAD, EHT, Creo View, Snowmobile — which a
+     same-Product-Group filter would not produce. The VM's own description
+     ("Modular VM with almost all Windchill modules… **contains many other
+     products as well**") suggests it may genuinely be manually associated
+     with a broad, curated set of demos rather than computed — meaning the
+     two directions ("VMs I need" vs "demos I support") may not be the same
+     mechanism at all, or the real filter is broader than Product Group
+     (e.g. Segment alone, or a manually maintained set for this specific
+     general-purpose VM). Also checked and ruled out this round:
+     `LayoutWebpartsContent` (a real column on Site Pages, for header-zone
+     web parts) is also `None` on this LDK's page, same as `CanvasContent1`
+     — though see the caveat directly below before trusting that "None".
+   - **A caution about trusting any "None"/absent field from this
+     investigation.** The 13.1.4.1 page's real, ~70-entry `Supported Demos`
+     did not merely read as an empty value — the field was **entirely
+     absent from the `fields` dict**, not present as a null. That is
+     independent evidence that Graph's `$expand=fields` can silently drop a
+     large/complex field rather than error on it, so `CanvasContent1` and
+     `LayoutWebpartsContent` reading as absent on these pages is **not
+     proof** they are actually empty — they could be large enough to hit the
+     same silent-drop behaviour. Nothing above should be read as "this page
+     definitely isn't a modern canvas page" — only as "Graph would not show
+     us that content either way."
+   - **Confirmed, same day, from the web part's own configuration pane.**
+     Elio did not know how this was built, so Liwei opened the LDK page in
+     Edit mode and read the "Highlighted content" web part's own settings
+     directly (no code, no Graph — just the page's Edit UI). It is a
+     **Custom query (KQL)**, not the basic Filter mode:
+     ```
+     Path:"https://ptccloud.sharepoint.com/sites/EXT-TDD/SitePages/Virtual Machines"
+       (Segment:"PLM") AND (Filetype:aspx)
+     ```
+     Sort: **Most recent** (Modified, descending — matches the observed card
+     order exactly). Layout: Carousel, 1 item shown at a time on the small
+     widget; "See all" runs the identical query with no cap, which is why it
+     returned exactly the 4 (or ~70, on the VM's reciprocal page) matching
+     pages. This fully resolves the apparent contradiction between the two
+     directions above: **the filter is on `Segment`, not `Product Group`** —
+     PLM is a broad segment that legitimately spans Jetstream, MedDev, FAD,
+     EHT, Creo View etc. alongside Windchill, which is exactly the mixed set
+     the VM's own ~70-row list showed. There is no stored join field, no
+     curated list, and no per-item relationship anywhere — every earlier
+     attempt to find one came up empty because there genuinely isn't one.
+   - **The reciprocal widget confirmed too, from the VM page's own web part.**
+     The "Supported Demos" widget on the `Windchill 13.1.4.1` VM page is the
+     same Highlighted Content / Custom Query pattern, mirrored:
+     ```
+     Path:"https://ptccloud.sharepoint.com/sites/EXT-TDD/SitePages/Demo Catalog"
+       (Segment:"PLM") AND (Filetype:aspx) AND WORDS(LDK)
+     ```
+     `Path` points at the `Demo Catalog` Site Pages folder instead of
+     `Virtual Machines`, same literal `Segment:"PLM"`, same most-recent sort
+     — plus one extra term, `AND WORDS(LDK)`, not present on the LDK page's
+     own query. That addition does not appear to be strictly enforced by the
+     live results, though: the VM's own ~70-row list's very first entry was
+     "Jetstream **VDK** V.1", which should not match a literal `WORDS(LDK)`
+     requirement — most likely because KQL's `WORDS()` matches a page's full
+     indexed body/description text, not just its title, so a VDK page whose
+     own text happens to mention "LDK" slips through. Not worth chasing
+     further; the core three-part recipe (Path scope, Segment literal,
+     most-recent sort) is what matters and is now confirmed on both sides.
+   - **One fragility worth recording, not for us to fix:** `"PLM"` appears in
+     the query text as a **literal string**, not a token bound to the page's
+     own Segment field (a true page-property binding renders as a
+     `{Segment}`-style placeholder in this same box, which is not what is
+     here). So each Site Page's copy of this web part was very likely
+     stamped with a hardcoded literal at creation/provisioning time, and
+     nothing keeps it in sync if that page's own Segment value is edited
+     afterwards. Not our bug to fix, but worth knowing if a page's supporting
+     content ever looks stale or wrong on the SharePoint side.
+   - **What this means for building it in our own Hub:** the relationship is
+     fully computable from data we can already have — no dependency on Seb or
+     Elio producing a curated mapping. Once new-ask item 2 (bringing VM
+     assets into the Hub) is scoped and VM Site Pages are ingested with their
+     own `Segment` field, "Supporting Demo Environment" on our own detail
+     page is: **same `Segment`, opposite content type (a Video/LDK/VDK asset
+     shows VM assets and vice versa), sorted by most recently modified** —
+     the same three ingredients SharePoint's own web part uses, computed
+     properly (bound live to each asset's actual current Segment) rather than
+     copied as a stale literal the way SharePoint's own copy is. This is a
+     genuinely good outcome: it turns out to need no new data source at all,
+     only the VM ingestion work item 2 already calls for.
+
+4. **Seb will pursue SSO** (an Entra ID app registration for real sign-in).
+   This is not a new blocker — it is the same one already tracked as §7.1.
+   Seb's earlier attempt via "Create new" app registration failed for lack of
+   permission, and the portal's own error suggested "provide the details of
+   an existing app registration" as the path to try instead (§4a of
+   `docs/HANDOVER-DEPLOYMENT.md`). If this succeeds, it unblocks the curator
+   role, the Share button, and — per this new ask — real per-user
+   attribution generally, not only Consensus DemoBoard ownership.
+
+5. **Admin area needs per-demo usage tracking with real analytics**, not just
+   uploads/settings (this expands backlog item 2 below, not a separate item).
+   Relevant existing infrastructure: `owned/stats.json` already counts
+   `views` / `downloads` / `launches` / `shares` per asset (`backend/models.py`,
+   `backend/repositories/json_repo.py`) but nothing in the UI surfaces it yet.
+   Per §7.3, this cannot be built as one honest number across sources: **0 of
+   455 SharePoint assets have any view count**, while Consensus's
+   `external_views` covers 472 of 491. Any usage dashboard either has to scope
+   itself per-source (e.g. "Most viewed on Consensus") or explicitly show "no
+   data" for SharePoint-only assets — inventing a number here is exactly what
+   §1.2 exists to prevent.
+
+### V2 scope — bringing VM and CAD data into the Hub (planned 2026-09-09)
+
+Elaborates new-ask item 2 above into an actual plan, now that item 3's
+investigation answered the dependency it had on VM assets existing. CAD
+datasets and VM environments are **two separate pieces of work with very
+different difficulty** — worth sequencing and possibly shipping separately
+rather than as one "V2" story.
+
+#### CAD datasets — the easy half, cheap and well-defined
+
+Measured 2026-09-09 across all 751 top-level Demo Catalog folders by their
+SharePoint `ContentType`, correcting the rougher §6.1 estimate ("167 CAD
+model folders, ~128 need a PM decision"):
+
+| ContentType | Folders |
+|---|---|
+| `Demo` (today's LDK/VDK/Video assets) | 456 |
+| `CAD Model` | **280** |
+| `Folder` (genuinely uncategorized — the real "needs a PM decision" set) | 15 |
+
+**280, not 167** carry the real, distinct `CAD Model` content type — sampled
+one (`Adirondack Chair`, a flat folder with just a `.zip` and a `.rar`) and
+it has its own honest metadata, nothing invented: `Title`, `Description`
+("Complete assembly and drawings for a wooden Adirondack chair."),
+`CAD_x0020_Product` (free text, e.g. "ProENGINEER Wildfire" — not the
+managed-metadata `Product` term Demo folders use), `Product_x0020_Version`,
+`Product_x0020_Maintenance_x0020_Release`, a thumbnail `Image`, Created/
+Modified. **No `Segment` and no managed `Product` term** on the one sampled
+— so a CAD Model asset cannot honestly be filtered by Segment or product
+family the way a Demo can, only browsed/searched by name and its free-text
+CAD product.
+
+Only 15 folders are genuinely unclassified now — a far smaller open question
+than the old ~128 figure suggested, and worth re-raising with the PM with
+the corrected number.
+
+**Confirmed 2026-09-09 as exactly what Elio meant**, via a screenshot of
+SharePoint's own `Demo Catalog/Forms/CAD Model Gallery.aspx` view (a
+pre-built library view filtered to `ContentType = CAD Model`) — it renders
+precisely `Name`, `Product Version`, `CAD Product`, `Description` per card,
+matching the fields measured above with nothing extra. Full-population
+field coverage across all 280: `Image` 280/280, `CAD_x0020_Product` 280/280,
+`Description` 280/280, `Product_x0020_Version` 276/280. One caveat found by
+comparing the two: the gallery screenshot showed one card ("Aerospace
+Data") rendering a **generic file icon instead of a real thumbnail**, yet
+its `Image` field holds a well-formed-looking path
+(`/sites/EXT-TDD/SiteAssets/CAD Model/Aerospace Data.png`) — so "100% of
+items have an `Image` value" is not the same claim as "100% of thumbnails
+actually resolve," and at least one does not. Worth spot-checking a handful
+of the 280 image URLs for a real 404 rate before promising thumbnails will
+always render, rather than assuming the field's presence is sufficient —
+same lesson as the SharePoint-assets-have-no-thumbnails finding in §1.5.
+
+Implementation shape: add a new `AssetType` (e.g. `cad_model`), extend the
+asset-definition funnel (currently `_load_mirror()`/the sync's
+"has a Demo Type" rule) to also admit `ContentType == "CAD Model"` folders,
+and map the CAD-specific fields above. Do **not** confuse this with the
+already-covered per-file `Demo Category == "CAD Data"` tag found on files
+*inside* existing Demo/LDK folders (§9 item 3's investigation) — that is a
+resource-level tag on content that is already in the catalogue today; this
+section is about the 280 **standalone** CAD-only folders that are not in the
+catalogue at all yet.
+
+#### VM environments — the harder half, real design decisions needed
+
+Two candidate sources were found, and **they disagree**, which is itself the
+main finding:
+
+- **Virtual Machine Catalog** document library — 139 folders, each with real
+  files (e.g. a release-notes PDF, a getting-started guide) and its own
+  `Supported Demos` lookup column (§9 item 3). But it appears **abandoned**:
+  its newest Windchill entry is `Windchill 13.0.1.1 Rev 1.0`, created 2024.
+- **Site Pages / Virtual Machines** — the "profile page" library. Confirmed
+  still actively maintained into 2026 (`Windchill 13.1.4.1`, last modified
+  Aug 2026) — with **no corresponding folder in the VM Catalog library at
+  all**. This is the one that is current.
+
+`ARCHITECTURE.md` §2a called the VM Catalog library "a second asset source"
+without knowing about this split — that framing is now known incomplete,
+not wrong exactly, but two-and-a-half years stale for the newest VMs. **Site
+Pages/Virtual Machines should be the source of record for VM ingestion**,
+not the VM Catalog library alone; the VM Catalog library is worth keeping
+around only to pull real files (release notes, getting-started guides) for
+the older VMs that still have a matching folder there.
+
+VM content is structurally unlike a Demo asset: mostly instructional text
+(FTP server addresses, credential naming conventions, a Cloud Portal
+template name) rather than files the Hub could preview or download the way
+it does for SharePoint files today. Recommendation, consistent with the
+Hub's own identity as "an index that dispatches, storing no content of its
+own" (§0): index a VM as **metadata + a link back to the real SharePoint
+page** — title, description, product/version/availability, a thumbnail,
+`Segment` — rather than trying to reproduce the FTP/Cloud Portal flow inside
+the Hub.
+
+Two things need an actual decision before coding, not just a plan:
+
+1. **`AssetType.VM` already exists in `backend/models.py`, unused since it
+   was added** — this is the type to activate, not a new one to invent.
+2. **Identity/mirror partitioning** (§1.1): does a VM asset get
+   `source_system="sharepoint"` (still Graph-sourced, just a different
+   library/shape) or its own value? Whichever is chosen, follow the existing
+   discipline exactly — the project has already paid once for getting
+   `source_system` semantics wrong (§1.1's 2026-08-26 incident, 288 assets
+   wrongly retired).
+
+Once VM assets exist with their own `Segment` field, "Supporting Demo
+Environment" (§9 item 3) becomes buildable exactly as scoped there — same
+`Segment`, opposite content type, sorted by most recently modified, bound
+live rather than copied as a stale literal. That feature has no further
+dependency beyond this section landing.
+
+**Suggested sequencing:** CAD Model ingestion first — the data is clean,
+the rule is a one-line `ContentType` check, and there is no open design
+question. VM ingestion second, and worth a short conversation with Seb
+first specifically about the VM Catalog library looking abandoned — that is
+likely news to him too, not something to silently work around in code.
 
 ### Ready now, no dependencies
 

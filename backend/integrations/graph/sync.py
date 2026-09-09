@@ -2,10 +2,11 @@
 
 Applies the structural rule measured from the real site:
 
-    An asset is a TOP-LEVEL folder in Demo Catalog carrying a Demo Type.
-    Everything beneath it is a resource.
+    An asset is a TOP-LEVEL folder in Demo Catalog carrying a Demo Type,
+    OR one with ContentType "CAD Model" (added 2026-09-09 -- a standalone
+    CAD dataset, not a demo). Everything beneath it is a resource.
 
-All 452 such folders sit at depth 0, so a file's owner is simply the first
+All such folders sit at depth 0, so a file's owner is simply the first
 segment of its path below the drive root. No prefix search, no heuristics.
 
 Field mapping is shared with the xlsx importer via
@@ -47,12 +48,26 @@ COLUMNS = {
     "owner": ("OwnedBy", "Owned_x0020_By"),
     "consensus_uuid": ("ConsensusUUID", "Consensus_x0020_UUID", "ConsensusDemoUUID"),
     "brightcove_id": ("BrightcoveID", "Brightcove_x0020_ID"),
-    # Measured 2026-08-26: populated on 167 folders, and ZERO of them are
-    # assets — they are CAD model folders (Cryogenic Tank, Deadbolt Lock) that
-    # share the library. So this yields nothing today. Kept because the mapping
-    # is correct and costs nothing; demo assets simply have no thumbnail in
-    # SharePoint, which is why thumbnail_url is null across the catalogue.
-    "thumbnail_url": ("Preview_x0020_Image_x0020_URL", "Icon_x0020_URL"),
+    # Measured 2026-08-26: `Preview_x0020_Image_x0020_URL`/`Icon_x0020_URL`
+    # were populated on 167 folders, and ZERO of them were demo assets — they
+    # were CAD model folders (Cryogenic Tank, Deadbolt Lock) that share the
+    # library, so this yielded nothing for the catalogue as it stood then.
+    # Re-measured 2026-09-09, now that CAD Model folders are ingested (see
+    # `content_type`/`cad_product` below): there are 280 of them today, and
+    # `Image` is the field that is actually complete across all of them
+    # (280/280) — `Preview_x0020_Image_x0020_URL` covers only the older 167,
+    # `Icon_x0020_URL` covers none. `Image` added as a candidate; demo assets
+    # remain thumbnail-less regardless, since none of the three has ever been
+    # seen populated on a Demo-content-type folder.
+    "thumbnail_url": ("Preview_x0020_Image_x0020_URL", "Icon_x0020_URL", "Image"),
+    #: Distinguishes a demo folder from a CAD Model folder when there is no
+    #: Demo Type to key off of. Measured 2026-09-09 across all 751 top-level
+    #: folders: 456 "Demo", 280 "CAD Model", 15 genuinely uncategorized.
+    "content_type": ("ContentType",),
+    #: Free text, not managed metadata like `Product` -- "Creo Parametric",
+    #: "ProENGINEER Wildfire". Fed through the same `parse_lookup()` as
+    #: `product` so it still reaches `family_of()`/`umbrella_of()` for free.
+    "cad_product": ("CAD_x0020_Product",),
 }
 
 
@@ -77,6 +92,10 @@ class SyncResult:
     resources: int = 0
     #: Folders skipped because they demo a product PTC no longer owns.
     divested: int = 0
+    #: Top-level folders that are neither a Demo (has a Demo Type) nor a CAD
+    #: Model (ContentType "CAD Model") -- genuinely uncategorized, 15 of them
+    #: as of 2026-09-09. The name predates CAD Model ingestion; kept as-is
+    #: rather than renamed, since `sync_report.py` already keys on it.
     skipped_no_demo_type: int = 0
     orphan_files: int = 0
     delta_token: str | None = None
@@ -165,26 +184,43 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
         demo_type = m.clean_text(_field(fields, "demo_type"))
         if not name:
             continue
-        if demo_type not in m.TYPE_MAP:
+
+        if demo_type in m.TYPE_MAP:
+            segment, all_segments = m.parse_segment(_field(fields, "segment"))
+            asset = m.blank_asset(m.slugify(name, taken), name, m.TYPE_MAP[demo_type])
+            asset.update(
+                description=m.clean_text(_field(fields, "description")),
+                products=m.parse_lookup(_field(fields, "product")),
+                language=m.parse_language(_field(fields, "language")),
+                segment=segment,
+                rails=all_segments[1:],
+                content_depth=m.content_depth(name),
+                consensus_uuid=m.clean_text(_field(fields, "consensus_uuid")),
+                brightcove_id=m.clean_text(_field(fields, "brightcove_id")),
+                thumbnail_url=m.parse_url(_field(fields, "thumbnail_url")),
+                uploaded_at=m.as_date(item.get("lastModifiedDateTime")),
+                web_url=item.get("webUrl"),
+                source_item_id=item.get("id"),
+            )
+        elif m.clean_text(_field(fields, "content_type")) == "CAD Model":
+            # A standalone CAD dataset, not a demo -- no Demo Type, no
+            # Segment, no managed-metadata Product column on this content
+            # type (measured 2026-09-09). `products` carries the free-text
+            # CAD_x0020_Product instead, which still flows through the usual
+            # family/umbrella derivation downstream.
+            asset = m.blank_asset(m.slugify(name, taken), name, "cad_model")
+            asset.update(
+                description=m.clean_text(_field(fields, "description")),
+                products=m.parse_lookup(_field(fields, "cad_product")),
+                thumbnail_url=m.parse_url(_field(fields, "thumbnail_url")),
+                uploaded_at=m.as_date(item.get("lastModifiedDateTime")),
+                web_url=item.get("webUrl"),
+                source_item_id=item.get("id"),
+            )
+        else:
             result.skipped_no_demo_type += 1
             continue
 
-        segment, all_segments = m.parse_segment(_field(fields, "segment"))
-        asset = m.blank_asset(m.slugify(name, taken), name, m.TYPE_MAP[demo_type])
-        asset.update(
-            description=m.clean_text(_field(fields, "description")),
-            products=m.parse_lookup(_field(fields, "product")),
-            language=m.parse_language(_field(fields, "language")),
-            segment=segment,
-            rails=all_segments[1:],
-            content_depth=m.content_depth(name),
-            consensus_uuid=m.clean_text(_field(fields, "consensus_uuid")),
-            brightcove_id=m.clean_text(_field(fields, "brightcove_id")),
-            thumbnail_url=m.parse_url(_field(fields, "thumbnail_url")),
-            uploaded_at=m.as_date(item.get("lastModifiedDateTime")),
-            web_url=item.get("webUrl"),
-            source_item_id=item.get("id"),
-        )
         assets[name] = asset
 
     # Pass 2 — every file belongs to its first path segment.

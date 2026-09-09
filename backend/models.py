@@ -23,6 +23,10 @@ class AssetType(str, Enum):
     VDK = "vdk"          # Video Demo Kit  (expansion still to be confirmed)
     VM = "vm"            # Virtual Machine
     WIKI = "wiki"        # present in the mockup, absent from the requirements doc
+    #: A standalone CAD dataset folder (ContentType "CAD Model" in the Demo
+    #: Catalog library) -- not a demo, has no Demo Type. 280 of these measured
+    #: 2026-09-09, previously excluded from the catalogue entirely.
+    CAD_MODEL = "cad_model"
 
 
 class FunnelStage(str, Enum):

@@ -28,7 +28,6 @@ CHANNEL_TO_DEPTH: dict[str, str] = {
     "social": "Teaser",
     "event": "Teaser",
     "web": "Overview",
-    "estore": "Overview",
     "prospect": "Explainer",
     "customer": "Explainer",
     "velocity": "Explainer",
@@ -39,7 +38,6 @@ CHANNEL_TO_DEPTH: dict[str, str] = {
 CHANNEL_LABELS: dict[str, str] = {
     "social": "Social (LinkedIn / YouTube)",
     "web": "Web (PTC.com)",
-    "estore": "eStore",
     "prospect": "Share with a prospect",
     "customer": "Share with an existing customer",
     "enablement": "Internal sales enablement",

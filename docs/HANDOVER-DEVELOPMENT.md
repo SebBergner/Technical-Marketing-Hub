@@ -831,10 +831,15 @@ outright) sit in `hub-api.js` and translate at render time, in
 Servigistics is a **business decision, not a data one** — it still has an
 asset, unlike IPE, which is kept visible at zero on the deliberate logic that
 its demos are being made now and dimming it would report a plan as a fault.
-**Known residual:** the Request-a-New-Asset form's product pills
-(`fillProductPills()`) are a separate code path from all three of the above
-and still offer "Servigistics" — flagged when found, not fixed, since it was
-outside what was actually asked.
+~~**Known residual:**~~ **Resolved as intentional, 2026-09-09 — not a bug.**
+The Request-a-New-Asset form's product pills (`fillProductPills()`) are a
+separate code path from all three of the above and still offer
+"Servigistics." Liwei's explicit call once asked directly: hiding it from
+*browse* is a business decision about what to feature, not a statement that
+Servigistics work can't be requested — someone should still be able to ask
+for a Servigistics demo even though none exist to browse today. So this
+pill list deliberately does **not** apply `HIDDEN_UMBRELLAS`, and should
+not gain that filter later without checking with Liwei first.
 
 **VDK's display expansion flip-flopped once, worth knowing if it moves
 again.** Checked directly against live SharePoint (`Demo_x0020_Type`, every
@@ -1349,9 +1354,10 @@ likely news to him too, not something to silently work around in code.
      first (see item 5 for exactly what is missing), let real numbers
      accumulate, then build the view once there is something to show.
 
-3. **`fillProductPills()` still offers "Servigistics"** on the
-   Request-a-New-Asset form (§8.6) — a residual gap in a code path separate
-   from the nav/dropdown hiding, noticed but out of scope when that shipped.
+3. ~~**`fillProductPills()` still offers "Servigistics"**~~ **Closed
+   2026-09-09 — not a bug, confirmed with Liwei directly (§8.6).** Requesting
+   a Servigistics demo should stay possible even though none exist to
+   browse today; the pill list deliberately does not hide it.
 
 4. ~~**Fill in `owned/segments.json`.**~~ **No longer the priority it was** —
    segments have no nav entry point any more (§8.3), so nobody currently
@@ -1359,6 +1365,53 @@ likely news to him too, not something to silently work around in code.
    still works and this is still worth doing if segments ever get a UI home
    again, but it is not blocking anything today the way it looked like it
    would on 2026-09-03.
+
+### Request-a-New-Asset fixes, 2026-09-09 evening
+
+Four small asks from Liwei, all shipped same evening:
+
+1. **Servigistics** — confirmed intentional, not a bug. See §8.6's updated
+   note and backlog item 3 above.
+2. **Product Scope pill labels now match the rest of the app.** Found while
+   fixing this: the IPE → "PTC Ignite" display rename (§8.6) never reached
+   `fillProductPills()` — it read raw `product_families` values straight
+   into `textContent`, so a future IPE-tagged asset would have shown "IPE"
+   here while every other filter/nav already said "PTC Ignite." Now calls
+   the same `umbrellaDisplayName()` used everywhere else; `dataset.value`
+   (what actually gets submitted) is untouched, so nothing about a stored
+   request's shape changes. **Not fixed, flagged instead:** `product_families`
+   (the derived 19-family list this pill set intentionally uses, for the
+   breadth reasons in the comment above `fillProductPills()`) shows raw
+   `"Jetstream"`/`"Orbit"`, not `"PTC Jetstream"`/`"PTC Orbit"` the way the
+   umbrella nav does — that rename is a `FAMILY_ROLLUP` step that only
+   `umbrella_of()` applies, not `family_of()`. Whether the request form
+   should also see the "PTC "-prefixed spelling is a judgement call nobody
+   has made yet, not an oversight on the same footing as the IPE one — ask
+   before changing it.
+3. **"eStore" removed from Distribution plan** — the pill in `index.html`,
+   its `CHANNEL_TO_LEVEL` entry (Elio's inline script, same file), and the
+   equivalent server-side `CHANNEL_TO_DEPTH`/`CHANNEL_LABELS` entries in
+   `backend/routers/taxonomy.py` (the real API this powers,
+   `GET /api/taxonomy/video-levels`, even though the frontend does not call
+   it today) — removing it from only one side would have left the two
+   definitions of "the channel list" disagreeing.
+4. **Anonymous visitors can submit a request again.** `POST /api/requests`
+   and `/with-files` depended on `require_authenticated`, which 401s anyone
+   who is not signed in — and since "Require authentication" is not enforced
+   at the App Service platform level (§2.6 of
+   `docs/HANDOVER-DEPLOYMENT.md`), **every visitor to the live app arrives as
+   ANONYMOUS today**, so this endpoint was refusing 100% of submissions, not
+   gating them by role. Switched to `get_current_user`, which never raises —
+   `_submit()` already only trusts an identity that is authenticated and not
+   the dev principal (§8.4) before overwriting the requester fields, so an
+   anonymous caller simply keeps whatever `Name`/`Email` they typed in the
+   form's own "Your details" fields, exactly as before Easy Auth existed.
+   Regression test in `tests/test_auth.py`
+   (`test_asset_requests_are_the_deliberate_exception`), proven to 401
+   against the old dependency before the fix. **`/api/requests/unsynced`
+   was deliberately left on `require_authenticated`** — it was not part of
+   this ask, and it returns other people's names/emails/notes, unlike
+   submission which only ever writes.
 
 ### Blocked on a person
 

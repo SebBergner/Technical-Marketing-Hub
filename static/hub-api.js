@@ -1329,8 +1329,14 @@
     families.forEach(function (f) {
       var pill = document.createElement("span");
       pill.className = "stage-pill";
+      // The value submitted stays the raw family name -- taxonomy.py and
+      // every stored request still call it "IPE"; only the label a person
+      // reads changes, same rule as the nav/dropdown rename (§8.6). Found
+      // 2026-09-09: this pill list was the one place that rename never
+      // reached, so it still read "IPE" after everywhere else had moved to
+      // "PTC Ignite".
       pill.dataset.value = f.value;
-      pill.textContent = f.value;
+      pill.textContent = umbrellaDisplayName(f.value);
       pill.title = f.count + " asset" + (f.count === 1 ? "" : "s") + " today";
       row.appendChild(pill);
     });

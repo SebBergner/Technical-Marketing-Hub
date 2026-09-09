@@ -100,6 +100,21 @@ def test_write_endpoints_refuse_an_anonymous_caller(enforcing, client):
                        json={"asset_id": "a1", "organization": "Acme"}).status_code == 401
 
 
+def test_asset_requests_are_the_deliberate_exception(enforcing, client):
+    """"Require authentication" is not enforced at the App Service platform
+    level (docs/HANDOVER-DEPLOYMENT.md §2.6), so every visitor arrives as
+    ANONYMOUS today -- and unlike curation/sync/share, an anonymous caller
+    must still be able to submit a request, or the feature is simply dead
+    for every visitor until SSO exists. Liwei, 2026-09-09.
+
+    Would fail against the old code, which depended on require_authenticated
+    here and 401'd exactly like the endpoints above.
+    """
+    response = client.post("/api/requests", json={"asset_type": "video"})
+    assert response.status_code == 201
+    assert response.json()["requester_email"] is None
+
+
 # ════════════════════════════ identity parsing ═════════════════════════════
 def test_principal_is_read_from_the_headers(enforcing, client):
     body = client.get("/api/auth/me", headers=easyauth_headers("liwchen@ptc.com")).json()

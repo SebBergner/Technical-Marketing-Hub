@@ -1115,6 +1115,28 @@ already known from earlier sections rather than starting from nothing.
    data" for SharePoint-only assets — inventing a number here is exactly what
    §1.2 exists to prevent.
 
+   **Checked 2026-09-09, and it goes further than "nothing surfaces it yet":
+   nothing populates it either.** `views` has a real endpoint
+   (`POST /api/assets/{id}/view` → `repo.increment_stat(asset_id, "views")`,
+   `backend/routers/assets.py`), but `static/hub-api.js` never calls it —
+   zero matches for that route anywhere in the frontend. `downloads` and
+   `launches` are worse: no code anywhere increments either of them, not even
+   on the file-download endpoint added in §5.6. The only counter genuinely
+   live today is `shares` (bumped in `backend/routers/consensus.py` on a
+   successful Consensus share) — and the Share button is itself hidden
+   (§7.1), so in practice it never fires either. **An Admin usage dashboard
+   built today would show zeros, not thin data** — worse than not building
+   it, since zero reads as "nothing gets used" rather than "nothing is being
+   counted."
+
+   This is a blocker independent of SSO/curator (§7.1) and cheaper to clear:
+   wire the frontend to call the view endpoint when a detail page opens, and
+   add `increment_stat(asset_id, "downloads")` to the download endpoint in
+   `backend/routers/assets.py`. Neither needs auth to exist first — it is
+   pure plumbing, and doing it now means real numbers have started
+   accumulating by the time an Admin dashboard is actually built, rather
+   than an analytics feature launching against three weeks of nothing.
+
 ### V2 scope — bringing VM and CAD data into the Hub (planned 2026-09-09)
 
 Elaborates new-ask item 2 above into an actual plan, now that item 3's
@@ -1294,8 +1316,24 @@ likely news to him too, not something to silently work around in code.
    — the list has no `Status`, `TriageNotes` or `DeliveredAsset` columns yet,
    and without them it is a suggestion box rather than a queue.
 
-2. **Admin area** for uploads and settings. Scoped in the meeting, not
-   started.
+2. **Admin area** — discussed 2026-09-09, and it splits into two pieces with
+   different blockers, worth treating separately rather than as one feature:
+
+   - **Uploads and settings** (the original scope) is a write surface, so it
+     is not "not started," it is **not buildable yet in a way that is safely
+     usable** — same reasoning as the curation endpoints and the Share
+     button (§7.1): it must sit behind `require_curator`, and with
+     `AUTH_CURATOR_GROUPS` empty, that means built-but-inert for everyone
+     until SSO lands, not a shortcut around auth. Fine to design now, not
+     worth implementing yet — there is nothing to verify it against.
+   - **Usage analytics** (new-ask item 5) is read-only and has **no
+     dependency on SSO/curator at all** — but per item 5's 2026-09-09
+     finding, it has its own, more fundamental blocker: nothing currently
+     populates `views`/`downloads`/`launches`, so a dashboard built today
+     would show zeros rather than thin data. This is genuinely ready-now
+     work, just not the dashboard itself yet — wire up the tracking calls
+     first (see item 5 for exactly what is missing), let real numbers
+     accumulate, then build the view once there is something to show.
 
 3. **`fillProductPills()` still offers "Servigistics"** on the
    Request-a-New-Asset form (§8.6) — a residual gap in a code path separate

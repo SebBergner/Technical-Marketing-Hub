@@ -48,18 +48,12 @@ COLUMNS = {
     "owner": ("OwnedBy", "Owned_x0020_By"),
     "consensus_uuid": ("ConsensusUUID", "Consensus_x0020_UUID", "ConsensusDemoUUID"),
     "brightcove_id": ("BrightcoveID", "Brightcove_x0020_ID"),
-    # Measured 2026-08-26: `Preview_x0020_Image_x0020_URL`/`Icon_x0020_URL`
-    # were populated on 167 folders, and ZERO of them were demo assets — they
-    # were CAD model folders (Cryogenic Tank, Deadbolt Lock) that share the
-    # library, so this yielded nothing for the catalogue as it stood then.
-    # Re-measured 2026-09-09, now that CAD Model folders are ingested (see
-    # `content_type`/`cad_product` below): there are 280 of them today, and
-    # `Image` is the field that is actually complete across all of them
-    # (280/280) — `Preview_x0020_Image_x0020_URL` covers only the older 167,
-    # `Icon_x0020_URL` covers none. `Image` added as a candidate; demo assets
-    # remain thumbnail-less regardless, since none of the three has ever been
-    # seen populated on a Demo-content-type folder.
-    "thumbnail_url": ("Preview_x0020_Image_x0020_URL", "Icon_x0020_URL", "Image"),
+    # Measured 2026-08-26: populated on 167 folders, and ZERO of them are demo
+    # assets — they are CAD model folders (Cryogenic Tank, Deadbolt Lock) that
+    # share the library. So this yields nothing today. Kept because the mapping
+    # is correct and costs nothing; demo assets simply have no thumbnail in
+    # SharePoint, which is why thumbnail_url is null across the catalogue.
+    "thumbnail_url": ("Preview_x0020_Image_x0020_URL", "Icon_x0020_URL"),
     #: Distinguishes a demo folder from a CAD Model folder when there is no
     #: Demo Type to key off of. Measured 2026-09-09 across all 751 top-level
     #: folders: 456 "Demo", 280 "CAD Model", 15 genuinely uncategorized.
@@ -68,6 +62,17 @@ COLUMNS = {
     #: "ProENGINEER Wildfire". Fed through the same `parse_lookup()` as
     #: `product` so it still reaches `family_of()`/`umbrella_of()` for free.
     "cad_product": ("CAD_x0020_Product",),
+    #: CAD Model's own thumbnail column, deliberately NOT folded into the
+    #: shared `thumbnail_url` above. Measured 2026-09-09: `Image` is complete
+    #: on all 280 CAD Model folders AND all 456 Demo folders alike — it turns
+    #: out to be a library-wide computed default
+    #: (`/sites/EXT-TDD/SiteAssets/CAD Model/<title>.png`), not a signal that
+    #: a real thumbnail exists. It resolves to a real, uploaded file for at
+    #: least some CAD Models (confirmed against Elio's own CAD Model Gallery
+    #: view) but not, as far as tested, for any Demo — extending the shared
+    #: field would have added 456 guaranteed-broken image requests to every
+    #: page load for zero benefit, so this stays CAD-Model-only.
+    "cad_thumbnail": ("Image",),
 }
 
 
@@ -165,6 +170,8 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
     Two passes, because a file can appear before its owning folder in a delta
     page and attribution would otherwise depend on ordering.
     """
+    from backend.config import settings
+
     result = SyncResult()
     items = _latest_per_item(items)
     assets: dict[str, dict] = {}
@@ -212,7 +219,8 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
             asset.update(
                 description=m.clean_text(_field(fields, "description")),
                 products=m.parse_lookup(_field(fields, "cad_product")),
-                thumbnail_url=m.parse_url(_field(fields, "thumbnail_url")),
+                thumbnail_url=m.absolutize_url(_field(fields, "cad_thumbnail"),
+                                               settings.graph_site_url),
                 uploaded_at=m.as_date(item.get("lastModifiedDateTime")),
                 web_url=item.get("webUrl"),
                 source_item_id=item.get("id"),

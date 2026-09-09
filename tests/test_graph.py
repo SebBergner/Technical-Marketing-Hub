@@ -387,6 +387,23 @@ def test_cad_model_folders_become_cad_model_assets():
     assert result.skipped_no_demo_type == 0
 
 
+def test_cad_model_thumbnail_is_made_absolute(monkeypatch):
+    """`Image` is a site-relative path on the live tenant (measured
+    2026-09-09), never a full URL -- an <img src> built from it would
+    otherwise resolve against our own origin and 404 every time."""
+    from backend.config import settings
+    monkeypatch.setattr(settings, "graph_site_url",
+                        "https://ptccloud.sharepoint.com/sites/EXT-TDD")
+
+    items = [folder("Adirondack Chair", demo_type=None, ContentType="CAD Model",
+                    Image="/sites/EXT-TDD/SiteAssets/CAD Model/Adirondack Chair.png")]
+    asset = build_assets(items)[0][0]
+
+    assert asset.thumbnail_url == (
+        "https://ptccloud.sharepoint.com/sites/EXT-TDD/SiteAssets/CAD Model/"
+        "Adirondack Chair.png")
+
+
 def test_a_folder_with_neither_demo_type_nor_cad_model_is_still_skipped():
     items = [folder("Mystery Folder", demo_type=None, ContentType="Folder")]
     assets, result = build_assets(items)

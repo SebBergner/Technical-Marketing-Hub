@@ -1168,6 +1168,40 @@ of the 280 image URLs for a real 404 rate before promising thumbnails will
 always render, rather than assuming the field's presence is sufficient —
 same lesson as the SharePoint-assets-have-no-thumbnails finding in §1.5.
 
+**Shipped locally 2026-09-09** (not yet pushed — see the deploy freeze note
+below). Two bugs found and fixed while wiring it up, both worth knowing if
+this is touched again:
+
+1. **`Image` is a library-wide computed default, not a real-thumbnail
+   signal.** Measured: it is textually populated on *all* 456 Demo folders
+   too, always following the pattern
+   `/sites/EXT-TDD/SiteAssets/CAD Model/<title>.png` — a real uploaded file
+   sits behind it for at least some CAD Models (confirmed against Elio's own
+   gallery view) but, as far as tested, none of the Demo folders. It is
+   therefore mapped as its own `cad_thumbnail` column, used only for CAD
+   Model assets — folding it into the shared `thumbnail_url` lookup put a
+   guaranteed-broken image path on every Demo card and silently suppressed
+   their generated colour cover (`paintCoverInto()` skips its fallback
+   whenever `thumbnail_url` is set at all, trusting it to be real).
+2. **The column value is a site-relative path** (`/sites/EXT-TDD/SiteAssets/…`),
+   never a full URL — unlike the `{"Url": ...}` shape other hyperlink
+   columns return. Handed straight to the page it resolves against
+   whichever origin is serving the Hub (localhost while developing, the
+   Azure app once deployed) instead of SharePoint, and always 404s.
+   `sharepoint_mapping.absolutize_url()` now prepends the scheme+host from
+   `settings.graph_site_url`.
+3. **Still open, not a bug in our code:** unlike `download_url()`/`preview()`,
+   which are Graph's own pre-authenticated redirects, this thumbnail is a
+   plain SharePoint page URL. It only renders for a viewer who is themselves
+   signed into `ptccloud.sharepoint.com` in their browser — confirmed by
+   testing in an unauthenticated browser context, where the CSS
+   background-image silently fails to load (no request even completes) while
+   the same URL is expected to render fine in Liwei's own already-authenticated
+   Chrome. If the Hub ever needs to work for a viewer without their own
+   SharePoint session, this would need to resolve through Graph's
+   `/thumbnails` endpoint instead, the same way video preview already does —
+   not done now, flagged for later.
+
 Implementation shape: add a new `AssetType` (e.g. `cad_model`), extend the
 asset-definition funnel (currently `_load_mirror()`/the sync's
 "has a Demo Type" rule) to also admit `ContentType == "CAD Model"` folders,

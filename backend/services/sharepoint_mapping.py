@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime
+from urllib.parse import urlparse
 
 #: Demo Type -> our AssetType. The catalogue contains only these two.
 TYPE_MAP = {"Live Demo Kit": "ldk", "Virtual Demo Kit": "vdk"}
@@ -122,6 +123,25 @@ def parse_url(value) -> str | None:
     if isinstance(value, dict):
         value = value.get("Url") or value.get("url") or ""
     return clean_text(value)
+
+
+def absolutize_url(value, base_url: str | None) -> str | None:
+    """Some SharePoint columns hold a site-relative path, not a full URL.
+
+    Measured 2026-09-09 on the `Image` column used for CAD Model thumbnails:
+    every value seen is a plain string like
+    `/sites/EXT-TDD/SiteAssets/CAD Model/Adirondack Chair.png` -- never the
+    `{"Url": ...}` dict shape `parse_url()` handles, and never absolute.
+    Handed straight to an `<img src>` this resolves against whatever origin
+    is currently serving the page (localhost while developing, the Azure app
+    once deployed) rather than SharePoint, and 404s every time. `base_url` is
+    `settings.graph_site_url` -- only its scheme and host are used.
+    """
+    text = parse_url(value)
+    if not text or text.startswith(("http://", "https://")) or not base_url:
+        return text
+    parsed = urlparse(base_url if "://" in base_url else f"https://{base_url}")
+    return f"{parsed.scheme}://{parsed.netloc}{text}"
 
 
 def parse_language(value) -> str:

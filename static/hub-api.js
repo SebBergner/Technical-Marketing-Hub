@@ -2469,12 +2469,10 @@
     paintCoverInto(card.querySelector(".asset-card__thumb"), a);
   }
 
-  /* Split out from paintCover so the details page can use the same cover.
-   * Seb asked for the placeholder there too, and the alternative was a second
-   * implementation that would drift from this one. */
-  function paintCoverInto(thumb, a) {
-    if (!thumb || a.thumbnail_url) return;      // a real picture always wins
-
+  /* The mark itself, split out so both the no-thumbnail case and the
+   * thumbnail-failed-to-load case (below) paint the identical cover rather
+   * than two implementations drifting apart. */
+  function renderCoverMark(thumb, a) {
     var family = coverFamily(a);
     thumb.classList.add("hub-cover");
     thumb.style.setProperty("--cover-hue", hueFor(family));
@@ -2506,6 +2504,31 @@
       mark.textContent = family || (a.products || [])[0] || "";
     }
     thumb.insertBefore(mark, thumb.firstChild);
+  }
+
+  /* Split out from paintCover so the details page can use the same cover.
+   * Seb asked for the placeholder there too, and the alternative was a second
+   * implementation that would drift from this one. */
+  function paintCoverInto(thumb, a) {
+    if (!thumb) return;
+    if (!a.thumbnail_url) { renderCoverMark(thumb, a); return; }
+
+    /* A real picture only wins once it actually loads. CAD Model thumbnails
+     * (added 2026-09-09) point straight at SharePoint's own SiteAssets, not
+     * a pre-authenticated Graph URL like preview()/download_url() use -- they
+     * only render for a viewer who is themselves signed into SharePoint in
+     * that browser. Elio's own card markup has already set this as a
+     * background-image with no fallback if it 404s, so an unauthenticated
+     * viewer would otherwise see a blank tile instead of any cover at all.
+     * Preloading costs nothing extra for the common case: the browser's own
+     * cache serves the background-image request that already fired for the
+     * same URL. */
+    var probe = new Image();
+    probe.onerror = function () {
+      thumb.style.backgroundImage = "";
+      renderCoverMark(thumb, a);
+    };
+    probe.src = a.thumbnail_url;
   }
 
   /* ------------------------------------------------- the suggestion strip */

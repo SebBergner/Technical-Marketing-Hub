@@ -1190,17 +1190,35 @@ this is touched again:
    Azure app once deployed) instead of SharePoint, and always 404s.
    `sharepoint_mapping.absolutize_url()` now prepends the scheme+host from
    `settings.graph_site_url`.
-3. **Still open, not a bug in our code:** unlike `download_url()`/`preview()`,
-   which are Graph's own pre-authenticated redirects, this thumbnail is a
-   plain SharePoint page URL. It only renders for a viewer who is themselves
-   signed into `ptccloud.sharepoint.com` in their browser — confirmed by
-   testing in an unauthenticated browser context, where the CSS
-   background-image silently fails to load (no request even completes) while
-   the same URL is expected to render fine in Liwei's own already-authenticated
-   Chrome. If the Hub ever needs to work for a viewer without their own
-   SharePoint session, this would need to resolve through Graph's
-   `/thumbnails` endpoint instead, the same way video preview already does —
-   not done now, flagged for later.
+3. **Resolved by preload-and-fall-back, deliberately not by routing through
+   Graph.** Unlike `download_url()`/`preview()`, which are Graph's own
+   pre-authenticated *per-click* redirects, this thumbnail renders for
+   *every card in a grid at once* — confirmed working in Liwei's own
+   already-authenticated Chrome, and confirmed silently failing (the CSS
+   background-image never even completes a request) in an unauthenticated
+   browser context. Re-resolving through Graph's `/thumbnails` endpoint per
+   page view was considered and rejected: that call pattern is once-per-click
+   for preview/download, but would be **once per card per page load** here —
+   up to 200 Graph calls a page, a real throttling risk that download/preview
+   never carry, for an audience (PTC's own TDD team) that is realistically
+   always signed into M365 already. Caching a Graph-resolved thumbnail URL at
+   sync time was also rejected: those URLs expire, and sync is manual and can
+   go a long time between runs (§2), so a stored one would likely be stale by
+   the time anyone loads the page.
+
+   Shipped instead, in `hub-api.js`'s `paintCoverInto()`: preload the
+   thumbnail with `new Image()` before trusting it, and on `onerror` fall
+   back to the exact same generated colour cover already used for an asset
+   with no `thumbnail_url` at all (`renderCoverMark()`, split out from
+   `paintCoverInto()` so both paths render identically). Zero added
+   server-side cost either way — the browser's own cache serves the probe
+   from the same request Elio's card markup already fired, so success costs
+   nothing extra, and failure degrades to an existing, already-correct visual
+   rather than a blank tile. If a real need for unauthenticated viewing ever
+   materialises, the properly durable fix would be downloading the thumbnail
+   *bytes* once at sync time into `DATA_DIR` and serving them ourselves — no
+   expiry, no per-view Graph cost, no dependence on the viewer's own session
+   — but that is real implementation work, not justified today.
 
 Implementation shape: add a new `AssetType` (e.g. `cad_model`), extend the
 asset-definition funnel (currently `_load_mirror()`/the sync's

@@ -1,9 +1,21 @@
 # Development Handover — TDD Portal / Technical Marketing Hub
 
-**Written 2026-09-03, substantially revised 2026-09-08, appended 2026-09-09**
-(new §9 subsection recording five unscoped asks from an Elio review — no
-other section changed) for a successor
-developer or AI assistant with no prior context on this project. Everything
+**Written 2026-09-03, substantially revised 2026-09-08, appended through
+2026-09-09** for a successor
+developer or AI assistant with no prior context on this project. The 2026-09-09
+session, in order: recorded five unscoped asks from an Elio review (§9);
+investigated and fully solved how SharePoint's own "Supporting Demo
+Environment" web part works (§9 item 3 — a Highlighted Content KQL query on
+Segment, confirmed both directions from the web part's own settings pane, not
+inferred); wrote and shipped a "V2 scope" plan for CAD Model and VM ingestion
+(§9's V2 section); **shipped CAD Model ingestion end to end** — 280
+previously-invisible standalone CAD datasets, now live — fixing two real bugs
+surfaced along the way (a library-wide thumbnail default that was silently
+breaking every Demo card's cover, and an unauthenticated-viewer fallback);
+split the Admin area into its two real blockers (SSO for writes, dead usage
+counters for reads — §9 item 5); and fixed the homepage's two dead "View all"
+links, one properly, one by hiding it rather than wiring it to a dishonest
+sort. All of it is live on Azure as of this revision. Everything
 here was verified against the working tree and the live data as of the
 revision date; where a number appears, it was measured, not estimated. Where
 something is unverified, it says so. Five feature commits landed between the
@@ -1190,9 +1202,11 @@ of the 280 image URLs for a real 404 rate before promising thumbnails will
 always render, rather than assuming the field's presence is sufficient —
 same lesson as the SharePoint-assets-have-no-thumbnails finding in §1.5.
 
-**Shipped locally 2026-09-09** (not yet pushed — see the deploy freeze note
-below). Two bugs found and fixed while wiring it up, both worth knowing if
-this is touched again:
+**Shipped and deployed 2026-09-09** — held locally at first (Liwei's
+request, ahead of Elio's manager demo of the live app that same week) and
+pushed once Elio had seen it locally and confirmed the demo could go ahead.
+Two bugs found and fixed while wiring it up, both worth knowing if this is
+touched again:
 
 1. **`Image` is a library-wide computed default, not a real-thumbnail
    signal.** Measured: it is textually populated on *all* 456 Demo folders

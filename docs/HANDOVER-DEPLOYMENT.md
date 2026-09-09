@@ -126,12 +126,13 @@ unilaterally.
 ### 2.4 Deploy history
 
 The two failures on 2026-08-03 were the initial workflow setup, before the
-publish profile secret existed. **Every deploy since — fourteen of them,
+publish profile secret existed. **Every deploy since — fifteen of them,
 including the original backend merge and every fix and feature since — has
 succeeded.** The most recent, current as of this revision:
 
 | When | What |
 |---|---|
+| 2026-09-09 20:11 | fix: the homepage rails' "View all" links did nothing |
 | 2026-09-09 19:33 | docs: mention CAD Models in the homepage subtitle |
 | 2026-09-09 (same push) | fix: an unauthenticated viewer saw a blank tile instead of the cover |
 | 2026-09-09 (same push) | fix: CAD Model thumbnails were breaking every Demo card's gradient cover |
@@ -643,6 +644,13 @@ worth knowing:** `/api/graph/status`'s `last_sync` still reads
 `2026-09-02`, which is known-stale (§5a) — the CAD Model data being live
 means the mirror on Azure Files was refreshed by hand more recently than
 that field shows, not that the field is now trustworthy.
+
+**The homepage's "Latest Uploads" `View all` link now works** (same push) —
+it was Elio's static `href="#"`, never wired to anything, and now reuses the
+sidebar's own "Latest Uploads" destination. `Most Viewed`'s equivalent link
+is deliberately hidden rather than fixed the same way — see
+`docs/HANDOVER-DEVELOPMENT.md` §9 item 5 for why (its backend sort key ranks
+by a counter nothing increments).
 
 federated search over ~808 assets, with **Load More** past the API's 200-item
 page ceiling · faceted filters that can be left as well as entered · a

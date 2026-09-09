@@ -1157,6 +1157,39 @@
     });
   }
 
+  /* The homepage rails' own "View all" links -- Elio's static `href="#"`,
+   * never wired to anything. Found 2026-09-09.
+   *
+   * Latest Uploads reuses the exact clearAll() + sortOverride mechanism the
+   * sidebar's own "Latest Uploads" nav item already uses just above, since
+   * that is the identical destination -- the whole catalogue, newest first.
+   *
+   * Most Viewed has no honest destination to link to yet: its own backend
+   * sort key (`most_viewed`) ranks by `stats.views`, which nothing
+   * increments (docs/HANDOVER-DEVELOPMENT.md §9 item 5), so it would rank
+   * everything by zero. The homepage rail itself stays -- it is a narrow,
+   * honest slice (only assets with a real Consensus `external_views`,
+   * client-side) -- but "View all" of it has nowhere real to go until that
+   * sort is fixed, so it is hidden rather than wired to a page that would
+   * look ranked but is not.
+   */
+  function wireHomeRailLinks() {
+    var latest = document.querySelector("#latestUploadsSection .section-head__link");
+    if (latest) {
+      latest.addEventListener("click", function (e) {
+        e.preventDefault();
+        exitOverlays();
+        clearAll();
+        sortOverride = "recent";
+        applyFilters();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    }
+
+    var mostViewed = document.querySelector("#mostViewedSection .section-head__link");
+    if (mostViewed) mostViewed.classList.add("hub-hidden");
+  }
+
   /* Nav entries that cannot do anything.
    *
    * Elio's sidebar promises five things this catalogue cannot deliver, and a
@@ -2909,6 +2942,7 @@
     fillProductPills(facets);
     await buildFamilyNav(facets);
     wireNav(facets);
+    wireHomeRailLinks();
     markUnavailable(facets);
     markNavActive();
     fillProductTiles();

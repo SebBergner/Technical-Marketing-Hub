@@ -501,9 +501,10 @@
   /* Fill a <select> from a facet, keeping whatever "all" option is already
    * there as the first entry. Counts come along because "Creo (319)" tells you
    * whether a filter is worth clicking. */
-  function fillSelect(id, facet) {
+  function fillSelect(id, facet, displayName) {
     var el = document.getElementById(id);
     if (!el || !facet || !facet.length) return;
+    displayName = displayName || function (v) { return v; };
 
     // Keep the labels already in the markup. Our facet values are storage
     // keys -- "video", "vdk" -- and rebuilding from them turned Elio's
@@ -522,7 +523,7 @@
       .forEach(function (f) {
         var o = document.createElement("option");
         o.value = f.value;
-        o.textContent = (labels[f.value] || f.value) + " (" + f.count + ")";
+        o.textContent = (labels[f.value] || displayName(f.value)) + " (" + f.count + ")";
         el.appendChild(o);
       });
   }
@@ -1035,6 +1036,32 @@
    * ?umbrella= query param); only the label changes here. */
   var UMBRELLA_DISPLAY = { "IPE": "PTC Ignite" };
   function umbrellaDisplayName(value) { return UMBRELLA_DISPLAY[value] || value; }
+
+  /* The same kind of display-only rename, for `product_families` rather
+   * than `umbrella_families` -- the Request form's Product Scope pills and
+   * the filter bar's Product dropdown, both built from the derived
+   * 19-family list rather than the curated 8-umbrella one (breadth: see the
+   * comment above fillProductPills()). "Jetstream"/"Orbit" are what
+   * SharePoint's own Product column and family_of() call them; "PTC
+   * Jetstream"/"PTC Orbit" is Seb's umbrella spelling, applied today only
+   * inside taxonomy.py's umbrella_of() via FAMILY_ROLLUP. Liwei, 2026-09-09:
+   * these two should read with the "PTC " prefix everywhere a person sees
+   * them, not only in the umbrella nav.
+   *
+   * Deliberately a SEPARATE map from UMBRELLA_DISPLAY, not folded into it:
+   * that map has a reverse lookup (umbrellaCanonicalName) tuned for the
+   * nav's own label<->value matching, where the umbrella facet already
+   * returns "PTC Jetstream" as the real value. Adding "Jetstream" alongside
+   * "PTC Jetstream" into the same table would make that reverse lookup
+   * resolve "PTC Jetstream" back to the wrong canonical value and break the
+   * nav's own PTC Jetstream destination. No reverse lookup is needed here --
+   * both call sites below only ever submit the raw family value, never the
+   * label -- so a plain one-way map is enough and cannot collide with the
+   * umbrella one. */
+  var FAMILY_DISPLAY = { "IPE": "PTC Ignite", "Jetstream": "PTC Jetstream",
+                         "Orbit": "PTC Orbit" };
+  function familyDisplayName(value) { return FAMILY_DISPLAY[value] || value; }
+
   function umbrellaCanonicalName(label) {
     for (var value in UMBRELLA_DISPLAY) {
       if (UMBRELLA_DISPLAY[value] === label) return value;
@@ -1330,13 +1357,11 @@
       var pill = document.createElement("span");
       pill.className = "stage-pill";
       // The value submitted stays the raw family name -- taxonomy.py and
-      // every stored request still call it "IPE"; only the label a person
-      // reads changes, same rule as the nav/dropdown rename (§8.6). Found
-      // 2026-09-09: this pill list was the one place that rename never
-      // reached, so it still read "IPE" after everywhere else had moved to
-      // "PTC Ignite".
+      // every stored request still call it "IPE"/"Jetstream"/"Orbit"; only
+      // the label a person reads changes, same rule as the nav/dropdown
+      // rename (§8.6). See FAMILY_DISPLAY above.
       pill.dataset.value = f.value;
-      pill.textContent = umbrellaDisplayName(f.value);
+      pill.textContent = familyDisplayName(f.value);
       pill.title = f.count + " asset" + (f.count === 1 ? "" : "s") + " today";
       row.appendChild(pill);
     });
@@ -2933,7 +2958,8 @@
     fillRails(assets);
 
     fillSelect("hubFilterProduct", (facets.product_families || facets.products || [])
-      .filter(function (f) { return HIDDEN_UMBRELLAS.indexOf(f.value) === -1; }));
+      .filter(function (f) { return HIDDEN_UMBRELLAS.indexOf(f.value) === -1; }),
+      familyDisplayName);
     fillSelect("hubFilterSegment", (facets.segments || []).filter(function (f) {
       return HIDDEN_SEGMENTS.indexOf(f.value) === -1;
     }));

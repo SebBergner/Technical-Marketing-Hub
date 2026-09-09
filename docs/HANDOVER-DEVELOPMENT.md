@@ -1372,22 +1372,26 @@ Four small asks from Liwei, all shipped same evening:
 
 1. **Servigistics** — confirmed intentional, not a bug. See §8.6's updated
    note and backlog item 3 above.
-2. **Product Scope pill labels now match the rest of the app.** Found while
-   fixing this: the IPE → "PTC Ignite" display rename (§8.6) never reached
-   `fillProductPills()` — it read raw `product_families` values straight
-   into `textContent`, so a future IPE-tagged asset would have shown "IPE"
-   here while every other filter/nav already said "PTC Ignite." Now calls
-   the same `umbrellaDisplayName()` used everywhere else; `dataset.value`
-   (what actually gets submitted) is untouched, so nothing about a stored
-   request's shape changes. **Not fixed, flagged instead:** `product_families`
-   (the derived 19-family list this pill set intentionally uses, for the
-   breadth reasons in the comment above `fillProductPills()`) shows raw
-   `"Jetstream"`/`"Orbit"`, not `"PTC Jetstream"`/`"PTC Orbit"` the way the
-   umbrella nav does — that rename is a `FAMILY_ROLLUP` step that only
-   `umbrella_of()` applies, not `family_of()`. Whether the request form
-   should also see the "PTC "-prefixed spelling is a judgement call nobody
-   has made yet, not an oversight on the same footing as the IPE one — ask
-   before changing it.
+2. **Product Scope pill labels, and the filter bar's Product dropdown, now
+   match the rest of the app.** Found while fixing this: the IPE → "PTC
+   Ignite" display rename (§8.6) never reached `fillProductPills()` — it
+   read raw `product_families` values straight into `textContent`.
+   Liwei's follow-up call, same evening: `"Jetstream"`/`"Orbit"` should also
+   read with the "PTC " prefix everywhere a person sees them, not only in
+   the umbrella nav — even though that spelling is otherwise a
+   `FAMILY_ROLLUP` step that only `taxonomy.py`'s `umbrella_of()` applies,
+   never `family_of()` (which is what `product_families` actually is).
+   Added a new, deliberately separate `FAMILY_DISPLAY` map/`familyDisplayName()`
+   in `hub-api.js` for this — not folded into `UMBRELLA_DISPLAY`, because
+   that map's reverse lookup (`umbrellaCanonicalName`, used by the nav's own
+   label↔value matching) would resolve "PTC Jetstream" back to the wrong
+   canonical value if "Jetstream" shared the table. Applied at both call
+   sites that show `product_families` as text: `fillProductPills()` and
+   `fillSelect("hubFilterProduct", …)` (which gained an optional third
+   `displayName` parameter for this). `dataset.value`/the submitted or
+   filtered-on value is untouched everywhere — still the raw
+   `"IPE"`/`"Jetstream"`/`"Orbit"` `family_of()`/`umbrella_of()` already
+   produce, so no stored data or existing filter link changes shape.
 3. **"eStore" removed from Distribution plan** — the pill in `index.html`,
    its `CHANNEL_TO_LEVEL` entry (Elio's inline script, same file), and the
    equivalent server-side `CHANNEL_TO_DEPTH`/`CHANNEL_LABELS` entries in

@@ -1550,6 +1550,40 @@ but treat as unconfirmed on Azure until a deploy actually happens.
    class="orion-breadcrumb">` in `index.html`, Elio's own static markup;
    `.orion-breadcrumb`'s CSS rule was left in place since nothing else used
    it and there was no reason to touch orion.css for a one-element removal.
+5. **The real bug behind "detail page click doesn't play":** found the same
+   afternoon, once Liwei reported it after item 3 above landed. Confirmed
+   with an actual mouse click in the Browser pane — `element.click()` from a
+   console does not exercise real hit-testing the same way and had shown
+   the feature working — and traced with `document.elementsFromPoint()` to
+   `.hub-cover__mark` sitting directly on top of `.vp-player__play`, eating
+   every click. Root cause: `.hub-cover__mark` is `position:absolute`, and a
+   *positioned* element always paints above a non-positioned sibling
+   regardless of DOM order or which one comes later in source — `.vp-player
+   __play` and the grid card's `.play-btn` had no `position` set at all, so
+   they lost that stacking fight unconditionally whenever a cover was also
+   painted underneath them. This combination — a play button AND a
+   thumbnail-less cover on the very same element — could not happen before
+   item 3: `canPlay` was Consensus-only, and a Consensus-linked asset
+   essentially always had its own `thumbnail_url`, so `paintCoverInto()`
+   never ran alongside a play button. Item 3 made the combination common
+   (any SharePoint LDK/VDK with a video, which by definition has no
+   thumbnail of its own), so a pre-existing landmine that nothing had ever
+   stepped on went off immediately. Fixed with `position:relative;
+   z-index:1` on both `.play-btn` and `.vp-player__play` — cheap, and closes
+   the same class of bug for either button in any future combination, not
+   just the one that surfaced it.
+6. **A Download button added to the file-preview modal's metadata panel**,
+   pinned to the bottom — Liwei: someone watching the preview and deciding
+   it is the file they want should not have to close the popup to go find a
+   download control elsewhere. A static `<a id="hubFilePreviewDownload">`
+   in the modal's own markup (`ensureFilePreviewModal()`), with its `href`
+   updated to the current file in `renderFilePreview()` — kept outside
+   `#hubFilePreviewInfo` deliberately, since that table's `innerHTML` is
+   fully replaced on every Prev/Next and a button living inside it would be
+   destroyed and rebuilt for no reason. Visually a `.vp-file__download`-style
+   pill (new `.hub-file-preview__download` class, matching color/hover
+   treatment), full width since it anchors a fixed-width column rather than
+   sitting in a row of other controls.
 
 ### Blocked on a person
 

@@ -305,6 +305,15 @@ a:hover { text-decoration: underline; }
   width: 42px; height: 42px; border-radius: 50%; background: var(--orion-indigo); border: none;
   display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff;
   box-shadow: 0 2px 6px rgba(79,91,213,.4);
+  /* Found 2026-09-10: .hub-cover__mark is `position:absolute`, and a
+     positioned element always paints above a non-positioned one regardless
+     of DOM order -- so on a card with no thumbnail_url (paintCoverInto()
+     always runs) AND a play button (a SharePoint asset cross-referenced to
+     Consensus, still with no thumbnail of its own), the cover mark sat on
+     top and silently ate every click. Needed real user clicks to catch --
+     element.click() from a console does not go through hit-testing the same
+     way and never showed the bug. */
+  position: relative; z-index: 1;
 }
 .play-btn svg { width: 17px; height: 17px; margin-left: 2px; }
 .play-btn:hover { background: var(--orion-indigo-strong); }
@@ -558,6 +567,13 @@ video.hub-inline-player__media { object-fit: contain; }
   width: 66px; height: 66px; border-radius: 50%; background: var(--orion-indigo); border: none;
   display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer;
   box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  /* Same fix as .play-btn above, and the actual bug behind "detail page
+     click doesn't play": .hub-cover__mark is position:absolute and was
+     painting on top of this button (a positioned element always beats a
+     static one, regardless of DOM order), silently swallowing every real
+     click on every SharePoint LDK/VDK -- exactly the case this button
+     newly needed to work for. */
+  position: relative; z-index: 1;
 }
 .vp-player__play svg { width: 27px; height: 27px; margin-left: 3px; }
 .vp-player__duration {
@@ -2237,6 +2253,20 @@ hubApplyFilters();
   .hub-file-preview__value { font-size:12.5px; color:var(--orion-text);
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     font-variant-numeric:tabular-nums; }
+  /* Liwei, 2026-09-10: a download control at the bottom of the side panel,
+     so deciding "this is the file I want" while watching the preview does
+     not mean closing the popup to go find one. Same visual language as
+     .vp-file__download (indigo pill, pinned #00890B fill on hover for the
+     same contrast reason documented there), full width since it anchors
+     the bottom of a fixed-width column rather than sitting in a row. */
+  .hub-file-preview__download { margin-top:14px; width:100%;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    padding:8px 12px; font-size:12.5px; font-weight:700;
+    color:var(--orion-indigo); background:var(--orion-indigo-soft);
+    border:1px solid var(--orion-indigo); border-radius:var(--orion-radius-sm);
+    cursor:pointer; text-decoration:none; }
+  .hub-file-preview__download:hover { background:#00890B; border-color:#00890B; color:#fff; }
+  .hub-file-preview__download svg { width:13px; height:13px; }
   .hub-file-preview__nav { display:flex; align-items:center;
     justify-content:space-between; padding:8px 14px;
     border-top:1px solid var(--orion-border); background:var(--orion-surface-2);

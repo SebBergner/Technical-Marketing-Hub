@@ -1980,6 +1980,16 @@
       +     '<div class="hub-file-preview__body">'
       +       '<div class="hub-file-preview__desc" id="hubFilePreviewDesc"></div>'
       +       '<div class="hub-file-preview__table" id="hubFilePreviewInfo"></div>'
+      // Liwei, 2026-09-10: "在这个popup的右边，属性栏的最下面添加Download
+      // button" -- someone watching the preview and deciding it's the file
+      // they want should not have to close the popup to go find a download
+      // control elsewhere. A static element, href updated per file in
+      // renderFilePreview() below, rather than rebuilt alongside the table
+      // -- the table's own innerHTML is fully replaced on every Prev/Next,
+      // and a button living inside it would need rebuilding for no reason.
+      +       '<a class="hub-file-preview__download" id="hubFilePreviewDownload"'
+      +         ' target="_blank" rel="noopener">'
+      +         '<svg class="orion-ico--sm orion-ico"><use href="#i-clock"/></svg>Download</a>'
       +     '</div>'
       +   '</div>'
       +   '<div class="hub-file-preview__nav">'
@@ -2062,6 +2072,11 @@
            +   '<span class="hub-file-preview__value">' + escapeHtml(r[1]) + '</span>'
            + '</div>';
     }).join("");
+
+    // f.item_id is guaranteed here -- MODAL_PREVIEWABLE_KINDS already
+    // required it before this file could reach the modal at all.
+    document.getElementById("hubFilePreviewDownload").href =
+      fileDownloadUrl(asset.id, f.item_id);
 
     document.getElementById("hubFilePreviewPrev").disabled = state.index <= 0;
     document.getElementById("hubFilePreviewNext").disabled = state.index >= state.files.length - 1;

@@ -1584,6 +1584,22 @@ but treat as unconfirmed on Azure until a deploy actually happens.
    pill (new `.hub-file-preview__download` class, matching color/hover
    treatment), full width since it anchors a fixed-width column rather than
    sitting in a row of other controls.
+7. **Switching demos left the previous one's video playing.** Liwei found
+   this immediately after item 5 shipped: start the hero player on one
+   asset, navigate to another (or back to the grid), and the first video
+   kept playing, audibly, behind the new page. Cause: `openAssetDetail()`
+   already cleaned up the old `.hub-cover__mark` before repainting the
+   player for a new asset ("the page is reused for every asset, so last
+   one's cover has to go") but had no equivalent step for
+   `embedInlinePlayer()`'s overlay — nothing had ever needed one before this
+   session. New `stopInlinePlayer(thumb)` next to `embedInlinePlayer()`:
+   removing the `<video>`/`<iframe>` node is the entire fix, since neither
+   keeps playing once detached from the document in any browser — no
+   `pause()` call needed, just remembering to remove it. Called from both
+   directions: `openAssetDetail()` (switching to a different asset) and
+   `closeAssetDetail()` (leaving the detail page for the grid). Grid cards
+   themselves were never at risk — they never adopted inline playback in the
+   first place (item 3's correction).
 
 ### Blocked on a person
 

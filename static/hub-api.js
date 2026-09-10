@@ -283,6 +283,17 @@
     thumb.appendChild(wrap);
   }
 
+  //: Removing the node is enough to stop it -- a <video> or <iframe> torn
+  //: out of the document does not keep playing in any browser -- but every
+  //: caller that might replace or hide `thumb` needs to remember to call
+  //: this first, which is exactly the bug Liwei found 2026-09-10: switching
+  //: detail pages left the previous asset's video audibly playing because
+  //: nothing removed it.
+  function stopInlinePlayer(thumb) {
+    var wrap = thumb.querySelector(".hub-inline-player");
+    if (wrap) wrap.remove();
+  }
+
   /* Plays inside the Hub rather than in a tab.
    *
    * Elio: "I'd rather do a popup, and everything's hidden." A browser popup
@@ -1778,7 +1789,15 @@
     var player = page.querySelector(".vp-player");
     if (player) {
       // The page is reused for every asset, so last one's cover has to go
-      // before this one's is painted, or the marks stack up.
+      // before this one's is painted, or the marks stack up. Bug, found by
+      // Liwei 2026-09-10: switching to a different demo left the PREVIOUS
+      // one's video/iframe playing, audibly, because only the cover mark was
+      // ever cleaned up here -- an inline player from embedInlinePlayer()
+      // was never in this list and just sat there. Removing the node stops
+      // playback in every browser (a <video> or <iframe> torn out of the
+      // document does not keep running), so this alone is the fix -- no
+      // separate pause() call needed.
+      stopInlinePlayer(player);
       player.querySelectorAll(".hub-cover__mark")
             .forEach(function (m) { m.remove(); });
       player.classList.remove("hub-cover");
@@ -2258,7 +2277,14 @@
 
   function closeAssetDetail() {
     var page = document.getElementById("videoPreviewPage");
-    if (page) page.classList.remove("active");
+    if (page) {
+      page.classList.remove("active");
+      // Same bug as openAssetDetail() guards against, the other direction:
+      // leaving the detail page entirely must not leave its video playing,
+      // invisibly, behind the grid.
+      var player = page.querySelector(".vp-player");
+      if (player) stopInlinePlayer(player);
+    }
     // Put the catalogue back, unless the request form is what is showing.
     var request = document.getElementById("requestViewPage");
     if (request && request.classList.contains("active")) return;

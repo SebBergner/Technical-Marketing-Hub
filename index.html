@@ -309,10 +309,12 @@ a:hover { text-decoration: underline; }
 .play-btn svg { width: 17px; height: 17px; margin-left: 2px; }
 .play-btn:hover { background: var(--orion-indigo-strong); }
 
-/* The inline player Seb asked for, 2026-09-10 -- layered on top of
-   .asset-card__thumb (already position:relative) rather than replacing its
-   contents, so closing it needs nothing reconstructed: the original cover
-   or thumbnail image was never removed, only covered. */
+/* The inline player Seb asked for, 2026-09-10 -- the detail page's own hero
+   player (.vp-player), confirmed after an initial mix-up that tried this on
+   grid tiles instead. Layered on top of the existing content (both
+   .vp-player and .asset-card__thumb are already position:relative) rather
+   than replacing it, so closing it needs nothing reconstructed: the
+   original cover or thumbnail image was never removed, only covered. */
 .hub-inline-player { position: absolute; inset: 0; z-index: 2; background: #000;
   display: flex; align-items: center; justify-content: center; }
 .hub-inline-player__media { width: 100%; height: 100%; border: none; background: #000; }
@@ -725,7 +727,6 @@ video.hub-inline-player__media { object-fit: contain; }
 
   <div class="orion-workarea">
     <div class="orion-topbar" id="mainTopbar">
-      <div class="orion-breadcrumb">Sales Enablement / <a>Technical Demo Development</a></div>
       <h1 class="orion-title">Technical Marketing Hub</h1>
       <!-- VDK reads "Video Demo Kit" here on purpose, not "Virtual Demo Kit".
            SharePoint's own Demo_x0020_Type column literally says "Virtual

@@ -1512,43 +1512,44 @@ but treat as unconfirmed on Azure until a deploy actually happens.
    new row is load-bearing, not decoration: without it a `flex:1` child
    inside a flex *column* parent sizes to its content instead of the space
    actually available, and the side panel's own scroll never engages.
-3. **Cards play inline now, not in a popup — for Consensus, and for the
-   first time at all for SharePoint LDK/VDK.** Seb: "Instead of forwarding
-   to Consensus for Videos when clicking the play button on the thumbnail
-   could you just play the video in that thumbnail frame? same for VDK's and
-   LDK's can we just embed the _CF video there and play it as a preview."
-   New `playInline()`/`embedInlinePlayer()` in `hub-api.js`, replacing
-   `openPreview()` as what a card's own play button calls (`openPreview()`
-   itself is untouched and still runs the detail page's hero player, which
-   nobody asked to change). Layered on top of the existing thumbnail
-   (`.asset-card__thumb` is already `position:relative`) rather than
-   replacing its contents, so the close (✕) button has nothing to
-   reconstruct — it just removes the overlay.
-   - **Consensus** (native, or a SharePoint asset cross-referenced via
-     `consensus_uuid`): same `previewUrl()` this always used, now in an
-     iframe sized to the thumbnail instead of a full-screen popup.
-   - **SharePoint LDK/VDK**: genuinely new capability — these never had a
-     play button before (§ "the play button did nothing on most of them").
-     The real constraint driving the implementation: `AssetSummary` (what a
-     grid card is built from) carries no `resources[]` or `main_video` —
-     only the full `Asset` (detail) response does, by design (§3.2's "resolve
-     at play time, never at list time" principle, previously only applied to
-     download/preview URLs). `video_count`, however, **is** on `AssetSummary`
-     — so that alone decides whether the play button shows at all
-     (`(a.type === "ldk" || a.type === "vdk") && a.video_count > 0`), and
-     which *specific* file plays is resolved with a `GET /api/assets/{id}`
-     lazily, only at the moment of the actual click — never at list/grid
-     render time, matching the same rule the server-side endpoints already
-     follow. The picked video: `main_video` if the asset has one chosen,
-     else the/a Customer Facing (`_CF`) video, else whatever video exists —
-     a quick inline preview is better served by showing *a* video than by
-     finding a reason to show none, unlike the detail page's own hero, which
-     stays `None` rather than guess (§ `pick_main_video()`'s own reasoning
-     in `sharepoint_mapping.py` — deliberately not changed by this).
-     Streamed with a native `<video>` element via the existing
-     `fileDownloadUrl()` endpoint — a direct, pre-authenticated Graph blob
-     link, so no SharePoint viewer chrome or iframe is needed for this case,
-     unlike Consensus.
+3. **The detail page's hero player plays inline now, not in a popup —
+   corrected 2026-09-10, same afternoon, after an initial mix-up.** Seb:
+   "Instead of forwarding to Consensus for Videos when clicking the play
+   button on the thumbnail could you just play the video in that thumbnail
+   frame? same for VDK's and LDK's can we just embed the _CF video there and
+   play it as a preview." First attempt applied this to the **grid card's**
+   play button — wrong surface: Liwei clarified the same day that "thumbnail"
+   meant the detail page's own hero (`.vp-player`, top-left of the page),
+   not a demo tile. The grid card's play button is fully reverted to its
+   original behaviour (`retypeCard()`/`openPreview()`, popup, Consensus
+   only, unchanged from before this review). `embedInlinePlayer()` — the
+   shared overlay mechanism both attempts would have used — was kept and is
+   now wired to `.vp-player` inside `openAssetDetail()` instead: layered on
+   top of the existing cover/thumbnail (both `.vp-player` and
+   `.asset-card__thumb` are already `position:relative`) rather than
+   replacing it, so the close (✕) button has nothing to reconstruct.
+   - **Consensus**: same `previewUrl()` this always used, now in an iframe
+     sized to the hero player instead of a full-screen popup.
+   - **SharePoint LDK/VDK**: genuinely new capability — the hero never had a
+     working play button for these before (`canPlay` was `!!previewUrl()`
+     only, which is Consensus-only). Unlike the grid-card attempt, this
+     needed **no lazy fetch and no `AssetSummary` workaround** — the detail
+     page already holds the full `Asset`, `resources[]` and `main_video`
+     included, since `openAssetDetail()` fetches exactly that. The picked
+     video: `main_video` if the asset has one chosen, else the/a Customer
+     Facing (`_CF`) video, else whatever video exists — a quick inline
+     preview is better served by showing *a* video than by finding a reason
+     to show none, unlike `pick_main_video()`'s own stricter reasoning in
+     `sharepoint_mapping.py` for what the hero shows as a *still* (deliberately
+     not changed by this). Streamed with a native `<video>` element via the
+     existing `fileDownloadUrl()` endpoint — a direct, pre-authenticated
+     Graph blob link, so no SharePoint viewer chrome or iframe is needed for
+     this case, unlike Consensus.
+4. **The homepage's "Sales Enablement / Technical Demo Development"
+   breadcrumb removed** — Liwei's ask, same afternoon. One `<div
+   class="orion-breadcrumb">` in `index.html`, Elio's own static markup;
+   `.orion-breadcrumb`'s CSS rule was left in place since nothing else used
+   it and there was no reason to touch orion.css for a one-element removal.
 
 ### Blocked on a person
 

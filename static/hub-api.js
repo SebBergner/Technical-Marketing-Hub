@@ -204,18 +204,21 @@
     }
 
     /* The play button was on every card and did nothing on most of them.
-     * A Consensus record IS a recording, so it plays. A SharePoint LDK/VDK
-     * with a video resource now plays too (Seb, 2026-09-10 -- see
-     * playInline() below); anything else genuinely has nothing to play, so
-     * the control is removed rather than left there inert. video_count is
-     * on AssetSummary (unlike resources[]/main_video, detail-only), so this
-     * check works from list data alone -- which specific video plays is
-     * resolved lazily, only once someone actually clicks. */
+     * A Consensus record IS a recording, so it plays -- in the Consensus
+     * player, which is where the video actually lives. A SharePoint demo kit
+     * is a folder of files with no single thing to play, so the control is
+     * removed rather than left there inert.
+     *
+     * Card-level inline playback was tried here 2026-09-10 and withdrawn the
+     * same day: Seb's "play it in that thumbnail frame" ask was about the
+     * DETAIL PAGE's own hero player (.vp-player, top-left of the page), not
+     * the grid tile. See openAssetDetail() below for where this actually
+     * landed, and embedInlinePlayer() for the shared overlay mechanism both
+     * would have used. */
     var play = card.querySelector(".play-btn");
     if (!play) return;
-    var canPlayCard = !!previewUrl(a)
-      || ((a.type === "ldk" || a.type === "vdk") && (a.video_count || 0) > 0);
-    if (!canPlayCard) { play.remove(); return; }   // nothing to play: no control
+    var url = previewUrl(a);
+    if (!url) { play.remove(); return; }   // nothing to play: no control
 
     var button = document.createElement("button");
     button.className = "play-btn";
@@ -226,26 +229,25 @@
     button.addEventListener("click", function (e) {
       e.preventDefault();
       e.stopPropagation();
-      playInline(card, a);
+      openPreview(a);
     });
     play.replaceWith(button);
   }
 
-  /* Plays in the thumbnail frame itself, not a popup.
+  /* Plays in a thumbnail-like frame itself, not a popup -- used by the
+   * detail page's own hero player (openAssetDetail() below). Seb, review:
+   * "instead of forwarding to Consensus for Videos when clicking the play
+   * button on the thumbnail could you just play the video in that thumbnail
+   * frame? same for VDK's and LDK's can we just embed the _CF video there
+   * and play it as a preview." Confirmed after an initial mix-up (2026-09-10)
+   * that "thumbnail" meant `.vp-player`, not a grid tile -- openPreview()
+   * below is what the grid still uses, unchanged.
    *
-   * Seb, review: "instead of forwarding to Consensus for Videos when
-   * clicking the play button on the thumbnail could you just play the video
-   * in that thumbnail frame? same for VDK's and LDK's can we just embed the
-   * _CF video there and play it as a preview." Replaces openPreview() as
-   * the grid card's own play action; openPreview() itself is untouched and
-   * still runs the detail page's own hero player, which nobody asked to
-   * change.
-   *
-   * An overlay layered on top of the existing thumbnail (absolute, inset:0)
-   * rather than replacing its contents -- .asset-card__thumb is already
-   * `position:relative` for the type chip/duration chip, and layering means
-   * the close button can just remove the overlay to get the original cover
-   * or thumbnail image back, with nothing to reconstruct.
+   * An overlay layered on top of the existing content (absolute, inset:0)
+   * rather than replacing it -- both `.vp-player` and `.asset-card__thumb`
+   * are already `position:relative`, and layering means the close button
+   * can just remove the overlay to get the original cover or thumbnail
+   * image back, with nothing to reconstruct.
    */
   function embedInlinePlayer(thumb, url, tag) {
     if (thumb.querySelector(".hub-inline-player")) return;   // already playing
@@ -279,42 +281,6 @@
     wrap.appendChild(media);
     wrap.appendChild(close);
     thumb.appendChild(wrap);
-  }
-
-  async function playInline(card, a) {
-    var thumb = card.querySelector(".asset-card__thumb");
-    if (!thumb) return;
-
-    // Consensus already has a URL on hand -- an iframe, same as the popup
-    // used, just sized to the thumbnail instead of the whole screen.
-    var consensus = previewUrl(a);
-    if (consensus) {
-      embedInlinePlayer(thumb, consensus, "iframe");
-      return;
-    }
-
-    // SharePoint LDK/VDK: AssetSummary (what a card is built from) carries
-    // no resources[] or main_video -- only the full Asset does -- so the
-    // actual file has to be resolved now, at the moment someone asks to
-    // play, the same "never at list time" rule download_url()/preview()
-    // already follow server-side. Prefer the asset's own chosen main_video;
-    // failing that, the/an explicitly Customer Facing video; failing that,
-    // whatever video exists, since a quick inline preview is better served
-    // by showing *a* video than by finding a reason to show none.
-    var full;
-    try {
-      full = await getJSON("/api/assets/" + encodeURIComponent(a.id));
-    } catch (err) {
-      console.error("[hub-api] could not resolve a video to play for", a.id, err);
-      return;
-    }
-    var videos = (full.resources || []).filter(function (r) { return r.kind === "video"; });
-    var pick = (full.main_video
-                && videos.find(function (r) { return r.name === full.main_video; }))
-             || videos.find(function (r) { return r.audience === "customer_facing"; })
-             || videos[0];
-    if (!pick || !pick.item_id) return;   // nothing playable after all
-    embedInlinePlayer(thumb, fileDownloadUrl(full.id, pick.item_id), "video");
   }
 
   /* Plays inside the Hub rather than in a tab.
@@ -1829,10 +1795,26 @@
       if (!asset.thumbnail_url) paintCoverInto(player, asset);
       var play = player.querySelector(".vp-player__play");
       if (play) {
-        var canPlay = !!previewUrl(asset);
+        // Seb, review: "play the video in that thumbnail frame ... same for
+        // VDK's and LDK's, embed the _CF video there." This is the
+        // "thumbnail" he meant -- confirmed 2026-09-10 after an initial
+        // mix-up that tried this on the grid tiles instead (withdrawn, see
+        // retypeCard() above). No fetch needed here, unlike a grid card:
+        // openAssetDetail() already has the full Asset, resources[] and
+        // main_video included, since this IS the detail response.
+        var videos = (asset.resources || []).filter(function (r) { return r.kind === "video"; });
+        var pick = (asset.main_video
+                    && videos.find(function (r) { return r.name === asset.main_video; }))
+                 || videos.find(function (r) { return r.audience === "customer_facing"; })
+                 || videos[0];
+        var consensusSrc = previewUrl(asset);   // Consensus wins when both exist, as before
+        var canPlay = !!consensusSrc || !!(pick && pick.item_id);
         play.style.display = canPlay ? "" : "none";
-        play.onclick = canPlay ? function () { openPreview(asset); } : null;
         play.title = canPlay ? "Play preview" : "";
+        play.onclick = canPlay ? function () {
+          if (consensusSrc) embedInlinePlayer(player, consensusSrc, "iframe");
+          else embedInlinePlayer(player, fileDownloadUrl(asset.id, pick.item_id), "video");
+        } : null;
       }
     }
 

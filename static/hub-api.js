@@ -204,14 +204,18 @@
     }
 
     /* The play button was on every card and did nothing on most of them.
-     * A Consensus record IS a recording, so it plays -- in the Consensus
-     * player, which is where the video actually lives. A SharePoint demo kit
-     * is a folder of files with no single thing to play, so the control is
-     * removed rather than left there inert. */
+     * A Consensus record IS a recording, so it plays. A SharePoint LDK/VDK
+     * with a video resource now plays too (Seb, 2026-09-10 -- see
+     * playInline() below); anything else genuinely has nothing to play, so
+     * the control is removed rather than left there inert. video_count is
+     * on AssetSummary (unlike resources[]/main_video, detail-only), so this
+     * check works from list data alone -- which specific video plays is
+     * resolved lazily, only once someone actually clicks. */
     var play = card.querySelector(".play-btn");
     if (!play) return;
-    var url = previewUrl(a);
-    if (!url) { play.remove(); return; }   // nothing to play: no control
+    var canPlayCard = !!previewUrl(a)
+      || ((a.type === "ldk" || a.type === "vdk") && (a.video_count || 0) > 0);
+    if (!canPlayCard) { play.remove(); return; }   // nothing to play: no control
 
     var button = document.createElement("button");
     button.className = "play-btn";
@@ -222,9 +226,95 @@
     button.addEventListener("click", function (e) {
       e.preventDefault();
       e.stopPropagation();
-      openPreview(a);
+      playInline(card, a);
     });
     play.replaceWith(button);
+  }
+
+  /* Plays in the thumbnail frame itself, not a popup.
+   *
+   * Seb, review: "instead of forwarding to Consensus for Videos when
+   * clicking the play button on the thumbnail could you just play the video
+   * in that thumbnail frame? same for VDK's and LDK's can we just embed the
+   * _CF video there and play it as a preview." Replaces openPreview() as
+   * the grid card's own play action; openPreview() itself is untouched and
+   * still runs the detail page's own hero player, which nobody asked to
+   * change.
+   *
+   * An overlay layered on top of the existing thumbnail (absolute, inset:0)
+   * rather than replacing its contents -- .asset-card__thumb is already
+   * `position:relative` for the type chip/duration chip, and layering means
+   * the close button can just remove the overlay to get the original cover
+   * or thumbnail image back, with nothing to reconstruct.
+   */
+  function embedInlinePlayer(thumb, url, tag) {
+    if (thumb.querySelector(".hub-inline-player")) return;   // already playing
+
+    var wrap = document.createElement("div");
+    wrap.className = "hub-inline-player";
+
+    var media = document.createElement(tag);
+    media.className = "hub-inline-player__media";
+    media.src = url;
+    if (tag === "video") {
+      media.controls = true;
+      media.autoplay = true;
+      media.playsInline = true;
+    } else {
+      media.setAttribute("allow", "fullscreen; autoplay");
+      media.setAttribute("allowfullscreen", "");
+    }
+
+    var close = document.createElement("button");
+    close.type = "button";
+    close.className = "hub-inline-player__close";
+    close.title = "Close";
+    close.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-x"/></svg>';
+    close.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      wrap.remove();
+    });
+
+    wrap.appendChild(media);
+    wrap.appendChild(close);
+    thumb.appendChild(wrap);
+  }
+
+  async function playInline(card, a) {
+    var thumb = card.querySelector(".asset-card__thumb");
+    if (!thumb) return;
+
+    // Consensus already has a URL on hand -- an iframe, same as the popup
+    // used, just sized to the thumbnail instead of the whole screen.
+    var consensus = previewUrl(a);
+    if (consensus) {
+      embedInlinePlayer(thumb, consensus, "iframe");
+      return;
+    }
+
+    // SharePoint LDK/VDK: AssetSummary (what a card is built from) carries
+    // no resources[] or main_video -- only the full Asset does -- so the
+    // actual file has to be resolved now, at the moment someone asks to
+    // play, the same "never at list time" rule download_url()/preview()
+    // already follow server-side. Prefer the asset's own chosen main_video;
+    // failing that, the/an explicitly Customer Facing video; failing that,
+    // whatever video exists, since a quick inline preview is better served
+    // by showing *a* video than by finding a reason to show none.
+    var full;
+    try {
+      full = await getJSON("/api/assets/" + encodeURIComponent(a.id));
+    } catch (err) {
+      console.error("[hub-api] could not resolve a video to play for", a.id, err);
+      return;
+    }
+    var videos = (full.resources || []).filter(function (r) { return r.kind === "video"; });
+    var pick = (full.main_video
+                && videos.find(function (r) { return r.name === full.main_video; }))
+             || videos.find(function (r) { return r.audience === "customer_facing"; })
+             || videos[0];
+    if (!pick || !pick.item_id) return;   // nothing playable after all
+    embedInlinePlayer(thumb, fileDownloadUrl(full.id, pick.item_id), "video");
   }
 
   /* Plays inside the Hub rather than in a tab.
@@ -1885,22 +1975,30 @@
     // unexplained silent failure in our own code.
     // Elio, 2026-09-08, on AMP's layout: "the preview video on top and
     // description on bottom... make it look good, but similar layout and
-    // information." Video stays the full-width top section it already was;
-    // everything AMP put in its Properties box is now a genuine label/value
-    // table, not the one-line bullet list this used to be, in a capped-height
-    // scrolling strip so a long description or many rows cannot crush the
-    // video down to nothing.
+    // information." Everything AMP put in its Properties box is now a
+    // genuine label/value table, not the one-line bullet list this used to
+    // be.
+    //
+    // Seb, 2026-09-10, having seen that version: "I like the preview popup,
+    // but maybe put the metadata from the bottom on the right ... vertical?"
+    // -- Liwei's call, the right side. So the desc/table pair (still one
+    // `.hub-file-preview__body`, unchanged inside) now sits beside the video
+    // in `.hub-file-preview__main`, not below it -- a real side panel, the
+    // shape AMP's own screenshot actually had, rather than a horizontal
+    // strip under the frame.
     backdrop.innerHTML =
         '<div class="hub-preview__box">'
       +   '<div class="hub-preview__bar">'
       +     '<span class="hub-preview__title" id="hubFilePreviewTitle"></span>'
       +     '<button class="hub-preview__close" title="Close">&times;</button>'
       +   '</div>'
-      +   '<iframe class="hub-preview__frame" id="hubFilePreviewFrame"'
-      +     ' allow="fullscreen"></iframe>'
-      +   '<div class="hub-file-preview__body">'
-      +     '<div class="hub-file-preview__desc" id="hubFilePreviewDesc"></div>'
-      +     '<div class="hub-file-preview__table" id="hubFilePreviewInfo"></div>'
+      +   '<div class="hub-file-preview__main">'
+      +     '<iframe class="hub-preview__frame" id="hubFilePreviewFrame"'
+      +       ' allow="fullscreen"></iframe>'
+      +     '<div class="hub-file-preview__body">'
+      +       '<div class="hub-file-preview__desc" id="hubFilePreviewDesc"></div>'
+      +       '<div class="hub-file-preview__table" id="hubFilePreviewInfo"></div>'
+      +     '</div>'
       +   '</div>'
       +   '<div class="hub-file-preview__nav">'
       +     '<button type="button" class="hub-file-preview__navbtn" id="hubFilePreviewPrev">'
@@ -2054,57 +2152,70 @@
         +   (FILE_ICON[f.kind] || "i-file-text") + '"/></svg>'
         + '<span class="vp-file__facts">' + escapeHtml(facts) + '</span>';
 
-      // A real <a>, not a string-built one: an href assigned as a DOM
-      // property needs no attribute-quote escaping, unlike the innerHTML
-      // this row otherwise builds with.
-      if (f.item_id) {
-        var link = document.createElement("a");
-        link.className = "vp-file__name";
-        link.href = fileDownloadUrl(asset.id, f.item_id);
-        link.target = "_blank";
-        link.rel = "noopener";
-        link.title = "Download";
-        link.textContent = f.name;
-        row.insertBefore(link, row.lastChild);
+      // Seb, review: the old "Preview" pill "looked like a tag", and asked
+      // for the file name itself to be the preview link, with a real
+      // Download button at the far right instead. So the name's role and
+      // the button's role have swapped from the previous design: the name
+      // now opens a preview (modal for video/image, a new tab for
+      // Word/PowerPoint/PDF), and Download is its own control, appended
+      // last so the row's flex layout (`.vp-file__facts`'s `margin-left:auto`
+      // already pushes everything before it left) puts it at the true far
+      // right rather than between the name and the facts, where the old
+      // Preview button sat.
+      var isModalPreviewable = previewable.indexOf(f) !== -1;
+      var isTabPreviewable = !isModalPreviewable && f.item_id
+                            && PREVIEWABLE_KINDS.indexOf(f.kind) !== -1;
+
+      if (isModalPreviewable) {
+        var name = document.createElement("a");
+        name.className = "vp-file__name";
+        name.href = "#";
+        name.title = "Preview";
+        name.textContent = f.name;
+        name.addEventListener("click", function (e) {
+          e.preventDefault();
+          openFilePreview(asset, previewable, previewable.indexOf(f));
+        });
+        row.insertBefore(name, row.lastChild);
+      } else if (isTabPreviewable) {
+        // In PREVIEWABLE_KINDS but not MODAL_PREVIEWABLE_KINDS -- today that
+        // is exactly "document" (Word/PowerPoint/PDF). A new tab, not the
+        // modal -- see MODAL_PREVIEWABLE_KINDS for why. A real <a>, not a
+        // string-built one: an href assigned as a DOM property needs no
+        // attribute-quote escaping, unlike the innerHTML this row otherwise
+        // builds with.
+        var name = document.createElement("a");
+        name.className = "vp-file__name";
+        name.href = filePreviewUrl(asset.id, f.item_id);
+        name.target = "_blank";
+        name.rel = "noopener";
+        name.title = "Preview in a new tab";
+        name.textContent = f.name;
+        row.insertBefore(name, row.lastChild);
       } else {
+        // Nothing to preview -- a CAD dataset (.zip/.rar) or a resource
+        // synced before item_id existed. Plain text; Download below still
+        // covers the first case, neither control applies to the second.
         var name = document.createElement("span");
         name.className = "vp-file__name";
         name.textContent = f.name;
         row.insertBefore(name, row.lastChild);
       }
-
-      // Separate from the name: the name downloads (Content-Disposition
-      // forces that regardless of file type, verified 2026-09-08 against a
-      // real video -- there is no "click to play" available on that URL),
-      // so looking at a file before deciding to download it needs a control
-      // of its own. Inserted after the name, still before facts, so the row
-      // reads icon / name / preview / facts.
-      if (previewable.indexOf(f) !== -1) {
-        var preview = document.createElement("button");
-        preview.type = "button";
-        preview.className = "vp-file__preview";
-        preview.title = "Preview";
-        preview.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg>Preview';
-        preview.addEventListener("click", function () {
-          openFilePreview(asset, previewable, previewable.indexOf(f));
-        });
-        row.insertBefore(preview, row.lastChild);
-      } else if (f.item_id && PREVIEWABLE_KINDS.indexOf(f.kind) !== -1) {
-        // In PREVIEWABLE_KINDS but not MODAL_PREVIEWABLE_KINDS -- today that
-        // is exactly "document" (Word/PowerPoint/PDF). A new tab, not the
-        // modal -- see MODAL_PREVIEWABLE_KINDS for why. A real <a>, same
-        // reasoning as the name link above about DOM-property hrefs needing
-        // no escaping.
-        var docPreview = document.createElement("a");
-        docPreview.className = "vp-file__preview";
-        docPreview.title = "Preview in a new tab";
-        docPreview.target = "_blank";
-        docPreview.rel = "noopener";
-        docPreview.href = filePreviewUrl(asset.id, f.item_id);
-        docPreview.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg>Preview';
-        row.insertBefore(docPreview, row.lastChild);
-      }
       list.appendChild(row);
+
+      // Download, its own control, appended after everything else so it
+      // lands at the far right of the row -- every file with an item_id can
+      // be downloaded, whether or not it can also be previewed.
+      if (f.item_id) {
+        var download = document.createElement("a");
+        download.className = "vp-file__download";
+        download.href = fileDownloadUrl(asset.id, f.item_id);
+        download.target = "_blank";
+        download.rel = "noopener";
+        download.title = "Download";
+        download.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-clock"/></svg>Download';
+        row.appendChild(download);
+      }
     });
     box.appendChild(list);
 

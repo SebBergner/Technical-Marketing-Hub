@@ -1478,6 +1478,78 @@ after Elio corrected one such demo by hand; `LDKs` moved from 214 → 213 and
 `VDKs` from 156 → 157 on the live nav counts, confirming the sync picked up
 exactly that one change.
 
+### Seb's review feedback, 2026-09-10 afternoon — shipped locally, not yet pushed
+
+Three asks, relayed by Liwei. **Held locally on Liwei's request** ("做完先别
+推送，现在本地服务器看看效果" — build it, don't push, look at it on the local
+server first) — all verified working there before this section was written,
+but treat as unconfirmed on Azure until a deploy actually happens.
+
+1. **File rows: the name is the preview now, Download moved to the far
+   right.** Seb: "The Preview buttons look strange, they look like tags.
+   Maybe use the file name as Preview link and add 'Download' buttons at the
+   far right in each row." Swapped the two controls' jobs in
+   `renderFileList()` (`hub-api.js`): the file name opens the modal preview
+   for video/image, or the SharePoint Office-Online viewer in a new tab for
+   Word/PowerPoint/PDF (same two destinations as before, just moved onto the
+   name); a new `.vp-file__download` button — the old `.vp-file__preview`
+   pill's CSS, renamed and repurposed rather than rewritten — is appended
+   last in each row so it lands at the true far right, taking advantage of
+   `.vp-file__facts`'s existing `margin-left:auto` rather than needing new
+   layout rules. A CAD dataset (.zip/.rar) or a resource with no `item_id`
+   still gets no preview affordance, exactly as before — only what Download
+   does changed.
+2. **The preview modal's metadata moved from a strip under the video to a
+   vertical panel on its right.** Seb: "I like the preview popup. but maybe
+   put the meta data from the bottom on the right or left vertical?" —
+   Liwei's call, the right side. New `.hub-file-preview__main` wraps the
+   iframe and the metadata body in a row instead of the box stacking them in
+   a column; the body is now a fixed 260px side panel with its own vertical
+   scroll rather than a capped-height horizontal strip, and the Properties
+   table switched from a multi-column grid (needed the old layout's width)
+   to a single-column list (what actually fits at 260px — and closer to
+   AMP's own screenshot shape than the grid ever was). `min-height:0` on the
+   new row is load-bearing, not decoration: without it a `flex:1` child
+   inside a flex *column* parent sizes to its content instead of the space
+   actually available, and the side panel's own scroll never engages.
+3. **Cards play inline now, not in a popup — for Consensus, and for the
+   first time at all for SharePoint LDK/VDK.** Seb: "Instead of forwarding
+   to Consensus for Videos when clicking the play button on the thumbnail
+   could you just play the video in that thumbnail frame? same for VDK's and
+   LDK's can we just embed the _CF video there and play it as a preview."
+   New `playInline()`/`embedInlinePlayer()` in `hub-api.js`, replacing
+   `openPreview()` as what a card's own play button calls (`openPreview()`
+   itself is untouched and still runs the detail page's hero player, which
+   nobody asked to change). Layered on top of the existing thumbnail
+   (`.asset-card__thumb` is already `position:relative`) rather than
+   replacing its contents, so the close (✕) button has nothing to
+   reconstruct — it just removes the overlay.
+   - **Consensus** (native, or a SharePoint asset cross-referenced via
+     `consensus_uuid`): same `previewUrl()` this always used, now in an
+     iframe sized to the thumbnail instead of a full-screen popup.
+   - **SharePoint LDK/VDK**: genuinely new capability — these never had a
+     play button before (§ "the play button did nothing on most of them").
+     The real constraint driving the implementation: `AssetSummary` (what a
+     grid card is built from) carries no `resources[]` or `main_video` —
+     only the full `Asset` (detail) response does, by design (§3.2's "resolve
+     at play time, never at list time" principle, previously only applied to
+     download/preview URLs). `video_count`, however, **is** on `AssetSummary`
+     — so that alone decides whether the play button shows at all
+     (`(a.type === "ldk" || a.type === "vdk") && a.video_count > 0`), and
+     which *specific* file plays is resolved with a `GET /api/assets/{id}`
+     lazily, only at the moment of the actual click — never at list/grid
+     render time, matching the same rule the server-side endpoints already
+     follow. The picked video: `main_video` if the asset has one chosen,
+     else the/a Customer Facing (`_CF`) video, else whatever video exists —
+     a quick inline preview is better served by showing *a* video than by
+     finding a reason to show none, unlike the detail page's own hero, which
+     stays `None` rather than guess (§ `pick_main_video()`'s own reasoning
+     in `sharepoint_mapping.py` — deliberately not changed by this).
+     Streamed with a native `<video>` element via the existing
+     `fileDownloadUrl()` endpoint — a direct, pre-authenticated Graph blob
+     link, so no SharePoint viewer chrome or iframe is needed for this case,
+     unlike Consensus.
+
 ### Blocked on a person
 
 5. **Customer-facing vs internal-only tag** — blocked on a data source (§7.3).

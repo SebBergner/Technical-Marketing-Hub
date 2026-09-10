@@ -309,6 +309,22 @@ a:hover { text-decoration: underline; }
 .play-btn svg { width: 17px; height: 17px; margin-left: 2px; }
 .play-btn:hover { background: var(--orion-indigo-strong); }
 
+/* The inline player Seb asked for, 2026-09-10 -- layered on top of
+   .asset-card__thumb (already position:relative) rather than replacing its
+   contents, so closing it needs nothing reconstructed: the original cover
+   or thumbnail image was never removed, only covered. */
+.hub-inline-player { position: absolute; inset: 0; z-index: 2; background: #000;
+  display: flex; align-items: center; justify-content: center; }
+.hub-inline-player__media { width: 100%; height: 100%; border: none; background: #000; }
+video.hub-inline-player__media { object-fit: contain; }
+.hub-inline-player__close {
+  position: absolute; top: 6px; right: 6px; z-index: 3; width: 22px; height: 22px;
+  border-radius: 50%; border: none; background: rgba(0,0,0,.6); color: #fff;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.hub-inline-player__close:hover { background: rgba(0,0,0,.85); }
+.hub-inline-player__close svg { width: 12px; height: 12px; }
+
 .asset-card__body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .asset-card__title { font-size: 13.5px; font-weight: 600; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .asset-card__meta { font-size: 12px; color: var(--orion-text-2); display: flex; align-items: center; gap: 6px; }
@@ -2145,14 +2161,17 @@ hubApplyFilters();
      the same #00890B every other filled button in this app pins to in both
      themes (--orion-indigo itself is #40AA1D in dark mode, which carries
      white text at only 3.01:1 -- fine for the idle text/border here, not
-     enough for a solid fill, so the fill is pinned rather than themed). */
-  .vp-file__preview { flex:0 0 auto; display:inline-flex; align-items:center;
+     enough for a solid fill, so the fill is pinned rather than themed).
+     Renamed from .vp-file__preview, 2026-09-10: Seb asked for the file name
+     itself to be the preview link and this button to become Download,
+     moved to the far right of the row -- same look, new job. */
+  .vp-file__download { flex:0 0 auto; display:inline-flex; align-items:center;
     gap:5px; padding:4px 10px; font-size:11.5px; font-weight:700;
     color:var(--orion-indigo); background:var(--orion-indigo-soft);
     border:1px solid var(--orion-indigo); border-radius:var(--orion-radius-pill);
     cursor:pointer; white-space:nowrap; text-decoration:none; }
-  .vp-file__preview:hover { background:#00890B; border-color:#00890B; color:#fff; }
-  .vp-file__preview svg { width:12px; height:12px; }
+  .vp-file__download:hover { background:#00890B; border-color:#00890B; color:#fff; }
+  .vp-file__download svg { width:12px; height:12px; }
 
 
   .hub-boot { display: flex; flex-direction: column; align-items: center;
@@ -2185,25 +2204,32 @@ hubApplyFilters();
     font-size:22px; line-height:1; color:var(--orion-text-3); cursor:pointer;
     padding:0 4px; }
   .hub-preview__close:hover { color:var(--orion-text); }
-  .hub-preview__frame { flex:1; width:100%; border:none; background:#fff; }
+  /* Frame + metadata panel, side by side. Seb, 2026-09-10: "put the
+     metadata from the bottom on the right ... vertical" -- this row is what
+     replaced the earlier stacked (video-on-top, table-below) layout.
+     min-height:0 is load-bearing: without it, a flex child set to flex:1
+     inside a flex *column* parent (.hub-preview__box) sizes to its content
+     instead of shrinking to the space actually available, and the panel's
+     own scroll never gets a chance to kick in. */
+  .hub-file-preview__main { flex:1; min-height:0; display:flex;
+    flex-direction:row; overflow:hidden; }
+  .hub-preview__frame { flex:1; min-width:0; height:100%; border:none;
+    background:#fff; }
 
-  /* The pieces the file-preview modal adds below the frame that the
-     Consensus one doesn't need -- Elio, 2026-09-08: "the preview video on
-     top and description on bottom... similar layout and information" to
-     Seb's AMP screenshot. A capped, scrolling height on the whole body: the
-     video is the point of the modal, and neither a long description nor a
-     ten-row Properties table should be able to crush it down to nothing. */
-  .hub-file-preview__body { flex:0 0 auto; max-height:220px; overflow-y:auto;
-    padding:12px 14px; border-top:1px solid var(--orion-border); }
+  /* The metadata panel the file-preview modal adds beside the frame that the
+     Consensus one doesn't need. Fixed width, full height, its own scroll --
+     a long description or a ten-row Properties table scrolls in place
+     rather than crushing the video, the same goal the old capped-height
+     strip had, just oriented the other way now that the panel is vertical. */
+  .hub-file-preview__body { flex:0 0 260px; overflow-y:auto;
+    padding:14px; border-top:none; border-left:1px solid var(--orion-border); }
   .hub-file-preview__desc { font-size:12.5px; color:var(--orion-text-2);
     line-height:1.5; margin-bottom:12px; }
   /* AMP's Properties box, as an actual label/value table rather than the one
-     bullet-separated line this used to be. A grid, not a vertical list: this
-     modal is wide and the panel sits under the video rather than beside it
-     the way AMP's own does, so laying rows out in columns uses that width
-     instead of turning the table into a tall scroll on its own. */
-  .hub-file-preview__table { display:grid;
-    grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:10px 20px; }
+     bullet-separated line this used to be. A single column, not the grid
+     this used to be: at 260px there is only ever room for one, and the
+     side-panel shape is itself what Seb asked to match -- see above. */
+  .hub-file-preview__table { display:flex; flex-direction:column; gap:10px; }
   .hub-file-preview__row { display:flex; flex-direction:column; gap:2px; min-width:0; }
   .hub-file-preview__label { font-size:10.5px; font-weight:700; letter-spacing:.03em;
     text-transform:uppercase; color:var(--orion-text-3); }

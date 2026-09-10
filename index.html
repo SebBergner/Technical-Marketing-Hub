@@ -684,6 +684,7 @@ video.hub-inline-player__media { object-fit: contain; }
 </defs>
 </symbol>
 <symbol id="logo-seismic" viewBox="0 0 300 300"><polygon points="104,78 233,52 230,153 104,126" fill="#FF5000"/><polygon points="69,146 195,173 195,221 66,247" fill="#FF5000"/></symbol>
+<symbol id="logo-ptc-mark" viewBox="0 0 284.42 325.42"><polygon points="142.21 9.21 9.21 86.01 9.21 153.91 142.21 76.61 217.01 119.51 202.11 128.11 142.21 93.71 90.11 123.81 209.21 192.81 275.21 154.11 275.21 86.01 142.21 9.21" fill="#3d4647"/><polygon points="142.21 316.21 275.21 239.51 275.21 171.41 142.21 248.81 67.41 205.81 82.31 197.21 142.21 231.71 194.31 201.51 75.21 132.51 9.21 171.21 9.21 239.51 142.21 316.21" fill="#40aa1d"/></symbol>
 
 </svg>
 
@@ -719,7 +720,7 @@ video.hub-inline-player__media { object-fit: contain; }
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-video"/></svg> Videos</span> <span class="count">86</span></div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-box"/></svg> LDKs <span class="orion-subtle" style="font-size:11px;">Live Demo Kits</span></span> <span class="count">22</span></div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-monitor"/></svg> VDKs <span class="orion-subtle" style="font-size:11px;">Video Demo Kits</span></span> <span class="count">9</span></div>
-      <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-layers"/></svg> CAD Model</span> <span class="count">0</span></div>
+      <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-layers"/></svg> CAD Dataset</span> <span class="count">0</span></div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-monitor"/></svg> Virtual Machines</span> <span class="count">14</span></div>
 
       <div class="orion-group">Funnel Stage</div>
@@ -751,20 +752,37 @@ video.hub-inline-player__media { object-fit: contain; }
            2026-09-08 that "Video Demo Kit" is the term to show. Display text
            only: TYPE_MAP, AssetType.VDK and the "vdk" filter value all stay
            exactly as SharePoint defines them, untouched by this. -->
-      <div class="orion-subtle">One home for Videos, Live Demo Kits (LDKs), Video Demo Kits (VDKs), CAD Models, and Virtual Machines — replacing the separate Demo Library, Demo Video Gallery, and VM pages.</div>
+      <div class="orion-subtle">One home for Videos, Live Demo Kits (LDKs), Video Demo Kits (VDKs), CAD Datasets, and Virtual Machines — replacing the separate Demo Library, Demo Video Gallery, and VM pages.</div>
       <div class="hero-search">
         <div class="hero-search__field">
           <svg class="orion-ico ico-muted"><use href="#i-search"/></svg>
           <input type="text" id="hubSearchInput" autocomplete="off" placeholder="Search by product, keyword, persona, or funnel stage…">
         </div>
-        <label class="filter-pill">Type:
+        <label class="filter-pill">Asset Type:
           <select id="hubFilterType">
             <option value="">All</option>
             <option value="video">Video</option>
             <option value="ldk">LDK</option>
             <option value="vdk">VDK</option>
             <option value="vm">Virtual Machine</option>
-            <option value="cad_model">CAD Model</option>
+            <option value="cad_model">CAD Dataset</option>
+          </select>
+          <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
+        </label>
+        <!-- Elio, 2026-09-10, ahead of tomorrow's meeting: "and when they
+             select Video, another filter appears, 'Video Type'" -- Technical
+             Teaser / Overview / Walkthrough. Nothing in the catalogue
+             classifies a video that way yet, so this is a placeholder only:
+             no counts (there is no honest number to show), not wired into
+             hubApplyFilters()/currentQuery(), and picking an option here
+             does not narrow the grid. See updateVideoTypeFilterVisibility()
+             in hub-api.js for the show/hide-on-Video half of this. -->
+        <label class="filter-pill" id="hubVideoTypeFilterPill" style="display:none;">Video Type:
+          <select id="hubFilterVideoType">
+            <option value="">All</option>
+            <option value="teaser">Technical Teaser</option>
+            <option value="overview">Technical Overview</option>
+            <option value="walkthrough">Technical Walkthrough</option>
           </select>
           <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
         </label>
@@ -2165,13 +2183,6 @@ hubApplyFilters();
     font-variant-numeric:tabular-nums; }
   .vp-files__note { margin-top:10px; font-size:12px; color:var(--orion-text-3);
     line-height:1.5; }
-  .vp-files__download-all { margin-left:10px; padding:5px 12px; font-size:12px;
-    font-weight:600; color:var(--orion-text); background:var(--orion-surface);
-    border:1px solid var(--orion-border-md); border-radius:var(--orion-radius-sm);
-    cursor:pointer; display:inline-flex; align-items:center; gap:5px;
-    white-space:nowrap; flex:0 0 auto; }
-  .vp-files__download-all:hover { background:var(--orion-surface-2); }
-  .vp-files__download-all svg { width:13px; height:13px; }
   /* Liwei, 2026-09-08: the icon-only grey button "太过不明显" -- easy to miss
      next to a filename. PTC green text and border at rest, so it reads as an
      action rather than another muted fact in the row; solid green on hover,
@@ -2239,6 +2250,7 @@ hubApplyFilters();
      rather than crushing the video, the same goal the old capped-height
      strip had, just oriented the other way now that the panel is vertical. */
   .hub-file-preview__body { flex:0 0 260px; overflow-y:auto;
+    display:flex; flex-direction:column;
     padding:14px; border-top:none; border-left:1px solid var(--orion-border); }
   .hub-file-preview__desc { font-size:12.5px; color:var(--orion-text-2);
     line-height:1.5; margin-bottom:12px; }
@@ -2258,8 +2270,13 @@ hubApplyFilters();
      not mean closing the popup to go find one. Same visual language as
      .vp-file__download (indigo pill, pinned #00890B fill on hover for the
      same contrast reason documented there), full width since it anchors
-     the bottom of a fixed-width column rather than sitting in a row. */
-  .hub-file-preview__download { margin-top:14px; width:100%;
+     the bottom of a fixed-width column rather than sitting in a row.
+     margin-top:auto, not a fixed gap -- Liwei's follow-up same day: with
+     .hub-file-preview__body now a flex column, this pins the button to the
+     panel's own bottom edge regardless of how short the description/table
+     above it are, instead of the button just trailing whatever height that
+     content happens to be. */
+  .hub-file-preview__download { margin-top:auto; width:100%;
     display:flex; align-items:center; justify-content:center; gap:6px;
     padding:8px 12px; font-size:12.5px; font-weight:700;
     color:var(--orion-indigo); background:var(--orion-indigo-soft);

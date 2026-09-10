@@ -39,7 +39,7 @@ from datetime import date
 from typing import Any
 
 from backend.models import (
-    Asset, AssetRequest, AssetStats, AssetSummary, Capability, Facets, FacetValue, MetadataProposal,
+    Asset, AssetRequest, AssetStats, AssetSummary, AssetType, Capability, Facets, FacetValue, MetadataProposal,
     Page, ProposalState, ProposalSummary, ValueRoadmap,
 )
 from backend.repositories.base import AssetQuery, AssetRepository
@@ -61,6 +61,17 @@ _MIRROR_FIELDS = (
     "internal_title",
     "resources", "resource_counts", "resource_count", "video_count", "main_video",
     "external_views",
+)
+
+#: The Type filter's own options, in the order Elio's dropdown shows them --
+#: always present in facets().types, even at zero, same reasoning as
+#: PRODUCT_FAMILIES in taxonomy.py: a value that only appeared once content
+#: existed would look like a bug rather than the plan it is. VM is the one
+#: at zero today -- Liwei/Elio, 2026-09-10, ahead of a demo: "I know VM isn't
+#: in our data yet, it'll show 0". WIKI is deliberately not here: nothing in
+#: the catalogue uses it, and it has no filter option to show.
+FILTER_TYPES = (
+    AssetType.VIDEO, AssetType.LDK, AssetType.VDK, AssetType.VM, AssetType.CAD_MODEL,
 )
 
 
@@ -363,8 +374,16 @@ class JsonAssetRepository(AssetRepository):
             f for r in rows_for("umbrella_families")
             for f in taxonomy.umbrellas_of(r.get("products")))
 
+        # Every filterable type, in FILTER_TYPES' order, at its real count or
+        # zero -- then anything scalar() found outside that list (there is
+        # none today) tacked on after, so nothing real ever goes missing.
+        type_counts = Counter(r.get("type") for r in rows_for("types") if r.get("type"))
+        type_facets = [FacetValue(value=t.value, count=type_counts.pop(t.value, 0))
+                       for t in FILTER_TYPES]
+        type_facets += [FacetValue(value=v, count=n) for v, n in sorted(type_counts.items())]
+
         return Facets(
-            types=scalar("type", "types"),
+            types=type_facets,
             products=multi("products", "products"),
             funnel_stages=scalar("funnel_stage", "funnel_stages"),
             segments=scalar("segment", "segments"),

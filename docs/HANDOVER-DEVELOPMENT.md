@@ -1478,12 +1478,12 @@ after Elio corrected one such demo by hand; `LDKs` moved from 214 → 213 and
 `VDKs` from 156 → 157 on the live nav counts, confirming the sync picked up
 exactly that one change.
 
-### Seb's review feedback, 2026-09-10 afternoon — shipped locally, not yet pushed
+### Seb's review feedback, 2026-09-10 afternoon — pushed 2026-09-10 evening
 
 Three asks, relayed by Liwei. **Held locally on Liwei's request** ("做完先别
 推送，现在本地服务器看看效果" — build it, don't push, look at it on the local
-server first) — all verified working there before this section was written,
-but treat as unconfirmed on Azure until a deploy actually happens.
+server first) — all verified working on the local server before this section
+was written; not yet independently re-verified on Azure post-deploy.
 
 1. **File rows: the name is the preview now, Download moved to the far
    right.** Seb: "The Preview buttons look strange, they look like tags.
@@ -1600,6 +1600,123 @@ but treat as unconfirmed on Azure until a deploy actually happens.
    `closeAssetDetail()` (leaving the detail page for the grid). Grid cards
    themselves were never at risk — they never adopted inline playback in the
    first place (item 3's correction).
+8. **Product logos on the Browse by Product nav** — Seb, review: "Can we add
+   the product logos for the Products?" Went through three shapes before
+   landing:
+   - First attempt: a small logo prefixed before each product's text label.
+     Liwei, same day: "看起来很奇怪，logo特别小还大小不一" (looks odd, logos
+     too small and inconsistent) — Windchill/Creo/ServiceMax/Codebeamer have
+     real hexagon-mark SVGs, but Jetstream/Ignite/Orbit only ever had full
+     wordmark lockups, so mixing icon-sized wordmarks with icon-sized hex
+     marks in one column read as inconsistent.
+   - Second attempt: the logo *became* the whole button (full wordmark,
+     light/dark variants, text visually hidden but kept in the DOM for
+     `wireNav()`/`fillSidebarCounts()`/`markNavActive()`, which all key off
+     the label's text node). Liwei: "每个logo太小了" (every logo is too
+     small) — the source SVGs carry a lot of dead padding around the actual
+     wordmark (sized for a fixed brand-lockup grid, not this use), so a
+     naive full-canvas viewBox shrank the real glyph to a fraction of the
+     icon's height. Recomputing a tight, content-derived viewBox per logo
+     (from real path/polygon coordinate bounds) surfaced a second, sharper
+     bug: an SVG `<use>` referencing a `<symbol>` whose shared viewBox does
+     **not** start at `0 0` places the content wrong (`<use>`'s default x/y
+     is 0,0 in the *outer* coordinate system, which does not line up with a
+     non-zero viewBox origin) — the artwork rendered cropped into one
+     corner rather than filling the icon. Fixed by translating every
+     coordinate so the tight viewBox always starts at `0 0`; the four
+     existing hex marks had never hit this because their source art already
+     happened to start near the origin.
+   - Liwei then rolled all of this back: "回滚回最早的text版本，text前面放
+     六边形的logo" — text label with a small hex-mark icon in front, exactly
+     `index.mockup.original.html`'s own pattern (`.nav-mark`, 15px,
+     `logo-*-mark` symbols), for Windchill/Creo/ServiceMax/Codebeamer.
+     Jetstream/Orbit/Ignite (no dedicated hex-mark art, confirmed against
+     both the media folder and the mockup) fell back to the sprite's plain
+     `i-hex` icon tinted PTC green — until Liwei sourced the real thing:
+     `data/media/ptc_master_logo_RGB_color.svg`, PTC's own corporate mark.
+     `logo-ptc-mark` is just that file's `<g id="LOGO">` — the two-polygon
+     diamond — with the "ptc" wordmark half of the same file left out and a
+     tight, zero-origin viewBox computed the same way as above. Wired into
+     both `NAV_MARK` (sidebar) and `FAMILY_MARK` (card cover placeholders)
+     for all three products, so the same real mark now stands in wherever a
+     dedicated one is missing, on both surfaces at once.
+9. **"Download all" removed; "Download Kit" was tried as a real zip trigger,
+   then reverted.** Liwei: "Download All 按键...这个功能将有Download Kit这个
+   按键实现，同时这个Download Kit应该将所有文件zip了之后下载，这是sharepoint
+   自带的功能" (hide Download All, Download Kit should do the zip — it's
+   SharePoint's own feature). "Download all" (`downloadAllFiles()`, one
+   browser tab per file — the code's own comment already said "not a zip")
+   is deleted outright. First attempt at the replacement rewrote every
+   asset's `web_url` (a `DocSetHome.aspx?id=<folder path>` link) into
+   `_layouts/15/download.aspx?SourceUrl=<same path>`, assuming that endpoint
+   zips a folder. **Liwei tested it against the live tenant and it failed —
+   SharePoint returned "File Not Found."** That endpoint forces a direct
+   download of a single file's `SourceUrl`; it does not zip a folder or
+   Document Set. Reverted `Download Kit`'s href to the plain `web_url`
+   (the `DocSetHome.aspx` page) it already had. SharePoint's real
+   "Download a copy" zip action lives in that page's own command bar,
+   gated behind a session-bound temp-auth token its own JS mints on load —
+   not forgeable from a static link built server- or client-side here.
+   Lesson: this class of "just call SharePoint's own endpoint" fix cannot be
+   verified from this environment (no ptccloud.sharepoint.com login) and
+   must be flagged as untested until someone with access tries it — this
+   one was tried and *did* need the flag.
+10. **The file-preview modal's Download button, pinned to the panel's
+    bottom edge instead of trailing the properties table.** Liwei: "右边属性
+    栏下面的Button, 请将它贴着底部，不要贴着属性栏" — with a fixed
+    `margin-top:14px`, the button's vertical position depended on how much
+    description/Properties content sat above it. `.hub-file-preview__body`
+    is now `display:flex; flex-direction:column` and the button's margin
+    changed to `margin-top:auto`, which pins it to the column's bottom
+    whenever there is spare room and simply follows the content into scroll
+    when there is not — one property, no JS.
+
+### Elio's Asset Type filter changes, 2026-09-10 evening — ahead of a meeting
+
+Four asks, all in one message, framed as needed before a meeting the next
+day. Backend + two files' worth of display strings; verified locally, not
+yet pushed at the time this section was written.
+
+1. **The homepage "Type" filter relabelled "Asset Type."** One `<label>` in
+   `index.html`.
+2. **"CAD Model" relabelled "CAD Dataset,"** everywhere it is a display
+   string for the `cad_model` type — the filter dropdown option, the
+   sidebar's Browse-by-Type nav item, the card type-chip (`TYPE_CHIP`), and
+   both of the label⇄value maps that key off what the sidebar displays
+   (`typeLabels` in `fillSidebarCounts()`, `NAV_TYPE`) — plus the homepage's
+   own descriptive subtitle. `TYPE_LABELS` (search-suggestion labels, always
+   plural — "Videos," "LDKs") got "CAD Datasets" to match its own
+   convention. The stored value, `AssetType.CAD_MODEL` / `"cad_model"`, is
+   untouched throughout — this is display-layer only, same rule as §8.6.
+3. **A "Virtual Machine" option that actually appears, at (0).** Liwei: "添加
+   VM选项（我知道现在VM不在我们的数据中，会显示为0）." The dropdown's static
+   markup already *had* a `vm` option, but `fillSelect()` fully rebuilds a
+   `<select>`'s options from `facets.types` on every load — and
+   `JsonAssetRepository.facets()` built `types` from `scalar("type",
+   "types")`, a plain count of whatever `type` values are actually present
+   in the data, so a value nothing uses yet (like `vm`, 0 assets) never
+   appeared at all, static markup or not. Same shape of problem
+   `umbrella_families` already solved for IPE (§9, "New asks — Elio review,
+   2026-09-09"): added `FILTER_TYPES` (`json_repo.py`) — the five real
+   Type-filter values, in order — and `facets()` now guarantees each one a
+   `FacetValue` (real count, or 0), with anything `scalar()` found outside
+   that list (nothing does, today) appended after. `WIKI` is deliberately
+   left out of `FILTER_TYPES`: it is a real `AssetType` member but nothing
+   in the catalogue uses it and it has never had a filter option. This also
+   fixed the sidebar's "Virtual Machines" nav count for free — it reads the
+   same `facets.types`.
+4. **A placeholder "Video Type" filter, shown only when Asset Type is
+   Video, that does not filter anything.** Quote: "and when they select
+   Video, another filter appears, 'Video Type'" — Technical Teaser /
+   Overview / Walkthrough, no counts ("由于我们没有数据判断这些Video的
+   Type，所以隐藏选项后面的数字"), and explicitly "仅作为占位展示，不用实际
+   filter data." `#hubFilterVideoType` is deliberately **not** in `CONTROLS`
+   — it never reaches `currentQuery()`, so picking an option changes nothing
+   about the results. `updateVideoTypeFilterVisibility()`, called from the
+   top of `applyFilters()` (so every path that can change Asset Type — the
+   dropdown, a sidebar nav click, Reset — reaches it), shows
+   `#hubVideoTypeFilterPill` only while Asset Type is `video`, and resets +
+   hides it otherwise so a stale pick cannot linger invisibly.
 
 ### Blocked on a person
 

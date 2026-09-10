@@ -192,7 +192,7 @@
     ldk:   ["i-box", "LDK"],
     vdk:   ["i-monitor", "VDK"],
     vm:    ["i-monitor", "Virtual Machine"],
-    cad_model: ["i-layers", "CAD Model"]
+    cad_model: ["i-layers", "CAD Dataset"]
   };
 
   function retypeCard(card, a) {
@@ -708,7 +708,7 @@
 
     // The type labels the nav uses are not our type values.
     var typeLabels = { "Videos": "video", "LDKs": "ldk", "VDKs": "vdk",
-                       "CAD Model": "cad_model", "Virtual Machines": "vm" };
+                       "CAD Dataset": "cad_model", "Virtual Machines": "vm" };
     (facets.types || []).forEach(function (f) {
       Object.keys(typeLabels).forEach(function (label) {
         if (typeLabels[label] === f.value) counts[label] = f.count;
@@ -853,7 +853,26 @@
     });
   }
 
+  /* Elio, 2026-09-10: "when they select Video, another filter appears,
+   * 'Video Type'" -- Technical Teaser / Overview / Walkthrough. Nothing in
+   * the catalogue classifies a video that way yet, so #hubFilterVideoType
+   * is deliberately NOT in CONTROLS: it never reaches currentQuery(), and
+   * picking an option in it does nothing but sit selected. This function is
+   * the whole of its wiring -- show it while Asset Type is Video, hide (and
+   * reset, so a stale pick doesn't linger invisibly) otherwise. */
+  function updateVideoTypeFilterVisibility() {
+    var pill = document.getElementById("hubVideoTypeFilterPill");
+    if (!pill) return;
+    var isVideo = val("hubFilterType") === "video";
+    pill.style.display = isVideo ? "" : "none";
+    if (!isVideo) {
+      var sel = document.getElementById("hubFilterVideoType");
+      if (sel) sel.value = "";
+    }
+  }
+
   async function applyFilters() {
+    updateVideoTypeFilterVisibility();
     var params = currentQuery();
     var active = params.toString().length > 0 || !!sortOverride;
 
@@ -1114,7 +1133,7 @@
    * offers LDK 259 and VDK 196 rather than two dead zeroes.)
    */
   var NAV_TYPE = { "Videos": "video", "LDKs": "ldk", "VDKs": "vdk",
-                   "CAD Model": "cad_model", "Virtual Machines": "vm" };
+                   "CAD Dataset": "cad_model", "Virtual Machines": "vm" };
   var navTargets = {};   // nav label -> {control, value, page}
 
   /* Umbrella families the sidebar and dropdown show under a different name
@@ -1737,6 +1756,23 @@
                      // downloadable right here, "Download Kit" says what
                      // pressing it actually gets you, better than sending
                      // someone to SharePoint to do the same thing manually.
+                     //
+                     // 2026-09-10: tried making this link straight to
+                     // SharePoint's _layouts/15/download.aspx?SourceUrl=
+                     // zip endpoint instead of the DocSetHome page, so
+                     // pressing it would zip-and-download in one step and
+                     // "Download all" (removed, see renderFileList) would
+                     // have a real replacement. Liwei tested it against the
+                     // live tenant: SharePoint returned "File Not Found" --
+                     // that endpoint is for a single file's SourceUrl, not
+                     // a folder/Document Set, so it cannot zip one. Reverted
+                     // to the DocSetHome link: SharePoint's actual "Download
+                     // a copy" zip action lives in that page's own command
+                     // bar, gated behind a session-bound temp-auth token its
+                     // JS mints itself, which a static link cannot forge.
+                     // "Download Kit" still means "get the whole kit" --
+                     // it just takes one more click, on SharePoint's page,
+                     // to press the real button.
                      asset.source === "consensus" ? "Go to Consensus"
                                                   : "Download Kit",
                      platformHref,
@@ -1890,31 +1926,6 @@
   function fileDownloadUrl(assetId, itemId) {
     return "/api/assets/" + encodeURIComponent(assetId) + "/files/"
          + encodeURIComponent(itemId) + "/download";
-  }
-
-  /* Each file downloads through its own redirect, one browser tab per file,
-   * not a zip -- there is no server-side zip machinery in this app, and
-   * building one to bundle at most a handful of files is a lot of new
-   * surface for what Elio asked for "if possible" ahead of a Friday
-   * deadline. Staggered rather than fired at once: Chrome treats several
-   * downloads opened synchronously from one click as a popup flood and
-   * blocks all but the first, so this spaces them out enough that each looks
-   * like its own gesture. The prompt Chrome still shows once per site
-   * ("this site is trying to download multiple files") is expected, not a
-   * bug -- accepting it is a one-time step for whoever uses this first. */
-  function downloadAllFiles(assetId, files) {
-    files.filter(function (f) { return f.item_id; })
-        .forEach(function (f, i) {
-      setTimeout(function () {
-        var a = document.createElement("a");
-        a.href = fileDownloadUrl(assetId, f.item_id);
-        a.target = "_blank";
-        a.rel = "noopener";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      }, i * 400);
-    });
   }
 
   /* Same free-form URL trick as fileDownloadUrl(): the endpoint itself does
@@ -2128,20 +2139,11 @@
       + '<svg class="orion-ico"><use href="#i-file-text"/></svg>Files in this folder'
       + '</div><span class="vp-files__summary">' + escapeHtml(summary) + '</span></div>';
 
-    var downloadable = files.filter(function (f) { return f.item_id; });
-    // Redundant at one file -- that file's own link already does the job --
-    // so the button earns its place only once there is more than one.
-    if (downloadable.length > 1) {
-      var all = document.createElement("button");
-      all.type = "button";
-      all.className = "vp-files__download-all";
-      all.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-clock"/></svg>Download all';
-      all.title = "Opens each file in its own tab -- there is no single combined file.";
-      all.addEventListener("click", function () {
-        downloadAllFiles(asset.id, downloadable);
-      });
-      box.querySelector(".vp-card__head").appendChild(all);
-    }
+    // "Download all" (button here) is gone -- Liwei, 2026-09-10: Download
+    // Kit, in the actions row above the fold, is the one path to the whole
+    // kit now. It lands on the asset's SharePoint page rather than zipping
+    // directly (see that button's own comment for why), but that page is
+    // where the real "Download a copy" zip action lives.
 
     // Prev/Next in the preview modal steps through this list, so it has to
     // exist before any row's button is wired, not be recomputed per click.
@@ -2690,11 +2692,24 @@
     "Windchill": 212, "Creo": 152, "ThingWorx": 268, "Codebeamer": 22,
     "Mathcad": 194, "ServiceMax": 340, "Arbortext": 42
   };
+  //: Orbit/Jetstream/IPE have no dedicated hex mark art (their only source
+  //: files are full wordmark lockups, not a standalone icon) -- these three
+  //: fall back to the real PTC corporate mark instead (Liwei supplied
+  //: data/media/ptc_master_logo_RGB_color.svg 2026-09-10; logo-ptc-mark is
+  //: just its "LOGO" group -- the two-polygon diamond -- with the "ptc"
+  //: wordmark half of that file left out and a tight viewBox recomputed
+  //: around the polygons, same treatment as the -side- logos got earlier).
+  //: Keyed by the RAW family name (product_families[0], via coverFamily())
+  //: -- unlike the nav map below this is not the umbrella facet, so
+  //: Orbit/Jetstream carry no "PTC " prefix here.
   var FAMILY_MARK = {
     "Windchill": ["logo-windchill-mark", "0 0 259.46 299.60"],
     "Creo": ["logo-creo-mark", "0 0 397.21 449.90"],
     "ServiceMax": ["logo-servicemax-mark", "0 0 71.14 82.15"],
-    "Codebeamer": ["logo-codebeamer-mark", "0 0 261.71 300.76"]
+    "Codebeamer": ["logo-codebeamer-mark", "0 0 261.71 300.76"],
+    "Orbit": ["logo-ptc-mark", "0 0 284.42 325.42"],
+    "Jetstream": ["logo-ptc-mark", "0 0 284.42 325.42"],
+    "IPE": ["logo-ptc-mark", "0 0 284.42 325.42"]
   };
 
   /* The family comes from the API, not from matching product strings here.
@@ -2803,7 +2818,7 @@
    * satisfy the search box.
    */
   var TYPE_LABELS = { video: "Videos", ldk: "LDKs", vdk: "VDKs",
-                      vm: "Virtual Machines", cad_model: "CAD Models" };
+                      vm: "Virtual Machines", cad_model: "CAD Datasets" };
 
   //: The eight codes LANG_MAP (sharepoint_mapping.py) and Consensus's
   //: `language.code` both produce, measured against the live catalogue --
@@ -2953,6 +2968,34 @@
    * IPE is on the list because its demos are being made now, and a family
    * that appeared only once content landed would look like a bug.
    */
+
+  //: Product hex marks for the Browse by Product nav, keyed by the umbrella
+  //: facet's own value -- so Orbit/Jetstream carry the "PTC " prefix
+  //: FAMILY_ROLLUP (taxonomy.py) already bakes into that facet, same
+  //: gotcha as FAMILY_MARK's comment above but the opposite convention.
+  //: Reuses the four existing sprite hex marks (logo-*-mark, the same ones
+  //: FAMILY_MARK draws on card covers) plus, for the three products with no
+  //: dedicated mark art, the real PTC corporate mark (logo-ptc-mark -- see
+  //: FAMILY_MARK's comment above) -- Liwei, 2026-09-10, after the
+  //: full-wordmark "logo-only button" version read too small/inconsistent
+  //: (see git history same date): back to Elio's original icon+text
+  //: nav-mark pattern, matching index.mockup.original.html.
+  var NAV_MARK = {
+    "Windchill":     ["logo-windchill-mark", "0 0 259.46 299.60"],
+    "Creo":          ["logo-creo-mark", "0 0 397.21 449.90"],
+    "ServiceMax":    ["logo-servicemax-mark", "0 0 71.14 82.15"],
+    "Codebeamer":    ["logo-codebeamer-mark", "0 0 261.71 300.76"],
+    "PTC Orbit":     ["logo-ptc-mark", "0 0 284.42 325.42"],
+    "PTC Jetstream": ["logo-ptc-mark", "0 0 284.42 325.42"],
+    "IPE":           ["logo-ptc-mark", "0 0 284.42 325.42"]
+  };
+
+  function navMarkHtml(value) {
+    var m = NAV_MARK[value];
+    if (!m) return "";
+    return '<svg class="nav-mark" viewBox="' + m[1] + '"><use href="#' + m[0] + '"/></svg> ';
+  }
+
   async function buildFamilyNav(facets) {
     var heading = null;
     document.querySelectorAll(".orion-group").forEach(function (g) {
@@ -2995,10 +3038,12 @@
        * group is a set of destinations, and a destination does not need a
        * quantity. The results heading already says how many are there.
        *
-       * No icon either: eight identical marks in a column carry no
-       * information, and only four of the eight products have a logo.
+       * Marks added 2026-09-10 -- Seb, review: "Can we add the product
+       * logos for the Products?" See NAV_MARK above. Servigistics is hidden
+       * from this nav regardless (§8.6).
        */
-      item.innerHTML = '<span class="label">' + escapeHtml(umbrellaDisplayName(f.value)) + '</span>';
+      item.innerHTML = '<span class="label">' + navMarkHtml(f.value)
+        + escapeHtml(umbrellaDisplayName(f.value)) + '</span>';
       anchor.after(item);
       anchor = item;
     });

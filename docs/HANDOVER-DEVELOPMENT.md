@@ -1417,6 +1417,67 @@ Four small asks from Liwei, all shipped same evening:
    this ask, and it returns other people's names/emails/notes, unlike
    submission which only ever writes.
 
+### Request form and homepage follow-ups, 2026-09-10 morning
+
+Four more asks from Liwei, following a new round of review with Elio:
+
+1. **VDK added to Asset type.** The picker only ever offered Video and LDK;
+   `index.html` now has a third pill, `data-value="vdk"`, matching the LDK
+   pill's own shape ("VDK" + a small "Video Demo Kit" subcaption). Deliberately
+   left `onAssetTypeChange()` untouched — the "Video details" section it
+   toggles still shows only for `video`, same as LDK today, since nothing was
+   asked about VDK's own behaviour there.
+2. **Product Scope pruned and reordered.** Six singleton "families" removed
+   outright — `ProENGINEER Wildfire`, `Division MOCKUP`, `ProENGINEER`,
+   `Catia`, `CoCreate`, `SolidWorks` — these are CAD Model's own free-text
+   `CAD_x0020_Product` values surfacing as noise in a list meant for routing a
+   *new* request, not for browsing what CAD software exists. Separately,
+   Creo/Codebeamer/Windchill/PTC Jetstream/PTC Ignite/ServiceMax/PTC Orbit are
+   now pulled to the front in exactly that order. **Checked with Liwei
+   directly rather than assumed:** this is a priority order, not a
+   replacement — Mathcad, Arbortext, PTC Modeler, Servigistics and anything
+   else that survives the exclusion list still follow behind them, sorted by
+   count as before. Getting this wrong by taking the ordered list as
+   exhaustive would have silently dropped Servigistics from the one place it
+   was explicitly kept the night before (§8.6, "Resolved as intentional").
+   Implementation: `PRODUCT_SCOPE_EXCLUDED` and `PRODUCT_SCOPE_PRIORITY` in
+   `hub-api.js`, both keyed on the raw `family_of()` value (`"Jetstream"`,
+   `"IPE"`, …), not the display label — the sort runs before
+   `familyDisplayName()` is applied to the text.
+3. **"CAD Model" added to Browse by Type**, on the homepage sidebar, between
+   VDKs and Virtual Machines as asked. New `<div class="orion-navitem">` in
+   `index.html`; wired into both `NAV_TYPE` and the sidebar-counts
+   `typeLabels` map in `hub-api.js` (the same two maps every other Browse by
+   Type entry needs — missing either one leaves the nav item either
+   unclickable or permanently showing a stale count). Shows live at 280 from
+   the moment it landed, with no dimming logic needed, unlike Virtual
+   Machines — `markUnavailable()` only dims a nav item when its facet count
+   is actually zero, and CAD Model's isn't.
+4. **The dominant CAD tag hidden on CAD Model tiles.** "ProENGINEER Wildfire"
+   is on 240 of 280 CAD Model assets — reading it on nearly every tile is
+   noise, the same reasoning `addLanguageTag()` already applies to skipping
+   "English" on 90% of the grid. New `hideDominantCadTag()` in `hub-api.js`,
+   called from `buildCard()`. Implementation note: the product name is a bare
+   text node inside `.asset-card__meta`, written that way by Elio's own
+   `videoAssetFromData()`, sitting next to the SharePoint platform badge
+   `platformActions()` inserts as a real element into the same container —
+   clearing only that text node (rather than hiding the whole meta row) was
+   necessary to keep the SharePoint badge on screen. Checks the exact product
+   string, not just `type === "cad_model"`, so a CAD Model tagged Creo
+   Parametric, Catia, etc. is untouched — those names are informative.
+
+**Also, a data question closed, not a code change:** why 11 folders whose own
+names end "VDK" were nonetheless typed "Live Demo Kit" (§ the
+`Demo_x0020_Type0` comment in `backend/integrations/graph/sync.py`, measured
+2026-08-26 but never explained until now) — Elio's answer, relayed by Liwei:
+whoever uploaded those simply forgot to update the Demo Type property to
+match the folder name. Not a sync bug, not a SharePoint quirk — a data-entry
+gap, and the team's own stated plan is a future pass to clean up Demo Catalog
+data quality directly in SharePoint. A full resync was run the same morning
+after Elio corrected one such demo by hand; `LDKs` moved from 214 → 213 and
+`VDKs` from 156 → 157 on the live nav counts, confirming the sync picked up
+exactly that one change.
+
 ### Blocked on a person
 
 5. **Customer-facing vs internal-only tag** — blocked on a data source (§7.3).

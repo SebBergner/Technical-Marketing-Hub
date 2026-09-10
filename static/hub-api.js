@@ -140,6 +140,31 @@
     thumb.appendChild(tag);
   }
 
+  /* "ProENGINEER Wildfire" is by far the commonest CAD Model product (240 of
+   * 280, an old pre-rebrand Creo name) and reading it on nearly every CAD
+   * Model tile is noise, not signal -- same principle addLanguageTag() above
+   * already applies to skipping "English". Liwei, 2026-09-10. Other CAD
+   * products (Creo Parametric, Catia, SolidWorks...) are informative and
+   * stay untouched -- this checks the exact string, not the asset type alone.
+   *
+   * The product name is a plain text node inside .asset-card__meta -- Elio's
+   * own videoAssetFromData() writes it that way -- sitting alongside the
+   * platform badge platformActions() inserts as a real element. Clearing
+   * only that text node, rather than hiding the whole row, keeps the
+   * SharePoint badge on screen. */
+  function hideDominantCadTag(card, a) {
+    if (a.type !== "cad_model") return;
+    if ((a.products || [])[0] !== "ProENGINEER Wildfire") return;
+    var meta = card.querySelector(".asset-card__meta");
+    if (!meta) return;
+    Array.prototype.forEach.call(meta.childNodes, function (node) {
+      if (node.nodeType === Node.TEXT_NODE
+          && node.textContent.trim() === "ProENGINEER Wildfire") {
+        node.textContent = "";
+      }
+    });
+  }
+
   function platformBadge(source, href) {
     var spec = PLATFORM_LABEL[source] || [source, "Open in " + source];
     // Without somewhere to go it stays a label; a link that goes nowhere is
@@ -381,6 +406,7 @@
     clampDescription(card, a);
     paintCover(card, a);
     addLanguageTag(card, a);
+    hideDominantCadTag(card, a);
 
     /* One badge per platform the asset is actually on. A SharePoint kit that
      * also has a Consensus recording gets both, which is the honest picture
@@ -615,7 +641,7 @@
 
     // The type labels the nav uses are not our type values.
     var typeLabels = { "Videos": "video", "LDKs": "ldk", "VDKs": "vdk",
-                       "Virtual Machines": "vm" };
+                       "CAD Model": "cad_model", "Virtual Machines": "vm" };
     (facets.types || []).forEach(function (f) {
       Object.keys(typeLabels).forEach(function (label) {
         if (typeLabels[label] === f.value) counts[label] = f.count;
@@ -1021,7 +1047,7 @@
    * offers LDK 259 and VDK 196 rather than two dead zeroes.)
    */
   var NAV_TYPE = { "Videos": "video", "LDKs": "ldk", "VDKs": "vdk",
-                   "Virtual Machines": "vm" };
+                   "CAD Model": "cad_model", "Virtual Machines": "vm" };
   var navTargets = {};   // nav label -> {control, value, page}
 
   /* Umbrella families the sidebar and dropdown show under a different name
@@ -1345,11 +1371,38 @@
    * Ordered by how much of the catalogue each one holds, because that is also
    * roughly the order people look for them in.
    */
+  //: Removed outright from Product Scope, 2026-09-10 -- singleton families
+  //: (CAD-software-as-a-family, from CAD Model's free-text CAD_x0020_Product,
+  //: §9's "V2 scope") that are noise for someone filing a new request, not
+  //: products anyone requests. Liwei's call.
+  var PRODUCT_SCOPE_EXCLUDED = ["ProENGINEER Wildfire", "Division MOCKUP",
+                                "ProENGINEER", "Catia", "CoCreate", "SolidWorks"];
+
+  //: Pulled to the front, in exactly this order, 2026-09-10 -- Liwei's call,
+  //: not a re-derivation of anything. Everything else that survives
+  //: PRODUCT_SCOPE_EXCLUDED (Mathcad, Arbortext, PTC Modeler, Servigistics,
+  //: ...) still follows behind them, sorted by count as before: this is a
+  //: priority order, not a replacement of the list -- explicitly confirmed
+  //: with Liwei rather than assumed, since dropping the rest silently would
+  //: have undone keeping Servigistics here on purpose (§8.6).
+  var PRODUCT_SCOPE_PRIORITY = ["Creo", "Codebeamer", "Windchill", "Jetstream",
+                                "IPE", "ServiceMax", "Orbit"];
+
   function fillProductPills(facets) {
     var row = document.getElementById("productScopeRow");
     if (!row) return;
     var families = (facets.product_families || []).slice()
-      .sort(function (a, b) { return b.count - a.count; });
+      .filter(function (f) { return PRODUCT_SCOPE_EXCLUDED.indexOf(f.value) === -1; })
+      .sort(function (a, b) {
+        var pa = PRODUCT_SCOPE_PRIORITY.indexOf(a.value);
+        var pb = PRODUCT_SCOPE_PRIORITY.indexOf(b.value);
+        if (pa !== -1 || pb !== -1) {
+          if (pa === -1) return 1;
+          if (pb === -1) return -1;
+          return pa - pb;
+        }
+        return b.count - a.count;
+      });
     if (!families.length) return;          // keep the markup rather than empty it
 
     row.innerHTML = "";

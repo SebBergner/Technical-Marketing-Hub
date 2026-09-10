@@ -36,6 +36,12 @@ COLUMNS = {
     # name. Do NOT add it. Measured 2026-08-26: the two disagree on 11 assets,
     # and the twin is the stale one — it calls 11 folders whose own names end in
     # "VDK" a Live Demo Kit. First match wins, so order matters here.
+    # Explained 2026-09-10 (Elio, via Liwei): not a system quirk — whoever
+    # uploaded those 11 simply never updated the Demo Type property to match,
+    # so the folder name and the column disagree. Confirms this column can be
+    # human-mistyped and is not self-correcting; the team's own plan is a
+    # future pass to clean up Demo Catalog data quality directly in
+    # SharePoint, not something to work around further in code here.
     "demo_type": ("Demo_x0020_Type", "DemoType", "Demo Type"),
     "segment": ("Segment",),
     "language": ("Language", "Language0"),

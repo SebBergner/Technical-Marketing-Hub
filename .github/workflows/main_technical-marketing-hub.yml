@@ -62,5 +62,5 @@ jobs:
         id: deploy-to-webapp
         with:
           app-name: 'Technical-Marketing-Hub'
-          slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_23E959270AF54630B240019FA30AF99E }}
+          slot-name: 'staging'
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_STAGING }}

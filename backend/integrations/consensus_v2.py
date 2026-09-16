@@ -4,18 +4,28 @@ V1 exposes tags from none of its 21 endpoints, and tags are the whole reason
 this exists: they carry segment, product, funnel stage and industry, four
 dimensions V1 cannot supply at all.
 
-The header nobody documents
----------------------------
-`platform: developer-platform` is **required**. It appears in neither the
-OpenAPI spec nor the OAuth guide; it was found in the JavaScript of Consensus's
-own docs portal, which sets it on every request. Without it a perfectly valid
-bearer token is rejected:
+The header nobody documents — and it depends on which token you hold
+--------------------------------------------------------------------
+`platform: developer-platform` appears in neither the OpenAPI spec nor the
+OAuth guide; it was found in the JavaScript of Consensus's own docs portal,
+which sets it on every request. Whether it is required or fatal depends
+entirely on where the bearer token came from. Both rows measured against
+`/demos/search` on the live tenant, same minute, 2026-09-15:
 
-    Bearer <token>                     -> 401 "Token header is invalid"
-    Bearer <token> + platform header   -> 200
+    docs-portal token + platform     -> 200
+    docs-portal token, no platform   -> 401 INVALID_TOKEN "Token header is invalid"
+    OAuth token       + platform     -> 502 EXTERNAL_SERVICE_ERROR
+                                        "Unable to validate access token"
+    OAuth token,      no platform    -> 200
 
-That error names the token, so the missing header is invisible from the message
-alone. Measured on the live tenant 2026-08-27.
+So the header selects a validation path, and each token is only valid on its
+own one. Neither error says so: the docs-portal failure blames the token when
+the header is missing, and the OAuth failure blames the token when the header
+is present. Sending it unconditionally — which this client did from
+2026-08-27, when the docs-portal token was the only one obtainable — is what
+made OAuth look broken on Consensus's side for weeks.
+
+`_get()` therefore sends it only on the fixed-token path.
 
 Two further traps, both from the spec and both worth knowing before debugging a
 400: `pageSize` has a **minimum of 5** (asking for 3 is a Bad Request), and
@@ -88,9 +98,12 @@ class ConsensusV2Client:
     def _get(self, path: str, params: dict) -> dict:
         headers = {
             "Authorization": f"Bearer {self._bearer()}",
-            "platform": PLATFORM_HEADER,      # without this, every call 401s
             "Accept": "application/json",
         }
+        # Only the docs-portal token wants it; on an OAuth token the same
+        # header turns a working call into a 502. See the module docstring.
+        if self._token_provider is None:
+            headers["platform"] = PLATFORM_HEADER
         with httpx.Client(timeout=60, transport=self._transport) as client:
             response = client.get(f"{self.base_url}{V2_ROOT}{path}",
                                   params=params, headers=headers)

@@ -496,3 +496,52 @@ def test_an_unknown_acting_user_is_explained_not_reported_as_unauthorised():
     message = str(caught.value)
     assert "newjoiner@ptc.com" in message
     assert "does not have a Consensus account" in message
+
+
+# ─────────────────────────────────────────── V2: the platform header, per token
+#
+# `platform: developer-platform` selects a validation path, and each kind of
+# token is only valid on its own one. Measured against the live tenant
+# 2026-09-15, same minute, `/demos/search`:
+#
+#     docs-portal token + platform     -> 200
+#     docs-portal token, no platform   -> 401 INVALID_TOKEN
+#     OAuth token       + platform     -> 502 EXTERNAL_SERVICE_ERROR
+#     OAuth token,      no platform    -> 200
+#
+# Sending it unconditionally is what made OAuth look broken on Consensus's
+# side for weeks: their error blames the token either way, never the header.
+def v2_handler(seen):
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["headers"] = {k.lower(): v for k, v in request.headers.items()}
+        return httpx.Response(200, json={"success": True,
+                                         "data": {"items": [], "next": None}})
+    return handler
+
+
+def test_oauth_token_must_not_carry_the_platform_header():
+    from backend.integrations.consensus_v2 import ConsensusV2Client
+
+    seen = {}
+    ConsensusV2Client(token_provider=lambda: "oauth-token", base_url=BASE,
+                      transport=httpx.MockTransport(v2_handler(seen))
+                      ).search_page()
+
+    assert seen["headers"]["authorization"] == "Bearer oauth-token"
+    assert "platform" not in seen["headers"], (
+        "an OAuth token with this header gets 502 EXTERNAL_SERVICE_ERROR")
+
+
+def test_docs_portal_token_still_carries_the_platform_header():
+    from backend.integrations.consensus_v2 import (
+        PLATFORM_HEADER, ConsensusV2Client,
+    )
+
+    seen = {}
+    ConsensusV2Client(token="docs-portal-token", base_url=BASE,
+                      transport=httpx.MockTransport(v2_handler(seen))
+                      ).search_page()
+
+    assert seen["headers"]["authorization"] == "Bearer docs-portal-token"
+    assert seen["headers"]["platform"] == PLATFORM_HEADER, (
+        "without it this token gets 401 INVALID_TOKEN")

@@ -11,7 +11,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 T = TypeVar("T")
 
@@ -188,6 +188,20 @@ class AssetBase(BaseModel):
     #: vocabularies we have verified, and dropping the rest would throw away
     #: the signal a person deliberately added.
     tags: list[str] = Field(default_factory=list)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def extra_tags(self) -> list[str]:
+        """`tags`, minus everything another field of this asset already says.
+
+        Derived rather than stored, and deliberately: it is a pure function of
+        `tags` and the classifier, so storing it would add a copy that goes
+        stale the moment a tag vocabulary changes — and would need a re-sync
+        to fix, for a value that costs nothing to compute. See
+        taxonomy.unclassified_tags() for what survives and why.
+        """
+        from backend.services import taxonomy      # local: avoids a cycle
+        return taxonomy.unclassified_tags(self.tags)
 
     customer_facing: bool = True
     has_narrated_audio: bool | None = None    # gates external sharing for video

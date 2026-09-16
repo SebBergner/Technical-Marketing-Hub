@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import pytest
 
-from backend.services.taxonomy import classify_tag, classify_tags
+from backend.services.taxonomy import (
+    classify_tag, classify_tags, unclassified_tags,
+)
 
 #: The complete vocabulary, with its live frequency, so a change in the source
 #: data shows up as a test failure rather than as silently missing metadata.
@@ -107,3 +109,39 @@ def test_empty_and_missing_tags_are_safe():
     for value in (None, [], [""], ["   "]):
         result = classify_tags(value)
         assert result["segment"] is None and result["products"] == []
+
+
+# ───────────────────────────────────────── what the detail page is allowed to show
+def test_a_tag_already_folded_into_a_field_is_not_left_over():
+    """The detail page prints `extra_tags`; a duplicate chip would be noise."""
+    assert unclassified_tags(["CAD", "Creo", "Teaser", "Prospecting"]) == []
+
+
+def test_a_funnel_tag_is_dropped_even_though_it_reads_nothing_like_our_value():
+    """The one that a string comparison in the browser would have missed.
+
+    Consensus tags the sales stage, we show the buyer's — "Prospecting"
+    becomes "Awareness". Printed side by side they look like a disagreement,
+    not a repetition, which is why this decision is made here and not there.
+    """
+    assert classify_tags(["Prospecting"])["funnel_stage"] == "Awareness"
+    assert unclassified_tags(["Prospecting"]) == []
+
+
+def test_languages_are_dropped_because_the_language_field_is_authoritative():
+    assert unclassified_tags(["French", "Korean", "Japanese"]) == []
+
+
+def test_a_campaign_tag_survives_because_no_field_of_ours_carries_it():
+    """55 demos on the tenant, 2026-09-15 — the main thing this row exists for."""
+    assert unclassified_tags(["PTC NEXT", "Creo", "Qualifying"]) == ["PTC NEXT"]
+
+
+def test_an_unknown_topic_survives_verbatim_including_their_typo():
+    """Their label, their spelling. 8 demos carry "Inteliigence"."""
+    assert unclassified_tags(["Artificial Inteliigence AI"])         == ["Artificial Inteliigence AI"]
+
+
+def test_blank_tags_never_reach_the_page():
+    assert unclassified_tags(None) == []
+    assert unclassified_tags(["", "   "]) == []

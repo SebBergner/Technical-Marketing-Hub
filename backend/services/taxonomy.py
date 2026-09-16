@@ -234,6 +234,34 @@ def classify_tags(tags: list[str] | None) -> dict:
             out[field] = value
     return out
 
+
+def unclassified_tags(tags: list[str] | None) -> list[str]:
+    """The tags that say something no field of ours already says.
+
+    The detail page prints these beside a demo, and printing all of `tags`
+    there was the wrong answer: of the 40 distinct tags on the tenant
+    (2026-09-15) all but three are exactly the values classify_tags() folds
+    into segment, funnel stage, depth, industry or products, so the page
+    would state the same fact twice. Worse in the funnel case, where the two
+    statements do not even look alike — Consensus tags the sales stage
+    ("Prospecting") and we show the buyer's ("Awareness"), so the pair reads
+    as a contradiction rather than a repetition.
+
+    Deciding that here rather than in the browser is deliberate: this is the
+    same `classify_tag()` that did the folding, so the two can never drift.
+    A frontend copy of these tables would have to be updated in lockstep with
+    them, and would silently show duplicates the day it was not.
+
+    Languages go too — `classify_tag` already treats them as modelled-
+    elsewhere (the `language` field is authoritative and 100% covered).
+    What survives today is the campaign tags and genuine topics: "PTC NEXT"
+    on 55 demos, "Artificial Inteliigence AI" on 8 (their spelling, kept as
+    they wrote it).
+    """
+    return [tag for tag in tags or []
+            if tag and tag.strip() and classify_tag(tag) is None
+            and tag.strip().lower() not in _TAG_LANGUAGES]
+
 # ─────────────────────────────────────── the umbrella list, decided not derived
 # Seb supplied this from the PTC NEXT booth list and the team settled the gaps
 # on 2026-09-02. It replaces the derived families as the primary way to browse:

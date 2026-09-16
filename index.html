@@ -228,6 +228,14 @@ a:hover { text-decoration: underline; }
 .orion-badge--ok     { background: var(--orion-green-soft); color: var(--orion-green-ink); }
 .orion-badge--risk   { background: var(--orion-danger-bg); color: var(--orion-danger-ink); }
 .orion-badge--open   { background: var(--orion-open-bg);   color: var(--orion-open-ink); }
+/* A badge that does something when clicked — the tag chips on a details page.
+   At rest it is identical to the badges beside it, deliberately: Liwei asked
+   for one chip style across the row. The affordance appears on hover and on
+   keyboard focus instead, which is where it is needed and where it cannot
+   fragment the resting look. */
+.orion-badge--action { cursor: pointer; }
+.orion-badge--action:hover { background: var(--orion-surface-3); color: var(--orion-text); }
+.orion-badge--action:focus-visible { outline: 2px solid var(--orion-indigo); outline-offset: 1px; }
 
 .orion-logo { display: flex; align-items: center; padding: 8px 4px; }
 .orion-logo svg { height: 22px; width: auto; }
@@ -583,7 +591,10 @@ video.hub-inline-player__media { object-fit: contain; }
 
 .vp-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 24px; }
 .vp-title { font-size: 21px; font-weight: 700; margin: 0 0 8px; line-height: 1.3; }
-.vp-meta-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--orion-text-2); margin-bottom: 6px; }
+/* Wraps since 2026-09-15: this row gained content depth and up to three
+   product families, so on a narrow window it is no longer a single line. */
+.vp-meta-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  row-gap: 6px; font-size: 13px; color: var(--orion-text-2); margin-bottom: 6px; }
 .vp-stats-row { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--orion-text-3); }
 .vp-actions { display: flex; gap: 8px; flex: none; }
 .vp-actions .btn-ghost, .vp-actions .btn-primary-sm { flex: none; padding: 8px 16px; }
@@ -769,20 +780,27 @@ video.hub-inline-player__media { object-fit: contain; }
           </select>
           <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
         </label>
-        <!-- Elio, 2026-09-10, ahead of tomorrow's meeting: "and when they
-             select Video, another filter appears, 'Video Type'" -- Technical
-             Teaser / Overview / Walkthrough. Nothing in the catalogue
-             classifies a video that way yet, so this is a placeholder only:
-             no counts (there is no honest number to show), not wired into
-             hubApplyFilters()/currentQuery(), and picking an option here
-             does not narrow the grid. See updateVideoTypeFilterVisibility()
-             in hub-api.js for the show/hide-on-Video half of this. -->
+        <!-- Elio, 2026-09-10: "and when they select Video, another filter
+             appears, 'Video Type'" -- Technical Teaser / Overview /
+             Walkthrough. It shipped that day as a placeholder that filtered
+             nothing, because nothing in the catalogue classified a video that
+             way.
+
+             Real since 2026-09-15: it filters on `content_depth`, whose three
+             stored values are exactly the three he asked for. The data was
+             there the whole time -- it arrives in Consensus's tags, and those
+             only started flowing reliably once V2 OAuth worked.
+
+             The option VALUES are the stored ones and must stay that way,
+             because fillSelect() matches a facet value to the label written
+             here; the labels keep Elio's wording. Counts are shown now that
+             there are honest ones to show. -->
         <label class="filter-pill" id="hubVideoTypeFilterPill" style="display:none;">Video Type:
           <select id="hubFilterVideoType">
             <option value="">All</option>
-            <option value="teaser">Technical Teaser</option>
-            <option value="overview">Technical Overview</option>
-            <option value="walkthrough">Technical Walkthrough</option>
+            <option value="Teaser">Technical Teaser</option>
+            <option value="Overview">Technical Overview</option>
+            <option value="Walkthrough">Technical Walkthrough</option>
           </select>
           <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
         </label>

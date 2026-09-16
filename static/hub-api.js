@@ -774,7 +774,7 @@
 
   var CONTROLS = ["hubSearchInput", "hubFilterType", "hubFilterProduct",
                   "hubFilterSegment", "hubFilterStage", "hubFilterLanguage",
-                  "hubFilterCf"];
+                  "hubFilterCf", "hubFilterVideoType"];
   var LANDING = ["continueSection", "latestUploadsSection", "mostViewedSection",
                  "browseByProductSection", "editorsPicksSection"];
   //: One request's ceiling, enforced server-side (`le=200` in assets.py) --
@@ -793,6 +793,14 @@
    * there is no umbrella control in the filter bar -- Browse by Product is the
    * only way in, and the reset button is the way out. */
   var umbrellaFilter = null;
+
+  /* The tag a chip on a details page has taken you to, held the same way and
+   * for the same reason: there is no tag control in the filter bar, clicking
+   * a chip is the only way in, and the reset button is the way out. The
+   * results heading says which tag is on, so a narrowed grid always explains
+   * itself -- a filter that is invisible AND unexplained is the trap this
+   * pattern exists to avoid. Liwei, 2026-09-16. */
+  var tagFilter = null;
 
   /* What "Load more" repeats. Liwei asked about this one filtering Creo down
    * to "showing 200 of 422" with no way to reach the other 222 -- the grid
@@ -820,10 +828,13 @@
     if (val("hubFilterSegment")) params.append("segment", val("hubFilterSegment"));
     if (val("hubFilterStage")) params.append("stage", val("hubFilterStage"));
     if (val("hubFilterLanguage")) params.append("language", val("hubFilterLanguage"));
+    // Elio's "Video Type", which is `content_depth` under its own name.
+    if (val("hubFilterVideoType")) params.append("depth", val("hubFilterVideoType"));
     var cf = val("hubFilterCf");
     if (cf === "yes") params.set("customer_facing", "true");
     if (cf === "no") params.set("customer_facing", "false");
     if (umbrellaFilter) params.append("umbrella", umbrellaFilter);
+    if (tagFilter) params.append("tag", tagFilter);
     return params;
   }
 
@@ -854,12 +865,17 @@
   }
 
   /* Elio, 2026-09-10: "when they select Video, another filter appears,
-   * 'Video Type'" -- Technical Teaser / Overview / Walkthrough. Nothing in
-   * the catalogue classifies a video that way yet, so #hubFilterVideoType
-   * is deliberately NOT in CONTROLS: it never reaches currentQuery(), and
-   * picking an option in it does nothing but sit selected. This function is
-   * the whole of its wiring -- show it while Asset Type is Video, hide (and
-   * reset, so a stale pick doesn't linger invisibly) otherwise. */
+   * 'Video Type'". Show it while Asset Type is Video; hide it otherwise, and
+   * clear it on the way out — a hidden filter that is still narrowing the
+   * grid is a trap, and this runs at the top of applyFilters() so the reset
+   * lands before currentQuery() reads the value.
+   *
+   * It filters for real since 2026-09-15 (see the markup in index.html).
+   *
+   * Only-on-Video is Elio's rule, kept as asked, but worth revisiting with
+   * him: `content_depth` is also set on 53 LDKs and 89 VDKs (measured
+   * 2026-09-15), and those are unreachable while the control is bound to
+   * Video. Renaming it would be his call, not a silent fix here. */
   function updateVideoTypeFilterVisibility() {
     var pill = document.getElementById("hubVideoTypeFilterPill");
     if (!pill) return;
@@ -906,6 +922,7 @@
                                        || baselineFacets.products);
         rescoreSelect("hubFilterSegment", baselineFacets.segments);
         rescoreSelect("hubFilterStage", baselineFacets.funnel_stages);
+        rescoreSelect("hubFilterVideoType", baselineFacets.content_depths);
         rescoreSelect("hubFilterLanguage", baselineFacets.languages);
         fillSidebarCounts(baselineFacets);
       }
@@ -944,6 +961,7 @@
       while (node) {
         if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
           node.textContent = sortOverride === "recent" ? " Latest uploads "
+                           : tagFilter ? " All assets tagged “" + tagFilter + "” "
                            : umbrellaFilter ? " All " + umbrellaDisplayName(umbrellaFilter) + " assets "
                            : seg ? " All " + seg + " assets "
                            : " All Assets ";
@@ -971,6 +989,7 @@
     rescoreSelect("hubFilterProduct", facets.product_families);
     rescoreSelect("hubFilterSegment", facets.segments);
     rescoreSelect("hubFilterStage", facets.funnel_stages);
+    rescoreSelect("hubFilterVideoType", facets.content_depths);
     rescoreSelect("hubFilterLanguage", facets.languages);
     // The sidebar shows the same three dimensions, so it takes the same
     // numbers. Leaving it on whole-catalogue counts would reintroduce, one
@@ -1110,6 +1129,7 @@
     });
     sortOverride = null;
     umbrellaFilter = null;
+    tagFilter = null;
     applyFilters();
   }
 
@@ -1415,7 +1435,7 @@
    * is correct however the filter was chosen -- nav, dropdown, or product
    * tile. Home lights up when nothing is filtered at all. */
   function markNavActive() {
-    var anyOn = !!sortOverride || !!umbrellaFilter || CONTROLS.some(function (id) {
+    var anyOn = !!sortOverride || !!umbrellaFilter || !!tagFilter || CONTROLS.some(function (id) {
       var el = document.getElementById(id);
       return el && el.value;
     });
@@ -1663,12 +1683,58 @@
       if (asset.consensus_uuid && asset.source !== "consensus") {
         meta.appendChild(platformBadge("consensus", consensusUrl(asset)));
       }
-      [asset.type && (TYPE_CHIP[asset.type] || [])[1],
-       (asset.product_families || [])[0],
-       asset.segment, asset.funnel_stage].filter(Boolean).forEach(function (t) {
+      /* Content depth sits next to the type on purpose: the type says what
+       * format this is, the depth says how far it goes ("Walkthrough" vs
+       * "Teaser"), and read together they are what someone is deciding on
+       * before pressing play. It was parsed and stored all along and simply
+       * never rendered -- added 2026-09-15, once Consensus V2 tags started
+       * arriving reliably over OAuth and 434 assets across both sources had
+       * a value for it.
+       *
+       * Products: all of them, capped. Showing only `[0]` understated the
+       * scope of anything tagged with more than one -- a demo covering Creo,
+       * Windchill and Mathcad read as Creo. Three is where the row still
+       * scans; the rest become "+N". */
+      var families = (asset.product_families || []).map(familyDisplayName);
+      var chips = [asset.type && (TYPE_CHIP[asset.type] || [])[1],
+                   asset.content_depth]
+        .concat(families.slice(0, 3))
+        .concat(families.length > 3 ? ["+" + (families.length - 3)] : [])
+        .concat([asset.segment, asset.funnel_stage])
+        // Consensus's leftover tags last, in the same row and the same chip
+        // as everything before them -- Liwei, 2026-09-16. Every other chip
+        // here already names a dimension with a filter behind it, and a tag
+        // now filters too, so a separate style would have drawn a line where
+        // the behaviour is the same. See `extra_tags` for why this is never
+        // the raw tag list.
+        .concat(asset.extra_tags || []);
+
+      var clickable = {};
+      (asset.extra_tags || []).forEach(function (t) { clickable[t] = 1; });
+
+      chips.filter(Boolean).forEach(function (t) {
         var chip = document.createElement("span");
         chip.className = "orion-badge";
         chip.textContent = t;
+        // Only the tags, for now: the dimension chips beside them each map to
+        // a control with its own rules (depth's is hidden unless the type is
+        // Video, "+N" names nothing), so wiring those is a separate decision
+        // rather than a free extension of this one.
+        if (clickable[t]) {
+          chip.className += " orion-badge--action";
+          chip.title = "Show every asset tagged “" + t + "”";
+          // A span is not focusable or announced as actionable on its own, and
+          // this one does something, so it says so and answers the keyboard.
+          chip.setAttribute("role", "button");
+          chip.tabIndex = 0;
+          chip.addEventListener("click", function () { openTag(t); });
+          chip.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();               // Space scrolls otherwise
+              openTag(t);
+            }
+          });
+        }
         meta.appendChild(chip);
       });
     }
@@ -3064,6 +3130,27 @@
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  /* A tag chip on a details page: show everything else carrying that tag.
+   *
+   * Clears the other filters for the same reason openFamily() does -- this is
+   * a destination, not a narrowing of wherever you happened to be, and
+   * landing on "3 results" because a stale Segment was still set would read
+   * as the tag being rare rather than the filters being stacked. It also
+   * leaves the details page, since the grid it is about to change is behind
+   * it. */
+  function openTag(tag) {
+    exitOverlays();
+    CONTROLS.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+    umbrellaFilter = null;
+    sortOverride = null;
+    tagFilter = tag;
+    applyFilters();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   /* The segment landing page is gone. All three of them asked for segments
    * to stop being the way in, and a page for a dimension nobody browses by is
    * a page nobody opens. What it did well -- a description and an owner --
@@ -3196,6 +3283,7 @@
       return HIDDEN_SEGMENTS.indexOf(f.value) === -1;
     }));
     fillSelect("hubFilterStage", facets.funnel_stages);
+    fillSelect("hubFilterVideoType", facets.content_depths);
     fillSelect("hubFilterLanguage", facets.languages);
     fillSelect("hubFilterType", facets.types);
     fillSidebarCounts(facets);

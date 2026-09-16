@@ -842,3 +842,32 @@ def test_an_asset_with_no_product_tag_is_kept(empty_repo):
         Asset(id="untagged", type=AssetType.VIDEO, title="Product Companies Rely on PTC"),
     ], "sharepoint")
     assert [a.id for a in empty_repo.list(AssetQuery(limit=10)).items] == ["untagged"]
+
+
+def test_filtering_by_tag_is_what_a_tag_chip_clicks(repo_factory):
+    """A details-page tag chip filters the grid by that tag (2026-09-16).
+
+    JSON only, and deliberately so: AssetSource carries no tags column, which
+    is why SqlAssetRepository.facets() has no tags facet either. The SQL
+    backend has not been used since that gap appeared, and closing it is a
+    schema change rather than a query one.
+    """
+    from backend.repositories.json_repo import JsonAssetRepository
+
+    repo = repo_factory()
+    if not isinstance(repo, JsonAssetRepository):
+        pytest.skip("AssetSource has no tags column — see the docstring")
+
+    repo.replace_source_rows([
+        make_asset("tagged-1", tags=["PTC NEXT", "Windchill"]),
+        make_asset("tagged-2", tags=["PTC NEXT"]),
+        make_asset("untagged", tags=[]),
+        make_asset("other-tag", tags=["Something Else"]),
+    ], "sharepoint")
+
+    hit = repo.list(AssetQuery(tags=["PTC NEXT"], limit=50))
+    assert {a.id for a in hit.items} == {"tagged-1", "tagged-2"}
+    assert hit.total == 2
+
+    # Exact values, not substrings: the chip sends the tag verbatim.
+    assert repo.list(AssetQuery(tags=["PTC"], limit=50)).total == 0

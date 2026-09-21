@@ -1654,6 +1654,28 @@
     return m + ":" + (sec < 10 ? "0" : "") + sec;
   }
 
+  /* One view, counted when a details page opens.
+   *
+   * The endpoint has existed since the stats model did; nothing ever called
+   * it, so `views` sat at zero everywhere and an Admin usage view built on it
+   * would have read as "nobody uses this" rather than "nobody counts this".
+   * Wired 2026-09-21, deliberately ahead of that view: numbers have to start
+   * accumulating before anyone can look at them.
+   *
+   * Fire-and-forget on purpose. It is a 204 with nothing to read, the page is
+   * already rendering without it, and a counter that could block a page from
+   * opening would be a worse bug than an uncounted view -- so a failure is
+   * logged at debug and otherwise ignored.
+   *
+   * What it counts is "a details page was opened", which includes reopening
+   * the same asset and includes whoever built it. Good enough to rank demos
+   * by interest; not an audience metric, and should not be presented as one.
+   */
+  function recordView(id) {
+    fetch("/api/assets/" + encodeURIComponent(id) + "/view", { method: "POST" })
+      .catch(function (err) { console.debug("[hub-api] view not counted", err); });
+  }
+
   async function openAssetDetail(id) {
     var asset;
     try {
@@ -1663,6 +1685,7 @@
       return;
     }
     detailAsset = asset;
+    recordView(id);
 
     var page = document.getElementById("videoPreviewPage");
     if (!page) return;

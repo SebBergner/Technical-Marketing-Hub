@@ -239,6 +239,30 @@ def test_a_listed_file_redirects_to_a_fresh_signed_url(client, repo_with_a_file)
     assert response.headers["location"] == "https://contoso.sharepoint.com/signed?x=1"
 
 
+def test_handing_out_a_download_link_counts_a_download(client, repo_with_a_file):
+    """Wired 2026-09-21. Nothing incremented `downloads` before that, so a
+    usage view built on it would have shown zeros and read as "unused"."""
+    with_graph(download_handler())
+    assert repo_with_a_file.get("a-kit").stats.downloads == 0
+
+    client.get(f"/api/assets/a-kit/files/{FILE_ITEM_ID}/download",
+               follow_redirects=False)
+
+    assert repo_with_a_file.get("a-kit").stats.downloads == 1
+
+
+def test_a_failed_download_is_not_counted(client, repo_with_a_file):
+    """Counting before the Graph call would have inflated the number with
+    every error — so the increment sits after the URL is in hand."""
+    with_graph(download_handler(download_url=None))
+
+    response = client.get(f"/api/assets/a-kit/files/{FILE_ITEM_ID}/download",
+                          follow_redirects=False)
+
+    assert response.status_code == 502
+    assert repo_with_a_file.get("a-kit").stats.downloads == 0
+
+
 def test_an_item_id_not_on_this_asset_is_refused(client, repo_with_a_file):
     """The point of checking membership at all: Graph would resolve any valid
     id in the drive regardless of which asset it is nominally under."""

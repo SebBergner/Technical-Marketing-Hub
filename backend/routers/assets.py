@@ -128,6 +128,15 @@ def download_file(asset_id: str, item_id: str,
         raise HTTPException(
             status_code=502,
             detail="SharePoint did not return a download link for this file")
+
+    # Counted here rather than at the top: a Graph failure above is not a
+    # download, and counting before the work would inflate the number with
+    # every error. What this measures is "a download link was handed out" --
+    # the redirect means we never learn whether the bytes arrived, so the
+    # counter is a floor on real downloads, not an exact count. Recorded per
+    # asset, not per file: the question a usage view answers is which demos
+    # get used, and per-file counts would need a shape `stats` does not have.
+    repo.increment_stat(asset_id, "downloads")
     return RedirectResponse(url, status_code=302)
 
 

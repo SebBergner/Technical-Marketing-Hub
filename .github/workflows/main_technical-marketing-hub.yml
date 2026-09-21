@@ -31,7 +31,18 @@ jobs:
           python -m venv antenv
           source antenv/bin/activate
           pip install -r requirements.txt
-                
+
+      # The gate this pipeline went 28 deploys without. The suite needs no
+      # credentials and no .env -- verified 2026-09-21 against a venv built
+      # from requirements.txt alone -- so a failure here is a real failure,
+      # not a missing secret. It runs in `build`, before the artifact is
+      # uploaded, so a red suite stops the deploy job from ever starting.
+      - name: Run tests
+        run: |
+          source antenv/bin/activate
+          pip install -r requirements-dev.txt
+          python -m pytest tests/ -q
+
       # By default, when you enable GitHub CI/CD integration through the Azure portal, the platform automatically sets the SCM_DO_BUILD_DURING_DEPLOYMENT application setting to true. This triggers the use of Oryx, a build engine that handles application compilation and dependency installation (e.g., pip install) directly on the platform during deployment. Hence, we exclude the antenv virtual environment directory from the deployment artifact to reduce the payload size. 
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4

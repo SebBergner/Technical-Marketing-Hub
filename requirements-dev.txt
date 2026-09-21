@@ -1,0 +1,11 @@
+# Test-only dependencies. Kept out of requirements.txt because Oryx installs
+# that one on the App Service itself, and the running site has no use for a
+# test runner.
+#
+# Nothing else belongs here yet: the suite needs no fixtures library and no
+# HTTP mock beyond httpx's own MockTransport, which requirements.txt already
+# provides. Verified 2026-09-21 by running the whole suite in a venv built
+# from requirements.txt + this file alone — 387 passed, 3 skipped.
+-r requirements.txt
+
+pytest

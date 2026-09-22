@@ -806,37 +806,6 @@
         var body = openSheet(
           source === "sharepoint" ? "SharePoint" : "Consensus", "source detail");
 
-        if (d.plays) {
-          var p = el("div", "card");
-          p.style.marginBottom = "12px";
-          p.appendChild(el("h2", null, "Plays on Consensus"));
-          var note = el("p", "muted", d.plays.note);
-          note.style.cssText = "font-size:12.5px;margin:6px 0 8px";
-          p.appendChild(note);
-          row(p, "Assets with counts", d.plays.assets_with_counts);
-          row(p, "Total plays", d.plays.total_views.toLocaleString());
-          var t = el("table");
-          var h = el("tr");
-          h.appendChild(el("th", null, "Most played"));
-          h.appendChild(el("th", "r", "Plays"));
-          t.appendChild(el("thead")).appendChild(h);
-          var tb = el("tbody");
-          d.plays.top.forEach(function (a) {
-            var tr = el("tr");
-            var td = el("td");
-            var link = el("a", null, a.title);
-            link.href = "/#/asset/" + encodeURIComponent(a.id);
-            link.target = "_blank";
-            td.appendChild(link);
-            tr.appendChild(td);
-            tr.appendChild(el("td", "r num", a.views.toLocaleString()));
-            tb.appendChild(tr);
-          });
-          t.appendChild(tb);
-          p.appendChild(t);
-          body.appendChild(p);
-        }
-
         var hist = el("div", "card");
         hist.appendChild(el("h2", null, "Sync history"));
         if (!d.runs.length) {

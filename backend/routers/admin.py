@@ -135,16 +135,6 @@ def overview(repo: AssetRepository = Depends(get_repo)):
             "percent_missing": round(missing * 100 / total, 1) if total else 0,
         })
 
-    # Consensus's own view counts are the only usage figure with any history.
-    # Kept apart from our counters rather than summed: every SharePoint asset
-    # has no view count at all, so one combined number would describe a
-    # population that does not exist (§7.3 of the handover).
-    external = [a for a in assets if getattr(a, "external_views", None)]
-    top_external = sorted(external, key=lambda a: -a.external_views)[:10]
-
-    own = [(a, a.stats) for a in assets if a.stats and (
-        a.stats.views or a.stats.downloads or a.stats.shares or a.stats.launches)]
-
     return {
         "environment": {
             # Which slot am I looking at. Staging and production are identical
@@ -183,24 +173,11 @@ def overview(repo: AssetRepository = Depends(get_repo)):
             "not_connected": ["Brightcove", "Seismic / PTC Velocity"],
         },
         "catalogue": {"total": total, "coverage": coverage},
-        "usage": {
-            "consensus_views": {
-                "assets_with_counts": len(external),
-                "total_views": sum(a.external_views for a in external),
-                "top": [{"id": a.id, "title": a.title, "views": a.external_views}
-                        for a in top_external],
-            },
-            "own_counters": {
-                "assets_touched": len(own),
-                "views": sum(s.views for _, s in own),
-                "downloads": sum(s.downloads for _, s in own),
-                "shares": sum(s.shares for _, s in own),
-                # The page prints this beside the numbers. They started at
-                # zero on this date, and without it a small number reads as
-                # "nobody uses the Hub" instead of "nobody was counting".
-                "counting_since": "2026-09-21",
-            },
-        },
+        # No "usage" block: it served the first version of this page, which
+        # read per-asset counters. Usage now comes from the event log via
+        # /api/admin/usage, and leaving the old shape here meant scanning
+        # every asset on each overview load to build something no caller
+        # read. Removed 2026-09-22.
         "proposals": {"pending": _pending_proposals(repo)},
         "requests": {"unsynced": _unsynced_requests(repo)},
     }
@@ -355,29 +332,24 @@ def usage_for_asset(asset_id: str, since: str | None = None,
 
 @router.get("/source/{source}", dependencies=[Depends(require_admin)])
 def source_detail(source: str, repo: AssetRepository = Depends(get_repo)):
-    """One source's own page: how its syncs have gone, and — for Consensus —
-    the play counts it keeps itself."""
+    """One source's own page: how its syncs have gone.
+
+    Consensus's own play counts are deliberately not here (Liwei, 2026-09-22).
+    They were tried on the main usage view, moved here, and are now nowhere:
+    this sheet answers "is the sync working", and a tally Consensus keeps on
+    its own platform, about its own audience, is not an answer to that. It
+    shared a panel with sync history only because both happened to be about
+    the same source.
+
+    The figures still exist per asset as `external_views`, so putting them
+    somewhere they belong is a UI decision, not a re-integration.
+    """
     runs = getattr(repo, "sync_runs", lambda **_: [])(source_system=source, limit=30)
     payload = {
         "source": source,
         "state": _source_state(repo, source),
         "runs": runs,
     }
-    if source == "consensus":
-        assets = [a for a in repo.list(AssetQuery(sources=["consensus"],
-                                                  limit=10 ** 6)).items
-                  if getattr(a, "external_views", None)]
-        payload["plays"] = {
-            "assets_with_counts": len(assets),
-            "total_views": sum(a.external_views for a in assets),
-            "top": [{"id": a.id, "title": a.title, "views": a.external_views}
-                    for a in sorted(assets, key=lambda a: -a.external_views)[:20]],
-            # Said here rather than left for the reader to assume: this is
-            # Consensus's own tally of plays on its own platform, not a
-            # measure of anything the Hub did.
-            "note": "Counted by Consensus on its own platform, before and "
-                    "independently of this Hub.",
-        }
     return payload
 
 

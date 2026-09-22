@@ -64,7 +64,11 @@ def client(tmp_path):
     app.dependency_overrides[get_repo] = lambda: store
     app.dependency_overrides[get_client] = lambda: StubConsensusClient([])
     try:
-        with TestClient(app) as c:
+        # A loopback host on purpose: issue_session() only marks the admin
+        # cookie Secure off-loopback, and a Secure cookie is dropped over
+        # plain http -- so "testserver" would make every signed-in test fail
+        # for a reason that has nothing to do with what it is testing.
+        with TestClient(app, base_url="http://localhost") as c:
             yield c
     finally:
         app.dependency_overrides.clear()
@@ -231,3 +235,78 @@ def test_warnings_are_exposed_on_the_diagnostics_endpoints(disabled, client, mon
     monkeypatch.setenv(APP_SERVICE_MARKER, "technical-marketing-hub")
     assert client.get("/api/auth/me").json()["warnings"]
     assert client.get("/api/debug/backend").json()["security_warnings"]
+
+
+# ════════════════════════ the temporary admin bridge (delete with SSO) ═══════
+#
+# The property these pin: a shared Admin sign-in may refresh our own mirror,
+# and may not touch SharePoint. See backend/admin_auth.py for why the line is
+# drawn there — one credential for everyone means no write to somebody else's
+# system can ever be attributed to a person.
+ADMIN_USER, ADMIN_PASS = "tddadmin", "a-long-test-password-8e1f"
+
+
+@pytest.fixture()
+def admin_configured(monkeypatch):
+    monkeypatch.setattr(settings, "admin_username", ADMIN_USER)
+    monkeypatch.setattr(settings, "admin_password", ADMIN_PASS)
+
+
+def sign_in_as_admin(client):
+    response = client.post("/api/admin/login",
+                           json={"username": ADMIN_USER, "password": ADMIN_PASS})
+    assert response.status_code == 200
+    return response
+
+
+def test_no_admin_credentials_means_no_admin_page_at_all(
+        enforcing, client, monkeypatch):
+    """Fails closed: an unset password is not an empty password.
+
+    Blanked explicitly — a developer's own .env sets these, and a test that
+    passes only on a machine without one is not a test."""
+    monkeypatch.setattr(settings, "admin_username", "")
+    monkeypatch.setattr(settings, "admin_password", "")
+    assert client.get("/api/admin/session").json() == {
+        "configured": False, "signed_in": False}
+    assert client.post("/api/admin/login",
+                       json={"username": "", "password": ""}).status_code == 503
+    assert client.get("/api/admin/overview").status_code == 503
+
+
+def test_the_wrong_password_does_not_sign_anyone_in(enforcing, admin_configured, client):
+    assert client.post("/api/admin/login",
+                       json={"username": ADMIN_USER, "password": "wrong"}
+                       ).status_code == 401
+    assert client.post("/api/admin/login",
+                       json={"username": "someone-else", "password": ADMIN_PASS}
+                       ).status_code == 401
+    assert client.get("/api/admin/overview").status_code == 401
+
+
+def test_an_admin_session_opens_the_overview_and_closes_on_sign_out(
+        enforcing, admin_configured, client):
+    assert client.get("/api/admin/overview").status_code == 401
+    sign_in_as_admin(client)
+    assert client.get("/api/admin/session").json()["signed_in"] is True
+    assert client.get("/api/admin/overview").status_code == 200
+    client.post("/api/admin/logout")
+    assert client.get("/api/admin/overview").status_code == 401
+
+
+def test_an_admin_session_may_refresh_the_mirror(enforcing, admin_configured, client):
+    """The one write it is trusted with: a sync reads upstream and replaces
+    our own rebuildable cache. 503 here is the Graph client being absent in
+    tests — what matters is that it is no longer 401."""
+    assert client.post("/api/graph/sync").status_code in (401, 503)
+    sign_in_as_admin(client)
+    assert client.post("/api/graph/sync").status_code != 401
+
+
+def test_an_admin_session_may_not_write_back_to_sharepoint(
+        enforcing, admin_configured, client):
+    """The line that makes the bridge acceptable. Write-back edits SharePoint's
+    own columns, so it stays curator-only however the admin signs in."""
+    sign_in_as_admin(client)
+    assert client.post("/api/graph/writeback").status_code in (401, 403)
+    assert client.post("/api/curation/propose").status_code == 401

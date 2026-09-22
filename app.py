@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.config import settings
 from backend.db import SessionLocal, create_all
 from backend.routers import (
-    assets, auth, consensus, curation, debug, graph, requests, segments,
+    admin, assets, auth, consensus, curation, debug, graph, requests, segments,
     taxonomy,
 )
 
@@ -72,6 +72,17 @@ app.include_router(consensus.router)
 app.include_router(curation.router)
 app.include_router(graph.router)
 app.include_router(debug.router)
+app.include_router(admin.router)
+
+
+@app.get("/admin", include_in_schema=False)
+async def admin_page():
+    """The Admin page. Its own file for the same reason /debug has one: this
+    is ours, index.html is Elio's, and the two must not collide.
+
+    Served to anyone — the page itself decides what to show, and every figure
+    on it comes from /api/admin/overview, which does not."""
+    return FileResponse(os.path.join(BASE_DIR, "static", "admin.html"))
 
 
 @app.get("/debug", include_in_schema=False)

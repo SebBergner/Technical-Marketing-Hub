@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
 
 from backend.config import settings
 from backend.deps import get_repo
@@ -70,12 +71,65 @@ def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo)):
     return asset
 
 
+def _file_facts(repo: AssetRepository, asset_id: str, item_id: str) -> dict:
+    """The name and kind behind an item id, for the event log.
+
+    Resolved from the asset we have already loaded rather than from Graph:
+    `_require_listed_file` has just proved the file is listed on this asset,
+    so the answer is in memory and costs nothing. A file that somehow is not
+    found still records the event, with the id alone — a download that
+    happened is worth logging even when its label is not available.
+    """
+    asset = repo.get(asset_id)
+    for resource in (asset.resources if asset else []):
+        if resource.item_id == item_id:
+            return {"item_id": item_id, "file": resource.name, "kind": resource.kind}
+    return {"item_id": item_id}
+
+
+def _record(repo: AssetRepository, event: str, asset_id: str | None = None, **fields) -> None:
+    """Best-effort usage event. A repository without the method (SQL) or a
+    disk hiccup must never turn a working page or download into a 500 — the
+    counter exists to inform, not to gate."""
+    recorder = getattr(repo, "record_usage_event", None)
+    if recorder is None:
+        return
+    try:
+        recorder(event, asset_id=asset_id, **fields)
+    except Exception:                                    # noqa: BLE001
+        log.warning("could not record a %s event", event, exc_info=True)
+
+
+class SearchEventIn(BaseModel):
+    q: str
+    results: int
+
+
+@router.post("/search-event", status_code=204)
+def record_search(body: SearchEventIn, repo: AssetRepository = Depends(get_repo)):
+    """What someone searched for, and how many results they got.
+
+    Posted by the page once typing settles, NOT derived from the /api/assets
+    calls that back the search box: those fire per keystroke, so the log would
+    fill with "w", "wi", "win" and the one real query would be buried in its
+    own prefixes.
+
+    The zero-result ones are the point (Liwei, 2026-09-21). "People keep
+    searching for X and we have nothing" is the most direct evidence there is
+    for what to commission next, and it cannot be recovered afterwards.
+    """
+    query = (body.q or "").strip()
+    if not query:
+        return
+    _record(repo, "search", None, q=query[:120], results=max(0, body.results))
+
+
 @router.post("/{asset_id}/view", status_code=204)
 def record_view(asset_id: str, repo: AssetRepository = Depends(get_repo)):
     """Fire-and-forget from the preview page."""
     if repo.get(asset_id) is None:
         raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
-    repo.increment_stat(asset_id, "views")
+    _record(repo, "view", asset_id)
 
 
 def _require_listed_file(asset_id: str, item_id: str, repo: AssetRepository) -> None:
@@ -129,14 +183,17 @@ def download_file(asset_id: str, item_id: str,
             status_code=502,
             detail="SharePoint did not return a download link for this file")
 
-    # Counted here rather than at the top: a Graph failure above is not a
-    # download, and counting before the work would inflate the number with
+    # Recorded here rather than at the top: a Graph failure above is not a
+    # download, and counting before the work would inflate the figure with
     # every error. What this measures is "a download link was handed out" --
-    # the redirect means we never learn whether the bytes arrived, so the
-    # counter is a floor on real downloads, not an exact count. Recorded per
-    # asset, not per file: the question a usage view answers is which demos
-    # get used, and per-file counts would need a shape `stats` does not have.
-    repo.increment_stat(asset_id, "downloads")
+    # the redirect means we never learn whether the bytes arrived, so it is a
+    # floor on real downloads, not an exact count.
+    #
+    # The file's own name and kind travel with the event (2026-09-21, Liwei:
+    # "点击下载的又是什么"). An asset-level counter could say a kit was
+    # downloaded forty times and never say whether people took the talk track
+    # or the .mp4 -- which is the part that tells you what to make more of.
+    _record(repo, "download", asset_id, **_file_facts(repo, asset_id, item_id))
     return RedirectResponse(url, status_code=302)
 
 
@@ -163,4 +220,10 @@ def preview_file(asset_id: str, item_id: str,
         raise HTTPException(
             status_code=502,
             detail="SharePoint did not return a preview link for this file")
+
+    # Liwei's call, 2026-09-21: a preview is the stronger signal of the two.
+    # Plenty of people watch a walkthrough and never download anything, and
+    # without this they are indistinguishable from people who opened the page
+    # and left.
+    _record(repo, "preview", asset_id, **_file_facts(repo, asset_id, item_id))
     return RedirectResponse(url, status_code=302)

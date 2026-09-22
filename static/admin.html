@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin · Technical Marketing Hub</title>
+<!--
+  Deliberately a separate page, not a view inside index.html: that file is
+  Elio's mock-up and the integration contract with it is non-invasive (see
+  docs/HANDOVER-DEVELOPMENT.md §5.1). An admin surface has nothing to do with
+  the catalogue's own markup and would only make that file harder to re-sync.
+
+  Self-contained for the same reason -- its own small stylesheet rather than a
+  share of hub-api.js's, so neither can break the other.
+-->
+<style>
+  :root{
+    --bg:#f6f7f4; --surface:#fff; --surface-2:#eef1ea; --border:#dde2d6;
+    --ink:#1b2318; --muted:#5d6a56; --faint:#8a9682;
+    --green:#00890B; --green-soft:#e3efe0;
+    --amber:#9a6a10; --amber-soft:#f6ecd7;
+    --red:#9a3324; --red-soft:#f6e3df;
+    --radius:10px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12160f; --surface:#191f15; --surface-2:#212a1c; --border:#2e3a27;
+      --ink:#e9ede2; --muted:#aebaa5; --faint:#7b8a73;
+      --green:#5fbe7c; --green-soft:#1d3323;
+      --amber:#e0b15c; --amber-soft:#3a2e15;
+      --red:#e28569; --red-soft:#3a241d;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.55 -apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px 20px 80px}
+  h1{font-size:20px;margin:0 0 2px}
+  h2{font-size:14px;margin:0;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--faint);font-weight:700}
+  a{color:var(--green)}
+  code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+  .muted{color:var(--muted)} .faint{color:var(--faint)}
+  .num{font-variant-numeric:tabular-nums}
+
+  /* environment banner ------------------------------------------------ */
+  .env{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:12px 16px;border-radius:var(--radius);margin-bottom:22px;
+    border:1px solid var(--border);background:var(--surface-2)}
+  .env--prod{background:var(--amber-soft);border-color:var(--amber)}
+  .env__tag{font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+    font-size:11.5px;padding:3px 10px;border-radius:99px;
+    background:var(--green-soft);color:var(--green)}
+  .env--prod .env__tag{background:var(--amber);color:#fff}
+
+  header.page{display:flex;justify-content:space-between;align-items:flex-start;
+    gap:16px;margin-bottom:20px}
+
+  /* Each block is a chapter, not a label. Before this the only thing marking
+     one was a small grey line of caps, so "Catalogue health" and "Hub usage"
+     read as two more cards in the same run -- Liwei, 2026-09-21. */
+  section{margin-bottom:34px}
+  section + section{border-top:1px solid var(--border);padding-top:30px}
+  .section-head{display:flex;justify-content:space-between;align-items:center;
+    gap:12px;margin-bottom:14px}
+  .section-head h2{font-size:15px;color:var(--ink);letter-spacing:.03em;
+    display:flex;align-items:center;gap:10px}
+  .section-head h2::before{content:"";display:block;width:3px;height:16px;
+    border-radius:2px;background:var(--green)}
+  .card-head{display:flex;justify-content:space-between;align-items:baseline;
+    gap:12px;margin-bottom:10px}
+
+  .card{background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);padding:16px 18px}
+  .grid{display:grid;gap:12px}
+  .grid--2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+
+  .kv{display:flex;justify-content:space-between;gap:12px;padding:5px 0;
+    border-bottom:1px dashed var(--border);font-size:13.5px}
+  .kv:last-child{border-bottom:0}
+  .kv dt{color:var(--muted);margin:0}
+  .kv dd{margin:0;text-align:right}
+
+  .pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;
+    white-space:nowrap}
+  .pill--ok{background:var(--green-soft);color:var(--green)}
+  .pill--warn{background:var(--amber-soft);color:var(--amber)}
+  .pill--bad{background:var(--red-soft);color:var(--red)}
+  .pill--off{background:var(--surface-2);color:var(--faint)}
+
+  /* coverage bars ------------------------------------------------------ */
+  .bar{height:6px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+  .bar>span{display:block;height:100%;background:var(--amber)}
+  .cov{display:grid;grid-template-columns:150px 1fr 96px;gap:12px;
+    align-items:center;padding:7px 0}
+  .cov a{text-decoration:none}
+  .cov a:hover{text-decoration:underline}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--faint);padding:0 8px 6px;font-weight:700}
+  td{padding:7px 8px;border-top:1px solid var(--border)}
+  td.r,th.r{text-align:right}
+
+  button{font:inherit;cursor:pointer;border-radius:8px;padding:7px 14px;
+    border:1px solid var(--border);background:var(--surface);color:var(--ink)}
+  button:hover:not(:disabled){background:var(--surface-2)}
+  button:disabled{opacity:.55;cursor:default}
+  .btn-primary{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}
+  .btn-primary:hover:not(:disabled){filter:brightness(1.07);background:var(--green)}
+
+  /* login -------------------------------------------------------------- */
+  .login{max-width:360px;margin:12vh auto;}
+  .login .card{display:grid;gap:12px}
+  label{display:grid;gap:5px;font-size:12.5px;color:var(--muted)}
+  input{font:inherit;padding:9px 11px;border-radius:8px;border:1px solid var(--border);
+    background:var(--bg);color:var(--ink)}
+  .err{color:var(--red);font-size:13px;min-height:18px}
+  [hidden]{display:none !important}
+
+  /* usage -------------------------------------------------------------- */
+  .ranges{display:flex;gap:4px;flex-wrap:wrap}
+  .ranges button{padding:4px 11px;font-size:12.5px;border-radius:99px}
+  .ranges button[aria-pressed="true"]{background:var(--green);border-color:var(--green);
+    color:#fff;font-weight:600}
+  .synthetic{background:var(--red-soft);color:var(--red);border:1px solid var(--red);
+    border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;font-size:13px}
+
+  .tiles{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .tile{background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);padding:14px 16px}
+  .tile__top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .tile__n{font-size:26px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+  .trend{font-size:12px;font-weight:600;padding:1px 7px;border-radius:99px}
+  .trend--up{color:var(--green);background:var(--green-soft)}
+  .trend--down{color:var(--red);background:var(--red-soft)}
+  .trend--flat{color:var(--faint);background:var(--surface-2)}
+
+  /* the breakdown table ----------------------------------------------- */
+  .tablebar{display:flex;gap:10px;align-items:center;justify-content:space-between;
+    flex-wrap:wrap;margin-bottom:12px}
+  .tablebar input{font:inherit;font-size:13px;padding:5px 11px;min-width:190px;
+    border-radius:99px;border:1px solid var(--border);
+    background:var(--bg);color:var(--ink)}
+  .tablewrap{overflow-x:auto}
+  .tablewrap table{min-width:430px}
+  th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+  th.sortable:hover{color:var(--ink)}
+  .bar{height:4px;border-radius:99px;background:var(--surface-2);
+    min-width:52px;margin-left:auto}
+  .bar__f{height:100%;border-radius:99px;background:var(--green)}
+  .share{font-size:11px;margin-top:2px}
+  .chip{font-size:12px;padding:3px 10px;border-radius:99px;margin-bottom:10px;
+    background:var(--green-soft);border-color:var(--green);color:var(--ink)}
+  .pager{display:flex;align-items:center;justify-content:space-between;
+    gap:12px;flex-wrap:wrap;margin-top:12px;font-size:12.5px}
+  .pager__nav{display:flex;gap:8px}
+  .pager__nav button{font-size:12.5px;padding:4px 12px}
+  .tile__l{font-size:12px;color:var(--muted);margin-top:2px}
+  .tile__note{font-size:11.5px;color:var(--faint);margin-top:4px}
+
+  .chart{width:100%;height:150px;display:block}
+  .chart-legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:8px}
+  .swatch{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+
+  tr.clickable{cursor:pointer}
+  tr.clickable:hover{background:var(--surface-2)}
+
+  /* drill-down sheet --------------------------------------------------- */
+  .overlay{position:fixed;inset:0;background:rgba(10,14,8,.55);z-index:50;
+    display:flex;align-items:flex-start;justify-content:center;padding:5vh 16px;
+    overflow:auto}
+  .sheet{background:var(--bg);border:1px solid var(--border);border-radius:14px;
+    width:min(820px,100%);padding:20px 22px 26px}
+  .sheet__head{display:flex;justify-content:space-between;align-items:flex-start;
+    gap:16px;margin-bottom:16px}
+</style>
+</head>
+<body>
+
+<!-- ── signed out ────────────────────────────────────────────────────── -->
+<div class="login" id="loginView" hidden>
+  <div class="card">
+    <div>
+      <h1>Admin</h1>
+      <div class="faint" style="font-size:12.5px">Technical Marketing Hub</div>
+    </div>
+    <form id="loginForm">
+      <label>Username <input id="u" autocomplete="username" required></label>
+      <label style="margin-top:10px">Password
+        <input id="p" type="password" autocomplete="current-password" required></label>
+      <div class="err" id="loginErr"></div>
+      <button class="btn-primary" style="width:100%" type="submit">Sign in</button>
+    </form>
+    <p class="faint" style="font-size:12px;margin:0">
+      A shared account, in place until single sign-on is configured. Actions
+      taken here are not attributed to a person.
+    </p>
+  </div>
+</div>
+
+<!-- ── not configured ───────────────────────────────────────────────── -->
+<div class="login" id="offView" hidden>
+  <div class="card">
+    <h1>No admin configured</h1>
+    <p class="muted" style="margin:0">
+      This deployment has no <code>ADMIN_USERNAME</code> / <code>ADMIN_PASSWORD</code>
+      set, so the Admin page is switched off entirely.
+    </p>
+  </div>
+</div>
+
+<!-- ── signed in ────────────────────────────────────────────────────── -->
+<div class="wrap" id="dashView" hidden>
+
+  <div class="env" id="envBanner">
+    <span class="env__tag" id="envTag">…</span>
+    <span class="muted" id="envDetail"></span>
+  </div>
+
+  <header class="page">
+    <div>
+      <h1>Admin</h1>
+      <div class="faint" id="loadedAt"></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button id="refreshBtn">Refresh</button>
+      <button id="logoutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <section>
+    <div class="section-head"><h2>Connected systems</h2></div>
+    <div class="grid grid--2" id="integrations"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Hub usage</h2>
+      <div class="ranges" id="ranges"></div>
+    </div>
+    <div class="synthetic" id="syntheticBanner" hidden>
+      <strong>Synthetic data.</strong> Some or all of the events in this window
+      were generated for testing and are tagged as such. Nothing here is a
+      measurement.
+    </div>
+    <div class="tiles" id="usageTotals"></div>
+    <div class="card" style="margin-top:12px">
+      <div id="usageChart"></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="tablebar">
+        <div class="ranges" id="breakdownDims"></div>
+        <input id="breakdownSearch" type="search" placeholder="Filter by name…"
+               autocomplete="off" aria-label="Filter the breakdown by name">
+      </div>
+      <div id="breakdownScope"></div>
+      <div id="breakdownTable"></div>
+      <div class="pager" id="breakdownPager"></div>
+    </div>
+    <div class="grid grid--2" style="margin-top:12px">
+      <div class="card" id="usageSearches"></div>
+      <div class="card" id="usageUntouched"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>Queues</h2></div>
+    <div class="grid grid--2" id="queues"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Catalogue health</h2>
+      <span class="faint" id="catTotal"></span>
+    </div>
+    <div class="card" id="coverage"></div>
+  </section>
+
+</div>
+
+<!-- ── drill-down: one demo, or one source ──────────────────────────── -->
+<div class="overlay" id="overlay" hidden>
+  <div class="sheet">
+    <div class="sheet__head">
+      <div>
+        <h1 id="sheetTitle" style="font-size:17px">…</h1>
+        <div class="faint" id="sheetSub"></div>
+      </div>
+      <button id="sheetClose">Close</button>
+    </div>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+
+<script src="/static/admin.js"></script>
+</body>
+</html>

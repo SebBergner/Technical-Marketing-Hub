@@ -6,6 +6,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from backend.admin_auth import admin_or_curator
 from backend.deps import CurrentUser, get_repo, require_authenticated, require_curator
 from backend.integrations.consensus_oauth import (
     ConsensusOAuth, ConsensusOAuthError, NotAuthorised, get_oauth,
@@ -267,8 +268,11 @@ def share_to_consensus(
 def sync(allow_downgrade: bool = False,
          repo: AssetRepository = Depends(get_repo),
          client: ConsensusClient = Depends(get_client),
-         user: CurrentUser = Depends(require_curator)):
-    """Index public Consensus demos as catalogue entries. Requires curator.
+         actor: str = Depends(admin_or_curator)):
+    """Index public Consensus demos as catalogue entries.
+
+    Needs the curator role, or an Admin sign-in — see the same note on
+    /api/graph/sync and backend/admin_auth.py.
 
     Consensus content stands on its own here — it is not attached to a
     SharePoint asset. The two catalogues hold different things (455 demo kits
@@ -298,12 +302,33 @@ def sync(allow_downgrade: bool = False,
             result = sync_demos(client, repo, allow_downgrade=allow_downgrade)
             api = "v1"
     except WouldDowngrade as exc:
+        _record_attempt(repo, ok=False, error=str(exc))
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except (ConsensusError, ConsensusV2Error) as exc:
+        _record_attempt(repo, ok=False, error=str(exc))
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    log.info("consensus %s sync by %s: %s", api, user.email, result.as_dict())
-    return {"api": api, **result.as_dict()}
+    summary = {"api": api, **result.as_dict()}
+    _record_attempt(repo, ok=True, summary=summary)
+    log.info("consensus %s sync by %s: %s", api, actor, result.as_dict())
+    return summary
+
+
+def _record_attempt(repo: AssetRepository, ok: bool, summary: dict | None = None,
+                    error: str | None = None) -> None:
+    """See the twin in routers/graph.py — same best-effort reasoning."""
+    recorder = getattr(repo, "record_sync_attempt", None)
+    if recorder is None:
+        return
+    try:
+        recorder("consensus", ok=ok, summary=summary, error=error)
+        # And one line in the history, so the Admin page can show how the last
+        # thirty runs went rather than only how the last one did.
+        historian = getattr(repo, "record_sync_run", None)
+        if historian:
+            historian("consensus", ok=ok, summary=summary, error=error)
+    except Exception:                                    # noqa: BLE001
+        log.warning("could not record the sync attempt", exc_info=True)
 
 
 # ─────────────────────────────────────────────────── Consensus V2 (OAuth 2.0)

@@ -585,6 +585,110 @@ class JsonAssetRepository(AssetRepository):
         with self._lock, open(path, "a", encoding="utf-8", newline="\n") as fh:
             fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
+    # ------------------------------------------------------------ usage events
+    #: Append-only, one JSON object per line, under `owned/` — Portal-authored
+    #: data that no sync may rebuild (§1.1), same as share_events.jsonl.
+    #:
+    #: An event log rather than counters, and the difference is not stylistic:
+    #: `stats.json` holds a running total per asset, which can answer "how many
+    #: downloads ever" and nothing else. It cannot answer "how many in
+    #: September", "did the people who opened this also download it", or "which
+    #: file did they take" — those are questions about individual occurrences,
+    #: and a counter has thrown the occurrences away. Counters cannot be
+    #: back-filled into events either, so the log starts from the day it ships
+    #: and the page says so rather than implying the catalogue was idle before.
+    #:
+    #: Deliberately anonymous: no IP, no user agent, no identity. Liwei's call,
+    #: 2026-09-21. The cost is that "unique visitors" is not derivable, only
+    #: "visits"; the gain is that this file is not personal data and needs no
+    #: privacy review to exist. If SSO ever makes attribution possible, that is
+    #: a decision to take deliberately, not to inherit by accident.
+    USAGE_EVENTS = ("view", "preview", "download", "search")
+
+    def record_usage_event(self, event: str, asset_id: str | None = None,
+                           **fields) -> None:
+        if event not in self.USAGE_EVENTS:
+            raise ValueError(f"unknown usage event {event!r}")
+        path = os.path.join(self.owned_dir, "usage_events.jsonl")
+        os.makedirs(self.owned_dir, exist_ok=True)
+        entry = {"at": utcnow().isoformat(timespec="seconds"), "event": event}
+        if asset_id:
+            entry["asset_id"] = asset_id
+        entry.update({k: v for k, v in fields.items() if v is not None})
+        with self._lock, open(path, "a", encoding="utf-8", newline="\n") as fh:
+            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    def usage_events(self, since: str | None = None,
+                     until: str | None = None) -> list[dict]:
+        """Every event in a window, oldest first.
+
+        Read and filtered in Python rather than indexed. At this catalogue's
+        traffic that is a file of thousands of lines, and the only caller is
+        one admin page: an index would be machinery to keep correct in
+        exchange for milliseconds nobody is waiting on. Worth revisiting if
+        the file ever reaches the millions, which would be a happy problem.
+
+        A malformed line is skipped, not fatal: the log's whole point is that
+        a truncated write costs one event, and a reader that refused to open
+        the file would turn that into losing all of them.
+        """
+        path = os.path.join(self.owned_dir, "usage_events.jsonl")
+        if not os.path.exists(path):
+            return []
+        out: list[dict] = []
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue
+                at = entry.get("at") or ""
+                if since and at < since:
+                    continue
+                if until and at > until:
+                    continue
+                out.append(entry)
+        return out
+
+    def record_sync_run(self, source_system: str, ok: bool,
+                        summary: dict | None = None, error: str | None = None) -> None:
+        """One line per sync, so the Admin page can show a history rather than
+        only the latest state. `sync_state` still holds "where we are"; this
+        holds "how we got here"."""
+        path = os.path.join(self.owned_dir, "sync_runs.jsonl")
+        os.makedirs(self.owned_dir, exist_ok=True)
+        entry = {"at": utcnow().isoformat(timespec="seconds"),
+                 "source": source_system, "ok": bool(ok)}
+        if summary:
+            entry["summary"] = summary
+        if error:
+            entry["error"] = error[:300]
+        with self._lock, open(path, "a", encoding="utf-8", newline="\n") as fh:
+            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    def sync_runs(self, source_system: str | None = None, limit: int = 50) -> list[dict]:
+        """Most recent first."""
+        path = os.path.join(self.owned_dir, "sync_runs.jsonl")
+        if not os.path.exists(path):
+            return []
+        rows: list[dict] = []
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue
+                if source_system and entry.get("source") != source_system:
+                    continue
+                rows.append(entry)
+        return list(reversed(rows))[:limit]
+
     def count_source_rows(self, source_system: str) -> int:
         """How many mirror rows one source currently contributes."""
         return len(_read(os.path.join(self.mirror_dir, f"{source_system}.json"), []))
@@ -618,6 +722,31 @@ class JsonAssetRepository(AssetRepository):
                 row["fingerprint"] = fingerprint
             if api is not None:
                 row["api"] = api
+            self._save("sync_state", state)
+
+    def record_sync_attempt(self, source_system: str, ok: bool,
+                            summary: dict | None = None,
+                            error: str | None = None) -> None:
+        """Stamp an attempt, successful or not.
+
+        `last_success_at` alone could not tell "nobody has synced for eleven
+        days" apart from "it has been failing since Tuesday" — the two look
+        identical from the outside and want opposite responses. Added
+        2026-09-21 for the Admin page, which is the first thing that reads
+        this rather than a person opening the file.
+
+        The error is stored as a string, deliberately truncated: it is there
+        to say what broke, and an upstream payload dumped whole into a file
+        we serve to a browser is a good way to leak something.
+        """
+        with self._lock:
+            state = self._load("sync_state")
+            row = state.setdefault(source_system, {})
+            row["last_attempt_at"] = utcnow().isoformat(timespec="seconds")
+            row["last_attempt_ok"] = bool(ok)
+            if summary is not None:
+                row["last_result"] = summary
+            row["last_error"] = (error or "")[:300] or None
             self._save("sync_state", state)
 
     def sync_state(self, source_system: str) -> dict:

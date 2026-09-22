@@ -100,12 +100,34 @@ class Settings(BaseSettings):
     #: Empty means nobody, which fails closed rather than open.
     auth_curator_groups: str = ""
 
+    # ------------------------------------------------ the admin bridge (temporary)
+    #: A single shared credential for the Admin page, for the stretch before
+    #: Entra SSO exists. Deliberately NOT a replacement for it:
+    #:
+    #:   * one credential for everybody, so nothing an admin does can be
+    #:     attributed to a person. That is why it unlocks only work on our own
+    #:     `owned/` data and the mirror refresh, never a SharePoint write-back
+    #:     (see backend/admin_auth.py for the full reasoning).
+    #:   * both blank by default, and every admin route answers 503 while they
+    #:     are — a half-configured deployment cannot accidentally expose the
+    #:     page, it simply has no admin at all.
+    #:
+    #: Delete these, and the module that reads them, when SSO lands.
+    admin_username: str = ""
+    admin_password: str = ""
+
     # ---------------------------------------------------------------- behaviour
     seed_path: str = os.path.join(BASE_DIR, "data", "seed", "assets.json")
     #: Keep the mockup's aspirational sidebar numbers instead of real counts.
     #: Real data is honest but makes stakeholder demos look emptier — flag it,
     #: do not change it silently.
     show_placeholder_counts: bool = False
+
+    @property
+    def admin_configured(self) -> bool:
+        """Both halves, or there is no admin. Checked before every admin route
+        so an empty password can never mean "no password required"."""
+        return bool(self.admin_username and self.admin_password)
 
     @property
     def graph_configured(self) -> bool:

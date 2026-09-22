@@ -6,6 +6,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.config import settings
+from backend.admin_auth import admin_or_curator
 from backend.deps import CurrentUser, get_repo, require_authenticated, require_curator
 from backend.integrations.graph.client import (
     GraphClient, GraphError, GraphPermissionError, get_graph_client,
@@ -68,24 +69,48 @@ def verify(client: GraphClient = Depends(require_client),
 @router.post("/sync")
 def sync(full: bool = False, repo: AssetRepository = Depends(get_repo),
          client: GraphClient = Depends(require_client),
-         user: CurrentUser = Depends(require_curator)):
-    """Pull the Demo Catalog and replace the mirror. Requires the curator role.
+         actor: str = Depends(admin_or_curator)):
+    """Pull the Demo Catalog and replace the mirror.
 
-    Portal-owned data — stable slugs, curation, the Value Roadmap index,
-    counters — is untouched.
+    Needs the curator role, or an Admin sign-in (2026-09-21 — see
+    backend/admin_auth.py for why a shared credential is allowed to refresh a
+    rebuildable mirror and nothing else). Portal-owned data — stable slugs,
+    curation, the Value Roadmap index, counters — is untouched either way.
     """
     token = None if full else _load_token(repo)
     try:
         result = sync_catalogue(client, repo, delta_token=token)
-    except GraphPermissionError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
-    except GraphError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    except ValueError as exc:
+    except (GraphPermissionError, GraphError, ValueError) as exc:
+        _record_attempt(repo, ok=False, error=str(exc))
+        if isinstance(exc, GraphPermissionError):
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        if isinstance(exc, GraphError):
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     _save_token(repo, result.delta_token)
-    return result.as_dict()
+    summary = result.as_dict()
+    _record_attempt(repo, ok=True, summary=summary)
+    log.info("graph sync by %s: %s", actor, summary)
+    return summary
+
+
+def _record_attempt(repo: AssetRepository, ok: bool, summary: dict | None = None,
+                    error: str | None = None) -> None:
+    """Best-effort: a repository without the method (SQL) must not turn a
+    successful sync into a 500 over a status line nobody has read yet."""
+    recorder = getattr(repo, "record_sync_attempt", None)
+    if recorder is None:
+        return
+    try:
+        recorder("sharepoint", ok=ok, summary=summary, error=error)
+        # And one line in the history, so the Admin page can show how the last
+        # thirty runs went rather than only how the last one did.
+        historian = getattr(repo, "record_sync_run", None)
+        if historian:
+            historian("sharepoint", ok=ok, summary=summary, error=error)
+    except Exception:                                    # noqa: BLE001
+        log.warning("could not record the sync attempt", exc_info=True)
 
 
 @router.get("/writeback/backlog")

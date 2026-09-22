@@ -998,6 +998,41 @@
 
     var none = document.querySelector(".hub-noresults");
     if (none) none.classList.toggle("show", page.total === 0);
+
+    noteSearch(val("hubSearchInput"), page.total);
+  }
+
+  /* What somebody searched for, once they have stopped typing.
+   *
+   * Two seconds, not the 200ms the grid itself uses: the grid should react to
+   * every keystroke, but the log should hold the question, not its prefixes.
+   * Without the delay "windchill" arrives as w, wi, win, wind… and the real
+   * query is buried in nine fragments of itself.
+   *
+   * The zero-result ones are the reason this exists (Liwei, 2026-09-21) —
+   * "people keep searching for X and we have nothing" is the most direct
+   * evidence there is for what to commission next, and it cannot be
+   * reconstructed after the fact.
+   */
+  var searchNoteTimer = null;
+  var lastNotedSearch = "";
+
+  function noteSearch(query, total) {
+    query = (query || "").trim();
+    clearTimeout(searchNoteTimer);
+    // Two characters is where the grid itself starts searching; below that
+    // there is no question being asked yet.
+    if (query.length < 2 || query === lastNotedSearch) return;
+    searchNoteTimer = setTimeout(function () {
+      lastNotedSearch = query;
+      fetch("/api/assets/search-event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ q: query, results: total }),
+      }).catch(function (err) {
+        console.debug("[hub-api] search not recorded", err);
+      });
+    }, 2000);
   }
 
   function formatAssetCount(shown, total) {

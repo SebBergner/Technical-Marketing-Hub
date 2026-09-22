@@ -41,6 +41,7 @@ Companion documents, all current as of 2026-09-08:
 | `docs/ARCHITECTURE.md` (922 lines) | the reasoning behind each decision, in the order it was made, with the measurements |
 | `README.md` | how to run it, how to wire each integration |
 | `docs/demo-request-list.md` | the SharePoint list contract for the intake form |
+| `docs/announcement-internal-trial.md` | the email inviting the team to test, plus what it deliberately leaves out and why. A template, not a record: it carries a short checklist to run before sending |
 
 Also check this session's saved memory (`tdd-portal-*` and
 `product-landing-pages-proposal` files) for context that is genuinely too

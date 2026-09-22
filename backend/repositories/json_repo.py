@@ -150,6 +150,25 @@ class WouldShrinkMirror(RuntimeError):
     """
 
 
+#: A second, read-only usage log for demonstration data, merged into every
+#: read of the real one.
+#:
+#: Separate rather than mixed in, and the reason is the day it gets removed.
+#: Demo events and real ones accumulate in the same window, so a single file
+#: means "delete the made-up figures" turns into downloading the log,
+#: filtering it and uploading it back -- and the obvious shortcut, deleting
+#: the file, silently throws away however much genuine history has built up
+#: beside them. Two files make the safe action the easy one: remove this file
+#: from the share and nothing real is touched.
+#:
+#: Nothing writes it. `record_usage_event` only ever appends to the real log,
+#: so a demo file cannot grow by itself or absorb a real event. Its contents
+#: still carry `"synthetic": true` per event, which is what raises the banner
+#: on the Admin page -- the filename is the operational convenience, the flag
+#: is the guarantee.
+DEMO_USAGE_EVENTS = "usage_events.demo.jsonl"
+
+
 class JsonAssetRepository(AssetRepository):
     #: Guards read-modify-write within the process. See the module docstring on
     #: why this is not sufficient across processes.
@@ -632,25 +651,29 @@ class JsonAssetRepository(AssetRepository):
         a truncated write costs one event, and a reader that refused to open
         the file would turn that into losing all of them.
         """
-        path = os.path.join(self.owned_dir, "usage_events.jsonl")
-        if not os.path.exists(path):
-            return []
         out: list[dict] = []
-        with open(path, encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except ValueError:
-                    continue
-                at = entry.get("at") or ""
-                if since and at < since:
-                    continue
-                if until and at > until:
-                    continue
-                out.append(entry)
+        for name in ("usage_events.jsonl", DEMO_USAGE_EVENTS):
+            path = os.path.join(self.owned_dir, name)
+            if not os.path.exists(path):
+                continue
+            with open(path, encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except ValueError:
+                        continue
+                    at = entry.get("at") or ""
+                    if since and at < since:
+                        continue
+                    if until and at > until:
+                        continue
+                    out.append(entry)
+        # Two files merged, so the order has to be restored rather than
+        # inherited from the reads.
+        out.sort(key=lambda e: e.get("at") or "")
         return out
 
     def record_sync_run(self, source_system: str, ok: bool,

@@ -13,12 +13,15 @@ Two further guards:
 
 * it writes under `data/runtime/owned/`, which is gitignored, so a synthetic
   log cannot reach the repository by accident;
-* to remove it, keep the real events and drop the rest:
+* it writes its OWN file, `usage_events.demo.jsonl`, and never touches the
+  real `usage_events.jsonl`. The repository merges the two when it reads, so
+  the Admin page looks identical either way -- but removing the demo data is
+  one delete:
 
-      grep -v '"synthetic": true' usage_events.jsonl > clean.jsonl
+      rm usage_events.demo.jsonl     (or delete it from the Azure Files share)
 
-  Do that before uploading `owned/` to any Azure Files share. Nothing in the
-  app deletes these for you.
+  Nothing real goes with it, however much genuine usage has accumulated
+  beside it in the meantime. Nothing in the app deletes it for you.
 
 Usage:  python scripts/seed_usage_events.py [--days 120] [--events 4000]
 """
@@ -34,6 +37,7 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.config import settings                                  # noqa: E402
+from backend.repositories.json_repo import DEMO_USAGE_EVENTS        # noqa: E402
 
 #: Searches a technical demo team plausibly runs. The zero-result ones are
 #: real gaps in the current catalogue, so the page's "we have nothing for
@@ -146,13 +150,16 @@ def main() -> int:
 
     lines.sort(key=lambda line: json.loads(line)["at"])
     os.makedirs(owned_dir, exist_ok=True)
-    path = os.path.join(owned_dir, "usage_events.jsonl")
-    with open(path, "a", encoding="utf-8", newline="\n") as fh:
+    # Its own file, never the real log. The app merges the two on read, so
+    # the page looks the same either way -- but removing the demo data
+    # stays a single delete that cannot take genuine history with it.
+    path = os.path.join(owned_dir, DEMO_USAGE_EVENTS)
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write("\n".join(lines) + "\n")
 
-    print(f"appended {len(lines)} synthetic events to {path}")
+    print(f"wrote {len(lines)} synthetic events to {path}")
     print("every one is tagged \"synthetic\": true — the Admin page will say so.")
-    print("remove with:  grep -v '\"synthetic\": true' usage_events.jsonl > clean.jsonl")
+    print("remove with:  delete that one file; the real log is untouched.")
     return 0
 
 

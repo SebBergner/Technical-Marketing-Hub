@@ -908,6 +908,7 @@ for this work is *"it looks identical, but the data is real."*
 | Item | Owner | Blocks |
 |---|---|---|
 | Graph app registration (`Sites.Selected` + site-level `write`) | IT | B onward |
+| Entra ID sign-in on the Web App (App Service Authentication, OIDC) | IT | the curator role, and Consensus V2 OAuth on Azure |
 | Confirm exact SharePoint site URL / site ID | Seb | B |
 | ~~Which Azure subscription owns the app~~ | **resolved** | `AZURE-PTC-CXC` / `b10a7da9-9267-43c9-ab54-7245298b5f83`, App Service `Technical-Marketing-Hub` (Linux, Python 3.13, East US), RG `Technical-Marketing-Hub_RG` |
 | Brightcove CMS API access | you | a 4th proposal source; better playback |

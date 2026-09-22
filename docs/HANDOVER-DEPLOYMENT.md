@@ -113,7 +113,7 @@ on:
 - `pip install -r requirements.txt` into `antenv`, purely as an early failure
   check; `antenv` is excluded from the artifact.
 - Deploys via `azure/webapps-deploy@v3` to app **`Technical-Marketing-Hub`**,
-  slot **`Production`**, using the publish profile secret.
+  slot **`staging`** (`AZUREAPPSERVICE_PUBLISHPROFILE_STAGING`). It deployed straight to `Production` until 2026-09-14; production now moves only by a manual swap.
 - `SCM_DO_BUILD_DURING_DEPLOYMENT` is set on the App Service by the portal, so
   **Oryx installs dependencies on the platform**. That is why the workflow ships
   source rather than a venv.
@@ -184,15 +184,19 @@ portal from this machine, so exact resource/resource-group names are still
 | | |
 |---|---|
 | App Service name | `Technical-Marketing-Hub` |
-| Slot | `Production` |
+| Slots | `Production` and `staging`. **Pushes to `main` deploy to `staging`, never straight to production** (since 2026-09-14); production changes only when someone presses Swap. First swap under this arrangement: 2026-09-22. |
 | Runtime | Python on Linux (Oryx build) |
 | **URL** | `https://technical-marketing-hub-c8gxg4fagycjh5dz.eastus-01.azurewebsites.net` — confirmed from a deploy log; **not** the plain `technical-marketing-hub.azurewebsites.net` guessed in the original version of this doc |
-| Resource group / Subscription | unknown from here [verify in portal] |
+| Resource group / Subscription | `Technical-Marketing-Hub_RG` / `AZURE-PTC-CXC` `b10a7da9-9267-43c9-ab54-7245298b5f83` — read from `resources.azure.com`, 2026-09-22. The earlier "unknown" here was already resolved in ARCHITECTURE.md §12 and is fixed rather than repeated. |
 | `DATA_DIR` | `/mnt/data`, an Azure Files mount — `storage_is_durable: true` confirmed via `/api/debug/backend` |
 | `AUTH_MODE` | `easyauth`, confirmed set |
-| `AUTH_CURATOR_GROUPS` | **still empty** — confirmed via `/api/auth/me`'s own warning. Nobody can curate or trigger a sync |
-| Authentication (platform-level "Require authentication") | **not enforced** — anonymous `curl` reaches `/` and every `/api/assets` route with a 200, no redirect. Reads are effectively public regardless of `AUTH_MODE` |
+| `AUTH_CURATOR_GROUPS` | **still empty** — confirmed via `/api/auth/me`'s own warning. Nobody can curate. Since 2026-09-22 `AUTH_CURATOR_EMAILS` is an alternative that needs no group claim from the identity provider, and the Admin sign-in below can trigger a sync without either |
+| Admin sign-in (`/admin`) | configured on **both** slots since 2026-09-22 — `/api/admin/session` reports `configured: true`. The shared-credential bridge described in `backend/admin_auth.py`; unlocks the syncs, never a SharePoint write-back |
+| Authentication (platform-level "Require authentication") | **not enabled at all** — `/.auth/me` returns **404**, which only happens when App Service Authentication is switched off entirely (checked 2026-09-22). So `AUTH_MODE=easyauth` is trusting headers that never arrive: reads are public and every write fails closed. Two independent gaps, and fixing either alone changes nothing — see `docs/deploying.md` |
 | `GRAPH_*` / `CONSENSUS_*` | all set — `graph_configured: true`, `consensus_configured: true` |
+| Consensus V2 | authenticates by `CONSENSUS_V2_TOKEN` on **both slots** (2026-09-22). Not OAuth: `/api/consensus/oauth/start` needs the curator role, which nobody can hold until SSO, so the browser flow cannot be completed on Azure. The token is opaque, expires without warning, and is replaced by hand — `.env.example` says how |
+| Storage mounts | production `portaldata`, staging `portaldatastaging`, both at `/mnt/data` under the name `TechnicalMarketingHubFileStorage`. **Marked a deployment slot setting**, so a swap leaves each slot on its own share — verified at the mechanism, not the portal UI: `config/slotConfigNames` reads `"azureStorageConfigNames": ["TechnicalMarketingHubFileStorage"]`. The checkbox lives on the parent app; ticking it on the staging slot does not persist, and that is expected |
+| App settings at swap | `slotConfigNames.appSettingNames` is **empty**, so every app setting swaps with the code. Checked 2026-09-22: both slots carry the same Graph and Consensus credentials, so a swap strips nothing. Anything that must differ per slot has to be ticked as a slot setting first |
 | Path mappings | the one Azure Files mount above; nothing else |
 
 ---

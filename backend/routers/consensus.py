@@ -351,8 +351,8 @@ def oauth_status(oauth: ConsensusOAuth = Depends(get_oauth)):
 
 
 @router.get("/consensus/oauth/start")
-def oauth_start(oauth: ConsensusOAuth = Depends(require_oauth),
-                user: CurrentUser = Depends(require_curator)):
+def oauth_start(user: CurrentUser = Depends(require_curator),
+                oauth: ConsensusOAuth = Depends(require_oauth)):
     """Begin authorisation. Open the returned URL in a browser.
 
     Requires curator: the resulting token acts on behalf of whoever signs in,
@@ -413,8 +413,8 @@ def oauth_callback(code: str | None = None, state: str | None = None,
 
 
 @router.post("/consensus/oauth/revoke")
-def oauth_revoke(oauth: ConsensusOAuth = Depends(require_oauth),
-                 user: CurrentUser = Depends(require_curator)):
+def oauth_revoke(user: CurrentUser = Depends(require_curator),
+                 oauth: ConsensusOAuth = Depends(require_oauth)):
     """Forget the stored tokens. Re-authorising needs a browser again."""
     oauth.store.clear()
     log.info("consensus oauth: %s cleared the stored tokens", user.email)

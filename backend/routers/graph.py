@@ -51,8 +51,8 @@ def status(repo: AssetRepository = Depends(get_repo)):
 
 
 @router.get("/verify")
-def verify(client: GraphClient = Depends(require_client),
-           user: CurrentUser = Depends(require_authenticated)):
+def verify(user: CurrentUser = Depends(require_authenticated),
+           client: GraphClient = Depends(require_client)):
     """Run this FIRST when IT delivers credentials.
 
     Separates "bad credentials" from "missing per-site grant". Those two fail
@@ -68,8 +68,8 @@ def verify(client: GraphClient = Depends(require_client),
 
 @router.post("/sync")
 def sync(full: bool = False, repo: AssetRepository = Depends(get_repo),
-         client: GraphClient = Depends(require_client),
-         actor: str = Depends(admin_or_curator)):
+         actor: str = Depends(admin_or_curator),
+         client: GraphClient = Depends(require_client)):
     """Pull the Demo Catalog and replace the mirror.
 
     Needs the curator role, or an Admin sign-in (2026-09-21 — see
@@ -123,8 +123,15 @@ def writeback_backlog(repo: AssetRepository = Depends(get_repo)):
 def writeback(dry_run: bool = True,
               limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=500),
               repo: AssetRepository = Depends(get_repo),
-              client: GraphClient = Depends(require_client),
-              user: CurrentUser = Depends(require_curator)):
+              # Authorisation BEFORE the configuration gate, and the order is
+              # load-bearing: FastAPI resolves these in the order they are
+              # declared, so with require_client first an unconfigured
+              # deployment answered 503 to everyone -- telling an anonymous
+              # caller about our Graph setup, and leaving the curator check
+              # unproven on any environment without credentials. CI has none,
+              # which is how this was caught (2026-09-22).
+              user: CurrentUser = Depends(require_curator),
+              client: GraphClient = Depends(require_client)):
     """Push accepted proposals into SharePoint columns. Requires curator.
 
     **Dry run by default.** Pass `dry_run=false` to actually write. This is the

@@ -303,10 +303,40 @@ def test_an_admin_session_may_refresh_the_mirror(enforcing, admin_configured, cl
     assert client.post("/api/graph/sync").status_code != 401
 
 
+@pytest.fixture()
+def no_graph(monkeypatch):
+    """No Graph credentials, which is what CI has and a developer does not.
+
+    Without this the write-back test below passes on a laptop and fails in the
+    pipeline: FastAPI resolves dependencies in declaration order, so whichever
+    of `require_client` (503) and `require_curator` (403) comes first decides
+    the answer, and only an unconfigured environment can tell them apart.
+    """
+    monkeypatch.setattr(settings, "graph_tenant_id", "")
+    monkeypatch.setattr(settings, "graph_client_id", "")
+    monkeypatch.setattr(settings, "graph_client_secret", "")
+
+
 def test_an_admin_session_may_not_write_back_to_sharepoint(
-        enforcing, admin_configured, client):
+        enforcing, admin_configured, no_graph, client):
     """The line that makes the bridge acceptable. Write-back edits SharePoint's
-    own columns, so it stays curator-only however the admin signs in."""
+    own columns, so it stays curator-only however the admin signs in.
+
+    Asserted with Graph deliberately unconfigured, because that is the case
+    that can regress: the refusal has to come from the curator check, not from
+    the credentials happening to be missing. 2026-09-22, when this returned
+    503 in CI and 403 locally.
+    """
     sign_in_as_admin(client)
     assert client.post("/api/graph/writeback").status_code in (401, 403)
     assert client.post("/api/curation/propose").status_code == 401
+
+
+def test_graph_configuration_is_never_disclosed_before_authorising(
+        enforcing, no_graph, client):
+    """An anonymous caller learns that they are not signed in, and nothing
+    else. 503 here would name our Graph settings to someone who has not
+    authenticated, and would leave the authorisation check unproven."""
+    assert client.post("/api/graph/writeback").status_code == 401
+    assert client.post("/api/graph/sync").status_code == 401
+    assert client.get("/api/graph/verify").status_code == 401

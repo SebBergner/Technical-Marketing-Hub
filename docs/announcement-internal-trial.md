@@ -13,7 +13,7 @@ were true when it was last checked and will not stay true. Run the checks in
 | Audience | the immediate team, not the wider Marketing / Solution Consulting org |
 | Sent by | Elio |
 | Prompted by | Seb, 2026-09-18: *"I think we have a good stage where we should start using the technical Marketing Hub internally in the team"* |
-| Last verified | 2026-09-22, production on v2026.1.35 |
+| Last verified | 2026-09-22, production on v2026.2.42 after the second swap |
 
 ---
 
@@ -63,6 +63,8 @@ A few things worth trying:
   one-click **Download Kit**
 - On a Consensus demo, the tags on the detail page are clickable — they filter
   the whole catalogue, which is a quick way to find related material
+- Use **Request New Asset** if something you need isn't in the catalogue yet —
+  it checks the catalogue for similar demos before you ask for a new one
 
 **Telling us what you think is the point of this round.** There's a
 **Share feedback** button at the bottom of the left sidebar — it opens our
@@ -71,7 +73,7 @@ all of it is worth sending. Real usage now is exactly what shapes what we
 build next.
 
 If you hit something that looks broken, the **version number next to the PTC
-logo** (bottom-left, e.g. v2026.1.35) tells us which build you were on —
+logo** (bottom-left, e.g. v2026.2.42) tells us which build you were on —
 including it makes the report much easier to act on.
 
 Two things to expect:
@@ -99,19 +101,20 @@ Platform sign-in is not enabled — `/.auth/me` returns 404, meaning App Service
 Authentication is off entirely. Anyone with the URL can read the catalogue.
 Fine for an internal mail; do not describe it as restricted.
 
-### Request New Asset is deliberately absent
+### Request New Asset — resolved 2026-09-22
 
-As of 2026-09-22 the **Check Demo Database for Similar Content** button is
-still a placeholder on production: it returns hard-coded matches with invented
-usage figures under real colleagues' names for Windchill, and a fabricated
-all-clear for every other product. The real version queries the catalogue and
-is on staging; production has not been swapped to it.
+For a while this draft deliberately left it out. The **Check Demo Database for
+Similar Content** button was a placeholder that returned hard-coded matches
+with invented usage figures under real colleagues' names for Windchill, and a
+fabricated all-clear for every other product — not something to point testers
+at.
 
-So the draft does not send people there. **Once production has the real
-version**, add this back to the list:
-
-> - Use **Request New Asset** if something you need isn't in the catalogue yet
->   — it checks the catalogue for similar demos before you ask for a new one
+Production now runs the real version (verified on v2026.2.42: a Windchill
+check returns 68 genuine matches with real dates and play counts), so the
+bullet is back in the list above. Kept here because it explains why the
+feature is worth naming in the mail at all: it answers "has someone already
+built this", which is the question the form exists to stop people answering
+by guesswork.
 
 ### What is left out on purpose
 

@@ -33,7 +33,10 @@ curl -s "$P/api/graph/status"; curl -s "$P/api/consensus/status"   # last sync d
 - [ ] Both sources synced recently — a fortnight-old catalogue undercuts the
       "now live and ready to use" framing.
 - [ ] The **Share feedback** button still points at the current form.
-- [ ] Decide the Request New Asset question below.
+- [ ] The **duplicate check** on Request New Asset is still the real one.
+      It was a placeholder returning invented figures until 2026-09-22, and
+      the mail now sends people to it — check a product returns plausible
+      matches before promising that it does.
 
 ---
 

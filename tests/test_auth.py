@@ -51,6 +51,86 @@ def enforcing(monkeypatch):
 
 
 @pytest.fixture()
+def named_curators(monkeypatch):
+    """Curators by address, with no group or app role in the token at all."""
+    monkeypatch.setattr(settings, "auth_curator_groups", "")
+    monkeypatch.setattr(settings, "auth_curator_emails",
+                        "elio@ptc.com, seb@ptc.com,liwei@ptc.com")
+
+
+def test_a_named_address_is_a_curator(enforcing, named_curators, client):
+    """The whole point: no group claim, no app role, still a curator.
+
+    This is what lets the identity provider send only the claims it already
+    offered -- oid, email, name -- with nothing extra requested for us.
+    """
+    headers = easyauth_headers(email="seb@ptc.com")
+
+    user = client.get("/api/auth/me", headers=headers).json()["user"]
+
+    assert user["is_authenticated"] is True
+    assert user["can_curate"] is True
+
+
+def test_the_address_match_ignores_case_and_spacing(enforcing, named_curators,
+                                                    client):
+    """Addresses are case-insensitive, and a list a person typed has spaces
+    in it. Neither should decide whether someone can curate."""
+    user = client.get("/api/auth/me",
+                      headers=easyauth_headers(email="Liwei@PTC.com")).json()["user"]
+
+    assert user["can_curate"] is True
+
+
+def test_an_address_not_on_the_list_is_only_a_viewer(enforcing, named_curators,
+                                                     client):
+    headers = easyauth_headers(email="someone.else@ptc.com")
+
+    user = client.get("/api/auth/me", headers=headers).json()["user"]
+
+    assert user["is_authenticated"] is True
+    assert user["can_curate"] is False
+
+
+def test_a_near_miss_address_is_not_a_curator(enforcing, named_curators, client):
+    """Matched whole, not by prefix or substring: an address that merely
+    contains a curator's is somebody else."""
+    for near in ("seb@ptc.com.attacker.example", "xseb@ptc.com", "seb@ptc.co"):
+        user = client.get("/api/auth/me",
+                          headers=easyauth_headers(email=near)).json()["user"]
+        assert user["can_curate"] is False, near
+
+
+def test_an_empty_list_grants_nobody(enforcing, client, monkeypatch):
+    """Fails closed. An empty setting is not a wildcard, and the blank
+    default must never be the permissive case."""
+    monkeypatch.setattr(settings, "auth_curator_groups", "")
+    monkeypatch.setattr(settings, "auth_curator_emails", "")
+
+    user = client.get("/api/auth/me",
+                      headers=easyauth_headers(email="seb@ptc.com")).json()["user"]
+
+    assert user["can_curate"] is False
+
+
+def test_a_named_address_is_ignored_without_easyauth(disabled, monkeypatch, client):
+    """The address is only trusted because the platform asserted it.
+
+    With auth disabled the headers are ignored entirely, so this asserts the
+    new route did not quietly become a way to grant yourself the role by
+    setting a header.
+    """
+    monkeypatch.setattr(settings, "auth_curator_emails", "seb@ptc.com")
+
+    user = client.get("/api/auth/me",
+                      headers=easyauth_headers(email="seb@ptc.com")).json()["user"]
+
+    # The local dev principal, not the header's identity.
+    assert user["is_dev_principal"] is True
+    assert user["email"] != "seb@ptc.com"
+
+
+@pytest.fixture()
 def disabled(monkeypatch):
     monkeypatch.setattr(settings, "auth_mode", AuthMode.DISABLED.value)
     monkeypatch.setattr(settings, "auth_curator_groups", "")
@@ -212,15 +292,30 @@ def test_warns_when_graph_write_is_live_but_auth_is_off(disabled, monkeypatch):
     assert any("Graph write access is configured" in w for w in security_warnings())
 
 
-def test_warns_when_enforcing_without_any_curator_group(monkeypatch):
+def test_warns_when_enforcing_without_any_way_to_grant_curator(monkeypatch):
+    """Both routes blanked explicitly: a developer's own .env may set either,
+    and a test that passes only on a machine without one is not a test."""
     monkeypatch.setattr(settings, "auth_mode", AuthMode.EASYAUTH.value)
     monkeypatch.setattr(settings, "auth_curator_groups", "")
-    assert any("AUTH_CURATOR_GROUPS is empty" in w for w in security_warnings())
+    monkeypatch.setattr(settings, "auth_curator_emails", "")
+    assert any("nor AUTH_CURATOR_EMAILS" in w for w in security_warnings())
+
+
+def test_named_curators_alone_silence_the_warning(monkeypatch):
+    """Any one route is enough. Warning about a missing group while three
+    named people can curate would be crying wolf, and a warning nobody can
+    act on is one people learn to scroll past."""
+    monkeypatch.setattr(settings, "auth_mode", AuthMode.EASYAUTH.value)
+    monkeypatch.setattr(settings, "auth_curator_groups", "")
+    monkeypatch.setattr(settings, "auth_curator_emails", "seb@ptc.com")
+    monkeypatch.delenv(APP_SERVICE_MARKER, raising=False)
+    assert security_warnings() == []
 
 
 def test_no_warnings_when_properly_configured(monkeypatch):
     monkeypatch.setattr(settings, "auth_mode", AuthMode.EASYAUTH.value)
     monkeypatch.setattr(settings, "auth_curator_groups", CURATOR_GROUP)
+    monkeypatch.setattr(settings, "auth_curator_emails", "")
     monkeypatch.delenv(APP_SERVICE_MARKER, raising=False)
     assert security_warnings() == []
 

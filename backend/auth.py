@@ -145,23 +145,41 @@ def _roles_from_claims(payload: dict) -> set[str]:
     return found
 
 
-def _map_roles(claim_values: set[str]) -> set[str]:
-    """Map Entra ID group ids / app role names onto our two roles.
+def _map_roles(claim_values: set[str], email: str | None = None) -> set[str]:
+    """Map Entra ID group ids / app role names / named addresses onto our roles.
 
-    Configured rather than hardcoded, because the group ids do not exist yet —
-    they come from whoever sets up the app registration. Until
-    `AUTH_CURATOR_GROUPS` is set, every authenticated user is a viewer only,
-    which fails closed: read and share work, curation does not.
+    Configured rather than hardcoded, because none of these values exist in
+    the code — they come from whoever sets up the app registration. Until one
+    of the three is set, every authenticated user is a viewer only, which
+    fails closed: read and share work, curation does not.
+
+    Three ways in, any of which is enough:
+
+    * a group object id listed in `AUTH_CURATOR_GROUPS`
+    * an app role literally named `curator`
+    * an address listed in `AUTH_CURATOR_EMAILS`
+
+    The last needs nothing from the identity provider beyond the address it
+    already asserts, which is why it exists: it unblocks a three-person
+    curator list without a group claim having to be requested, emitted and
+    kept in step.
     """
+    roles = {Role.VIEWER.value}
+
     configured = {g.strip() for g in (settings.auth_curator_groups or "").split(",")
                   if g.strip()}
-    roles = {Role.VIEWER.value}
     if configured and (claim_values & configured):
         roles.add(Role.CURATOR.value)
     # An explicit app role named "curator" also counts, so app roles work
     # without needing group object ids.
     if Role.CURATOR.value in {v.lower() for v in claim_values}:
         roles.add(Role.CURATOR.value)
+
+    named = {e.strip().lower()
+             for e in (settings.auth_curator_emails or "").split(",") if e.strip()}
+    if named and email and email.strip().lower() in named:
+        roles.add(Role.CURATOR.value)
+
     return roles
 
 
@@ -187,7 +205,7 @@ def principal_from_request(request: Request) -> CurrentUser:
         name=payload.get("name") or email,
         object_id=headers.get(PRINCIPAL_ID_HEADER),
         provider=headers.get(PRINCIPAL_IDP_HEADER) or payload.get("auth_typ"),
-        roles=_map_roles(claim_values),
+        roles=_map_roles(claim_values, email),
         is_authenticated=True,
     )
 
@@ -239,11 +257,17 @@ def security_warnings() -> list[str]:
             "AUTH IS DISABLED ON APP SERVICE. Every caller is treated as a curator. "
             "Set AUTH_MODE=easyauth and enable App Service Authentication (Entra ID) "
             "with 'Require authentication'.")
-    if settings.auth_mode == AuthMode.EASYAUTH.value and not settings.auth_curator_groups:
+    # Any one of the three routes is enough, so this only fires when none of
+    # them can grant the role. An app role cannot be detected from config --
+    # it arrives in the token -- so a deployment relying solely on app roles
+    # will see this warning and can ignore it; /api/auth/me shows the truth.
+    if (settings.auth_mode == AuthMode.EASYAUTH.value
+            and not settings.auth_curator_groups
+            and not settings.auth_curator_emails):
         warnings.append(
-            "AUTH_CURATOR_GROUPS is empty, so nobody has the curator role and "
-            "curation endpoints will refuse everyone. Set it to the Entra ID group "
-            "object id(s), or assign an app role named 'curator'.")
+            "Neither AUTH_CURATOR_GROUPS nor AUTH_CURATOR_EMAILS is set, so nobody "
+            "has the curator role and curation endpoints will refuse everyone "
+            "unless the token carries an app role named 'curator'.")
     if on_app_service and settings.graph_configured and disabled:
         warnings.append(
             "Graph write access is configured while auth is disabled — an "

@@ -99,6 +99,24 @@ class Settings(BaseSettings):
     #: decide metadata proposals and trigger a sync. Comma-separated.
     #: Empty means nobody, which fails closed rather than open.
     auth_curator_groups: str = ""
+    #: Curators named by address, comma separated, matched case-insensitively
+    #: against the signed-in identity.
+    #:
+    #: Exists because the curator list is three people who are known by name,
+    #: and naming them needs nothing from the identity provider beyond the
+    #: address it already asserts -- no group claim to request, no object id
+    #: to copy, nothing to keep in step with a directory. Liwei, 2026-09-22.
+    #:
+    #: The trade-off, written down rather than discovered later: an address is
+    #: a weaker key than a group. It changes when somebody's name changes, it
+    #: is not revoked when they leave, and keeping it current is a person's
+    #: job rather than the directory's. Right for three names; move to
+    #: `auth_curator_groups` or an app role before it is a dozen.
+    #:
+    #: Only ever compared against an address the platform asserted, never one
+    #: a caller supplied -- see principal_from_request, which ignores every
+    #: header unless auth_mode is easyauth.
+    auth_curator_emails: str = ""
 
     # ------------------------------------------------ the admin bridge (temporary)
     #: A single shared credential for the Admin page, for the stretch before

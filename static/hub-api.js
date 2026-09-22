@@ -3065,6 +3065,63 @@
    * views is worse than an empty page.
    *
    * So a failure has to SAY so. Every early return in boot() lands here. */
+  /* ── the sidebar foot: feedback, and which build this is ──────────────
+   *
+   * Both requested by Seb (2026-09-22) ahead of opening the Hub to the whole
+   * team, and they work as a pair: the version is what makes a piece of
+   * feedback actionable, because "the filter is broken" and "the filter is
+   * broken on v2026.1.47" are different reports.
+   *
+   * Built here rather than in index.html for the usual reason -- that file is
+   * Elio's, and the integration contract is one script tag and no edits. The
+   * foot already exists and holds the PTC mark; this appends to it.
+   */
+  var FEEDBACK_URL =
+    "https://app.smartsheet.com/b/form/019fd30ea3ee75c7aaf4abf2e58a0342";
+
+  function buildSidebarFoot() {
+    var foot = document.querySelector(".orion-side__foot");
+    if (!foot || foot.querySelector(".hub-foot__row")) return;
+
+    var link = document.createElement("a");
+    link.className = "hub-foot__feedback";
+    link.href = FEEDBACK_URL;
+    // A new tab, not a navigation: somebody writing feedback has the thing
+    // they are describing on screen, and taking the page away from them to
+    // show a form is how half-written feedback gets lost.
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.innerHTML =
+      '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">'
+      + '<path d="M2 3.2A1.2 1.2 0 0 1 3.2 2h9.6A1.2 1.2 0 0 1 14 3.2v7.1'
+      + 'a1.2 1.2 0 0 1-1.2 1.2H6.3L3.2 14v-2.5A1.2 1.2 0 0 1 2 10.3z"'
+      + ' fill="none" stroke="currentColor" stroke-width="1.3"'
+      + ' stroke-linejoin="round"/></svg>'
+      + "<span>Share feedback</span>";
+    // The shared form covers more than this Hub, so say where it goes rather
+    // than let the click be a surprise.
+    link.title = "Opens PTC's feedback form in a new tab";
+
+    var row = document.createElement("div");
+    row.className = "hub-foot__row";
+    var mark = foot.querySelector(".orion-logo");
+    if (mark) row.appendChild(mark);
+    var version = document.createElement("span");
+    version.className = "hub-foot__version";
+    version.textContent = "";
+    row.appendChild(version);
+
+    foot.insertBefore(link, foot.firstChild);
+    foot.appendChild(row);
+
+    // Fire-and-forget: an unreachable version endpoint leaves the label empty
+    // rather than an apology, and nothing else on the page depends on it.
+    fetch("/api/version")
+      .then(function (r) { return r.json(); })
+      .then(function (d) { version.textContent = d.version || ""; })
+      .catch(function () {});
+  }
+
   function bootFailed(message) {
     var boot = document.getElementById("hubBoot");
     var text = document.getElementById("hubBootMessage");
@@ -3356,6 +3413,7 @@
     markUnavailable(facets);
     markNavActive();
     fillProductTiles();
+    buildSidebarFoot();
 
     // Real content is in place: reveal the thread. See the #mainThread rule in
     // index.html for why it also reveals itself on a timer.

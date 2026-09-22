@@ -37,6 +37,11 @@ jobs:
       # from requirements.txt alone -- so a failure here is a real failure,
       # not a missing secret. It runs in `build`, before the artifact is
       # uploaded, so a red suite stops the deploy job from ever starting.
+      # Y in vYEAR.X.Y. Written at build time rather than committed, so it
+      # cannot go stale and cannot be forgotten. See backend/version.py.
+      - name: Stamp the build number
+        run: echo "${{ github.run_number }}" > BUILD_NUMBER
+
       - name: Run tests
         run: |
           source antenv/bin/activate

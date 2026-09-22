@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.config import settings
+from backend.version import app_version
 from backend.db import SessionLocal, create_all
 from backend.routers import (
     admin, assets, auth, consensus, curation, debug, graph, requests, segments,
@@ -119,6 +120,17 @@ app.mount("/static", RevalidatingStatic(directory=os.path.join(BASE_DIR, "static
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/version")
+async def version():
+    """What the sidebar prints, bottom-left beside the PTC mark.
+
+    Public, and deliberately so: it is the first thing to ask for when
+    somebody reports a problem, and requiring a sign-in to find out which
+    build you are on would defeat the reason it is on screen at all.
+    """
+    return {"version": app_version()}
 
 
 @app.get("/")

@@ -139,9 +139,20 @@
     var c2 = card("Consensus");
     row(c2, "V1 (images, sharing)", cs.v1_configured ? "configured" : "missing",
         cs.v1_configured ? "pill--ok" : "pill--off");
-    row(c2, "V2 OAuth", cs.v2_authorised ? "authorised"
+    // Named by what it can do, not by how it was set up: a hand-supplied
+    // token syncs exactly as well as OAuth, it just cannot renew itself.
+    row(c2, "V2 access",
+        cs.v2_route === "oauth" ? "authorised (OAuth)"
+        : cs.v2_route === "token" ? "manual token"
         : cs.v2_configured ? "not authorised" : "not configured",
-        cs.v2_authorised ? "pill--ok" : "pill--warn");
+        cs.v2_route ? "pill--ok" : "pill--warn");
+    if (cs.v2_route === "token") {
+      var note = el("div", "faint");
+      note.style.cssText = "font-size:11.5px;margin:-2px 0 6px";
+      note.textContent = "Expires without warning \u2014 a sync then refuses "
+        + "rather than downgrading. Replace it in both slots.";
+      c2.appendChild(note);
+    }
     // An expired access token is not a fault and must not read like one: the
     // stored refresh token mints a new one on the next call. Only the absence
     // of a refresh token would be a problem, and that is `v2_authorised`

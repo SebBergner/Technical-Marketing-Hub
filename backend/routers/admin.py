@@ -158,6 +158,15 @@ def overview(repo: AssetRepository = Depends(get_repo)):
                 "v1_configured": settings.consensus_configured,
                 "v2_configured": settings.consensus_v2_configured,
                 "v2_authorised": oauth_status.get("authorised"),
+                # Which route V2 can actually authenticate by, if any. Without
+                # this the page reported "not configured" on any deployment
+                # using CONSENSUS_V2_TOKEN, because `consensus_v2_configured`
+                # only ever asked about the OAuth pair -- so the Azure slots,
+                # where the hand-supplied token is the only route available
+                # before SSO, looked broken while syncing perfectly well.
+                "v2_route": ("oauth" if oauth_status.get("authorised")
+                             else "token" if settings.consensus_v2_token
+                             else None),
                 "v2_token_expires_in": oauth_status.get("access_token_expires_in"),
                 "scopes": oauth_status.get("scopes"),
                 **_source_state(repo, "consensus"),

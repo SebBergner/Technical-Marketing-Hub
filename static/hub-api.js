@@ -3122,6 +3122,200 @@
       .catch(function () {});
   }
 
+  /* ── the duplicate check on the request form ──────────────────
+   *
+   * index.html ships a placeholder: it waits 700ms and looks the answer up in
+   * a three-entry table, all Windchill, carrying invented usage figures under
+   * real colleagues' names. Every other product fell through to "nothing
+   * similar found", which is the worse of the two answers -- a clearance to
+   * build something that may already exist, issued without looking.
+   *
+   * This asks the catalogue instead. Overriding the global rather than
+   * editing index.html keeps the one-script-tag contract: the button's inline
+   * onclick calls whatever window.checkExistingAsset is when it is clicked,
+   * and this file is deferred, so it always wins.
+   */
+  var DUPLICATE_LIMIT = 5;
+
+  function requestScopeProducts() {
+    // "Other" is a real option on the form and matches no product facet, so
+    // it widens the search rather than narrowing it to nothing.
+    return Array.prototype.slice.call(
+      document.querySelectorAll("#productScopeRow .stage-pill--active"))
+      .map(function (p) { return p.dataset.value; })
+      .filter(function (v) { return v && v !== "Other"; });
+  }
+
+  function duplicateRow(asset) {
+    var row = document.createElement("div");
+    row.style.cssText = "padding:8px 0;border-top:1px solid var(--orion-border)";
+
+    var link = document.createElement("a");
+    link.href = "#/asset/" + encodeURIComponent(asset.id);
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.style.cssText = "font-weight:600;text-decoration:none";
+    link.textContent = asset.title || asset.id;
+    row.appendChild(link);
+
+    var bits = [asset.content_depth, (asset.product_families || []).join(", "),
+                asset.type === "ldk" ? "" : durationLabel(asset.duration_seconds)];
+    var meta = document.createElement("div");
+    meta.className = "orion-subtle";
+    meta.style.cssText = "margin:2px 0;font-size:12px";
+    meta.textContent = bits.filter(Boolean).join(" · ");
+    row.appendChild(meta);
+
+    var facts = [];
+    // Named for what it is. This is Consensus's own tally on its own
+    // platform, not anything the Hub measured, and calling it "uses" -- as
+    // the placeholder did -- would invent a meaning it does not have.
+    if (asset.external_views) {
+      facts.push(asset.external_views
+        + (asset.external_views === 1 ? " play" : " plays") + " on Consensus");
+    }
+    if (asset.uploaded_at) facts.push("added " + asset.uploaded_at);
+    if (facts.length) {
+      var stats = document.createElement("div");
+      stats.style.cssText = "font-size:12px;color:var(--orion-text-2)";
+      stats.textContent = facts.join(" · ");
+      row.appendChild(stats);
+    }
+    return row;
+  }
+
+  function renderDuplicateCheck(page, products, level, host, relaxed) {
+    var who = (products.length ? products.join(", ") : "any product")
+      + " · English";
+    var scope = relaxed ? who : who + " · " + (level || "any style");
+
+    var note = document.createElement("div");
+    note.className = "modal__note";
+    note.style.alignItems = "flex-start";
+
+    if (!page.total) {
+      var ok = document.createElement("span");
+      ok.textContent = "Nothing in the catalogue matches " + scope
+        + " — clear to create something new.";
+      note.appendChild(ok);
+      return note;
+    }
+
+    note.style.background = "var(--orion-warn-bg)";
+    var body = document.createElement("div");
+    body.style.width = "100%";
+
+    var head = document.createElement("div");
+    head.style.cssText = "font-weight:700;margin-bottom:2px;color:var(--orion-warn-ink)";
+    head.textContent = page.total === 1
+      ? "1 similar demo already exists"
+      : page.total + " similar demos already exist";
+    body.appendChild(head);
+
+    var sub = document.createElement("div");
+    sub.className = "orion-subtle";
+    sub.style.cssText = "font-size:12px;margin-bottom:4px";
+    // When the style filter was dropped, say so. "Nothing at this exact
+    // style, but here is what exists for the product" and "here is what
+    // matches exactly" support different decisions, and collapsing them
+    // would overstate how close these are.
+    sub.textContent = (relaxed
+      ? "Nothing classified as “" + level + "” — showing everything for " + scope
+      : "Matching " + scope)
+      + (page.total > DUPLICATE_LIMIT
+        ? " — " + DUPLICATE_LIMIT + " newest shown" : "");
+    body.appendChild(sub);
+
+    (page.items || []).forEach(function (a) { body.appendChild(duplicateRow(a)); });
+
+    var actions = document.createElement("div");
+    actions.style.cssText = "margin-top:10px";
+    var proceed = document.createElement("button");
+    proceed.className = "btn-primary-sm";
+    proceed.type = "button";
+    proceed.style.cssText = "flex:none;padding:6px 12px";
+    proceed.textContent = "Create new anyway";
+    // Dismisses the panel and nothing else. The placeholder's three buttons
+    // answered "Decision recorded" and recorded nothing; a button that lies
+    // about persisting something is worse than no button.
+    proceed.addEventListener("click", function () { host.style.display = "none"; });
+    actions.appendChild(proceed);
+    body.appendChild(actions);
+
+    note.appendChild(body);
+    return note;
+  }
+
+  window.checkExistingAsset = function (btn, level) {
+    var host = document.getElementById("existingCheck-" + level);
+    if (!host) return;
+    var products = requestScopeProducts();
+    btn.disabled = true;
+    btn.style.opacity = ".6";
+    btn.textContent = "Checking Demo Database…";
+
+    function query(depth) {
+      var params = new URLSearchParams();
+      products.forEach(function (p) { params.append("product", p); });
+      if (depth) params.append("depth", depth);
+      // Newest first. NOT sort=most_viewed, which looks like the obvious
+      // choice and is not: it orders by our own stats.views, a counter
+      // nothing has updated since usage moved to the event log, so every row
+      // scores zero and the order is arbitrary while looking deliberate.
+      params.append("sort", "recent");
+      // English only, and the scope line says so. Without it a single demo
+      // published in eight languages fills every slot with translations of
+      // itself, pushing the genuinely different work off the list -- which
+      // is the opposite of what a duplicate check is for.
+      params.append("language", "en");
+      params.append("limit", String(DUPLICATE_LIMIT));
+      return fetch("/api/assets?" + params.toString()).then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      });
+    }
+
+    // The form offers four styles (VIDEO_LEVELS in index.html); the
+    // catalogue only ever classifies three -- Teaser, Overview, Walkthrough.
+    // "Explainer" therefore matches nothing, and filtering on it would hand
+    // out a clean bill of health that only means the word is unused. So an
+    // empty exact match falls back to the product alone, labelled as such.
+    query(level)
+      .then(function (page) {
+        if (page.total || !level || !products.length) {
+          return { page: page, relaxed: false };
+        }
+        return query(null).then(function (wider) {
+          return { page: wider, relaxed: wider.total > 0 };
+        });
+      })
+      .then(function (out) {
+        btn.style.display = "none";
+        host.style.display = "";
+        host.innerHTML = "";
+        host.appendChild(renderDuplicateCheck(
+          out.page, products, level, host, out.relaxed));
+      })
+      .catch(function (err) {
+        // "Could not check" and "nothing found" mean opposite things to
+        // somebody deciding whether to build, so a failure never renders as
+        // an all-clear. The button comes back so they can retry.
+        console.warn("[hub-api] duplicate check failed", err);
+        btn.disabled = false;
+        btn.style.opacity = "";
+        btn.textContent = "Check Demo Database for Similar Content";
+        host.style.display = "";
+        host.innerHTML = "";
+        var warn = document.createElement("div");
+        warn.className = "modal__note";
+        var text = document.createElement("span");
+        text.textContent = "Could not reach the catalogue, so nothing was "
+          + "checked — this is not an all-clear. Try again in a moment.";
+        warn.appendChild(text);
+        host.appendChild(warn);
+      });
+  };
+
   function bootFailed(message) {
     var boot = document.getElementById("hubBoot");
     var text = document.getElementById("hubBootMessage");

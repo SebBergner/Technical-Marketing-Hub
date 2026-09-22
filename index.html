@@ -1893,7 +1893,7 @@ function computeKindOfDemo() {
       '<div class="field-hint" style="margin-top:4px;">' + VIDEO_LEVEL_HINT[level] + '</div>' +
       '<div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">' +
         '<button class="btn-ghost" style="flex:none; padding:6px 12px;" onclick="openStyleExampleModal(\'' + level + '\')"><svg class="orion-ico--sm orion-ico"><use href="#i-play"/></svg>See an example of this style</button>' +
-        '<button class="btn-ghost" style="flex:none; padding:6px 12px;" onclick="checkExistingAsset(this, \'' + level + '\')"><svg class="orion-ico--sm orion-ico"><use href="#i-search"/></svg>Check Consensus for something similar</button>' +
+        '<button class="btn-ghost" style="flex:none; padding:6px 12px;" onclick="checkExistingAsset(this, \'' + level + '\')"><svg class="orion-ico--sm orion-ico"><use href="#i-search"/></svg>Check Demo Database for Similar Content</button>' +
       '</div>' +
       '<div id="existingCheck-' + level + '" style="display:none; margin-top:10px;"></div>' +
       '</div>';
@@ -1928,7 +1928,7 @@ var EXISTING_ASSET_MATCHES = {
 function checkExistingAsset(btn, level) {
   btn.disabled = true;
   btn.style.opacity = '.6';
-  btn.textContent = 'Checking Consensus…';
+  btn.textContent = 'Checking Demo Database…';
   var resultEl = document.getElementById('existingCheck-' + level);
   var products = Array.from(document.querySelectorAll('#productScopeRow .stage-pill--active')).map(function(p) { return p.dataset.value; });
   var key = (products[0] || 'Other') + '|' + level;
@@ -1955,7 +1955,7 @@ function checkExistingAsset(btn, level) {
     } else {
       resultEl.innerHTML =
         '<div class="modal__note"><svg class="orion-ico orion-ico--sm" style="color:var(--orion-green-ink);"><use href="#i-check"/></svg>' +
-        '<span>No similar asset found in Consensus for this product and style — clear to create something new.</span></div>';
+        '<span>No similar asset found in the Demo Database for this product and style — clear to create something new.</span></div>';
     }
   }, 700);
 }

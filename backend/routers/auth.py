@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from backend.auth import AuthMode, CurrentUser, get_current_user, security_warnings
+from backend.auth import ENFORCING_MODES, CurrentUser, get_current_user, security_warnings
 from backend.config import settings
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -20,7 +20,7 @@ def me(user: CurrentUser = Depends(get_current_user)):
     return {
         "user": user.as_dict(),
         "mode": settings.auth_mode,
-        "enforcing": settings.auth_mode == AuthMode.EASYAUTH.value,
+        "enforcing": settings.auth_mode in ENFORCING_MODES,
         "curator_groups_configured": bool(settings.auth_curator_groups),
         "warnings": security_warnings(),
     }

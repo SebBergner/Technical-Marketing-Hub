@@ -4,10 +4,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 
 from backend.config import settings
 from backend.version import app_version
 from backend.db import SessionLocal, create_all
+from backend import oidc
 from backend.routers import (
     admin, assets, auth, consensus, curation, debug, graph, requests, segments,
     taxonomy,
@@ -74,6 +76,31 @@ app.include_router(curation.router)
 app.include_router(graph.router)
 app.include_router(debug.router)
 app.include_router(admin.router)
+app.include_router(oidc.router)
+
+# Middleware, innermost first. Starlette wraps each new one around the ones
+# already added, so the order below is the reverse of the order a request
+# meets them in: canonical_host, then the session, then the sign-in gate.
+# The gate must sit inside SessionMiddleware because it reads the session;
+# the host redirect sits outside everything, so a request on the wrong host
+# never touches a cookie at all.
+#
+# All three are installed in every AUTH_MODE and decide per request whether
+# to act, so switching mode is a setting and a restart, never a code change.
+# Outside oidc mode the session is never written, so no cookie is ever set.
+app.middleware("http")(oidc.require_sign_in)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=oidc.session_secret(),
+    session_cookie=oidc.SESSION_COOKIE,
+    max_age=settings.session_timeout_hours * 3600,
+    # lax, not strict: the return from Microsoft is a top-level navigation
+    # from another site, and strict would withhold the very cookie that
+    # holds the sign-in being completed.
+    same_site="lax",
+    https_only=settings.https_only,
+)
+app.middleware("http")(oidc.canonical_host)
 
 
 @app.get("/admin", include_in_schema=False)

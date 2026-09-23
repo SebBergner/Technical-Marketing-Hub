@@ -93,6 +93,8 @@ class Settings(BaseSettings):
     #: development, and safe because a forged header must never grant access.
     #: "easyauth" trusts them, and is only correct behind App Service
     #: Authentication with "Require authentication" turned on.
+    #: "oidc" is the app signing people in itself (backend/oidc.py): /login,
+    #: /auth/callback, /logout, and a gate in front of every other route.
     auth_mode: str = "disabled"
 
     #: Entra ID group object ids (or app role names) whose members may curate —
@@ -117,6 +119,48 @@ class Settings(BaseSettings):
     #: a caller supplied -- see principal_from_request, which ignores every
     #: header unless auth_mode is easyauth.
     auth_curator_emails: str = ""
+    #: Curators by Entra object id (the `oid` claim), comma separated. The
+    #: stronger of the two per-person keys: an oid never changes and is never
+    #: reused, where an address can do both -- Microsoft's own guidance is not
+    #: to authorise on `email` at all. /api/auth/me shows your oid once you
+    #: are signed in, which is the easy way to collect the three of them.
+    auth_curator_oids: str = ""
+
+    # ------------------------------------------------ sign-in (AUTH_MODE=oidc)
+    #: The Entra app registration IT creates for interactive sign-in. Not the
+    #: GRAPH_* one: that reads SharePoint as the app itself, this one proves
+    #: who a person is, and keeping them apart means neither can be widened
+    #: by accident while configuring the other.
+    oidc_tenant_id: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: str = ""
+    #: Must match a redirect URI on the app registration exactly, and differs
+    #: per slot -- so on Azure it has to be a *deployment slot setting*, or a
+    #: swap hands each slot the other's address. Left blank locally, where it
+    #: is derived from the request (http://localhost:8000/auth/callback).
+    oidc_redirect_uri: str = ""
+
+    # The next four keep AMP's names (Seb's app, read 2026-09-23), so the two
+    # apps' Azure configuration can be compared line by line.
+    #: Signs the session cookie. Unset means a random key per process: nothing
+    #: forgeable, but every restart signs everyone out and two instances would
+    #: not recognise each other's cookies. security_warnings() says so.
+    secret_key: str = ""
+    #: Marks the session cookie Secure. True on Azure; false locally, where
+    #: a Secure cookie over plain http would simply never be stored.
+    https_only: bool = False
+    #: Idle timeout, sliding: any request within the window extends it.
+    session_timeout_hours: int = 12
+    #: Hard ceiling, however active the session is. The identity provider has
+    #: no way to reach into our cookie, so without this a person disabled in
+    #: Entra would keep access for as long as they kept clicking. Signing in
+    #: again is silent while their Microsoft session is alive.
+    session_absolute_hours: int = 24
+    #: The canonical hostname (tmh.ptcxc.com / dev-tmh.ptcxc.com). When set,
+    #: requests arriving on *.azurewebsites.net are redirected to it. A slot
+    #: setting for the same reason as the redirect URI, and only to be set once
+    #: the custom domain answers -- before that it points everyone at nothing.
+    custom_domain: str = ""
 
     # ------------------------------------------------ the admin bridge (temporary)
     #: A single shared credential for the Admin page, for the stretch before
@@ -140,6 +184,13 @@ class Settings(BaseSettings):
     #: Real data is honest but makes stakeholder demos look emptier — flag it,
     #: do not change it silently.
     show_placeholder_counts: bool = False
+
+    @property
+    def oidc_configured(self) -> bool:
+        """All three, or sign-in cannot start. The redirect URI is not on the
+        list because it has a sensible local default."""
+        return bool(self.oidc_tenant_id and self.oidc_client_id
+                    and self.oidc_client_secret)
 
     @property
     def admin_configured(self) -> bool:

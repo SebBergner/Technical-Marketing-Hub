@@ -163,6 +163,31 @@ an update. Fine for a single instance; scale-out needs a real store.
 
 *Implemented 2026-08-20, ahead of any write path, as section 1 requires.*
 
+> **Revised 2026-09-23: the deployed Hub moves to its own OIDC sign-in**
+> (`AUTH_MODE=oidc`, `backend/oidc.py`). Easy Auth below is still
+> implemented and tested, and remains a valid way to run the app.
+>
+> What changed was not the analysis but the circumstances. Seb gave IT the
+> callback addresses `https://tmh.ptcxc.com/auth/callback` and
+> `https://dev-tmh.ptcxc.com/auth/callback` — app-defined routes, which only
+> a hand-rolled flow has; Easy Auth's are fixed at `/.auth/login/aad/callback`.
+> AMP, Seb's other app, is planned the same way, and one pattern across two
+> apps is worth more than the code Easy Auth saves. It also gains local runs
+> the real sign-in rather than a stand-in.
+>
+> The cost is that the security-critical parts are ours. They are kept
+> narrow — msal does the protocol — and each property has a test that was
+> shown to fail with the protecting check removed (eleven of them; one did
+> not fail at first, and was rewritten). The first end-to-end run also found
+> a real defect no unit test had: a favicon request redirected to /login
+> started a second flow and replaced the one in progress. Only navigations
+> are sent to sign in now.
+>
+> Curators gain an object-id route (`AUTH_CURATOR_OIDS`). Microsoft's claims
+> reference says not to authorise on `email`; addresses stay supported
+> because they are what three people can name today, but the oid is the key
+> to move to.
+
 Entra ID sign-in is handled by the platform; the app receives identity as
 `X-MS-CLIENT-PRINCIPAL-*` headers.
 

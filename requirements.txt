@@ -5,6 +5,10 @@ sqlalchemy>=2.0
 pydantic-settings
 httpx
 msal
+# Signs the session cookie for the app's own sign-in (AUTH_MODE=oidc).
+# Starlette's SessionMiddleware imports it at load time, so without it
+# the app does not start at all -- in any mode.
+itsdangerous
 # Required by FastAPI to parse multipart form data — the request
 # intake's file uploads. Without it that endpoint fails at import.
 python-multipart

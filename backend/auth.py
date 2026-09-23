@@ -1,7 +1,19 @@
 """Authentication and authorisation.
 
-Identity comes from **Azure App Service Easy Auth**: the platform performs the
-Entra ID sign-in and injects the result as request headers before our code runs.
+Three modes, chosen by `AUTH_MODE`:
+
+* `oidc` — the app signs people in itself (backend/oidc.py). Identity lives in
+  the signed session cookie, written once at /auth/callback. This is the mode
+  the deployed Hub uses from 2026-09-23, matching the callback URLs Seb gave IT
+  and the pattern planned for AMP.
+* `easyauth` — the platform does the sign-in and injects headers, described
+  below. Kept, working and tested, because it is a legitimate way to run the
+  app and costs nothing to leave in place.
+* `disabled` — local development; a labelled dev principal with full rights.
+
+Identity in `easyauth` mode comes from **Azure App Service Easy Auth**: the
+platform performs the Entra ID sign-in and injects the result as request
+headers before our code runs.
 
     X-MS-CLIENT-PRINCIPAL-NAME   the user's UPN / email
     X-MS-CLIENT-PRINCIPAL-ID     their object id
@@ -34,6 +46,7 @@ import binascii
 import json
 import logging
 import os
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -74,6 +87,14 @@ class AuthMode(str, Enum):
     DISABLED = "disabled"
     #: Running behind App Service Easy Auth; headers are authoritative.
     EASYAUTH = "easyauth"
+    #: The app's own OIDC sign-in; the session cookie is authoritative and the
+    #: X-MS-* headers are ignored exactly as in `disabled`.
+    OIDC = "oidc"
+
+
+#: Modes in which access control is actually on. Anything else is either local
+#: development or a misconfiguration, and security_warnings() says which.
+ENFORCING_MODES = {AuthMode.EASYAUTH.value, AuthMode.OIDC.value}
 
 
 @dataclass
@@ -145,24 +166,32 @@ def _roles_from_claims(payload: dict) -> set[str]:
     return found
 
 
-def _map_roles(claim_values: set[str], email: str | None = None) -> set[str]:
-    """Map Entra ID group ids / app role names / named addresses onto our roles.
+def _map_roles(claim_values: set[str], email: str | None = None,
+               oid: str | None = None, username: str | None = None) -> set[str]:
+    """Map Entra ID group ids / app role names / named people onto our roles.
 
     Configured rather than hardcoded, because none of these values exist in
     the code — they come from whoever sets up the app registration. Until one
-    of the three is set, every authenticated user is a viewer only, which
-    fails closed: read and share work, curation does not.
+    of them is set, every authenticated user is a viewer only, which fails
+    closed: read and share work, curation does not.
 
-    Three ways in, any of which is enough:
+    Four ways in, any of which is enough:
 
     * a group object id listed in `AUTH_CURATOR_GROUPS`
     * an app role literally named `curator`
+    * an object id listed in `AUTH_CURATOR_OIDS`
     * an address listed in `AUTH_CURATOR_EMAILS`
 
-    The last needs nothing from the identity provider beyond the address it
-    already asserts, which is why it exists: it unblocks a three-person
-    curator list without a group claim having to be requested, emitted and
-    kept in step.
+    The last two need nothing from the identity provider beyond what it sends
+    for every sign-in anyway. Of the two, prefer the oid: it never changes and
+    is never reused, where an address can do both, and Microsoft's guidance is
+    not to authorise on `email` at all. Addresses stay supported because they
+    are what three people can name today without looking anything up.
+
+    `username` is `preferred_username` (the UPN) in oidc mode. It is matched
+    alongside `email` because at PTC the two normally agree, but either can be
+    absent from a given token and a curator should not lose the role over which
+    one happened to arrive.
     """
     roles = {Role.VIEWER.value}
 
@@ -175,16 +204,69 @@ def _map_roles(claim_values: set[str], email: str | None = None) -> set[str]:
     if Role.CURATOR.value in {v.lower() for v in claim_values}:
         roles.add(Role.CURATOR.value)
 
+    oids = {o.strip().lower()
+            for o in (settings.auth_curator_oids or "").split(",") if o.strip()}
+    if oids and oid and oid.strip().lower() in oids:
+        roles.add(Role.CURATOR.value)
+
     named = {e.strip().lower()
              for e in (settings.auth_curator_emails or "").split(",") if e.strip()}
-    if named and email and email.strip().lower() in named:
+    offered = {v.strip().lower() for v in (email, username) if v and v.strip()}
+    if named and (offered & named):
         roles.add(Role.CURATOR.value)
 
     return roles
 
 
+def session_user(request: Request) -> dict | None:
+    """The signed-in person from the session cookie, or None.
+
+    None as well when the session is older than SESSION_ABSOLUTE_HOURS,
+    whatever the idle timer says -- and the stale identity is dropped from the
+    session, so the cookie stops carrying it. Reads the session from the ASGI
+    scope rather than `request.session`, which raises when SessionMiddleware
+    is not installed; that makes this safe to call from any mode.
+    """
+    session = request.scope.get("session")
+    if not isinstance(session, dict):
+        return None
+    user = session.get("user")
+    if not isinstance(user, dict) or not user.get("oid"):
+        return None
+    signed_in_at = user.get("signed_in_at")
+    ceiling = settings.session_absolute_hours * 3600
+    if not isinstance(signed_in_at, (int, float)) \
+            or time.time() - signed_in_at > ceiling:
+        session.pop("user", None)
+        return None
+    return user
+
+
+def _principal_from_session(request: Request) -> CurrentUser:
+    user = session_user(request)
+    if user is None:
+        return ANONYMOUS
+    claim_values = {str(v) for v in (user.get("roles") or []) + (user.get("groups") or [])
+                    if v}
+    email = user.get("email") or user.get("username")
+    return CurrentUser(
+        email=email,
+        name=user.get("name") or email,
+        object_id=user.get("oid"),
+        provider="aad",
+        roles=_map_roles(claim_values, user.get("email"), user.get("oid"),
+                         user.get("username")),
+        is_authenticated=True,
+    )
+
+
 def principal_from_request(request: Request) -> CurrentUser:
     """Build the current user. Headers are honoured only in easyauth mode."""
+    if settings.auth_mode == AuthMode.OIDC.value:
+        # The session, and only the session. X-MS-* headers are ignored here
+        # for the same reason as in disabled mode: nothing puts them there, so
+        # anyone who sends them is making them up.
+        return _principal_from_session(request)
     if settings.auth_mode != AuthMode.EASYAUTH.value:
         # Deliberately ignore any X-MS-* header here. Believing them with auth
         # switched off would mean a forged header grants access.
@@ -221,8 +303,7 @@ async def require_authenticated(
     if not (user.is_authenticated or user.is_dev_principal):
         raise HTTPException(
             status_code=401,
-            detail="Sign-in required. This app expects Azure App Service Easy Auth "
-                   "(Entra ID) in front of it.",
+            detail="Sign-in required.",
         )
     return user
 
@@ -235,7 +316,8 @@ async def require_curator(
         raise HTTPException(
             status_code=403,
             detail="This action needs the curator role. Ask an administrator to add "
-                   "you to a group listed in AUTH_CURATOR_GROUPS.",
+                   "you to AUTH_CURATOR_OIDS, AUTH_CURATOR_EMAILS or a group in "
+                   "AUTH_CURATOR_GROUPS.",
         )
     return user
 
@@ -250,24 +332,48 @@ def security_warnings() -> list[str]:
     """
     warnings: list[str] = []
     on_app_service = bool(os.environ.get(APP_SERVICE_MARKER))
-    disabled = settings.auth_mode != AuthMode.EASYAUTH.value
+    # Not "!= easyauth": oidc enforces too, and treating it as disabled would
+    # raise the loudest warning on exactly the deployments doing it right.
+    disabled = settings.auth_mode not in ENFORCING_MODES
+    oidc = settings.auth_mode == AuthMode.OIDC.value
 
     if on_app_service and disabled:
         warnings.append(
             "AUTH IS DISABLED ON APP SERVICE. Every caller is treated as a curator. "
-            "Set AUTH_MODE=easyauth and enable App Service Authentication (Entra ID) "
-            "with 'Require authentication'.")
+            "Set AUTH_MODE=oidc (the app's own sign-in) or AUTH_MODE=easyauth "
+            "(App Service Authentication with 'Require authentication').")
+    if oidc and not settings.oidc_configured:
+        warnings.append(
+            "AUTH_MODE=oidc but OIDC_TENANT_ID, OIDC_CLIENT_ID and "
+            "OIDC_CLIENT_SECRET are not all set, so nobody can sign in and every "
+            "page is closed. That fails safe, but it is not working.")
+    if oidc and on_app_service and not settings.secret_key:
+        warnings.append(
+            "SECRET_KEY is not set, so sessions are signed with a random key per "
+            "process: every restart signs everyone out, and with more than one "
+            "instance a sign-in only works on the instance that issued it.")
+    if oidc and on_app_service and not settings.https_only:
+        warnings.append(
+            "HTTPS_ONLY is not true, so the session cookie is not marked Secure "
+            "and could be sent over plain http.")
+    if oidc and on_app_service and not settings.oidc_redirect_uri:
+        warnings.append(
+            "OIDC_REDIRECT_URI is not set. Behind App Service the request looks "
+            "like http, so the derived callback address will not match the https "
+            "one registered with Entra and sign-in will fail.")
     # Any one of the three routes is enough, so this only fires when none of
     # them can grant the role. An app role cannot be detected from config --
     # it arrives in the token -- so a deployment relying solely on app roles
     # will see this warning and can ignore it; /api/auth/me shows the truth.
-    if (settings.auth_mode == AuthMode.EASYAUTH.value
+    if (settings.auth_mode in ENFORCING_MODES
             and not settings.auth_curator_groups
-            and not settings.auth_curator_emails):
+            and not settings.auth_curator_emails
+            and not settings.auth_curator_oids):
         warnings.append(
-            "Neither AUTH_CURATOR_GROUPS nor AUTH_CURATOR_EMAILS is set, so nobody "
-            "has the curator role and curation endpoints will refuse everyone "
-            "unless the token carries an app role named 'curator'.")
+            "Neither AUTH_CURATOR_GROUPS nor AUTH_CURATOR_EMAILS nor "
+            "AUTH_CURATOR_OIDS is set, so nobody has the curator role and curation "
+            "endpoints will refuse everyone unless the token carries an app role "
+            "named 'curator'.")
     if on_app_service and settings.graph_configured and disabled:
         warnings.append(
             "Graph write access is configured while auth is disabled — an "

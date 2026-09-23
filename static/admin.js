@@ -11,6 +11,34 @@
 (function () {
   "use strict";
 
+  /* ── when the session runs out with the page open ─────────────────────
+   *
+   * The server's sign-in gate (backend/oidc.py) answers an API call that
+   * has no session with 401 and an X-Sign-In header. A page already open
+   * would otherwise just stop loading data, with nothing to say why -- so
+   * any such answer sends the person to sign in and back to exactly where
+   * they were, including the #/asset/... part the server never sees.
+   *
+   * Keyed on the header, not on 401 alone: the Admin page's own 401 means
+   * "the admin password has not been entered", and must keep meaning that.
+   */
+  (function watchForExpiredSession() {
+    var original = window.fetch;
+    if (!original || original.hubSignInWatch) return;
+    var watched = function () {
+      return original.apply(this, arguments).then(function (response) {
+        var login = response.status === 401 && response.headers.get("X-Sign-In");
+        if (login) {
+          var here = location.pathname + location.search + location.hash;
+          location.assign(login + "?next=" + encodeURIComponent(here));
+        }
+        return response;
+      });
+    };
+    watched.hubSignInWatch = true;
+    window.fetch = watched;
+  })();
+
   var $ = function (id) { return document.getElementById(id); };
 
   function show(view) {

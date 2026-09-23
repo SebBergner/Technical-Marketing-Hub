@@ -24,6 +24,73 @@ The app detects exactly this and says so — in the startup log, in
 `/api/auth/me` and in `/api/debug/backend` — but a warning is not a guard.
 Nothing refuses the request.
 
+There are two ways to turn it on. **1a is the plan of record** (2026-09-23);
+1b stays documented and working because it is a legitimate alternative.
+Never both at once: with App Service Authentication switched on, the platform
+answers `/login` and `/auth/callback` itself and the app's own sign-in never
+sees the request.
+
+### 1a. The app's own sign-in — `AUTH_MODE=oidc`
+
+The app runs OpenID Connect against Entra itself (`backend/oidc.py`), on the
+callback addresses Seb gave IT on 2026-09-23 — the same pattern AMP is
+planned to use. Every route except `/login`, `/auth/callback`, `/logout`,
+`/health` and `/api/version` needs a session.
+
+**From IT**, one app registration (or one per slot, which Microsoft
+recommends):
+
+- Platform **Web**, redirect URIs
+  `https://tmh.ptcxc.com/auth/callback`,
+  `https://dev-tmh.ptcxc.com/auth/callback`, and
+  `http://localhost:8000/auth/callback` if sign-in should work locally
+- Delegated permissions `openid`, `profile`, `email`, admin-consented.
+  Nothing else: the app never calls Graph as the signed-in user.
+- Back to us: the **tenant id**, **client id** and a **client secret**
+- `oid` needs no optional claim — the `profile` scope brings it
+
+**Order matters**, because the last step closes the site:
+
+1. Seb binds `tmh.ptcxc.com` / `dev-tmh.ptcxc.com` to production / staging,
+   with TLS, and each answers.
+2. On the **staging** slot, add the settings below. `AUTH_MODE=oidc` last.
+3. Check on `https://dev-tmh.ptcxc.com`: it sends you to Microsoft and back;
+   `/api/auth/me` shows your `object_id` and an empty `warnings`; the
+   staging slot's `azurewebsites.net` address redirects to `dev-tmh`.
+4. Add the curators' `object_id`s to `AUTH_CURATOR_OIDS` (read them off
+   `/api/auth/me` once each of them has signed in).
+5. Production the same way, once staging has been lived with.
+
+| Setting | Value | Slot setting? |
+|---|---|---|
+| `AUTH_MODE` | `oidc` | no — same on both |
+| `OIDC_TENANT_ID` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | from IT | only if IT gives one registration per slot |
+| `OIDC_REDIRECT_URI` | `https://tmh.ptcxc.com/auth/callback` (prod), `https://dev-tmh…` (staging) | **yes** |
+| `CUSTOM_DOMAIN` | `tmh.ptcxc.com` / `dev-tmh.ptcxc.com` | **yes** |
+| `SECRET_KEY` | long and random, different per slot | **yes** |
+| `HTTPS_ONLY` | `true` | no |
+| `SESSION_TIMEOUT_HOURS` / `SESSION_ABSOLUTE_HOURS` | `12` / `24` (the defaults) | no |
+| `AUTH_CURATOR_OIDS` | curators' object ids | no — same on both |
+
+The three **yes** rows are the ones a swap would otherwise exchange, which
+would send each slot's sign-in to the other slot's address. They are
+different per slot by nature, so mark them before the first swap.
+
+Set `CUSTOM_DOMAIN` only once the domain answers: it redirects every
+`azurewebsites.net` request to it, so set early it points everyone at
+nothing. It is a 302 rather than a 301 for the same reason — a browser never
+caches a mistake.
+
+`OIDC_REDIRECT_URI` cannot be derived on Azure: behind App Service the
+request reaches the app as http, so a derived address would not match the
+https one IT registered. The app warns when it is missing.
+
+### 1b. App Service Authentication — `AUTH_MODE=easyauth`
+
+The platform signs people in and hands the app their identity as headers.
+Callbacks are the platform's own, fixed at `/.auth/login/aad/callback`, so
+IT would register those instead of the addresses in 1a.
+
 **In the Azure portal, on the Web App:**
 
 1. **Settings → Authentication → Add identity provider**

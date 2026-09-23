@@ -90,9 +90,27 @@ def sync(full: bool = False, repo: AssetRepository = Depends(get_repo),
 
     _save_token(repo, result.delta_token)
     summary = result.as_dict()
+    summary["vm_pages"] = _sync_vm_pages(client, repo)
     _record_attempt(repo, ok=True, summary=summary)
     log.info("graph sync by %s: %s", actor, summary)
     return summary
+
+
+def _sync_vm_pages(client: GraphClient, repo: AssetRepository) -> dict:
+    """The VM pages ride along with the catalogue sync, and fail alone.
+
+    Same site, same credentials, same button on the Admin page -- but a
+    different source, so a problem reading pages must not undo a catalogue
+    sync that has already succeeded. The outcome is reported inside the
+    summary either way, so a failure is visible rather than silent.
+    """
+    from backend.integrations.graph.vm_pages import sync_vm_pages
+    try:
+        site = client.resolve_site(settings.graph_site_url)
+        return {"ok": True, **sync_vm_pages(client, repo, site).as_dict()}
+    except Exception as exc:                                 # noqa: BLE001
+        log.exception("vm page sync failed")
+        return {"ok": False, "error": str(exc)[:300]}
 
 
 def _record_attempt(repo: AssetRepository, ok: bool, summary: dict | None = None,

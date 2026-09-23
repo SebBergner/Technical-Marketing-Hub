@@ -12,7 +12,7 @@ from backend.db import SessionLocal, create_all
 from backend import oidc
 from backend.routers import (
     admin, assets, auth, consensus, curation, debug, graph, requests, segments,
-    taxonomy,
+    taxonomy, vms,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -77,6 +77,7 @@ app.include_router(graph.router)
 app.include_router(debug.router)
 app.include_router(admin.router)
 app.include_router(oidc.router)
+app.include_router(vms.router)
 
 # Middleware, innermost first. Starlette wraps each new one around the ones
 # already added, so the order below is the reverse of the order a request

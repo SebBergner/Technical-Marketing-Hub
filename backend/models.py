@@ -145,6 +145,107 @@ class AssetStats(BaseModel):
 
 
 # ------------------------------------------------------------------ asset
+# ─────────────────────────────────────────────────────────── virtual machines
+class VmBlock(BaseModel):
+    """One paragraph, list item or table of a VM page section.
+
+    `sealed` marks a block whose content was a credential. Its text is not
+    here -- only a placeholder travels with the public record, and the content
+    itself lives in a separate file read by one signed-in endpoint
+    (backend/integrations/graph/vm_pages.py explains why).
+    """
+    kind: str                                  # "p" | "li" | "table"
+    text: str | None = None
+    rows: list[list[str]] | None = None
+    #: Links written inside this block, kept so "Download from FTP" stays a
+    #: link. Rendered beside the text, never as HTML.
+    links: list["VmLink"] = Field(default_factory=list)
+    sealed: bool = False
+
+
+class VmSection(BaseModel):
+    """A heading of the source page and everything under it."""
+    id: str                                    # anchor, unique within the page
+    heading: str | None = None                 # None: the text before any heading
+    blocks: list[VmBlock] = Field(default_factory=list)
+    #: The whole section is credentials (e.g. "Admin Credentials"), so even
+    #: its structure is withheld until someone signs in.
+    sealed: bool = False
+
+
+class VmLink(BaseModel):
+    label: str
+    url: str
+    kind: str                                  # cloud_portal | download | vm_page | other
+
+
+class VmDocument(BaseModel):
+    """A file the page embeds or links to -- release notes, guides.
+
+    `asset_id` + `item_id` are set when the file is one the catalogue already
+    mirrors (most live in Demo Catalog/Release Notes), which lets the Hub's
+    existing preview and download work on it. Otherwise it opens in SharePoint.
+    """
+    name: str
+    url: str
+    asset_id: str | None = None
+    item_id: str | None = None
+
+
+class VmRelated(BaseModel):
+    """An asset connected to this VM, and how we know.
+
+    `via` is shown to the reader, because a link someone wrote on the page
+    and a match we worked out from the title deserve different trust.
+      page      linked from the VM page itself
+      supports  named in the page's "Supported Demo Material" query
+      inferred  same product family and dataset -- a suggestion, labelled so
+    """
+    asset_id: str
+    title: str
+    type: AssetType
+    via: str
+
+
+class VmSupportsFilter(BaseModel):
+    """"Every PLM LDK runs here" -- a whole slice of the catalogue.
+
+    From queries like `Segment:"PLM" AND WORDS(LDK)`. Rendered as a filter
+    link with a count rather than expanded into a list of hundreds.
+    """
+    label: str
+    segment: str | None = None
+    type: AssetType | None = None
+
+
+class VmDetail(BaseModel):
+    """Everything a VM page says beyond the common asset fields."""
+    version: str | None = None
+    page_modified_by: str | None = None
+    ptc_only: bool = False
+    sections: list[VmSection] = Field(default_factory=list)
+    actions: list[VmLink] = Field(default_factory=list)
+    documents: list[VmDocument] = Field(default_factory=list)
+    related_vms: list[VmRelated] = Field(default_factory=list)
+    related_demos: list[VmRelated] = Field(default_factory=list)
+    supports: list[VmSupportsFilter] = Field(default_factory=list)
+    #: How many sealed blocks and sections there are, so a reader who is not
+    #: signed in is told there is something to sign in for.
+    sealed_count: int = 0
+    #: Public section text, flattened for search. Never contains sealed text.
+    search_text: str = ""
+
+
+VmBlock.model_rebuild()
+
+
+class UsedByVm(BaseModel):
+    """On a demo's detail: a VM that says it runs this demo."""
+    asset_id: str
+    title: str
+    via: str
+
+
 class AssetBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -277,6 +378,10 @@ class Asset(AssetBase):
     #: assets that have any video. The remaining 122 need a human to choose, so
     #: this stays None rather than guessing.
     main_video: str | None = None
+    #: VM pages only (type == vm).
+    vm: VmDetail | None = None
+    #: Every other asset: the VMs whose pages say they run it.
+    used_by_vms: list[UsedByVm] = Field(default_factory=list)
 
 
 # ------------------------------------------------------- metadata proposals

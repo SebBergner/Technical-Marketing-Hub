@@ -61,7 +61,17 @@ _MIRROR_FIELDS = (
     "internal_title",
     "resources", "resource_counts", "resource_count", "video_count", "main_video",
     "external_views",
+    # VM pages only. Public by construction: credentials are sealed out of it
+    # before it is built (backend/integrations/graph/vm_pages.py) and live in
+    # PRIVATE_DIR instead.
+    "vm",
 )
+
+#: Under mirror/, and never read as catalogue data: _load_mirror only reads
+#: *.json at the top level of mirror/. Holds what VM pages say that only a
+#: signed-in person may see. Rebuilt by every VM sync, like the rest of mirror/.
+PRIVATE_DIR = "private"
+VM_SECRETS_FILE = "vm_credentials.json"
 
 #: The Type filter's own options, in the order Elio's dropdown shows them --
 #: always present in facets().types, even at zero, same reasoning as
@@ -103,6 +113,19 @@ def _as_date(value: Any) -> date | None:
         except ValueError:
             return None
     return None
+
+
+def _searchable(record: dict) -> str | None:
+    """The text a search looks at besides the title.
+
+    For a VM that includes its page's public text, so "SQL Server 2019" finds
+    the VM that has it installed. Public only: sealed content was removed
+    before `search_text` was built, so a search cannot be used to probe for a
+    password one character at a time.
+    """
+    text = record.get("description")
+    extra = (record.get("vm") or {}).get("search_text")
+    return f"{text or ''} {extra}" if extra else text
 
 
 def _dedupe_by_id(tagged: list[tuple[str, dict]]) -> list[dict]:
@@ -251,7 +274,7 @@ class JsonAssetRepository(AssetRepository):
             # Membership comes from the scorer, so a record can never be
             # excluded by one rule and ranked by another.
             if query.text and not relevance.matches(
-                    query.text, record.get("title"), record.get("description")):
+                    query.text, record.get("title"), _searchable(record)):
                 return False
 
             for field, wanted in (("type", query.types),
@@ -315,7 +338,7 @@ class JsonAssetRepository(AssetRepository):
         elif query.sort == "relevance" and query.text:
             # Recency breaks ties, so equally-relevant results keep the old order.
             rows.sort(key=lambda r: (*relevance.ranking(query.text, r.get("title"),
-                                                        r.get("description")),
+                                                        _searchable(r)),
                                      recency(r)), reverse=True)
         else:
             rows.sort(key=recency, reverse=True)
@@ -344,7 +367,30 @@ class JsonAssetRepository(AssetRepository):
             is_editor_pick=bool(own.get("is_editor_pick")),
             value_roadmap=self._to_roadmap(roadmap),
         )
+        if record.get("type") == AssetType.VM.value:
+            data["vm"] = record.get("vm")
+        else:
+            from backend.integrations.graph.vm_pages import used_by_vms   # local: cycle
+            vms = [r for r in self._load_mirror() if r.get("type") == AssetType.VM.value]
+            if vms:
+                data["used_by_vms"] = used_by_vms(record, vms)
         return Asset(**data)
+
+    # ─────────────────────────────────────────── sealed VM page content
+    def replace_vm_secrets(self, secrets: dict) -> None:
+        """Replace the sealed content of every VM page at once.
+
+        Kept apart from the mirror file on purpose: the public record cannot
+        leak what it never contained, whatever later code does with it.
+        """
+        folder = os.path.join(self.mirror_dir, PRIVATE_DIR)
+        os.makedirs(folder, exist_ok=True)
+        with self._lock:
+            _atomic_write(os.path.join(folder, VM_SECRETS_FILE), secrets)
+
+    def vm_secrets(self, asset_id: str) -> dict | None:
+        path = os.path.join(self.mirror_dir, PRIVATE_DIR, VM_SECRETS_FILE)
+        return (_read(path, {}) or {}).get(asset_id)
 
     def facets(self, query: AssetQuery | None = None) -> Facets:
         """Every filter value with a real count, each scoped to its own slice.

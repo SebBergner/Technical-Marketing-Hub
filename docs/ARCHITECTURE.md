@@ -751,6 +751,28 @@ Three things that will bite otherwise:
 Run it on a timer (hourly is plenty). Graph change notifications can come later if anyone actually
 wants near-real-time; the delta loop is self-healing either way.
 
+### Virtual Machine pages (added 2026-09-23)
+
+The VMs come from the 38 pages under `SitePages/Virtual Machines/`, read with
+`GET /sites/{siteId}/pages/microsoft.graph.sitePage?$expand=canvasLayout` on the same catalogue
+sync (`backend/integrations/graph/vm_pages.py`; its docstring has the detail). The older *VM
+Catalog* library is stale and not read. A failure here is reported in the sync summary under
+`vm_pages` and never fails the catalogue sync.
+
+- **Pages become sections**, not fields: the pages share no template, so the Hub shows each page's
+  own headings, folded, with a table of contents. Text is rendered as text, never as HTML.
+- **Credentials are sealed at sync time.** Sections headed like credentials, and paragraphs, list
+  items and table rows naming a password, are replaced in the public record by a marker and written
+  to `mirror/private/vm_credentials.json` instead. A second pass over the finished record re-checks
+  and logs anything the first pass missed. `GET /api/vms/{id}/credentials` serves them only to a
+  signed-in person — never to the local development principal on App Service, so `AUTH_MODE` left
+  at `disabled` there does not publish them. Until SSO is on, the Hub says they are on the
+  SharePoint page.
+- **Relations say how they are known**: `page` (linked from the VM page), `supports` (named in its
+  Highlighted content query), `inferred` (same dataset and product family — labelled as a guess in
+  the UI). A query naming a slice (`Segment:"PLM"` + `WORDS(LDK)`) becomes a filter button, not a
+  list. A demo's detail shows the VMs that run it.
+
 ### Write-back rules
 
 1. **Optimistic concurrency.** Always `If-Match` with the stored ETag. On `412`, re-read, show the user

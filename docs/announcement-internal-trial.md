@@ -53,9 +53,10 @@ demo content, now live and ready to use:
 
 It replaces the separate Demo Library, Demo Video Gallery, and VM pages with a
 single catalogue covering Videos, Live Demo Kits (LDKs), Video Demo Kits
-(VDKs), CAD Datasets, and Virtual Machines — pulled together from SharePoint
-and Consensus so you don't have to remember which system has what. It's about
-1,100 assets today.
+(VDKs) and CAD Datasets — pulled together from SharePoint and Consensus so you
+don't have to remember which system has what. It's about 1,100 assets today.
+Virtual Machines have a place in the catalogue but nothing in them yet; you'll
+see the filter greyed out until they arrive.
 
 A few things worth trying:
 
@@ -125,6 +126,20 @@ The Admin page, Share-to-Consensus and comments. Each is either behind the
 admin sign-in or not built, and naming them would send people hunting for
 things that are not there. The rule this follows: an announcement should
 undersell what exists rather than describe what is planned.
+
+### Virtual Machines are listed but empty
+
+The catalogue holds 441 videos, 280 CAD datasets, 213 LDKs, 157 VDKs — and
+**zero virtual machines** (checked 2026-09-22). The site itself is honest
+about it: the sidebar shows "Virtual Machines 0", greyed out and unclickable,
+with the tooltip *"No virtual machines in the catalogue yet"*. Post-Sale gets
+the same treatment for the same reason.
+
+An earlier draft of this mail listed Virtual Machines among what the
+catalogue covers, which the site then contradicts on screen. The line now
+says the type exists and is empty, which is what a tester will actually find.
+
+Restore the simpler phrasing once VMs are indexed.
 
 ### The feedback form is shared with AMP
 

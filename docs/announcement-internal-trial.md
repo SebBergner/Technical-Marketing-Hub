@@ -13,7 +13,8 @@ were true when it was last checked and will not stay true. Run the checks in
 | Audience | the immediate team, not the wider Marketing / Solution Consulting org |
 | Sent by | Elio |
 | Prompted by | Seb, 2026-09-18: *"I think we have a good stage where we should start using the technical Marketing Hub internally in the team"* |
-| Last verified | 2026-09-22, production on v2026.2.42 after the second swap |
+| Revised | 2026-09-23, after Elio and Seb's review: the phased rollout, the internal-review framing, and the old sites staying up |
+| Last verified | 2026-09-23, production on v2026.2.42 |
 
 ---
 
@@ -46,17 +47,21 @@ curl -s "$P/api/graph/status"; curl -s "$P/api/consensus/status"   # last sync d
 
 Hi team,
 
-We'd like to introduce the **Technical Marketing Hub** — the new home for our
+We'd like to introduce the **Technical Marketing Hub** — a new home for our
 demo content, now live and ready to use:
 
 🔗 **https://technical-marketing-hub-c8gxg4fagycjh5dz.eastus-01.azurewebsites.net**
 
-It replaces the separate Demo Library, Demo Video Gallery, and VM pages with a
-single catalogue covering Videos, Live Demo Kits (LDKs), Video Demo Kits
-(VDKs) and CAD Datasets — pulled together from SharePoint and Consensus so you
-don't have to remember which system has what. It's about 1,100 assets today.
-Virtual Machines have a place in the catalogue but nothing in them yet; you'll
-see the filter greyed out until they arrive.
+**This is an internal review.** Only our team has been invited so far, and
+we're sharing it before it's finished on purpose: it isn't perfect yet, and
+your feedback now is what will shape it before it goes any wider.
+
+The Hub brings the Demo Library, Demo Video Gallery, and VM pages together in
+one catalogue covering Videos, Live Demo Kits (LDKs), Video Demo Kits (VDKs),
+CAD Datasets, and Virtual Machines (to be added) — pulled from SharePoint and
+Consensus so you don't have to remember which system has what. It's about
+1,100 assets today. The existing sites aren't going anywhere for now, so
+nothing you rely on changes while we test.
 
 A few things worth trying:
 
@@ -73,8 +78,7 @@ A few things worth trying:
 **Telling us what you think is the point of this round.** There's a
 **Share feedback** button at the bottom of the left sidebar — it opens our
 feedback form in a new tab. What's useful, what's missing, what's confusing:
-all of it is worth sending. Real usage now is exactly what shapes what we
-build next.
+all of it is worth sending.
 
 If you hit something that looks broken, the **version number next to the PTC
 logo** (bottom-left, e.g. v2026.2.42) tells us which build you were on —
@@ -88,9 +92,18 @@ Two things to expect:
   won't catch everything yet. That's a content gap we're working through, not
   a bug — though do tell us if a specific demo is hard to find.
 
-This is an early release and we're starting with the immediate team. Once SSO
-is in place we'll open it to the broader Marketing and Solution Consulting
-team — for now, consider it a preview with the people who'll use it most.
+**What happens next**
+
+We're rolling the Hub out in phases:
+
+1. **GXC** — this internal review, starting now
+2. **The wider Marketing organization** — next, and this phase will also bring
+   single sign-on (SSO)
+3. **PTC** more broadly
+4. **Partners**, last
+
+Each phase builds on what we learn in the one before, so what you tell us now
+shapes every step after it.
 
 Thanks for helping us get this right,
 [Elio / signature]
@@ -104,6 +117,11 @@ Thanks for helping us get this right,
 Platform sign-in is not enabled — `/.auth/me` returns 404, meaning App Service
 Authentication is off entirely. Anyone with the URL can read the catalogue.
 Fine for an internal mail; do not describe it as restricted.
+
+This is why the mail says **"only our team has been invited"** and not "only
+our team has access", which is how Seb put it in review (2026-09-23). The
+first is true; the second will be once SSO is on. Strengthen the wording then,
+not before.
 
 ### Request New Asset — resolved 2026-09-22
 
@@ -127,6 +145,24 @@ admin sign-in or not built, and naming them would send people hunting for
 things that are not there. The rule this follows: an announcement should
 undersell what exists rather than describe what is planned.
 
+### The phased rollout
+
+From Seb, 2026-09-23: GXC first, then the Marketing organization, then PTC,
+and partners last. SSO arrives with the second phase. The mail names the order
+but no dates, deliberately — none were agreed, and a date in an announcement
+reads as a commitment.
+
+Update the numbered list as each phase happens, rather than writing a new
+mail from scratch: the list is the part a later reader will want current.
+
+### The old sites stay up
+
+Elio, 2026-09-23: the Demo Library, Demo Video Gallery and VM pages are not
+being shut down for now. So the mail says the Hub *brings them together*, not
+that it *replaces* them — the earlier "It replaces the separate…" wording
+would have told people to stop using pages that are still the fallback.
+Restore "replaces" when they are actually retired.
+
 ### Virtual Machines are listed but empty
 
 The catalogue holds 441 videos, 280 CAD datasets, 213 LDKs, 157 VDKs — and
@@ -136,10 +172,12 @@ with the tooltip *"No virtual machines in the catalogue yet"*. Post-Sale gets
 the same treatment for the same reason.
 
 An earlier draft of this mail listed Virtual Machines among what the
-catalogue covers, which the site then contradicts on screen. The line now
-says the type exists and is empty, which is what a tester will actually find.
+catalogue covers without qualification, which the site then contradicts on
+screen. The mail now says "Virtual Machines (to be added)" — Liwei's wording
+in the draft that went to Elio, shorter than the sentence it replaced and
+equally honest.
 
-Restore the simpler phrasing once VMs are indexed.
+Drop "(to be added)" once VMs are indexed.
 
 ### The feedback form is shared with AMP
 

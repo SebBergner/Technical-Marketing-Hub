@@ -3612,6 +3612,8 @@
     // Who is signed in, and the way out -- only when the app does its own
     // sign-in (AUTH_MODE=oidc). Under Easy Auth the platform owns sign-out,
     // and locally there is nobody to sign out, so nothing is shown.
+    // Seb, 2026-09-25: between Share feedback and the PTC mark rather than
+    // under the mark, and the name easy to read -- it was muted 11.5px.
     fetch("/api/auth/me")
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
@@ -3626,7 +3628,7 @@
         out.textContent = "Sign out";
         who.appendChild(name);
         who.appendChild(out);
-        foot.appendChild(who);
+        foot.insertBefore(who, row);
       })
       .catch(function () {});
   }

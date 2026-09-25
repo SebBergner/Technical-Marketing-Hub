@@ -218,9 +218,25 @@ class VmSupportsFilter(BaseModel):
     type: AssetType | None = None
 
 
+class VmVersion(BaseModel):
+    """Another version of the same VM, for moving between them."""
+    asset_id: str
+    title: str
+    version: str | None = None
+
+
 class VmDetail(BaseModel):
     """Everything a VM page says beyond the common asset fields."""
     version: str | None = None
+    #: Which VM this is a version of -- the title up to its first version
+    #: number, normalised ("windchill", "alm cb"). None when the title has no
+    #: version, which makes the VM a line of its own.
+    line: str | None = None
+    #: The newest version of the same line, when this is not it. Listings
+    #: leave a superseded VM out (backend/services/listing.py).
+    superseded_by: str | None = None
+    #: Every other version of the line, newest first.
+    other_versions: list[VmVersion] = Field(default_factory=list)
     page_modified_by: str | None = None
     ptc_only: bool = False
     sections: list[VmSection] = Field(default_factory=list)

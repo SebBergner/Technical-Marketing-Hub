@@ -22,7 +22,7 @@ from backend.models import (
     Page, ProposalState, ProposalSummary, ValueRoadmap,
 )
 from backend.repositories.base import AssetQuery, AssetRepository
-from backend.services import relevance, taxonomy
+from backend.services import listing, relevance, taxonomy
 from backend.tables import (
     AssetCuration, AssetIdentity, AssetSource, AssetStatsRow, AssetValueRoadmap,
     MetadataEdit, MetadataProposal as ProposalRow, ShareEvent, SyncState, utcnow,
@@ -104,6 +104,11 @@ class SqlAssetRepository(AssetRepository):
             # repository drops these at its read funnel; this is the same
             # guarantee, expressed where this one reads.
             if taxonomy.is_excluded(src.products):
+                return False
+            # The title rule from listing.py. The older-VM rule needs the VM
+            # detail, which this backend does not store, so it has nothing to
+            # apply it to.
+            if listing.is_unlisted_title(src.title):
                 return False
             if query.umbrella_families and not (
                     set(taxonomy.umbrellas_of(src.products))
@@ -191,7 +196,8 @@ class SqlAssetRepository(AssetRepository):
                 select(AssetSource)
                 .join(AssetIdentity, AssetIdentity.asset_id == AssetSource.asset_id)
                 .where(AssetIdentity.retired_at.is_(None))
-            ).scalars().all() if not taxonomy.is_excluded(r.products)]
+            ).scalars().all() if not taxonomy.is_excluded(r.products)
+                and not listing.is_unlisted_title(r.title)]
 
         # Reuse the listing's own filtering so a facet count can never disagree
         # with the number of results clicking it produces.

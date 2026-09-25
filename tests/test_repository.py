@@ -19,7 +19,7 @@ from datetime import date
 
 import pytest
 
-from backend.services import taxonomy
+from backend.services import listing, taxonomy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -42,9 +42,10 @@ with open(SEED, encoding="utf-8") as _fh:
 #: read funnel, so 452 rows on disk become 366 in the catalogue. Computed
 #: rather than hardcoded, because the divested list is a business decision that
 #: will change and a hardcoded 366 would make an ordinary edit look like a
-#: regression.
+#: regression. Likewise for what is kept out of listings (listing.py): the
+#: seed has a "Release Notes" folder, which opens by id but is never listed.
 SEED_RECORDS = [r for r in SEED_FILE_RECORDS
-                if not taxonomy.is_excluded(r.get("products"))]
+                if not taxonomy.is_excluded(r.get("products")) and listing.is_listed(r)]
 SEED_COUNT = len(SEED_RECORDS)
 
 #: A product that genuinely appears — and survives the exclusion, or every

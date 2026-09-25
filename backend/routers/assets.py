@@ -43,6 +43,9 @@ def list_assets(
     has_consensus_uuid: bool | None = None,
     rail: str | None = None,
     editor_picks: bool = False,
+    include_older_vms: bool = Query(
+        default=False,
+        description="also list VMs a newer version of the same VM supersedes"),
     sort: str = Query(
         default="relevance", pattern="^(relevance|recent|most_viewed|title)$",
         description="relevance ranks title matches above description matches and "
@@ -59,6 +62,7 @@ def list_assets(
         umbrella_families=umbrella, tags=tag,
         customer_facing=customer_facing, has_narrated_audio=has_narrated_audio,
         has_consensus_uuid=has_consensus_uuid, rail=rail, editor_picks_only=editor_picks,
+        include_older_vms=include_older_vms,
         sort=sort, limit=limit, offset=offset,
     ))
 

@@ -354,7 +354,8 @@ def test_secrets_are_stored_outside_the_mirror_the_catalogue_reads(repo):
         assert secret not in public
         assert secret in open(private, encoding="utf-8").read()
     # The private file is not read as catalogue rows.
-    assert repo.list(AssetQuery(limit=100)).total == len(CATALOGUE) + 1
+    # (Release Notes is in CATALOGUE but never listed -- see test_listing.py.)
+    assert repo.list(AssetQuery(limit=100)).total == len(CATALOGUE) - 1 + 1
 
 
 def test_the_detail_carries_the_page_but_never_a_secret(repo):

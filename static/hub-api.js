@@ -863,6 +863,9 @@
     if (cf === "no") params.set("customer_facing", "false");
     if (umbrellaFilter) params.append("umbrella", umbrellaFilter);
     if (tagFilter) params.append("tag", tagFilter);
+    if (val("hubFilterType") === "vm" && val("hubFilterVmVersions") === "all") {
+      params.set("include_older_vms", "true");
+    }
     return params;
   }
 
@@ -915,8 +918,42 @@
     }
   }
 
+  /* Paul and Scott, 2026-09-25: VMs list only the newest version of each --
+   * one Windchill, not five -- with a way to see the rest. Built here rather
+   * than in the markup, next to Video Type and on the same rule: shown only
+   * while Asset Type is Virtual Machine, and reset on the way out so a hidden
+   * control never keeps narrowing (or widening) the grid. */
+  function updateVmVersionFilter() {
+    var pill = document.getElementById("hubVmVersionsPill");
+    if (!pill) {
+      var anchor = document.getElementById("hubVideoTypeFilterPill");
+      if (!anchor) return;
+      pill = document.createElement("label");
+      pill.className = "filter-pill";
+      pill.id = "hubVmVersionsPill";
+      pill.appendChild(document.createTextNode("Versions: "));
+      var select = document.createElement("select");
+      select.id = "hubFilterVmVersions";
+      [["", "Latest only"], ["all", "All versions"]].forEach(function (o) {
+        var option = document.createElement("option");
+        option.value = o[0];
+        option.textContent = o[1];
+        select.appendChild(option);
+      });
+      select.addEventListener("change", applyFilters);
+      pill.appendChild(select);
+      pill.insertAdjacentHTML("beforeend",
+        '<svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>');
+      anchor.insertAdjacentElement("afterend", pill);
+    }
+    var isVm = val("hubFilterType") === "vm";
+    pill.style.display = isVm ? "" : "none";
+    if (!isVm) document.getElementById("hubFilterVmVersions").value = "";
+  }
+
   async function applyFilters() {
     updateVideoTypeFilterVisibility();
+    updateVmVersionFilter();
     var params = currentQuery();
     var active = params.toString().length > 0 || !!sortOverride;
 
@@ -2386,6 +2423,26 @@
     }
     if (vm.ptc_only) facts.push("PTC only — not for partners");
     if (facts.length) c.box.appendChild(vmEl("div", "hub-vm-facts", facts.join(" · ")));
+
+    // Listings show only the newest version of a VM, so an older one is
+    // reached from here -- and an older one says plainly that it is.
+    var others = vm.other_versions || [];
+    if (vm.superseded_by) {
+      var newer = others.filter(function (o) { return o.asset_id === vm.superseded_by; })[0];
+      var note = vmEl("div", "hub-vm-notice hub-vm-notice--older");
+      note.appendChild(document.createTextNode("An older version. The current one is "));
+      note.appendChild(assetLink(vm.superseded_by, newer ? newer.title : "the newest version"));
+      c.box.appendChild(note);
+    }
+    if (others.length) {
+      c.box.appendChild(vmEl("div", "vp-label hub-vm-sub",
+        vm.superseded_by ? "Other versions" : "Older versions"));
+      var list = vmEl("div", "hub-vm-list");
+      others.forEach(function (o) {
+        list.appendChild(assetLink(o.asset_id, o.title));
+      });
+      c.box.appendChild(list);
+    }
     return c.box;
   }
 

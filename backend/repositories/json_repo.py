@@ -43,7 +43,7 @@ from backend.models import (
     Page, ProposalState, ProposalSummary, ValueRoadmap,
 )
 from backend.repositories.base import AssetQuery, AssetRepository
-from backend.services import relevance, taxonomy
+from backend.services import listing, relevance, taxonomy
 from backend.tables import utcnow
 
 log = logging.getLogger(__name__)
@@ -271,6 +271,9 @@ class JsonAssetRepository(AssetRepository):
         rows = self._load_mirror()
 
         def keep(record: dict) -> bool:
+            # Reachable by id, never met while browsing -- listing.py says why.
+            if not listing.is_listed(record, query.include_older_vms):
+                return False
             # Membership comes from the scorer, so a record can never be
             # excluded by one rule and ranked by another.
             if query.text and not relevance.matches(
@@ -371,7 +374,10 @@ class JsonAssetRepository(AssetRepository):
             data["vm"] = record.get("vm")
         else:
             from backend.integrations.graph.vm_pages import used_by_vms   # local: cycle
-            vms = [r for r in self._load_mirror() if r.get("type") == AssetType.VM.value]
+            # The VMs to use today: an older version is reachable from the
+            # newest, not offered alongside it.
+            vms = [r for r in self._load_mirror() if r.get("type") == AssetType.VM.value
+                   and not listing.is_superseded_vm(r)]
             if vms:
                 data["used_by_vms"] = used_by_vms(record, vms)
         return Asset(**data)
@@ -408,7 +414,7 @@ class JsonAssetRepository(AssetRepository):
         base = query or AssetQuery()
         # Deliberately the same _rows() the listing uses, so a facet count can
         # never disagree with the number of results clicking it produces.
-        full = self._rows(base) if query else self._load_mirror()
+        full = self._rows(base)
         cache: dict[str, list[dict]] = {}
 
         def rows_for(dimension: str) -> list[dict]:

@@ -60,10 +60,10 @@ from html.parser import HTMLParser
 from urllib.parse import unquote, urlparse
 
 from backend.models import (
-    Asset, AssetType, UsedByVm, VmBlock, VmDetail, VmDocument, VmLink, VmRelated,
+    Asset, AssetType, UsedByVm, VmBlock, VmDetail, VmDocument, VmLink, VmRelated, VmVersion,
     VmSection, VmSupportsFilter,
 )
-from backend.services import taxonomy
+from backend.services import listing, taxonomy
 
 log = logging.getLogger(__name__)
 
@@ -550,6 +550,60 @@ def version_in_title(title: str) -> str | None:
     return versions[0] if len(versions) == 1 else None
 
 
+def version_line(title: str) -> tuple[str, tuple[int, ...]] | None:
+    """Which VM this title is a version of, and how new it is.
+
+    The line is everything before the first version number, normalised:
+    "Windchill 13.1.4.1 - Virtual Machine" and "Windchill 11.1 M020-CPS08 -
+    Virtual Machine" are both "windchill"; "ALM (CB 3.3.0 RVS 13.5 ...)" is
+    "alm cb", and "ALM Pure Variants 7.3.0" a different VM, "alm pure
+    variants". The first version number orders the line -- for a bundle
+    like ALM's that is Codebeamer's, which is the one its releases follow.
+
+    Segment would have been the obvious key, but most VM titles name no
+    segment (the Windchill ones do not), and ACD and Windchill are different
+    VMs however their segments compare.
+    """
+    match = _VERSION.search(title or "")
+    if not match:
+        return None
+    line = " ".join(re.findall(r"[a-z0-9+]+", title[:match.start()].lower()))
+    if not line:
+        return None
+    return line, tuple(int(p) for p in match.group(0).split("."))
+
+
+def _mark_versions(assets: list[Asset]) -> int:
+    """Point every older version of a VM at the newest one.
+
+    Divested VMs take no part: they are never shown, so one must not be
+    "the newest" of a line whose visible members it would then hide.
+    Returns how many VMs were superseded.
+    """
+    lines: dict[str, list[tuple[tuple[int, ...], str, Asset]]] = {}
+    for asset in assets:
+        found = version_line(asset.title)
+        if not found or taxonomy.is_excluded(asset.products):
+            continue
+        line, version = found
+        asset.vm.line = line
+        lines.setdefault(line, []).append(
+            (version, (asset.uploaded_at or date.min).isoformat(), asset))
+    superseded = 0
+    for members in lines.values():
+        members.sort(key=lambda m: (m[0], m[1]), reverse=True)
+        newest = members[0][2]
+        for _, _, asset in members:
+            asset.vm.other_versions = [
+                VmVersion(asset_id=o.id, title=o.title,
+                          version=".".join(str(n) for n in v))
+                for v, _, o in members if o is not asset]
+            if asset is not newest:
+                asset.vm.superseded_by = newest.id
+                superseded += 1
+    return superseded
+
+
 def segment_in_title(title: str) -> str | None:
     """Only when the title says it -- deriving a segment from the product
     would be a guess this module does not make."""
@@ -637,6 +691,8 @@ class VmSyncResult:
     supports_filters: int = 0
     documents: int = 0
     documents_previewable: int = 0
+    #: Older versions of a VM whose newest version is also synced.
+    superseded: int = 0
     unresolved_demo_links: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
@@ -696,6 +752,8 @@ def build_vm_assets(pages: list[dict], layouts: dict[str, dict], demo_pages: dic
         def add_demo(record: dict, via: str):
             if record["id"] in related or record.get("type") == AssetType.VM.value:
                 return
+            if listing.is_unlisted_title(record.get("title")):
+                return          # documentation, not a demo to run
             related[record["id"]] = VmRelated(asset_id=record["id"], title=record["title"],
                                               type=record["type"], via=via)
 
@@ -809,6 +867,7 @@ def build_vm_assets(pages: list[dict], layouts: dict[str, dict], demo_pages: dic
         result.documents += len(documents)
         result.documents_previewable += sum(1 for d in documents if d.item_id)
 
+    result.superseded = _mark_versions(assets)
     return assets, all_secrets, result
 
 

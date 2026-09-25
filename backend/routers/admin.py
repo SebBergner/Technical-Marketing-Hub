@@ -122,7 +122,7 @@ def overview(repo: AssetRepository = Depends(get_repo)):
     oauth = get_oauth()
     oauth_status = oauth.status()
 
-    assets = repo.list(AssetQuery(limit=10 ** 6)).items
+    assets = repo.list(AssetQuery(limit=10 ** 6, include_older_vms=True)).items
     total = len(assets)
 
     coverage = []
@@ -496,7 +496,7 @@ def usage_untouched(since: str | None = None, until: str | None = None,
     touched = {e["asset_id"] for e in _events(repo, since, until)
                if e.get("asset_id")}
     rows = []
-    for asset in repo.list(AssetQuery(limit=10 ** 6)).items:
+    for asset in repo.list(AssetQuery(limit=10 ** 6, include_older_vms=True)).items:
         if asset.id in touched:
             continue
         if q and q.strip().lower() not in (asset.title or "").lower():

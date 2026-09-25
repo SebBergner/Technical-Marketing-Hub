@@ -68,6 +68,7 @@ def get_facets(
     source: list[str] = Query(default=[]),
     tag: list[str] = Query(default=[]),
     customer_facing: bool | None = None,
+    include_older_vms: bool = False,
     repo: AssetRepository = Depends(get_repo),
 ):
     """Every filter value with a real count behind it.
@@ -85,10 +86,10 @@ def get_facets(
         umbrella_families=umbrella,
         funnel_stages=stage, segments=segment, languages=language,
         content_depths=depth, sources=source, tags=tag,
-        customer_facing=customer_facing,
+        customer_facing=customer_facing, include_older_vms=include_older_vms,
     )
     any_filter = any([q, type, product, family, umbrella, stage, segment,
-                      language, depth, source, tag]) or customer_facing is not None
+                      language, depth, source, tag, include_older_vms])         or customer_facing is not None
     return repo.facets(query if any_filter else None)
 
 

@@ -47,6 +47,9 @@ class AssetQuery:
     has_consensus_uuid: bool | None = None
     rail: str | None = None
     editor_picks_only: bool = False
+    #: Older versions of a VM are left out of listings unless asked for --
+    #: see backend/services/listing.py.
+    include_older_vms: bool = False
     sort: SortKey = "relevance"
     limit: int = 50
     offset: int = 0

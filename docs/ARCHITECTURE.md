@@ -772,6 +772,19 @@ Catalog* library is stale and not read. A failure here is reported in the sync s
   Highlighted content query), `inferred` (same dataset and product family — labelled as a guess in
   the UI). A query naming a slice (`Segment:"PLM"` + `WORDS(LDK)`) becomes a filter button, not a
   list. A demo's detail shows the VMs that run it.
+- **Only the newest version of each VM is listed** (Paul and Scott, 2026-09-25). A VM's line is its
+  title up to the first version number ("windchill", "alm cb", "alm pure variants"); the highest
+  first version number wins. Older versions are reachable from the newest one's detail and by
+  choosing *Versions: All versions* while Asset Type is Virtual Machine (`include_older_vms`).
+  Segment was not usable as the key: most VM titles name none.
+
+### Reachable but not listed (added 2026-09-25)
+
+`backend/services/listing.py` holds the softer sibling of the divestment rule: records that open
+by id but never appear in a listing, search or facet count — older VM versions (above) and any
+asset titled exactly "Release Notes", which is documentation filed in the Demo Catalog. It stays
+reachable because VM pages preview its PDFs. The Admin page's catalogue tables still count older
+VMs; they describe the whole catalogue, not what a browser meets.
 
 ### Write-back rules
 

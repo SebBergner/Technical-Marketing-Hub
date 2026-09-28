@@ -751,6 +751,9 @@ Three things that will bite otherwise:
 Run it on a timer (hourly is plenty). Graph change notifications can come later if anyone actually
 wants near-real-time; the delta loop is self-healing either way.
 
+*Built 2026-09-28 as a daily run, switched on per slot from the Admin page — see
+`backend/auto_sync.py` and docs/deploying.md, "The daily sync".*
+
 ### Virtual Machine pages (added 2026-09-23)
 
 The VMs come from the 38 pages under `SitePages/Virtual Machines/`, read with

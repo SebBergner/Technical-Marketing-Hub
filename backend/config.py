@@ -21,6 +21,13 @@ class Settings(BaseSettings):
         env_file=os.path.join(BASE_DIR, ".env"), extra="ignore"
     )
 
+    #: Whether this process runs the daily-sync loop (backend/auto_sync.py).
+    #: The loop only syncs when the Admin page has switched it on; this is
+    #: the off switch beneath that one, for tests and one-off scripts, which
+    #: must never start syncing a real tenant because a developer's data
+    #: directory happens to have the schedule on.
+    auto_sync_scheduler: bool = True
+
     # ---------------------------------------------------------------- storage
     #: "json" keeps the Portal a server-side index with SharePoint as the centre
     #: of gravity — no database to provision. "sql" is retained and tested, for

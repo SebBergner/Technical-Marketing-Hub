@@ -282,14 +282,31 @@ def sync(allow_downgrade: bool = False,
     Only `isPublic` demos are indexed. The rest are customer-specific boards
     and meeting recordings: unmaintained, and they name customers.
     """
+    try:
+        return run_sync(client, repo, actor, allow_downgrade=allow_downgrade)
+    except ConsensusNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except WouldDowngrade as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except (ConsensusError, ConsensusV2Error) as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+class ConsensusNotConfigured(Exception):
+    """Neither API can authenticate on this deployment."""
+
+
+def run_sync(client: ConsensusClient, repo: AssetRepository, actor: str,
+             allow_downgrade: bool = False) -> dict:
+    """The sync itself, shared by the button and the daily schedule
+    (backend/auto_sync.py). Records the attempt and re-raises a failure."""
     v2 = get_v2_client()
     if v2 is None and not client.is_configured():
-        raise HTTPException(
-            status_code=503,
-            detail=("Consensus is not configured. Either authorise V2 at "
-                    "/api/consensus/oauth/start, or set the V1 credentials: "
-                    "CONSENSUS_BASE_URL, CONSENSUS_API_KEY, "
-                    "CONSENSUS_API_SECRET and CONSENSUS_USER_EMAIL."))
+        raise ConsensusNotConfigured(
+            "Consensus is not configured. Either authorise V2 at "
+            "/api/consensus/oauth/start, or set the V1 credentials: "
+            "CONSENSUS_BASE_URL, CONSENSUS_API_KEY, "
+            "CONSENSUS_API_SECRET and CONSENSUS_USER_EMAIL.")
     try:
         if v2 is not None:
             # V2 whenever it can authenticate: it is the only source of tags,
@@ -301,12 +318,9 @@ def sync(allow_downgrade: bool = False,
         else:
             result = sync_demos(client, repo, allow_downgrade=allow_downgrade)
             api = "v1"
-    except WouldDowngrade as exc:
+    except (WouldDowngrade, ConsensusError, ConsensusV2Error) as exc:
         _record_attempt(repo, ok=False, error=str(exc))
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except (ConsensusError, ConsensusV2Error) as exc:
-        _record_attempt(repo, ok=False, error=str(exc))
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise
 
     summary = {"api": api, **result.as_dict()}
     _record_attempt(repo, ok=True, summary=summary)

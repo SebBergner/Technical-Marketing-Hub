@@ -24,6 +24,14 @@ from backend.config import settings
 
 
 @pytest.fixture(autouse=True)
+def no_daily_sync_loop(monkeypatch):
+    """The app's startup would otherwise start the daily-sync loop, and the
+    suite shares the developer's real data directory -- where the schedule
+    may well be switched on (backend/auto_sync.py)."""
+    monkeypatch.setattr(settings, "auto_sync_scheduler", False)
+
+
+@pytest.fixture(autouse=True)
 def never_reach_consensus(monkeypatch):
     """No test authenticates to Consensus unless it deliberately builds a
     client with a mock transport.

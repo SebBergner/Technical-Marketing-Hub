@@ -224,6 +224,121 @@
     host.appendChild(c4);
   }
 
+  /* The daily sync (backend/auto_sync.py). First in "Connected systems"
+   * because it is about both of the cards after it: it presses their two
+   * sync buttons once a day. Liwei, 2026-09-28. */
+  function two(n) { return (n < 10 ? "0" : "") + n; }
+
+  function localHour(hourUtc) {
+    var d = new Date();
+    d.setUTCHours(hourUtc, 0, 0, 0);
+    return two(d.getHours()) + ":" + two(d.getMinutes());
+  }
+
+  function when(iso) {
+    if (!iso) return "—";
+    var d = new Date(iso);
+    return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  }
+
+  function sourceWord(name, r) {
+    if (!r) return null;
+    if (r.ok === true) return name + " ✓";
+    if (r.ok === false) return name + " failed";
+    return name + " skipped";
+  }
+
+  function renderAutoSync(a) {
+    var host = $("integrations");
+    if (!a || !host) return;
+    var c = card("Daily automatic sync");
+    c.classList.add("card--wide");
+    var head = c.querySelector(".card-head");
+
+    var toggle = el("label", "switch");
+    var box = el("input");
+    box.type = "checkbox";
+    box.checked = !!a.enabled;
+    box.setAttribute("aria-label", "Daily automatic sync");
+    toggle.appendChild(box);
+    toggle.appendChild(el("span", "switch__track"));
+    toggle.appendChild(el("span", "switch__label", a.enabled ? "On" : "Off"));
+    head.appendChild(toggle);
+
+    var hour = el("select");
+    for (var h = 0; h < 24; h++) {
+      var o = el("option", null, two(h) + ":00 UTC  (" + localHour(h) + " your time)");
+      o.value = String(h);
+      if (h === a.hour_utc) o.selected = true;
+      hour.appendChild(o);
+    }
+
+    function save() {
+      box.disabled = hour.disabled = true;
+      fetch("/api/admin/auto-sync", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: box.checked, hour_utc: +hour.value })
+      })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (body) {
+            if (!r.ok) throw new Error(body.detail || ("HTTP " + r.status));
+            return body;
+          });
+        })
+        .then(function () { load(); })
+        .catch(function (err) {
+          box.disabled = hour.disabled = false;
+          box.checked = !!a.enabled;
+          window.alert("Could not change the schedule:\n\n" + err.message);
+        });
+    }
+    box.addEventListener("change", save);
+    hour.addEventListener("change", save);
+
+    var t = row(c, "Runs daily at", "");
+    t.querySelector("dd").textContent = "";
+    t.querySelector("dd").appendChild(hour);
+
+    row(c, "Next run", a.enabled ? when(a.next_run_at) : "off",
+        a.enabled ? null : "pill--off");
+
+    var last = a.last_run;
+    if (!last) {
+      row(c, "Last scheduled run", "never", "pill--off");
+    } else if (!last.finished_at) {
+      row(c, "Last scheduled run", "running since " + when(last.started_at), "pill--warn");
+    } else {
+      var res = last.results || {};
+      var words = [sourceWord("SharePoint", res.sharepoint),
+                   sourceWord("Consensus", res.consensus)].filter(Boolean);
+      row(c, "Last scheduled run", when(last.started_at) + " · " + words.join(" · "),
+          last.ok ? "pill--ok" : "pill--bad");
+      ["sharepoint", "consensus"].forEach(function (k) {
+        if (res[k] && res[k].ok === false) {
+          row(c, (k === "sharepoint" ? "SharePoint" : "Consensus") + " error", res[k].error || "—");
+        }
+      });
+    }
+    if (a.changed_by) {
+      row(c, "Last changed", when(a.changed_at) + " by " + a.changed_by);
+    }
+    if (!a.scheduler_running) {
+      row(c, "Scheduler", "not running in this process", "pill--bad");
+    }
+
+    var note = el("p", "muted");
+    note.style.cssText = "font-size:12px;margin:10px 0 0;line-height:1.5";
+    note.textContent = "Runs the two syncs below — SharePoint (with the VM pages), then "
+      + "Consensus — on this environment only; staging and production each have "
+      + "their own switch. Turning it on does not sync now: the first run is the "
+      + "next time the hour comes round. If App Service has put the site to sleep "
+      + "at that hour (\"Always On\" off), the run happens on the next visit instead.";
+    c.appendChild(note);
+
+    host.insertBefore(c, host.firstChild);
+  }
+
   function renderCoverage(cat) {
     $("catTotal").textContent = cat.total.toLocaleString() + " assets";
     var host = $("coverage");
@@ -930,6 +1045,7 @@
         if (!d) return;
         renderEnvironment(d.environment);
         renderIntegrations(d.integrations);
+        renderAutoSync(d.auto_sync);
         renderCoverage(d.catalogue);
         renderQueues(d);
         renderRanges();

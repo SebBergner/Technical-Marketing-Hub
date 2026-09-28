@@ -56,7 +56,17 @@ async def lifespan(app: FastAPI):
         print(f"[startup] no source credentials — seeded {result['assets']} assets "
               f"from the xlsx snapshot. This data is STALE; it exists so a fresh "
               f"clone runs. Configure GRAPH_* / CONSENSUS_* and sync for real data.")
+
+    # The daily sync's loop. It only syncs when switched on from the Admin
+    # page -- see backend/auto_sync.py.
+    task = None
+    if settings.auto_sync_scheduler:
+        import asyncio
+        from backend import auto_sync
+        task = asyncio.create_task(auto_sync.scheduler())
     yield
+    if task:
+        task.cancel()
 
 
 app = FastAPI(

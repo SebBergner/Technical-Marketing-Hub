@@ -77,16 +77,27 @@ def sync(full: bool = False, repo: AssetRepository = Depends(get_repo),
     rebuildable mirror and nothing else). Portal-owned data — stable slugs,
     curation, the Value Roadmap index, counters — is untouched either way.
     """
+    try:
+        return run_sync(client, repo, actor, full=full)
+    except GraphPermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except GraphError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+def run_sync(client: GraphClient, repo: AssetRepository, actor: str,
+             full: bool = False) -> dict:
+    """The sync itself, shared by the button and the daily schedule
+    (backend/auto_sync.py), so the two can never drift apart. Records the
+    attempt either way and re-raises a failure for the caller to report."""
     token = None if full else _load_token(repo)
     try:
         result = sync_catalogue(client, repo, delta_token=token)
     except (GraphPermissionError, GraphError, ValueError) as exc:
         _record_attempt(repo, ok=False, error=str(exc))
-        if isinstance(exc, GraphPermissionError):
-            raise HTTPException(status_code=403, detail=str(exc)) from exc
-        if isinstance(exc, GraphError):
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise
 
     _save_token(repo, result.delta_token)
     summary = result.as_dict()

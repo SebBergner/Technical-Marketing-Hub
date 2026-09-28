@@ -222,7 +222,27 @@ and they are what sharing and thumbnails use.
 - `/api/debug/backend` — reports which repository, whether Graph and Consensus
   are configured, and the security warnings. Read it first.
 - `/api/auth/me` — confirms Easy Auth is actually in front of the app.
-- Run a sync from the UI. Nothing runs on a schedule yet, so a fresh instance
-  starts from whatever `DATA_DIR` holds.
+- Run a sync from the UI. A fresh instance starts from whatever `DATA_DIR`
+  holds.
+
+### The daily sync (added 2026-09-28)
+
+Admin → Connected systems → **Daily automatic sync** switches on a once-a-day
+run of both syncs (SharePoint with the VM pages, then Consensus) at an hour
+chosen in UTC. The switch is stored in `owned/auto_sync.json` on that slot's
+share, so **staging and production are switched separately**. Turning it on
+does not sync immediately; the first run is the next time the hour comes round.
+
+It runs inside the app (`backend/auto_sync.py`), so it needs the app to be
+awake:
+
+- **Enable *Always On*** on each slot that uses it — *Settings → Configuration
+  → General settings → Always on* (a per-slot setting; needs Basic tier or
+  higher). Without it App Service unloads the app after about 20 idle minutes,
+  and a run due while it sleeps happens on the next visit instead.
+- Several gunicorn workers are fine: a lock file on the share lets one of them
+  run it. A lock left by a crashed worker is taken over after three hours.
+- The Admin card shows the last scheduled run and each source's result;
+  failures are also in each source's *Sync history*.
 - Consensus's OAuth redirect URI, if that flow is ever fixed, will need the
   deployed origin rather than `http://localhost:8000`.

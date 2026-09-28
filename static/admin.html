@@ -88,6 +88,23 @@
   .pill--bad{background:var(--red-soft);color:var(--red)}
   .pill--off{background:var(--surface-2);color:var(--faint)}
 
+  /* the daily-sync card: full width, with an on/off switch in its head ---- */
+  .card--wide{grid-column:1 / -1}
+  .card--wide select{font:inherit;font-size:13px;padding:4px 8px;border-radius:6px;
+    border:1px solid var(--border);background:var(--surface);color:var(--ink)}
+  .switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+    font-size:13px;font-weight:600;color:var(--ink);position:relative}
+  .switch input{position:absolute;opacity:0;width:1px;height:1px}
+  .switch__track{width:38px;height:22px;border-radius:99px;background:var(--surface-2);
+    border:1px solid var(--border);position:relative;transition:background .15s}
+  .switch__track::after{content:"";position:absolute;top:2px;left:2px;width:16px;
+    height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);
+    transition:transform .15s}
+  .switch input:checked + .switch__track{background:var(--green);border-color:var(--green)}
+  .switch input:checked + .switch__track::after{transform:translateX(16px)}
+  .switch input:focus-visible + .switch__track{outline:2px solid var(--green);outline-offset:2px}
+  .switch input:disabled + .switch__track{opacity:.55}
+
   /* coverage bars ------------------------------------------------------ */
   .bar{height:6px;border-radius:99px;background:var(--surface-2);overflow:hidden}
   .bar>span{display:block;height:100%;background:var(--amber)}

@@ -1,6 +1,7 @@
 """The Admin page's own endpoints: sign-in, and one aggregated overview.
 
-Everything here is behind `require_admin` except the two session routes, and
+Everything here is behind `require_admin` except the two session routes and
+PUT /auto-sync (which takes the sync buttons' key, `admin_or_curator`), and
 the overview is a single call on purpose. The alternative — the page fanning
 out to /api/debug/backend, /api/auth/me, /api/consensus/oauth/status,
 /api/taxonomy and the repository — would have spread an admin view across
@@ -19,11 +20,13 @@ import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.admin_auth import (
-    clear_session, has_admin_session, issue_session, require_admin, verify_password,
+    admin_or_curator, clear_session, has_admin_session, issue_session, require_admin,
+    verify_password,
 )
+from backend import auto_sync
 from backend.auth import security_warnings
 from backend.config import settings
 from backend.deps import get_repo
@@ -189,7 +192,42 @@ def overview(repo: AssetRepository = Depends(get_repo)):
         # read. Removed 2026-09-22.
         "proposals": {"pending": _pending_proposals(repo)},
         "requests": {"unsynced": _unsynced_requests(repo)},
+        "auto_sync": _auto_sync_view(),
     }
+
+
+# ───────────────────────────────────────────────────────── the daily sync
+class AutoSyncIn(BaseModel):
+    enabled: bool
+    hour_utc: int = Field(default=auto_sync.DEFAULT_HOUR_UTC, ge=0, le=23)
+
+
+def _auto_sync_view() -> dict:
+    state = auto_sync.load_state()
+    upcoming = auto_sync.next_slot(state)
+    return {
+        "enabled": state["enabled"],
+        "hour_utc": state["hour_utc"],
+        "changed_by": state.get("changed_by"),
+        "changed_at": state.get("changed_at"),
+        "next_run_at": upcoming.isoformat(timespec="seconds") if upcoming else None,
+        "last_run": state.get("last_run"),
+        # Whether the loop runs in this process at all. False only in tests
+        # and scripts -- but if it ever reads False on Azure, the switch
+        # would be a switch connected to nothing, and the page should say so.
+        "scheduler_running": settings.auto_sync_scheduler,
+    }
+
+
+@router.put("/auto-sync")
+def set_auto_sync(body: AutoSyncIn, actor: str = Depends(admin_or_curator)):
+    """Switch the daily sync on or off, and choose its hour (UTC).
+
+    The same key as the sync buttons (admin_or_curator): the schedule does
+    nothing a button press could not, it only presses it daily.
+    """
+    auto_sync.configure(body.enabled, body.hour_utc, actor)
+    return _auto_sync_view()
 
 
 def _pending_proposals(repo: AssetRepository) -> int | None:

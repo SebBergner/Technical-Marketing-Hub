@@ -84,8 +84,15 @@
     return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   }
 
+  /* A server timestamp in the VIEWER's time zone. App Service runs in UTC,
+   * so the raw string showed 17:31 for an upload made at 13:31 EDT
+   * (Liwei, 2026-09-29). */
   function fmtStamp(iso) {
-    return iso ? iso.replace("T", " ").slice(0, 16) : null;
+    if (!iso) return null;
+    var d = new Date(iso);
+    if (isNaN(d)) return iso.replace("T", " ").slice(0, 16);
+    return d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric",
+                                       hour: "2-digit", minute: "2-digit" });
   }
 
   /* ── hover tooltip, shared by every chart mark ──────────────────────── */
@@ -351,14 +358,26 @@
       row.style.marginTop = "6px";
       row.appendChild(el("span", "muted", "Earlier uploads:"));
       var sel = el("select");
+      // Nothing is opened on arrival: a previous upload shown by default
+      // read as the migration in hand (Liwei, 2026-09-29). Open one on purpose.
+      var none = el("option", null, "— open an earlier upload —");
+      none.value = "";
+      sel.appendChild(none);
       d.sheets.forEach(function (s) {
         var o = el("option", null, (s.filename || s.sheet_id) + " · " + (fmtStamp(s.uploaded_at) || "") +
                     (s.counts ? " · " + fmtInt(s.counts.new) + " new" : ""));
         o.value = s.sheet_id;
         sel.appendChild(o);
       });
-      if (sheetId) sel.value = sheetId;
-      sel.addEventListener("change", function () { openSheet(sel.value); });
+      sel.value = sheetId || "";
+      sel.addEventListener("change", function () {
+        if (sel.value) { openSheet(sel.value); return; }
+        sheetId = null;
+        clearTimeout(previewTimer);
+        $("uploadMsg").textContent = "";
+        $("bcPreview").hidden = true;
+        $("bcStart").hidden = true;
+      });
       row.appendChild(sel);
       c.appendChild(row);
     }
@@ -692,11 +711,21 @@
     RUNNER = d.runner_enabled;
     ACTIVE = d.active_run;
     renderUpload(d);
-    if (!sheetId && (d.sheets || []).length) openSheet(d.sheets[0].sheet_id);
-    else if (sheetId) openSheet(sheetId);
+    // Only what this visit opened is shown again (Refresh keeps it).
+    if (sheetId) openSheet(sheetId);
+    // A run is shown unasked only when it needs someone: going, or paused /
+    // stopped with videos left. Finished runs are in "Migration runs" below.
     var latest = d.latest_run;
-    if (d.active_run) trackRun(d.active_run);
-    else if (latest) { runId = latest.batch_id; renderRun(latest); }
+    if (d.active_run) {
+      trackRun(d.active_run);
+    } else if (latest && (latest.state === "paused" || latest.state === "stopped")) {
+      runId = latest.batch_id;
+      renderRun(latest);
+    } else if (latest && runId === latest.batch_id) {
+      renderRun(latest);                       // the run this visit started
+    } else {
+      $("bcRun").hidden = true;
+    }
   }
 
   /* After a run finishes: redraw the library overview in place. */

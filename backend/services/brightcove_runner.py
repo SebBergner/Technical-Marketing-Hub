@@ -23,7 +23,7 @@ it by an adapter once its format is known; nothing here depends on that sheet.
     gallery_url            optional
     source                 blank = fetch from Brightcove by ID (the normal case);
                            or a local path / http(s) URL, for tests
-    filename               blank = Brightcove's original file name
+    filename               blank = "<title>_<video type>.mp4" (video_file_name)
 
 So a sheet only has to supply the IDs and the classification a person
 decides (segments, products, customer-facing); everything Brightcove already
@@ -183,14 +183,22 @@ def enrich(records: list[VideoRecord], bc) -> None:
             stamp = video.get("published_at") or video.get("created_at")
             if stamp:
                 r.original_publish_date = date.fromisoformat(stamp[:10])
-        if not r.filename:
-            original = os.path.splitext(os.path.basename(video.get("original_filename") or ""))[0]
-            r.filename = w.safe_folder_name(original or r.title) + ".mp4"
         rendition = bc.best_mp4(r.brightcove_id)
         if rendition is None:
             r.problems.append("Brightcove has no downloadable MP4 rendition")
         else:
             r.size_bytes = rendition.get("size")
+
+
+def video_file_name(r: VideoRecord) -> str:
+    """The migrated file's name: "<demo name>_<Video Type>.mp4" (Liwei,
+    2026-09-29) -- e.g. "Creo 10 Top Enhancements_Technical Overview.mp4".
+    Without a Video Type, the demo name alone. The same cleaning as the
+    folder name, so a title SharePoint accepts as a folder is accepted here.
+    """
+    video_type = r.extra.get("video_type")
+    stem = f"{r.title}_{video_type}" if video_type else r.title
+    return w.safe_folder_name(stem) + ".mp4"
 
 
 def validate(records: list[VideoRecord], choices, terms: w.TermIndex) -> None:
@@ -236,6 +244,8 @@ def validate(records: list[VideoRecord], choices, terms: w.TermIndex) -> None:
                           if (t := terms.get(p)) and t[0].lower() == p.lower()]
         if not r.title:
             r.problems.append("title is empty")
+        if not r.filename and r.from_brightcove and r.title:
+            r.filename = video_file_name(r)
         if r.filename and not r.filename.lower().endswith(tuple("." + e for e in m.VIDEO_EXT)):
             r.problems.append(f"filename {r.filename!r} is not a video file name")
         if not r.filename and not r.from_brightcove:

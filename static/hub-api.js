@@ -649,6 +649,172 @@
       });
   }
 
+  /* ------------------------------------------------- a searchable dropdown
+   *
+   * Liwei, 2026-09-29: the Product dropdown has grown too long to scan, so it
+   * gets a search box, and products counting (0) are left out of the list.
+   *
+   * The native <select> stays the one source of truth. It is only hidden:
+   * applyFilters, clearAll, the left nav and rescoreSelect all keep reading
+   * and writing it, exactly as before, and this is a view over it. Elio's
+   * markup is untouched (his file is integrated non-invasively). A value set
+   * from code fires no event, so the select's own `value` / `selectedIndex`
+   * are wrapped to refresh the label, and a MutationObserver catches the
+   * option texts rescoreSelect rewrites.
+   *
+   * The left nav's product shortcuts are unchanged: they are the main
+   * products on purpose.
+   */
+  var COMBO_CSS =
+    ".hub-combo__btn{flex:1;border:none;background:transparent;font:inherit;font-size:13px;" +
+    "color:var(--orion-text-2);text-align:left;cursor:pointer;padding:2px 30px 2px 6px;" +
+    "white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}" +
+    ".hub-combo__btn:focus-visible{outline:2px solid var(--orion-link);outline-offset:2px;border-radius:4px}" +
+    ".hub-combo__pop{position:absolute;top:calc(100% + 4px);left:0;z-index:60;min-width:260px;" +
+    "background:var(--orion-surface);border:1px solid var(--orion-border-md);" +
+    "border-radius:var(--orion-radius-sm);box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px;cursor:default}" +
+    ".hub-combo__search{width:100%;box-sizing:border-box;font:inherit;font-size:13px;padding:7px 9px;" +
+    "border:1px solid var(--orion-border-md);border-radius:6px;background:var(--orion-surface-2);" +
+    "color:var(--orion-text);outline:none}" +
+    ".hub-combo__search:focus{border-color:var(--orion-link)}" +
+    ".hub-combo__list{list-style:none;margin:6px 0 0;padding:0;max-height:280px;overflow-y:auto}" +
+    ".hub-combo__opt{padding:6px 9px;border-radius:4px;cursor:pointer;color:var(--orion-text);" +
+    "font-size:13px;white-space:nowrap}" +
+    ".hub-combo__opt.is-active{background:var(--orion-surface-3)}" +
+    ".hub-combo__opt[aria-selected=true]{font-weight:600}" +
+    ".hub-combo__none{padding:8px 9px;color:var(--orion-text-3);font-size:13px}";
+
+  function enhanceSearchableSelect(id, placeholder, noneText) {
+    var sel = document.getElementById(id);
+    if (!sel || sel.dataset.hubCombo) return;
+    sel.dataset.hubCombo = "1";
+    if (!document.getElementById("hubComboCss")) {
+      var style = document.createElement("style");
+      style.id = "hubComboCss";
+      style.textContent = COMBO_CSS;
+      document.head ? document.head.appendChild(style) : document.body.appendChild(style);
+    }
+    var pill = sel.parentNode;
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "hub-combo__btn";
+    btn.setAttribute("aria-haspopup", "listbox");
+    btn.setAttribute("aria-expanded", "false");
+    sel.style.display = "none";
+    sel.parentNode.insertBefore(btn, sel.nextSibling);
+
+    var pop = document.createElement("div");
+    pop.className = "hub-combo__pop";
+    pop.hidden = true;
+    var input = document.createElement("input");
+    input.type = "search";
+    input.className = "hub-combo__search";
+    input.placeholder = placeholder;
+    input.setAttribute("aria-label", placeholder);
+    var list = document.createElement("ul");
+    list.className = "hub-combo__list";
+    list.setAttribute("role", "listbox");
+    pop.appendChild(input);
+    pop.appendChild(list);
+    pill.appendChild(pop);
+
+    var shown = [], active = -1;
+
+    function label() { var o = sel.options[sel.selectedIndex]; btn.textContent = o ? o.textContent : ""; }
+    function count(o) { var m = /\((\d+)\)\s*$/.exec(o.textContent); return m ? +m[1] : null; }
+
+    function setActive(k) {
+      shown.forEach(function (li, n) { li.classList.toggle("is-active", n === k); });
+      active = k;
+      if (shown[k]) shown[k].scrollIntoView({ block: "nearest" });
+    }
+
+    function render() {
+      var q = input.value.trim().toLowerCase();
+      list.innerHTML = "";
+      shown = [];
+      Array.prototype.forEach.call(sel.options, function (o, i) {
+        var current = i === sel.selectedIndex;
+        if (o.value && count(o) === 0 && !current) return;          // (0) is noise
+        if (q && (!o.value || o.textContent.toLowerCase().indexOf(q) === -1)) return;
+        var li = document.createElement("li");
+        li.className = "hub-combo__opt";
+        li.setAttribute("role", "option");
+        li.textContent = o.textContent;
+        li.dataset.i = String(i);
+        if (current) li.setAttribute("aria-selected", "true");
+        li.addEventListener("mousedown", function (e) { e.preventDefault(); choose(i); });
+        list.appendChild(li);
+        shown.push(li);
+      });
+      if (!shown.length) {
+        var none = document.createElement("li");
+        none.className = "hub-combo__none";
+        none.textContent = noneText;
+        list.appendChild(none);
+      }
+      var at = -1;
+      shown.forEach(function (li, n) { if (+li.dataset.i === sel.selectedIndex) at = n; });
+      setActive(q ? 0 : Math.max(at, 0));
+    }
+
+    function open() {
+      if (!pop.hidden) return;
+      pop.hidden = false;
+      btn.setAttribute("aria-expanded", "true");
+      input.value = "";
+      render();
+      input.focus();
+    }
+    function close() {
+      pop.hidden = true;
+      btn.setAttribute("aria-expanded", "false");
+    }
+    function choose(i) {
+      close();
+      if (sel.selectedIndex !== i) {
+        sel.selectedIndex = i;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));   // the existing filters run
+      }
+      label();
+      btn.focus();
+    }
+
+    // The whole pill opens it, as the native select did; its own label
+    // behaviour would only focus the hidden select.
+    pill.addEventListener("click", function (e) {
+      if (pop.contains(e.target)) return;
+      e.preventDefault();
+      pop.hidden ? open() : close();
+    });
+    input.addEventListener("input", render);
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setActive(Math.min(active + 1, shown.length - 1)); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setActive(Math.max(active - 1, 0)); }
+      else if (e.key === "Enter") { e.preventDefault(); if (shown[active]) choose(+shown[active].dataset.i); }
+      else if (e.key === "Escape") { e.preventDefault(); close(); btn.focus(); }
+      else if (e.key === "Tab") { close(); }
+    });
+    btn.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
+    });
+    document.addEventListener("mousedown", function (e) {
+      if (!pop.hidden && !pill.contains(e.target)) close();
+    });
+
+    // Values set from code (clearAll, the left nav) fire no event.
+    ["value", "selectedIndex"].forEach(function (prop) {
+      var d = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, prop);
+      Object.defineProperty(sel, prop, {
+        configurable: true,
+        get: function () { return d.get.call(this); },
+        set: function (v) { d.set.call(this, v); label(); }
+      });
+    });
+    new MutationObserver(label).observe(sel, { childList: true, subtree: true, characterData: true });
+    label();
+  }
+
   /* -------------------------------------------------------------- the rails */
 
   /* Replace the cards inside one curated row, leaving its heading alone. */
@@ -4108,6 +4274,8 @@
     fillSelect("hubFilterType", facets.types);
     fillSidebarCounts(facets);
     takeOverControls();
+    // After takeOverControls, which swaps each control for a fresh clone.
+    enhanceSearchableSelect("hubFilterProduct", "Search products…", "No product matches");
     wireShareModal();
     wireRequestForm();
     wireDetailPage();

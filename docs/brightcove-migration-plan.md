@@ -760,3 +760,21 @@ kept rendition is 1080p.
   (case-insensitive, like SharePoint). Run in sequence, the second would fail; run in parallel,
   the two race for the folder. **V29 has 3 such pairs, 6 rows** (for example "Windchill AI
   Assistant" and "Creo Simulation Live"). Seb needs distinct Proposed Titles for them.
+
+**Changes, 2026-09-29 afternoon, after the review with Seb (Liwei)**
+
+- **The migrated video file is named `<Demo name>_<Video Type>.mp4`**, for example
+  `Creo 10 Top Enhancements_Technical Overview.mp4`, or just the Demo name when there is no
+  Video Type. It is cleaned like the folder name. A `filename` given in the manifest still wins,
+  and local test sources keep their own names. Files already in the library keep their old
+  names, because the tool never updates existing videos.
+- **Main page: the Product dropdown is now searchable, and products counting (0) are hidden.**
+  This is a visible change to the main page.
+  - The native `<select>` stays the only source of truth, hidden. `applyFilters`, "Clear all",
+    the left nav and `rescoreSelect` still read and write it.
+  - The searchable panel is a view over it. Its `value` / `selectedIndex` are wrapped so values
+    set from code refresh the label.
+  - Elio's `index.html` is untouched: all of this is in `static/hub-api.js`.
+  - The left nav's product shortcuts are unchanged.
+  - Checked locally (15:0x EDT): search, Enter, Esc, "No product matches", Clear all, and values
+    set from code. With Type = Virtual Machine, 11 products at (0) were hidden and 4 shown.

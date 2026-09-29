@@ -108,9 +108,24 @@ def test_blanks_are_filled_from_brightcove_and_the_sheet_wins(tmp_path):
     assert a.folder_name == "Windchill - Change Management Overview"
     assert a.description == "How change flows."
     assert str(a.original_publish_date) == "2019-05-14"          # published_at, not created_at
-    assert a.filename == "WC_Change_Mgmt_v3.mp4"
+    run.validate(records, ["PLM"], w.TermIndex({}))
+    # Named after the demo, not Brightcove's upload name (no Video Type here).
+    assert a.filename == "Windchill - Change Management Overview.mp4"
     assert a.size_bytes == 50_000
     assert (b.title, b.description) == ("My Own Title", "Own text")
+
+
+def test_the_file_is_named_demo_underscore_video_type(tmp_path):
+    """Liwei, 2026-09-29: "Creo 10 Top Enhancements_Technical Overview"."""
+    p = tmp_path / "m.csv"
+    p.write_text("brightcove_id,title,customer_facing,video_type,filename\n"
+                 f"{VIDEO['id']},Creo 10 Top Enhancements,yes,Technical Overview,\n"
+                 f"{VIDEO['id'][:-1]}2,Kept As Given,yes,Technical Overview,own-name.mp4\n",
+                 encoding="utf-8")
+    records = run.load_manifest(str(p))
+    run.validate(records, ["PLM"], w.TermIndex({}))
+    assert records[0].filename == "Creo 10 Top Enhancements_Technical Overview.mp4"
+    assert records[1].filename == "own-name.mp4"
 
 
 def test_videos_brightcove_cannot_supply_are_reported(tmp_path):

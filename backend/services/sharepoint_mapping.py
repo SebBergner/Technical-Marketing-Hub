@@ -13,8 +13,12 @@ import re
 from datetime import date, datetime
 from urllib.parse import urlparse
 
-#: Demo Type -> our AssetType. The catalogue contains only these two.
-TYPE_MAP = {"Live Demo Kit": "ldk", "Virtual Demo Kit": "vdk"}
+#: Demo Type -> our AssetType. The live catalogue holds only the first two
+#: (measured 2026-09-28: 253 LDK, 205 VDK, no "Video"). "Video" is the choice
+#: the Brightcove Gallery migration writes (HLR-B5); it maps onto the same
+#: type as a Consensus video, so one Type filter covers both. Proven against
+#: the Gallery_Brightcove test library, docs/brightcove-migration-plan.md §9.
+TYPE_MAP = {"Live Demo Kit": "ldk", "Virtual Demo Kit": "vdk", "Video": "video"}
 
 LANG_MAP = {
     "English": "en",
@@ -78,9 +82,17 @@ def parse_lookup(value) -> list[str]:
     Measured on the live tenant 2026-08-26: Product is managed metadata, so
     reading only LookupValue yielded the raw dict and produced garbage
     products on every one of the 455 assets.
+
+    A SINGLE-valued managed metadata column arrives as one bare dict rather
+    than a list of them (measured 2026-09-28 on the Gallery_Brightcove test
+    library, before its Product was switched to multi-valued). Unwrapped, it
+    fell through to the string branch and stored "{'Label': ...}" as a
+    product name.
     """
     if not value:
         return []
+    if isinstance(value, dict):
+        value = [value]
     if isinstance(value, list):
         raw = []
         for v in value:
@@ -318,6 +330,37 @@ def derive_video_facts(asset: dict) -> None:
     stated = [v["has_audio"] for v in videos if v["has_audio"] is not None]
     if stated:
         asset["has_narrated_audio"] = any(stated)
+
+
+def as_bool(value) -> bool | None:
+    """A SharePoint Yes/No column as True/False, or None when nobody set it.
+
+    Graph returns real booleans; the xlsx export says "Yes"/"No". Anything
+    else is treated as unset rather than guessed at.
+    """
+    if isinstance(value, bool):
+        return value
+    text = (clean_text(value) or "").lower()
+    return {"yes": True, "true": True, "1": True,
+            "no": False, "false": False, "0": False}.get(text)
+
+
+def apply_stated_flags(asset: dict, customer_facing: bool | None,
+                       has_audio: bool | None) -> None:
+    """Let the folder's own Yes/No columns overrule the filename inference.
+
+    Run AFTER derive_video_facts. A person (or the Gallery migration) who
+    sets Customer Facing has said something explicit, and the filename rule
+    is only a guess -- one that defaults to customer-facing when a name says
+    nothing, which would show GXC internal-only videos as customer-facing
+    (HLR-A9). Unset columns change nothing: measured 2026-09-28, both
+    columns are empty on all 457 demo assets in the Demo Catalog, so today's
+    catalogue is unaffected.
+    """
+    if customer_facing is not None:
+        asset["customer_facing"] = customer_facing
+    if has_audio is not None:
+        asset["has_narrated_audio"] = has_audio
 
 
 def blank_asset(asset_id: str, title: str, asset_type: str = "ldk") -> dict:

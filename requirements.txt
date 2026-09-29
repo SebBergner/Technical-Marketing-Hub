@@ -12,3 +12,9 @@ itsdangerous
 # Required by FastAPI to parse multipart form data — the request
 # intake's file uploads. Without it that endpoint fails at import.
 python-multipart
+# Trust the operating system's certificates for outbound HTTPS. On a PTC
+# workstation Zscaler re-signs Brightcove's traffic and only the Windows
+# store trusts that; see backend/integrations/tls.py. Optional at runtime.
+truststore
+# Reads Seb's gallery workbook uploaded on /migration (backend/services/gallery_sheet.py).
+openpyxl

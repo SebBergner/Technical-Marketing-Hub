@@ -54,6 +54,17 @@ COLUMNS = {
     "owner": ("OwnedBy", "Owned_x0020_By"),
     "consensus_uuid": ("ConsensusUUID", "Consensus_x0020_UUID", "ConsensusDemoUUID"),
     "brightcove_id": ("BrightcoveID", "Brightcove_x0020_ID"),
+    #: The Brightcove Gallery migration's columns (docs/brightcove-migration-plan.md).
+    #: Not in the Demo Catalog yet (measured 2026-09-28); `OriginalPublishDate`
+    #: is the internal name on the Gallery_Brightcove test library.
+    "original_publish_date": ("OriginalPublishDate", "Original_x0020_Publish_x0020_Date"),
+    #: Yes/No columns. Deliberately NOT the `…0` twins (`Customer_x0020_Facing0`,
+    #: `Contains_x0020_Audio0`): as with Demo Type, those are the site-column
+    #: copies, not the library's own. Empty on every demo asset today
+    #: (measured 2026-09-28), so reading them changes nothing until someone
+    #: sets them; see sharepoint_mapping.apply_stated_flags.
+    "customer_facing": ("Customer_x0020_Facing",),
+    "has_audio": ("Contains_x0020_Audio",),
     # Measured 2026-08-26: populated on 167 folders, and ZERO of them are demo
     # assets — they are CAD model folders (Cryogenic Tank, Deadbolt Lock) that
     # share the library. So this yields nothing today. Kept because the mapping
@@ -181,6 +192,9 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
     result = SyncResult()
     items = _latest_per_item(items)
     assets: dict[str, dict] = {}
+    #: Yes/No columns as the folder states them, applied after the filename
+    #: inference in derive_video_facts so that an explicit value wins.
+    stated: dict[str, tuple[bool | None, bool | None]] = {}
     taken: set[str] = set()
 
     # Pass 1 — top-level folders carrying a Demo Type become assets.
@@ -211,10 +225,17 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
                 consensus_uuid=m.clean_text(_field(fields, "consensus_uuid")),
                 brightcove_id=m.clean_text(_field(fields, "brightcove_id")),
                 thumbnail_url=m.parse_url(_field(fields, "thumbnail_url")),
-                uploaded_at=m.as_date(item.get("lastModifiedDateTime")),
+                # The content's own date when the folder states one; the
+                # folder's last edit otherwise, as before. Without this every
+                # migrated Gallery video would read as uploaded on the day of
+                # the migration and flood Latest Uploads (HLR-A8).
+                uploaded_at=(m.as_date(_field(fields, "original_publish_date"))
+                             or m.as_date(item.get("lastModifiedDateTime"))),
                 web_url=item.get("webUrl"),
                 source_item_id=item.get("id"),
             )
+            stated[name] = (m.as_bool(_field(fields, "customer_facing")),
+                            m.as_bool(_field(fields, "has_audio")))
         elif m.clean_text(_field(fields, "content_type")) == "CAD Model":
             # A standalone CAD dataset, not a demo -- no Demo Type, no
             # Segment, no managed-metadata Product column on this content
@@ -253,8 +274,9 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
         owner["resources"].append(m.build_resource(filename, subfolder, item))
         result.resources += 1
 
-    for asset in assets.values():
+    for name, asset in assets.items():
         m.derive_video_facts(asset)
+        m.apply_stated_flags(asset, *stated.get(name, (None, None)))
 
     result.assets = len(assets)
     return [Asset.model_validate(a) for a in assets.values()], result

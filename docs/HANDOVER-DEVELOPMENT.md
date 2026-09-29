@@ -295,7 +295,7 @@ repositories with three tests that were proven to fail against the old code
 
 ```
 app.py                       FastAPI app, router registration, lifespan seeding,
-                             RevalidatingStatic (see §4.1), / and /debug
+                             RevalidatingStatic (see §4.1), / and /admin
 backend/
   config.py                  every setting, all env-driven. Read this first.
   models.py                  Pydantic domain types
@@ -329,7 +329,6 @@ backend/
 static/
   hub-api.js                 2271 lines. The entire front-end integration
   css/orion.css              Elio's stylesheet
-  debug.html                 plain data inspector, ours, cannot collide with Elio's
 index.html                   Elio's file, 2.5 MB. See §5
 tests/                       365 pass, 2 skip
 ```

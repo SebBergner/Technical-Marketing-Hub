@@ -11,8 +11,8 @@ from backend.version import app_version
 from backend.db import SessionLocal, create_all
 from backend import oidc
 from backend.routers import (
-    admin, assets, auth, consensus, curation, debug, graph, requests, segments,
-    taxonomy, vms,
+    admin, assets, auth, consensus, curation, debug, graph, migration, requests,
+    segments, taxonomy, vms,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
     if empty and can_fetch:
         print("[startup] catalogue is empty and credentials are set — "
               "POST /api/graph/sync and /api/consensus/sync to populate it "
-              "(buttons on /debug)")
+              "(buttons on /admin)")
     elif empty and os.path.exists(settings.seed_path):
         result = load_seed(repo)
         print(f"[startup] no source credentials — seeded {result['assets']} assets "
@@ -64,6 +64,12 @@ async def lifespan(app: FastAPI):
         import asyncio
         from backend import auto_sync
         task = asyncio.create_task(auto_sync.scheduler())
+    # A migration run started from /migration and interrupted by a restart
+    # carries on from its batch log (backend/services/migration_jobs.py).
+    # Only where runs are enabled; it returns at once and runs in a thread.
+    if settings.migration_runner_enabled:
+        from backend.services import migration_jobs
+        migration_jobs.auto_resume()
     yield
     if task:
         task.cancel()
@@ -86,6 +92,7 @@ app.include_router(curation.router)
 app.include_router(graph.router)
 app.include_router(debug.router)
 app.include_router(admin.router)
+app.include_router(migration.router)
 app.include_router(oidc.router)
 app.include_router(vms.router)
 
@@ -116,19 +123,36 @@ app.middleware("http")(oidc.canonical_host)
 
 @app.get("/admin", include_in_schema=False)
 async def admin_page():
-    """The Admin page. Its own file for the same reason /debug has one: this
-    is ours, index.html is Elio's, and the two must not collide.
+    """The Admin page. Its own file because it is ours, index.html is
+    Elio's, and the two must not collide.
 
     Served to anyone — the page itself decides what to show, and every figure
     on it comes from /api/admin/overview, which does not."""
     return FileResponse(os.path.join(BASE_DIR, "static", "admin.html"))
 
 
-@app.get("/debug", include_in_schema=False)
-async def debug_page():
-    """Plain data inspector. Separate from index.html on purpose — that file is
-    Elio's, and the two must not collide."""
-    return FileResponse(os.path.join(BASE_DIR, "static", "debug.html"))
+@app.get("/migration", include_in_schema=False)
+async def migration_page():
+    """Content migrations into SharePoint, one section per source
+    (Brightcove Gallery first). Its own page, like /admin, and not linked
+    from index.html or /admin (Liwei, 2026-09-28).
+
+    Served to anyone for the same reason as /admin: the page decides what to
+    show, and every figure on it comes from /api/migration/..., which is
+    behind the admin sign-in.
+
+    `no-cache` for the reason RevalidatingStatic gives below: without it the
+    browser kept serving a superseded copy of this page after it changed
+    (seen 2026-09-28, a new element missing from the DOM while the server
+    was already returning it)."""
+    return FileResponse(os.path.join(BASE_DIR, "static", "migration.html"),
+                        headers={"Cache-Control": "no-cache"})
+
+
+# /debug, the plain data inspector, was removed 2026-09-28 for security at
+# Liwei's request: it was served to anyone, with buttons for sync and
+# SharePoint write-back. Its duties live on /admin, behind the admin sign-in.
+# /api/debug/backend (the read-only diagnostics) is unchanged.
 class RevalidatingStatic(StaticFiles):
     """Static files that must be revalidated on every request.
 

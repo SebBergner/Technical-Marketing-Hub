@@ -512,7 +512,7 @@ This was the one-time squash merge that first put the backend on `main`
    modal with the video/image playing and a Properties table below it, or (for
    a Word/PowerPoint file) a new tab. See `docs/HANDOVER-DEVELOPMENT.md` §5.6
    for the two non-obvious constraints this depends on.
-8. **`/debug`** — the plain data inspector, for anything the UI obscures.
+8. ~~`/debug`~~ — removed 2026-09-28 for security; use `/admin` (and `/api/debug/backend` for diagnostics).
 
 If a sync you *can* trigger (locally, or once curator access exists) refuses
 with `WouldShrinkMirror`, that is the tripwire working, not a bug — it means
@@ -720,5 +720,5 @@ holds the curator role the sync endpoints require. Shape when you build both:
 an Azure timer (WebJob or Function) calling the two endpoints — **hourly for
 SharePoint** (it has a delta token, so an unchanged check is nearly free) and
 **once or twice daily for Consensus** (no delta; it re-pulls everything) —
-running as a principal that has the curator role, plus a manual button in
-`/debug` for troubleshooting.
+running as a principal that has the curator role, plus the manual sync
+buttons on `/admin` for troubleshooting (`/debug` was removed 2026-09-28).

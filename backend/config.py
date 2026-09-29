@@ -185,6 +185,26 @@ class Settings(BaseSettings):
     admin_username: str = ""
     admin_password: str = ""
 
+    # ------------------------------------------------------------- migrations
+    #: Where the Brightcove Gallery migration puts its demos: the "Demo Video"
+    #: library (URL DemoVideo), their permanent home. First Gallery_Brightcove
+    #: (2026-09-28); renamed 2026-09-29 because it will hold demo videos from
+    #: other sources too (Seb, Elio). The /migration page summarises it
+    #: read-only, and the CLI refuses to write to it without --allow-production.
+    migration_brightcove_library: str = "Demo Video"
+    #: The term set Product's labels are looked up in. Extranet / "PTC Product":
+    #: the Product term "Creo Parametric" on a Demo Catalog folder was found
+    #: there on 2026-09-28 -- likely Product's bound set, not proven, since
+    #: Graph v1.0 does not expose a column's term set. A label missing from
+    #: it is reported by the dry run rather than guessed at.
+    migration_product_term_set: str = "505d8d92-dc55-422c-8f3c-a52cbaadf259"
+    #: Whether THIS deployment may run a migration started from /migration.
+    #: Off by default and meant to be on in exactly one place (staging, set as
+    #: a deployment-slot setting): staging and production have separate data
+    #: shares, so their run locks cannot see each other, and two runs at once
+    #: would race to create the same folders (Liwei, 2026-09-29).
+    migration_runner_enabled: bool = False
+
     # ---------------------------------------------------------------- behaviour
     seed_path: str = os.path.join(BASE_DIR, "data", "seed", "assets.json")
     #: Keep the mockup's aspirational sidebar numbers instead of real counts.

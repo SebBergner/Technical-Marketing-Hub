@@ -447,6 +447,70 @@ def test_customer_facing_comes_from_the_video_filenames():
     assert by_title["Kit B"].customer_facing is True
 
 
+# ─────────────────────── Brightcove Gallery migration (HLR-A8, A9, B5)
+def test_a_video_demo_type_becomes_a_video_asset():
+    """The Demo Type the Gallery migration writes. Same AssetType as a
+    Consensus video, so the one Type filter covers both."""
+    asset = build_assets([folder("Polaris AR", demo_type="Video")])[0][0]
+    assert asset.type.value == "video"
+
+
+def test_single_valued_managed_metadata_is_unwrapped():
+    """Measured on the test library 2026-09-28: a single-valued managed
+    metadata column is one dict, not a list. It used to be stored as the
+    string "{'Label': ...}"."""
+    term = {"Label": "Creo Parametric", "TermGuid": "0f90d5b6", "WssId": 183}
+    asset = build_assets([folder("Kit v.1", Product=term)])[0][0]
+    assert asset.products == ["Creo Parametric"]
+
+
+def test_the_customer_facing_column_overrules_the_filename():
+    """An explicit column is a statement; the filename rule is a guess that
+    defaults to customer-facing, which would expose GXC internal videos."""
+    items = [
+        folder("Internal Clip", demo_type="Video", Customer_x0020_Facing=False),
+        file_item("Internal Clip - Customer Facing.mp4", "/Internal Clip"),
+        folder("Plain Clip", demo_type="Video", item_id="id-plain", Customer_x0020_Facing=False),
+        file_item("Plain Clip.mp4", "/Plain Clip"),
+    ]
+    by_title = {a.title: a for a in build_assets(items)[0]}
+    assert by_title["Internal Clip"].customer_facing is False
+    assert by_title["Plain Clip"].customer_facing is False
+
+
+def test_unset_yes_no_columns_leave_the_filename_rule_alone():
+    """Both columns are empty on every demo asset today (2026-09-28), so the
+    live catalogue must come out exactly as before."""
+    items = [folder("Kit A"), file_item("Kit A Demo - Internal Only.mp4", "/Kit A")]
+    asset = build_assets(items)[0][0]
+    assert asset.customer_facing is False
+    assert asset.has_narrated_audio is None
+
+
+def test_contains_audio_column_is_read():
+    asset = build_assets([folder("Clip", demo_type="Video", Contains_x0020_Audio=True)])[0][0]
+    assert asset.has_narrated_audio is True
+
+
+def test_the_stale_twin_yes_no_columns_are_not_read():
+    """`…0` are the site-column copies, not the library's own, as with
+    Demo_x0020_Type0."""
+    asset = build_assets([folder("Clip", demo_type="Video",
+                                 Customer_x0020_Facing0=False)])[0][0]
+    assert asset.customer_facing is True
+
+
+def test_original_publish_date_is_preferred_over_last_modified():
+    asset = build_assets([folder("Clip", demo_type="Video",
+                                 OriginalPublishDate="2019-05-14T00:00:00Z")])[0][0]
+    assert str(asset.uploaded_at) == "2019-05-14"
+
+
+def test_without_a_publish_date_the_folder_date_is_kept():
+    asset = build_assets([folder("Kit v.1")])[0][0]
+    assert str(asset.uploaded_at) == "2025-07-21"
+
+
 def test_deleted_items_are_ignored():
     items = [folder("Gone"), {"id": "x", "name": "Gone", "folder": {},
                               "deleted": {"state": "deleted"},

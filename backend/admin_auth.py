@@ -24,6 +24,13 @@ what it may unlock is bounded by what is safe to do anonymously:
 `require_admin` therefore gates only the first two, and nothing in this file
 grants the curator role.
 
+One exception, deliberate and temporary (Liwei, 2026-09-29): STARTING a
+Brightcove migration run on /migration, which writes to SharePoint, accepts
+this sign-in too, because production has no SSO yet. It is only allowed with
+a typed operator name, kept in the run's batch log, so each run is traceable
+to a person by more than the shared credential. When production has SSO it
+becomes curator-only. See backend/routers/migration.py.
+
 Mechanics
 ---------
 A signed cookie, not HTTP Basic: Basic re-sends the password on every request

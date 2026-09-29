@@ -32,6 +32,14 @@ def no_daily_sync_loop(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def no_migration_runs(monkeypatch):
+    """A developer's .env may enable migration runs on their machine; the
+    suite must never start or resume one against the real tenant. Tests of
+    the runner switch it on themselves, with fake clients."""
+    monkeypatch.setattr(settings, "migration_runner_enabled", False)
+
+
+@pytest.fixture(autouse=True)
 def never_reach_consensus(monkeypatch):
     """No test authenticates to Consensus unless it deliberately builds a
     client with a mock transport.

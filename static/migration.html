@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Migration · Technical Marketing Hub</title>
+<!--
+  Content migrations into the Demo Catalog, one section per source. Its own
+  page, like /admin, and deliberately not linked from index.html (Elio's) or
+  from /admin (Liwei, 2026-09-28). Self-contained for the same reason as
+  admin.html: its own small stylesheet, so no other page can break it.
+
+  Read-only. The migration's writes run from the CLI; see
+  backend/routers/migration.py for why the shared admin sign-in may not
+  start them.
+-->
+<style>
+  :root{
+    --bg:#f6f7f4; --surface:#fff; --surface-2:#eef1ea; --border:#dde2d6;
+    --ink:#1b2318; --muted:#5d6a56; --faint:#8a9682;
+    --green:#00890B; --green-soft:#e3efe0;
+    --amber:#9a6a10; --amber-soft:#f6ecd7;
+    --red:#9a3324; --red-soft:#f6e3df;
+    --radius:10px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12160f; --surface:#191f15; --surface-2:#212a1c; --border:#2e3a27;
+      --ink:#e9ede2; --muted:#aebaa5; --faint:#7b8a73;
+      --green:#5fbe7c; --green-soft:#1d3323;
+      --amber:#e0b15c; --amber-soft:#3a2e15;
+      --red:#e28569; --red-soft:#3a241d;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.55 -apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px 20px 80px}
+  h1{font-size:20px;margin:0 0 2px}
+  h2{font-size:14px;margin:0;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--faint);font-weight:700}
+  code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+  .muted{color:var(--muted)} .faint{color:var(--faint)}
+  .num{font-variant-numeric:tabular-nums}
+  [hidden]{display:none !important}
+
+  .env{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:12px 16px;border-radius:var(--radius);margin-bottom:22px;
+    border:1px solid var(--border);background:var(--surface-2)}
+  .env--prod{background:var(--amber-soft);border-color:var(--amber)}
+  .env__tag{font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+    font-size:11.5px;padding:3px 10px;border-radius:99px;
+    background:var(--green-soft);color:var(--green)}
+  .env--prod .env__tag{background:var(--amber);color:#fff}
+
+  header.page{display:flex;justify-content:space-between;align-items:flex-start;
+    gap:16px;margin-bottom:20px;flex-wrap:wrap}
+  section{margin-bottom:34px}
+  .section-head{display:flex;justify-content:space-between;align-items:center;
+    gap:12px;margin-bottom:6px}
+  .section-head h2{font-size:15px;color:var(--ink);letter-spacing:.03em;
+    display:flex;align-items:center;gap:10px}
+  .section-head h2::before{content:"";display:block;width:3px;height:16px;
+    border-radius:2px;background:var(--green)}
+  .section-note{margin:0 0 14px;font-size:13px}
+  .card-head{display:flex;justify-content:space-between;align-items:baseline;
+    gap:12px;margin-bottom:10px;flex-wrap:wrap}
+
+  .card{background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);padding:16px 18px;min-width:0}
+  .card--wide{grid-column:1 / -1}
+  .card--off{background:var(--surface-2)}
+  .grid{display:grid;gap:12px}
+  .grid--2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+
+  .kv{display:flex;justify-content:space-between;gap:12px;padding:5px 0;
+    border-bottom:1px dashed var(--border);font-size:13.5px}
+  .kv:last-child{border-bottom:0}
+  .kv dt{color:var(--muted);margin:0}
+  .kv dd{margin:0;text-align:right}
+  .kv__detail{display:block;font-size:11.5px;color:var(--faint)}
+
+  .pill{font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;
+    white-space:nowrap}
+  .pill--ok{background:var(--green-soft);color:var(--green)}
+  .pill--warn{background:var(--amber-soft);color:var(--amber)}
+  .pill--bad{background:var(--red-soft);color:var(--red)}
+  .pill--off{background:var(--surface-2);color:var(--faint)}
+
+  .tablewrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:560px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--faint);padding:0 8px 6px;font-weight:700}
+  td{padding:7px 8px;border-top:1px solid var(--border);vertical-align:top}
+
+  button{font:inherit;cursor:pointer;border-radius:8px;padding:7px 14px;
+    border:1px solid var(--border);background:var(--surface);color:var(--ink)}
+  button:hover:not(:disabled){background:var(--surface-2)}
+  .btn-primary{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}
+  .btn-primary:hover:not(:disabled){filter:brightness(1.07);background:var(--green)}
+
+  .login{max-width:360px;margin:12vh auto;padding:0 16px}
+  .login .card{display:grid;gap:12px}
+  label{display:grid;gap:5px;font-size:12.5px;color:var(--muted)}
+  input{font:inherit;padding:9px 11px;border-radius:8px;border:1px solid var(--border);
+    background:var(--bg);color:var(--ink)}
+  .err{color:var(--red);font-size:13px;min-height:18px}
+  .empty{color:var(--muted);font-size:13px;margin:0}
+
+  /* new migration: upload, preview, start, progress ----------------------- */
+  section + section{border-top:1px solid var(--border);padding-top:30px}
+  .drop{border:2px dashed var(--border);border-radius:var(--radius);padding:22px 16px;
+    text-align:center;cursor:pointer;color:var(--muted);font-size:13.5px}
+  .drop:hover,.drop.over{border-color:var(--green);background:var(--green-soft);color:var(--ink)}
+  .drop input{display:none}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .row select,.form input[type=text],.form input[type=number]{font:inherit;font-size:13.5px;
+    padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--ink)}
+  .form{display:grid;gap:12px;max-width:560px}
+  .form label{font-size:12.5px}
+  .choice{display:flex;gap:16px;flex-wrap:wrap;font-size:13.5px;color:var(--ink)}
+  .choice label{display:flex;gap:6px;align-items:center;font-size:13.5px;color:var(--ink)}
+  .warnbox{background:var(--amber-soft);border:1px solid var(--amber);color:var(--ink);
+    border-radius:8px;padding:9px 12px;font-size:13px}
+  .badbox{background:var(--red-soft);border:1px solid var(--red);color:var(--ink);
+    border-radius:8px;padding:9px 12px;font-size:13px}
+  details{border-top:1px solid var(--border);padding:8px 0}
+  details:first-of-type{border-top:0}
+  summary{cursor:pointer;font-size:13.5px}
+  summary .pill{margin-left:6px}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+  button.btn-primary:disabled{opacity:.45;cursor:default;filter:none}
+
+  /* KPI row ------------------------------------------------------------ */
+  .tiles{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .tile{background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);padding:14px 16px;min-width:0}
+  .tile__n{font-size:26px;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums}
+  .tile__n--small{font-size:20px;line-height:1.3}
+  .tile__l{font-size:12px;color:var(--muted);margin-top:2px}
+  .tile__note{font-size:11.5px;color:var(--faint);margin-top:4px}
+
+  /* progress meter: one ramp, track and fill ----------------------------- */
+  .meter{height:10px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin:10px 0 6px}
+  .meter>span{display:block;height:100%;border-radius:99px;background:var(--green)}
+
+  /* horizontal share bars: one series, one hue, value at the tip -------- */
+  .hbars{display:grid;gap:6px}
+  .hbar{display:grid;grid-template-columns:minmax(90px,34%) 1fr;gap:10px;align-items:center;
+    font-size:13px;padding:2px 0}
+  .hbar__name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+  .hbar__track{display:flex;align-items:center;gap:8px;min-width:0}
+  .hbar__fill{height:14px;border-radius:0 4px 4px 0;background:var(--green);min-width:2px;flex:none}
+  .hbar__val{font-size:12px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .hbar--other .hbar__fill{background:var(--faint)}
+
+  /* columns: counts over time / by year ---------------------------------- */
+  .cols{display:flex;align-items:flex-end;gap:2px;height:140px;padding-top:18px;
+    border-bottom:1px solid var(--border)}
+  .col{flex:1 1 0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+    height:100%;min-width:0;cursor:default}
+  .col__bar{width:100%;max-width:24px;border-radius:4px 4px 0 0;background:var(--green);min-height:2px}
+  .col__val{font-size:11px;color:var(--muted);margin-bottom:3px;font-variant-numeric:tabular-nums}
+  .col--unknown .col__bar{background:var(--faint)}
+  .col-axis{display:flex;gap:2px;margin-top:4px}
+  .col-axis span{flex:1 1 0;min-width:0;text-align:center;font-size:11px;color:var(--faint);
+    overflow:hidden;white-space:nowrap}
+  .chart-note{font-size:11.5px;color:var(--faint);margin:8px 0 0}
+
+  .tip{position:fixed;z-index:60;pointer-events:none;background:var(--ink);color:var(--bg);
+    font-size:12px;padding:5px 9px;border-radius:6px;white-space:nowrap}
+  td a{color:var(--green)}
+</style>
+</head>
+<body>
+<!-- ── loading: the status call reads the whole library live, which takes
+     a few seconds, and a blank page for that long reads as a broken one. -->
+<div class="login" id="loadingView">
+  <p class="muted" style="text-align:center">Loading migration status…</p>
+</div>
+
+<!-- ── signed out ────────────────────────────────────────────────────── -->
+<div class="login" id="loginView" hidden>
+  <div class="card">
+    <div>
+      <h1>Migration</h1>
+      <div class="faint" style="font-size:12.5px">Technical Marketing Hub · Admin sign-in</div>
+    </div>
+    <form id="loginForm">
+      <label>Username <input id="u" autocomplete="username" required></label>
+      <label style="margin-top:10px">Password
+        <input id="p" type="password" autocomplete="current-password" required></label>
+      <div class="err" id="loginErr"></div>
+      <button class="btn-primary" style="width:100%" type="submit">Sign in</button>
+    </form>
+    <p class="faint" style="font-size:12px;margin:0">
+      The same shared account as the Admin page, in place until single sign-on
+      is configured.
+    </p>
+  </div>
+</div>
+
+<!-- ── not configured ───────────────────────────────────────────────── -->
+<div class="login" id="offView" hidden>
+  <div class="card">
+    <h1>No admin configured</h1>
+    <p class="muted" style="margin:0">
+      This deployment has no <code>ADMIN_USERNAME</code> / <code>ADMIN_PASSWORD</code>
+      set, so the Migration page is switched off entirely.
+    </p>
+  </div>
+</div>
+
+<!-- ── signed in ────────────────────────────────────────────────────── -->
+<div class="wrap" id="dashView" hidden>
+  <div class="env" id="envBanner">
+    <span class="env__tag" id="envTag">…</span>
+    <span class="muted" id="envDetail"></span>
+  </div>
+
+  <header class="page">
+    <div>
+      <h1>Migration</h1>
+      <div class="muted">Content moved into SharePoint from other platforms, one section per source.</div>
+      <div class="faint" id="loadedAt"></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button id="refreshBtn">Refresh</button>
+      <button id="logoutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <section id="bcMigrate">
+    <div class="section-head"><h2>New migration · Brightcove Gallery → SharePoint</h2></div>
+    <p class="section-note muted">
+      1 Upload the gallery workbook → 2 check what it would bring in → 3 start → 4 follow it.
+      Nothing is written to SharePoint until a run is started.
+    </p>
+    <div class="card" id="bcUpload"></div>
+    <div id="bcPreview" hidden>
+      <div class="tiles" id="pvTiles" style="margin-top:12px"></div>
+      <div class="grid grid--2" style="margin-top:12px">
+        <div class="card" id="pvSegments"></div>
+        <div class="card" id="pvProducts"></div>
+      </div>
+      <div class="grid grid--2" style="margin-top:12px">
+        <div class="card" id="pvTypes"></div>
+        <div class="card" id="pvGalleries"></div>
+      </div>
+      <div class="grid grid--2" style="margin-top:12px">
+        <div class="card" id="pvCustomers"></div>
+        <div class="card" id="pvAudience"></div>
+      </div>
+      <div class="card" style="margin-top:12px" id="pvProblems"></div>
+    </div>
+    <div class="card" style="margin-top:12px" id="bcStart" hidden></div>
+    <div class="card" style="margin-top:12px" id="bcRun" hidden></div>
+  </section>
+
+  <section id="brightcove">
+    <div class="section-head"><h2>Library overview</h2></div>
+    <p class="section-note muted" id="bcNote"></p>
+    <div class="card" id="bcNotice" hidden></div>
+    <div id="bcBody">
+      <div class="tiles" id="bcTiles"></div>
+      <div class="card" style="margin-top:12px" id="bcProgress"></div>
+      <div class="grid grid--2" style="margin-top:12px">
+        <div class="card" id="bcSegments"></div>
+        <div class="card" id="bcProducts"></div>
+      </div>
+      <div class="grid grid--2" style="margin-top:12px">
+        <div class="card" id="bcWeeks"></div>
+        <div class="card" id="bcYears"></div>
+      </div>
+      <div class="card" style="margin-top:12px" id="bcRecent"></div>
+      <div class="card" style="margin-top:12px" id="bcBatches"></div>
+    </div>
+  </section>
+  <div class="tip" id="tip" hidden></div>
+</div>
+
+<script src="/static/migration.js"></script>
+</body>
+</html>

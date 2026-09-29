@@ -332,6 +332,13 @@ def test_warnings_are_exposed_on_the_diagnostics_endpoints(disabled, client, mon
     assert client.get("/api/debug/backend").json()["security_warnings"]
 
 
+def test_the_debug_page_is_gone(disabled, client):
+    """Removed 2026-09-28 for security: it was served to anyone, with sync
+    and write-back buttons. Neither its route nor its static file may return."""
+    assert client.get("/debug").status_code == 404
+    assert client.get("/static/debug.html").status_code == 404
+
+
 # ════════════════════════ the temporary admin bridge (delete with SSO) ═══════
 #
 # The property these pin: a shared Admin sign-in may refresh our own mirror,

@@ -746,3 +746,17 @@ kept rendition is 1080p.
 - **Always On** must be on for the staging slot, or App Service unloads the app while a run is
   going.
 - `openpyxl` and `truststore` arrive through `requirements.txt` on the next deploy.
+
+**Changes, 2026-09-29 afternoon (Liwei, after a first test upload)**
+
+- **The page no longer asks for the library name.** The library is fixed
+  (`MIGRATION_BRIGHTCOVE_LIBRARY`) and shown on the page. A name that is sent must still match,
+  and the Demo Catalog is still refused.
+- **Parallel uploads: 1–5 per run**, default 3, chosen on the page and clamped on the server.
+  Workers take videos from one shared queue; a pause stops them from taking more, and uploads
+  already running finish. The batch log is now thread-safe (one lock). A test with real threads
+  pins that downloads overlap.
+- **Rows that would give the same folder name are now flagged, both of them**
+  (case-insensitive, like SharePoint). Run in sequence, the second would fail; run in parallel,
+  the two race for the folder. **V29 has 3 such pairs, 6 rows** (for example "Windchill AI
+  Assistant" and "Creo Simulation Live"). Seb needs distinct Proposed Titles for them.

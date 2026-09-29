@@ -9,6 +9,7 @@ video is in.
 """
 from __future__ import annotations
 
+import itertools
 import json
 import os
 
@@ -63,7 +64,7 @@ class FakeGraph:
     def __init__(self, library="Gallery_Brightcove_Test", existing=(), video=True):
         self.library, self.existing, self.video = library, list(existing), video
         self.calls: list[tuple[str, str, object]] = []
-        self.next_id = 0
+        self.ids = itertools.count(1)       # thread-safe: parallel runs use this fake
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         path, method = request.url.path, request.method
@@ -82,8 +83,7 @@ class FakeGraph:
         if path.endswith(f"/drives/{DRIVE}/root/children") and method == "GET":
             return httpx.Response(200, json={"value": self.existing})
         if path.endswith(f"/drives/{DRIVE}/root/children") and method == "POST":
-            self.next_id += 1
-            return httpx.Response(201, json={"id": f"folder-{self.next_id}", "name": body["name"],
+            return httpx.Response(201, json={"id": f"folder-{next(self.ids)}", "name": body["name"],
                                              "webUrl": f"{SITE_URL}/x"})
         if path.endswith("/createUploadSession"):
             return httpx.Response(200, json={"uploadUrl": "https://upload.example/session-1"})
@@ -214,9 +214,9 @@ def row(bcid="111", title="Polaris AR", segments="PLM;CAD", products="Creo Param
 def test_a_manifest_reports_every_problem_without_stopping(tmp_path):
     path = write_manifest(tmp_path, [
         row(),
-        row(bcid="222", cf="", date="14/05/2019"),
+        row(bcid="222", title="Second", cf="", date="14/05/2019"),
         row(bcid="111", title="Duplicate"),
-        row(bcid="333", source="notes.txt"),
+        row(bcid="333", title="Fourth", source="notes.txt"),
     ])
     records = run.load_manifest(path)
     run.validate(records, ["ALM", "CAD", "PLM"], TERMS)
@@ -225,6 +225,17 @@ def test_a_manifest_reports_every_problem_without_stopping(tmp_path):
     assert any("YYYY-MM-DD" in p for p in records[1].problems)
     assert any("repeats row 2" in p for p in records[2].problems)
     assert any("not a video" in p for p in records[3].problems)
+
+
+def test_rows_that_would_share_a_folder_are_both_flagged(tmp_path):
+    """V29 had 3 such pairs (2026-09-29). Case-insensitive, like SharePoint."""
+    records = run.load_manifest(write_manifest(tmp_path, [
+        row(bcid="1", title="Creo Simulation Live"), row(bcid="2", title="Other"),
+        row(bcid="3", title="creo simulation live")]))
+    run.validate(records, ["PLM", "CAD"], TERMS)
+    assert any("same folder name as row 4" in p for p in records[0].problems)
+    assert any("same folder name as row 2" in p for p in records[2].problems)
+    assert records[1].problems == []
 
 
 def test_unknown_values_are_reported_not_forced(tmp_path):

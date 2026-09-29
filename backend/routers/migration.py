@@ -137,8 +137,12 @@ def sheet_problems(sheet_id: str):
 class RunIn(BaseModel):
     sheet_id: str
     limit: int | None = None
-    confirm_library: str
+    #: Optional since 2026-09-29: the library is fixed, so the page no
+    #: longer asks for it to be typed. A name that is sent must still match.
+    confirm_library: str | None = None
     operator: str | None = None
+    #: Parallel uploads, 1-5 (Liwei: 3 to 5); the server clamps it.
+    parallel: int = jobs.DEFAULT_PARALLEL
 
 
 class ResumeIn(BaseModel):
@@ -152,7 +156,7 @@ def start_run(body: RunIn, actor: str = Depends(admin_or_curator)):
         raise HTTPException(status_code=422, detail="The limit must be at least 1.")
     try:
         batch_id = jobs.start_run(body.sheet_id, limit=body.limit, operator=operator, via=actor,
-                                  confirm_library=body.confirm_library)
+                                  confirm_library=body.confirm_library, parallel=body.parallel)
     except jobs.RunRefused as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     log.info("migration run %s started by %s (%s)", batch_id, operator, actor)

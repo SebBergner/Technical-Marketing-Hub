@@ -49,6 +49,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import threading
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from typing import Callable
@@ -205,6 +206,21 @@ def validate(records: list[VideoRecord], choices, terms: w.TermIndex) -> None:
         choices = {"Segment": tuple(choices)}
     segment_choices = list(choices.get("Segment") or ())
     allowed = {s.lower(): s for s in segment_choices}
+
+    # Two rows that would become the same folder: the second create fails,
+    # and with parallel uploads the two race for it. SharePoint names are
+    # case-insensitive. Both rows are flagged -- which one keeps the name is
+    # the sheet owner's call. V29 had 3 such pairs (2026-09-29).
+    by_name: dict[str, list[VideoRecord]] = {}
+    for r in records:
+        if r.title:
+            by_name.setdefault(r.folder_name.lower(), []).append(r)
+    for same in by_name.values():
+        for r in same if len(same) > 1 else ():
+            others = ", ".join(str(o.row) for o in same if o is not r)
+            r.problems.append(f"title gives the same folder name as row {others}; "
+                              f"titles must be unique")
+
     for r in records:
         for key, (column, is_choice) in EXTRA.items():
             values = r.hub_products if key == "hub_products" else (
@@ -239,10 +255,16 @@ def _now() -> str:
 
 class BatchLog:
     """One JSON file per run under owned/migration/brightcove/batches/, the
-    shape the /migration page reads. Rewritten atomically after every step."""
+    shape the /migration page reads. Rewritten atomically after every step.
+
+    Thread-safe: parallel uploads (migration_jobs) update one log from
+    several threads, and an unguarded update could be written out half-done
+    or lost to another thread's save.
+    """
 
     def __init__(self, data: dict):
         self.data = data
+        self._lock = threading.RLock()
 
     @classmethod
     def new(cls, mode: str, library: str, manifest: str, planned: int) -> "BatchLog":
@@ -264,13 +286,14 @@ class BatchLog:
         return next((i for i in self.data["items"] if i["brightcove_id"] == brightcove_id), None)
 
     def set_item(self, brightcove_id: str, **fields) -> dict:
-        entry = self.item(brightcove_id)
-        if entry is None:
-            entry = {"brightcove_id": brightcove_id}
-            self.data["items"].append(entry)
-        entry.update(fields, updated_at=_now())
-        self.save()
-        return entry
+        with self._lock:
+            entry = self.item(brightcove_id)
+            if entry is None:
+                entry = {"brightcove_id": brightcove_id}
+                self.data["items"].append(entry)
+            entry.update(fields, updated_at=_now())
+            self.save()
+            return entry
 
     def recount(self) -> None:
         counts: dict[str, int] = {}
@@ -279,16 +302,18 @@ class BatchLog:
         self.data["counts"] = counts
 
     def save(self) -> None:
-        self.recount()
-        os.makedirs(batches_dir(), exist_ok=True)
-        tmp = self.path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump(self.data, fh, indent=1, ensure_ascii=False)
-        os.replace(tmp, self.path)
+        with self._lock:
+            self.recount()
+            os.makedirs(batches_dir(), exist_ok=True)
+            tmp = self.path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(self.data, fh, indent=1, ensure_ascii=False)
+            os.replace(tmp, self.path)
 
     def finish(self) -> None:
-        self.data["finished_at"] = _now()
-        self.save()
+        with self._lock:
+            self.data["finished_at"] = _now()
+            self.save()
 
 
 # ───────────────────────────────────────────────────────────── planning

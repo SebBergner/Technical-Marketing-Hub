@@ -403,8 +403,10 @@
           msg.appendChild(box("badbox", "The preview failed: " + p.error));
           return;
         }
+        var by = (p.uploaded_by || "—").replace(/^curator:/, "")
+          .replace(/^admin-session$/, "the shared admin account");
         msg.textContent = (p.filename || "Workbook") + " · uploaded " + (fmtStamp(p.uploaded_at) || "") +
-          " by " + (p.uploaded_by || "—") + " · checked " + (fmtStamp(p.computed_at) || "");
+          " by " + by + " · checked " + (fmtStamp(p.computed_at) || "");
         renderPreview(p);
         renderStart(p);
       })
@@ -501,12 +503,19 @@
     radio("all", "All " + fmtInt(n) + " videos", n <= 10);
     form.appendChild(choice);
 
-    var confirm = el("input");
-    confirm.type = "text";
-    confirm.placeholder = LIB;
-    var lc = el("label", null, "Type the library name to confirm: " + LIB);
-    lc.appendChild(confirm);
-    form.appendChild(lc);
+    // The library is fixed (Liwei, 2026-09-29): shown, not asked for.
+    form.appendChild(el("p", "empty", "Target library: " + LIB + " — the only library this page writes to."));
+
+    var par = el("select");
+    [1, 2, 3, 4, 5].forEach(function (k) {
+      var o = el("option", null, k === 1 ? "1 (one at a time)" : String(k));
+      o.value = String(k);
+      par.appendChild(o);
+    });
+    par.value = "3";
+    var lp = el("label", null, "Parallel uploads");
+    lp.appendChild(par);
+    form.appendChild(lp);
 
     var operator = null;
     if (ACTOR && ACTOR.kind === "admin-session") {
@@ -522,18 +531,19 @@
     var go = el("button", "btn-primary", "Start migration");
     go.disabled = true;
     function check() {
-      go.disabled = confirm.value.trim() !== LIB || (operator && operator.value.trim().length < 2);
+      go.disabled = !!(operator && operator.value.trim().length < 2);
     }
-    confirm.addEventListener("input", check);
+    check();
     if (operator) operator.addEventListener("input", check);
     var err = el("p", "err");
     go.addEventListener("click", function () {
       go.disabled = true;
       err.textContent = "";
       api("POST", "/api/migration/brightcove/runs", {
-        sheet_id: p.sheet_id, confirm_library: confirm.value.trim(),
+        sheet_id: p.sheet_id,
         limit: pilot.checked ? Math.min(10, n) : null,
-        operator: operator ? operator.value.trim() : null
+        operator: operator ? operator.value.trim() : null,
+        parallel: parseInt(par.value, 10)
       }).then(function (j) {
         ACTIVE = j.batch_id;
         c.hidden = true;
@@ -582,6 +592,7 @@
     cardHead(c, "4 · Progress", s.pause_requested && s.state === "running" ? "Pausing after this video" : st[0],
              s.pause_requested && s.state === "running" ? "pill--off" : st[1]);
     c.appendChild(el("p", "empty", "Started " + (fmtStamp(s.started_at) || "") + " by " + (s.operator || "—") +
+      " · " + (s.parallel || 1) + " at a time" +
       (s.finished_at ? " · finished " + fmtStamp(s.finished_at) : "")));
     if (s.stopped_error) c.appendChild(box("badbox", "The run stopped: " + s.stopped_error));
 
@@ -609,10 +620,13 @@
     }
     c.appendChild(el("div", "muted", pct + "% · " + fmtInt(done) + " of " + demos(s.total) + " done · " +
       fmtSize(s.bytes_done) + " of " + fmtSize(s.bytes_total) + eta));
-    if (s.current && s.state === "running") {
-      var cur = s.current;
-      var part = cur.size ? " " + Math.round((cur.uploaded_bytes || 0) * 100 / cur.size) + "%" : "";
-      c.appendChild(el("p", "empty", "Now: " + cur.title + " — " + (ITEM_STATE[cur.status] || cur.status) + part));
+    if (s.state === "running") {
+      // Several at once with parallel uploads.
+      (s.current || []).forEach(function (cur) {
+        var part = cur.size ? " " + Math.round((cur.uploaded_bytes || 0) * 100 / cur.size) + "%" : "";
+        c.appendChild(el("p", "empty", "Now: " + cur.title + " — " +
+          (ITEM_STATE[cur.status] || cur.status) + part));
+      });
     }
 
     var row = el("div", "row");

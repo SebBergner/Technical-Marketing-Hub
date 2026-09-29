@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 import os
+import threading
+import time
 from datetime import datetime
 
 import httpx
@@ -27,6 +29,7 @@ from tests.test_auth import easyauth_headers
 from tests.test_brightcove_runner import FakeGraph, FakeUploader
 from tests.test_brightcove_source import VIDEO, FakeBrightcove
 
+REAL_THREAD = threading.Thread            # kept before the fixture swaps it for Inline
 ADMIN_USER, ADMIN_PASS = "tddadmin", "a-long-test-password-8e1f"
 CURATORS = "11111111-2222-3333-4444-555555555555"
 LIB = "Demo Video"
@@ -41,6 +44,9 @@ class Inline:
 
     def start(self):
         self.target(*self.args)
+
+    def join(self, timeout=None):
+        pass
 
 
 @pytest.fixture(autouse=True)
@@ -170,7 +176,7 @@ def test_only_xlsx_is_accepted(client):
 
 # ─────────────────────────────────────────────────────────────── who may start
 def body(sid, **kw):
-    return {"sheet_id": sid, "confirm_library": LIB, **kw}
+    return {"sheet_id": sid, **kw}
 
 
 def test_the_shared_admin_sign_in_must_name_an_operator(client, tmp_path):
@@ -197,12 +203,15 @@ def test_a_signed_in_non_curator_cannot_use_the_page(client):
     assert client.get("/api/migration/brightcove/status", headers=viewer).status_code == 403
 
 
-def test_the_library_name_must_be_typed_exactly(client, tmp_path):
+def test_the_library_is_fixed_so_no_name_is_asked_but_a_wrong_one_is_refused(client, tmp_path):
+    """Liwei, 2026-09-29: the page no longer asks for the library name."""
     admin(client)
     sid = upload(client, tmp_path)
     r = client.post("/api/migration/brightcove/runs",
-                    json={"sheet_id": sid, "confirm_library": "demo video", "operator": "Liwei"})
-    assert r.status_code == 409 and "library name exactly" in r.json()["detail"]
+                    json={"sheet_id": sid, "confirm_library": "Demo Catalog", "operator": "Liwei"})
+    assert r.status_code == 409 and "only write to Demo Video" in r.json()["detail"]
+    r = client.post("/api/migration/brightcove/runs", json={"sheet_id": sid, "operator": "Liwei"})
+    assert r.status_code == 200, r.text
 
 
 def test_runs_only_start_where_they_are_enabled(client, tmp_path, monkeypatch):
@@ -225,6 +234,52 @@ def test_a_run_carries_every_video_to_done_and_reports_progress(client, tmp_path
     writes = [p for m, p, _ in isolated.calls if m != "GET"]
     assert any(p.endswith("/root/children") for p in writes), "a folder was created"
     assert not os.path.exists(jobs._lock_path()), "the lock is released"
+
+
+def test_parallel_uploads_really_overlap_and_all_finish(client, tmp_path, monkeypatch):
+    """Liwei, 2026-09-29: 3-5 at once. Real threads here, not Inline."""
+    videos = {f"63000000000{n}": {**VIDEO, "id": f"63000000000{n}", "name": f"Video {n}"}
+              for n in (11, 12, 13)}
+    brightcove = FakeBrightcove(videos=videos)
+    graph = FakeGraph(library=LIB)
+    monkeypatch.setattr(jobs, "clients", lambda: (graph.client(), brightcove.client()))
+    active, peak, guard = [0], [0], threading.Lock()
+
+    def cdn(request):
+        with guard:
+            active[0] += 1
+            peak[0] = max(peak[0], active[0])
+        time.sleep(0.3)                                 # long enough to overlap
+        with guard:
+            active[0] -= 1
+        return httpx.Response(200, content=b"x" * SIZE)
+
+    monkeypatch.setattr(jobs, "http_clients", lambda: (
+        FakeUploader(size=SIZE).client(), httpx.Client(transport=httpx.MockTransport(cdn))))
+    admin(client)
+    rows = [["PLM - All", vid, v["name"], v["name"], False, "S", "L", "", "Windchill",
+             datetime(2020, 1, 1), "Technical Overview", "Feature", "PLM", "Yes"]
+            for vid, v in videos.items()]
+    sid = upload(client, tmp_path, rows=rows)
+    monkeypatch.setattr(jobs, "_spawn", lambda bid: None)
+    bid = client.post("/api/migration/brightcove/runs",
+                      json=body(sid, operator="Liwei", parallel=3)).json()["batch_id"]
+
+    monkeypatch.setattr(jobs.threading, "Thread", REAL_THREAD)
+    jobs.execute(bid)
+    s = jobs.run_status(bid)
+    assert s["counts"] == {"done": 3} and s["state"] == "finished"
+    assert s["parallel"] == 3
+    assert peak[0] >= 2, f"downloads never overlapped (peak {peak[0]})"
+
+
+def test_parallel_is_clamped_to_five(client, tmp_path, monkeypatch):
+    admin(client)
+    sid = upload(client, tmp_path)
+    monkeypatch.setattr(jobs, "_spawn", lambda bid: None)
+    bid = client.post("/api/migration/brightcove/runs",
+                      json=body(sid, operator="Liwei", parallel=50)).json()["batch_id"]
+    assert jobs.run.BatchLog.load(bid).data["parallel"] == 5
 
 
 def test_a_second_run_is_refused_while_one_holds_the_lock(client, tmp_path):

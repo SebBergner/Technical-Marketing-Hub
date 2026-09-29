@@ -348,12 +348,21 @@ def _pause_path(batch_id: str) -> str:
     return os.path.join(_control_dir(), f"{batch_id}.pause")
 
 
+#: Parallel uploads a run may use (Liwei, 2026-09-29: 3 to 5). Each holds
+#: one 10 MiB chunk in memory; SharePoint's 429s are retried per chunk.
+MAX_PARALLEL = 5
+DEFAULT_PARALLEL = 3
+
+
 def start_run(sheet_id: str, *, limit: int | None, operator: str, via: str,
-              confirm_library: str) -> str:
+              confirm_library: str | None = None, parallel: int = DEFAULT_PARALLEL) -> str:
+    """The library is fixed -- MIGRATION_BRIGHTCOVE_LIBRARY, never chosen on
+    the page -- so typing its name is no longer asked (Liwei, 2026-09-29).
+    A name that IS sent must still be that library."""
     if not settings.migration_runner_enabled:
         raise RunRefused("Runs are not enabled on this deployment (MIGRATION_RUNNER_ENABLED).")
-    if (confirm_library or "").strip() != settings.migration_brightcove_library:
-        raise RunRefused(f"Type the library name exactly: {settings.migration_brightcove_library}")
+    if confirm_library and confirm_library.strip() != settings.migration_brightcove_library:
+        raise RunRefused(f"Runs only write to {settings.migration_brightcove_library}.")
     if not (operator or "").strip():
         raise RunRefused("An operator name is required.")
     if active_run():
@@ -370,8 +379,9 @@ def start_run(sheet_id: str, *, limit: int | None, operator: str, via: str,
         raise RunRefused("Nothing new to migrate in that sheet.")
     blog = run.BatchLog.new("upload", preview.get("library") or settings.migration_brightcove_library,
                             manifest, planned=(preview.get("counts") or {}).get("rows"))
-    blog.data.update(sheet_id=sheet_id, operator=operator.strip(), via=via,
-                     limit=limit, started_from="page")
+    blog.data.update(sheet_id=sheet_id, operator=operator.strip(), via=via, limit=limit,
+                     parallel=max(1, min(MAX_PARALLEL, int(parallel or 1))),
+                     started_from="page")
     for r in todo:
         blog.data["items"].append({"brightcove_id": r["brightcove_id"], "row": r["row"],
                                    "title": r["title"], "status": "pending",
@@ -388,7 +398,12 @@ def _spawn(batch_id: str) -> None:
 
 
 def execute(batch_id: str) -> None:
-    """Carry every unfinished item of a batch to done, one at a time."""
+    """Carry every unfinished item of a batch to done, `parallel` at a time.
+
+    Workers take the next unfinished video from one shared queue. A pause
+    stops them from TAKING another; what is already uploading finishes, so
+    no upload is abandoned half-way.
+    """
     if not _claim(batch_id):
         log.info("migration %s: another process holds the run lock", batch_id)
         return
@@ -396,31 +411,35 @@ def execute(batch_id: str) -> None:
         blog = run.BatchLog.load(batch_id)
         graph, bc, target, terms, records, status = _prepare(blog.data["manifest"])
         by_id = {r.brightcove_id: r for r in records}
-        unfinished = [i["brightcove_id"] for i in blog.data["items"]
-                      if i.get("status") in ("pending", "folder_created", "uploading", "uploaded")]
+        queue = [i["brightcove_id"] for i in blog.data["items"]
+                 if i.get("status") in ("pending", "folder_created", "uploading", "uploaded")]
+        parallel = max(1, min(MAX_PARALLEL, int(blog.data.get("parallel") or 1)))
         blog.data.pop("paused_at", None)
         blog.data["finished_at"] = None
         blog.save()
-        for bcid in unfinished:
-            if os.path.exists(_pause_path(batch_id)):
-                blog.data["paused_at"] = _now()
-                blog.save()
-                log.info("migration %s paused", batch_id)
-                return
+        take = threading.Lock()
+        paused = threading.Event()
+
+        def next_video() -> str | None:
+            with take:
+                if os.path.exists(_pause_path(batch_id)):
+                    paused.set()
+                    return None
+                return queue.pop(0) if queue else None
+
+        def one(bcid: str) -> None:
             record = by_id.get(bcid)
-            fresh = blog.item(bcid).get("status") == "pending"
-            if fresh and status.get(bcid) == "existing":
+            if blog.item(bcid).get("status") == "pending" and status.get(bcid) == "existing":
                 # Arrived in the library since the preview (another run, or
                 # by hand): the ID is the key, so it is not uploaded twice.
                 blog.set_item(bcid, status="existing", note="already in the library")
-                continue
+                return
             if record is None or record.problems:
                 blog.set_item(bcid, status="failed",
                               error="no longer valid in the sheet: " + "; ".join(
                                   (record.problems if record else ["row missing"]))[:400])
-                continue
-            blog.set_item(bcid, status=blog.item(bcid).get("status") or "pending",
-                          started_at=blog.item(bcid).get("started_at") or _now())
+                return
+            blog.set_item(bcid, started_at=blog.item(bcid).get("started_at") or _now())
             try:
                 uploader, source_http = http_clients()
                 run.migrate_one(graph, target, terms, record, blog, bc=bc, uploader=uploader,
@@ -429,7 +448,24 @@ def execute(batch_id: str) -> None:
             except Exception as exc:                       # noqa: BLE001
                 log.exception("migration %s: %s failed", batch_id, bcid)
                 blog.set_item(bcid, status="failed", error=str(exc)[:500])
-            _heartbeat()
+
+        def worker() -> None:
+            while (bcid := next_video()) is not None:
+                one(bcid)
+                _heartbeat()
+
+        workers = [threading.Thread(target=worker, daemon=True, name=f"migration-{batch_id}-{n}")
+                   for n in range(min(parallel, max(1, len(queue))))]
+        for t in workers:
+            t.start()
+        for t in workers:
+            t.join()
+        if paused.is_set() and any(i.get("status") in ("pending", "folder_created", "uploading",
+                                                       "uploaded") for i in blog.data["items"]):
+            blog.data["paused_at"] = _now()
+            blog.save()
+            log.info("migration %s paused", batch_id)
+            return
         blog.finish()
     except Exception as exc:                               # noqa: BLE001
         log.exception("migration %s stopped", batch_id)
@@ -477,15 +513,17 @@ def run_status(batch_id: str) -> dict | None:
     running = active_run() == batch_id
     state = ("running" if running else "paused" if d.get("paused_at")
              else "finished" if d.get("finished_at") else "stopped")
-    current = next((i for i in items if i.get("status") in ("folder_created", "uploading", "uploaded")), None)
+    current = [i for i in items if i.get("status") in ("folder_created", "uploading", "uploaded")]
     return {
         "batch_id": batch_id, "state": state, "operator": d.get("operator"), "via": d.get("via"),
         "started_at": d.get("started_at"), "finished_at": d.get("finished_at"),
         "paused_at": d.get("paused_at"), "pause_requested": os.path.exists(_pause_path(batch_id)),
         "stopped_error": d.get("stopped_error"), "counts": d.get("counts") or {},
+        "parallel": d.get("parallel") or 1,
         "total": len(items), "bytes_total": total_bytes, "bytes_done": done_bytes,
-        "current": current and {k: current.get(k) for k in
-                                ("brightcove_id", "title", "status", "size", "uploaded_bytes")},
+        # Every video in flight -- several at once with parallel uploads.
+        "current": [{k: c.get(k) for k in ("brightcove_id", "title", "status", "size",
+                                           "uploaded_bytes")} for c in current],
         "items": [{k: i.get(k) for k in ("brightcove_id", "title", "status", "size",
                                          "uploaded_bytes", "error", "web_url")} for i in items],
     }

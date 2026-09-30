@@ -867,8 +867,17 @@ Nothing here is built yet. These are the decisions that the Hub work (Phase 3) b
 ### Backlog (not scheduled)
 
 1. **Thumbnails on video cards.** (Duration turned out to arrive from Graph already, see above.) The source is a Brightcove poster or a SharePoint thumbnail; neither is tested yet.
-2. **Newest-published first:** the most recently published videos rank first in search results
-   (`OriginalPublishDate`).
+2. **Newest-published first — done 2026-09-30** (`relevance.order_key`).
+   - Search results are ordered by band, then date, then span:
+     - a title that is exactly the query;
+     - then the query anywhere in the title, **newest first**;
+     - then the words scattered across the title;
+     - then description-only hits.
+   - Searching "BMX", "Introduction to Behavioral Modeling (BMX) - LDK" (2026-09-25) moved from
+     9th to 1st locally.
+   - For Demo Video assets the date is `OriginalPublishDate`.
+   - Trade-off: within a band, how soon the title says the words (span) now only breaks
+     same-day ties.
 3. **Several videos in one demo:**
    - A future SharePoint boolean column **"Preview"** marks which video is the demo's preview.
    - That video could also serve as the card's thumbnail.

@@ -351,10 +351,10 @@ class JsonAssetRepository(AssetRepository):
         elif query.sort == "title":
             rows.sort(key=lambda r: r.get("title", "").lower())
         elif query.sort == "relevance" and query.text:
-            # Recency breaks ties, so equally-relevant results keep the old order.
-            rows.sort(key=lambda r: (*relevance.ranking(query.text, r.get("title"),
-                                                        _searchable(r)),
-                                     recency(r)), reverse=True)
+            # Band first, then newest first (relevance.order_key, 2026-09-30).
+            rows.sort(key=lambda r: relevance.order_key(query.text, r.get("title"),
+                                                        _searchable(r), recency(r)),
+                      reverse=True)
         else:
             rows.sort(key=recency, reverse=True)
 

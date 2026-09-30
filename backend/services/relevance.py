@@ -124,6 +124,28 @@ def ranking(text: str | None, title: str | None,
     return (score(text, title, description), -span(text, title))
 
 
+#: How search results are ORDERED, coarser than the tiers on purpose.
+#:
+#: Liwei, 2026-09-30: searching "BMX", the newest demo ("Introduction to
+#: Behavioral Modeling (BMX) - LDK", 2026-09-25) came ninth, behind 2024 kits,
+#: because a title that merely STARTS with the word, or says it a few
+#: characters sooner, outranked it and the date only broke exact ties. Among
+#: results that name the query in their title, the newest is the better
+#: answer. So: the title being exactly the query still wins outright; every
+#: other way of having the query in the title is one band, newest first;
+#: then titles with the words scattered; then description-only hits. Span
+#: now only orders results published the same day.
+_BAND = {EXACT_TITLE: 3, TITLE_PREFIX: 2, TITLE_WORD: 2, TITLE_SUBSTRING: 2,
+         TITLE_ALL_TERMS: 1, ANY_FIELD: 0}
+
+
+def order_key(text: str | None, title: str | None, description: str | None,
+              recency) -> tuple:
+    """Sort key for search results, best first when sorted descending:
+    band, then publish date, then span."""
+    return (_BAND.get(score(text, title, description), -1), recency, -span(text, title))
+
+
 def matches(text: str | None, title: str | None,
             description: str | None = None) -> bool:
     """Whether a record belongs in the results at all.

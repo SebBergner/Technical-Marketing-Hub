@@ -137,9 +137,9 @@ class SqlAssetRepository(AssetRepository):
         elif query.sort == "title":
             rows.sort(key=lambda r: r[0].title.lower())
         elif query.sort == "relevance" and query.text:
-            rows.sort(key=lambda r: (*relevance.ranking(query.text, r[0].title,
-                                                        r[0].description),
-                                     recency(r)), reverse=True)
+            rows.sort(key=lambda r: relevance.order_key(query.text, r[0].title,
+                                                        r[0].description, recency(r)),
+                      reverse=True)
         else:  # recent
             rows.sort(key=recency, reverse=True)
 

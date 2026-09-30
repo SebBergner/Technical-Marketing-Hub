@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from backend.config import settings
 from backend.deps import get_repo
 from backend.integrations.graph.client import GraphClient, GraphError
-from backend.models import Asset, AssetSummary, Page
+from backend.models import Asset, AssetSummary, Page, video_type_filter
 from backend.repositories.base import AssetRepository, AssetQuery
 from backend.routers.graph import require_client
 
@@ -57,7 +57,7 @@ def list_assets(
 ):
     return repo.list(AssetQuery(
         text=q, types=type, products=product, funnel_stages=stage, segments=segment,
-        industries=industry, value_drivers=driver, languages=language, content_depths=depth,
+        industries=industry, value_drivers=driver, languages=language, content_depths=video_type_filter(depth),
         sources=source, product_families=family,
         umbrella_families=umbrella, tags=tag,
         customer_facing=customer_facing, has_narrated_audio=has_narrated_audio,

@@ -11,7 +11,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 T = TypeVar("T")
 
@@ -43,6 +43,48 @@ class ContentDepth(str, Enum):
     OVERVIEW = "Overview"
     EXPLAINER = "Explainer"
     WALKTHROUGH = "Walkthrough"
+
+
+class VideoType(str, Enum):
+    """An asset's Video Type (stored as `content_depth`), five values.
+
+    Liwei, 2026-09-29: the Hub uses the "Demo Video" library's five, and the
+    Hub's older three map onto them (LEGACY_VIDEO_TYPES). The Request form
+    keeps its own four (`ContentDepth`), because those are recommendations
+    written to the SharePoint request list, not tags on an asset.
+    """
+    TECHNICAL_OVERVIEW = "Technical Overview"
+    TECHNICAL_WALKTHROUGH = "Technical Walkthrough"
+    TECHNICAL_TEASER = "Technical Teaser"
+    PRESENTER_SUPPORT = "Presenter Support"
+    OTHER = "Other"
+
+
+#: The older three, still in mirrors written before the switch and in links
+#: and Request-form lookups that say `depth=Overview`.
+LEGACY_VIDEO_TYPES = {
+    "Overview": VideoType.TECHNICAL_OVERVIEW.value,
+    "Walkthrough": VideoType.TECHNICAL_WALKTHROUGH.value,
+    "Teaser": VideoType.TECHNICAL_TEASER.value,
+}
+
+
+def video_type(value) -> str | None:
+    """Any spelling we have stored or been sent, as one of the five, or None."""
+    if value is None:
+        return None
+    text = str(getattr(value, "value", value)).strip()
+    text = LEGACY_VIDEO_TYPES.get(text, text)
+    return text if text in {v.value for v in VideoType} else None
+
+
+def video_type_filter(values: list[str]) -> list[str]:
+    """A `depth=` filter as given, with the older three spelled the new way.
+
+    Unknown values are kept, so they match nothing -- dropping them would turn
+    "Explainer" (a Request-form value no asset carries) into no filter at all.
+    """
+    return [LEGACY_VIDEO_TYPES.get(v, v) for v in values]
 
 
 class ResourceKind(str, Enum):
@@ -291,7 +333,8 @@ class AssetBase(BaseModel):
     #: the two lists are separate.
     umbrella_families: list[str] = Field(default_factory=list)
     funnel_stage: FunnelStage | None = None
-    content_depth: ContentDepth | None = None
+    #: The Video Type. Named for its history; see VideoType.
+    content_depth: VideoType | None = None
     language: str = "en"
     segment: str | None = None                # CAD / PLM / IPL
     industry: str | None = None
@@ -305,6 +348,13 @@ class AssetBase(BaseModel):
     #: vocabularies we have verified, and dropping the rest would throw away
     #: the signal a person deliberately added.
     tags: list[str] = Field(default_factory=list)
+
+    @field_validator("content_depth", mode="before")
+    @classmethod
+    def _one_of_the_five(cls, value):
+        """Older spellings become the five; anything unknown is dropped
+        rather than failing the whole record."""
+        return video_type(value)
 
     @computed_field  # type: ignore[prop-decorator]
     @property

@@ -40,7 +40,7 @@ from typing import Any
 
 from backend.models import (
     Asset, AssetRequest, AssetStats, AssetSummary, AssetType, Capability, Facets, FacetValue, MetadataProposal,
-    Page, ProposalState, ProposalSummary, ValueRoadmap,
+    Page, ProposalState, ProposalSummary, ValueRoadmap, video_type,
 )
 from backend.repositories.base import AssetQuery, AssetRepository
 from backend.services import listing, relevance, taxonomy
@@ -236,7 +236,15 @@ class JsonAssetRepository(AssetRepository):
                 stamp = os.path.getmtime(path)
                 cached = self._mirror_cache.get(path)
                 if cached is None or cached[0] != stamp:
-                    cached = (stamp, _read(path, []))
+                    records = _read(path, [])
+                    # A mirror written before the five Video Types (2026-09-30)
+                    # still says "Overview"; filters and facets read these raw
+                    # records, so they are brought up to date here rather than
+                    # waiting for the next sync.
+                    for record in records:
+                        if record.get("content_depth"):
+                            record["content_depth"] = video_type(record["content_depth"])
+                    cached = (stamp, records)
                     self._mirror_cache[path] = cached
                 # The filename IS the source system, which is what lets a
                 # collision be resolved rather than merely detected.

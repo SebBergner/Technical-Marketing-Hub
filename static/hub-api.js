@@ -122,26 +122,6 @@
     };
   }
 
-  /* Where a result came from. Two platforms hold different things — a kit to
-   * run versus a recording to send — so a card that does not say which is
-   * asking the reader to guess. */
-  /* The platform label is the action.
-   *
-   * Serge, 2026-09-02: "instead of share demo, you could remove that
-   * altogether and just click consensus and it would take you to the video in
-   * consensus. That way you're saving real estate and it's super logical,
-   * because it's implying if you're at SharePoint, you click on SharePoint, it
-   * takes you to SharePoint."
-   *
-   * So the badge stops being decoration and becomes the link. That also
-   * removes the separate share control from the card entirely, which is what
-   * made the actions row worth its space in the first place.
-   */
-  var PLATFORM_LABEL = {
-    consensus: ["Consensus", "Open this demo in Consensus"],
-    sharepoint: ["SharePoint", "Open this demo kit's folder in SharePoint"]
-  };
-
   /* A language tag on the tile, so a French-only recording is not discovered
    * by opening it. Skipped for English on purpose: 727 of 807 assets are
    * English, and a badge on 90% of the grid would be repetition, not a
@@ -168,48 +148,97 @@
     thumb.appendChild(tag);
   }
 
-  /* "ProENGINEER Wildfire" is by far the commonest CAD Model product (240 of
-   * 280, an old pre-rebrand Creo name) and reading it on nearly every CAD
-   * Model tile is noise, not signal -- same principle addLanguageTag() above
-   * already applies to skipping "English". Liwei, 2026-09-10. Other CAD
-   * products (Creo Parametric, Catia, SolidWorks...) are informative and
-   * stay untouched -- this checks the exact string, not the asset type alone.
+  /* ------------------------------------------------------------------ tags
    *
-   * The product name is a plain text node inside .asset-card__meta -- Elio's
-   * own videoAssetFromData() writes it that way -- sitting alongside the
-   * platform badge platformActions() inserts as a real element. Clearing
-   * only that text node, rather than hiding the whole row, keeps the
-   * SharePoint badge on screen. */
-  function hideDominantCadTag(card, a) {
-    if (a.type !== "cad_model") return;
-    if ((a.products || [])[0] !== "ProENGINEER Wildfire") return;
-    var meta = card.querySelector(".asset-card__meta");
-    if (!meta) return;
-    Array.prototype.forEach.call(meta.childNodes, function (node) {
-      if (node.nodeType === Node.TEXT_NODE
-          && node.textContent.trim() === "ProENGINEER Wildfire") {
-        node.textContent = "";
-      }
+   * Liwei, 2026-09-29/30, after Serge's gallery mockup
+   * (Highlevel/Gallery_to_TMH_Import_Playbook.html):
+   *
+   *   * No source anywhere a user looks. Serge no longer wants to see where a
+   *     demo lives -- no SharePoint or Consensus badge, and no badge as a
+   *     link either, since the detail page's own button opens the demo.
+   *     Which source holds what is admin knowledge (/admin, /migration).
+   *   * The card is layered instead of one row of look-alike chips: at most
+   *     two coloured pills (Video Type, Segment), the named customer as a
+   *     grey chip, then one plain line "Creo, Codebeamer and 2 more ·
+   *     Consideration".
+   *   * The detail page lists every tag in a field : value table (below).
+   *   * No "+N" chip. It read as a tag of its own (Bobcat's "+1" was
+   *     ServiceMax). On the card the overflow is words, with every product in
+   *     the tooltip; the detail page names them all.
+   *
+   * "ProENGINEER Wildfire" stays off CAD Dataset cards: 240 of 280 carry it,
+   * an old pre-rebrand Creo name, and repeating it on nearly every tile is
+   * noise (Liwei, 2026-09-10).
+   */
+  var TAGS_CSS =
+    ".hub-card-pills{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 6px}" +
+    ".hub-pill{display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;" +
+    "font-size:11.5px;font-weight:600;line-height:1.4;border:1px solid transparent;white-space:nowrap}" +
+    ".hub-pill--vtype{background:var(--orion-open-bg);color:var(--orion-open-ink);border-color:var(--orion-warn-border)}" +
+    ".hub-pill--segment{background:var(--orion-indigo-soft);color:var(--orion-indigo-strong);border-color:#cfd3f5}" +
+    ".hub-pill--customer{background:var(--orion-surface-3);color:var(--orion-text-2);font-weight:500}" +
+    ".hub-card-line{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}" +
+    ".hub-facts{margin-top:14px}" +
+    ".hub-facts__table{width:100%;border-collapse:collapse;font-size:13px}" +
+    ".hub-facts__table th{width:170px;text-align:left;font-weight:500;color:var(--orion-text-2);" +
+    "padding:8px 12px 8px 0;vertical-align:top;border-top:1px solid var(--orion-border)}" +
+    ".hub-facts__table td{padding:8px 0;color:var(--orion-text);border-top:1px solid var(--orion-border)}" +
+    ".hub-facts__table tr:first-child th,.hub-facts__table tr:first-child td{border-top:none}" +
+    ".hub-facts__table td .orion-badge{margin:0 6px 4px 0}" +
+    ".hub-total{margin-left:10px;font-size:13px;font-weight:500;color:var(--orion-text-3);" +
+    "vertical-align:middle;white-space:nowrap}";
+
+  function ensureTagsCss() {
+    if (document.getElementById("hubTagsCss")) return;
+    var style = document.createElement("style");
+    style.id = "hubTagsCss";
+    style.textContent = TAGS_CSS;
+    (document.head || document.body).appendChild(style);
+  }
+
+  function pill(text, kind) {
+    var el = document.createElement("span");
+    el.className = "hub-pill hub-pill--" + kind;
+    el.textContent = text;
+    return el;
+  }
+
+  /* The families a card names, in display form, minus the CAD-tile noise. */
+  function cardFamilies(a) {
+    return (a.product_families || []).map(familyDisplayName).filter(function (f) {
+      return !(a.type === "cad_model" && f === "ProENGINEER Wildfire");
     });
   }
 
-  function platformBadge(source, href) {
-    var spec = PLATFORM_LABEL[source] || [source, "Open in " + source];
-    // Without somewhere to go it stays a label; a link that goes nowhere is
-    // worse than a badge that never claimed to be one.
-    var el = document.createElement(href ? "a" : "span");
-    el.className = "orion-badge hub-source hub-source--" + source
-                 + (href ? " hub-source--link" : "");
-    el.textContent = spec[0];
-    el.title = href ? spec[1] : spec[0];
-    if (href) {
-      el.href = href;
-      el.target = "_blank";
-      el.rel = "noopener";
-      // The card's own click opens the details page; this one must not.
-      el.addEventListener("click", function (e) { e.stopPropagation(); });
+  /* "Creo, Codebeamer and 2 more": words, never a "+2" chip. */
+  function familiesText(families, shown) {
+    if (families.length <= shown) return families.join(", ");
+    return families.slice(0, shown).join(", ")
+         + " and " + (families.length - shown) + " more";
+  }
+
+  function renderCardTags(card, a) {
+    ensureTagsCss();
+    var meta = card.querySelector(".asset-card__meta");
+    if (!meta) return;
+
+    var pills = document.createElement("div");
+    pills.className = "hub-card-pills";
+    if (a.content_depth) pills.appendChild(pill(a.content_depth, "vtype"));
+    if (a.segment) pills.appendChild(pill(a.segment, "segment"));
+    if (a.named_customer) pills.appendChild(pill(a.named_customer, "customer"));
+    if (pills.childNodes.length) meta.parentNode.insertBefore(pills, meta);
+
+    var families = cardFamilies(a);
+    var line = [familiesText(families, 2), a.funnel_stage].filter(Boolean).join(" · ");
+    meta.innerHTML = "";
+    if (line) {
+      var text = document.createElement("span");
+      text.className = "hub-card-line";
+      text.textContent = line;
+      if (families.length > 2) text.title = families.join(", ");
+      meta.appendChild(text);
     }
-    return el;
   }
 
   /* Elio's own static cards already establish the convention: a kit is a box,
@@ -501,30 +530,7 @@
     clampDescription(card, a);
     paintCover(card, a);
     addLanguageTag(card, a);
-    hideDominantCadTag(card, a);
-
-    /* One badge per platform the asset is actually on. A SharePoint kit that
-     * also has a Consensus recording gets both, which is the honest picture
-     * and replaces the small logo button that used to say the same thing
-     * less clearly.
-     *
-     * Only the Consensus badge still links out. The SharePoint one stopped,
-     * 2026-09-08 (Liwei/Elio): with the detail page now the place to
-     * download the kit's files directly, a second door straight from the
-     * tile to the SharePoint page duplicated that journey rather than
-     * adding one. Consensus is untouched -- its badge is still the primary
-     * way to reach a recording that has no file list of its own. */
-    var meta = card.querySelector(".asset-card__meta");
-    if (meta) {
-      var anchor = meta.firstChild;
-      if (a.consensus_uuid && a.source !== "consensus") {
-        meta.insertBefore(platformBadge("consensus", consensusUrl(a)), anchor);
-      }
-      meta.insertBefore(
-        platformBadge(a.source,
-                      a.source === "consensus" ? consensusUrl(a) : null),
-        meta.firstChild);
-    }
+    renderCardTags(card, a);
 
     /* The name opens a details page inside the Hub, not the platform.
      *
@@ -1631,8 +1637,8 @@
 
   var UNAVAILABLE = {
     "Favorites": "Favourites need a per-user store, which the Hub does not have yet",
-    "Most Viewed": "No view counts for SharePoint assets yet, so any ranking "
-                 + "would show Consensus only",
+    "Most Viewed": "No view counts for most assets yet, so a ranking would "
+                 + "leave most of the catalogue out",
     "Virtual Machines": "No virtual machines in the catalogue yet",
     "Post-Sale": "No assets are tagged Post-Sale yet"
   };
@@ -1961,86 +1967,30 @@
     // -- see toCardData().
     setText("vpDuration", asset.type === "ldk" ? "" : durationLabel(asset.duration_seconds));
 
-    /* The meta row carries the platform badges, so the details page offers the
-     * same two doors as the card and nobody has to go back to find them. */
+    /* The meta row: the two things someone decides on before pressing play,
+     * what format it is and how far it goes. Everything else is in the
+     * Details table under the description (see renderFactsTable). No source
+     * badge -- Serge, via Liwei 2026-09-29. */
     var meta = document.getElementById("vpMeta");
     if (meta) {
+      ensureTagsCss();
       meta.innerHTML = "";
-      meta.appendChild(platformBadge(
-        asset.source,
-        asset.source === "consensus" ? consensusUrl(asset) : asset.web_url));
-      if (asset.consensus_uuid && asset.source !== "consensus") {
-        meta.appendChild(platformBadge("consensus", consensusUrl(asset)));
-      }
-      /* Content depth sits next to the type on purpose: the type says what
-       * format this is, the depth says how far it goes ("Walkthrough" vs
-       * "Teaser"), and read together they are what someone is deciding on
-       * before pressing play. It was parsed and stored all along and simply
-       * never rendered -- added 2026-09-15, once Consensus V2 tags started
-       * arriving reliably over OAuth and 434 assets across both sources had
-       * a value for it.
-       *
-       * Products: all of them, capped. Showing only `[0]` understated the
-       * scope of anything tagged with more than one -- a demo covering Creo,
-       * Windchill and Mathcad read as Creo. Three is where the row still
-       * scans; the rest become "+N". */
-      var families = (asset.product_families || []).map(familyDisplayName);
-      var chips = [asset.type && (TYPE_CHIP[asset.type] || [])[1],
-                   asset.content_depth]
-        .concat(families.slice(0, 3))
-        .concat(families.length > 3 ? ["+" + (families.length - 3)] : [])
-        .concat([asset.segment, asset.funnel_stage])
-        // Consensus's leftover tags last, in the same row and the same chip
-        // as everything before them -- Liwei, 2026-09-16. Every other chip
-        // here already names a dimension with a filter behind it, and a tag
-        // now filters too, so a separate style would have drawn a line where
-        // the behaviour is the same. See `extra_tags` for why this is never
-        // the raw tag list.
-        .concat(asset.extra_tags || []);
-
-      var clickable = {};
-      (asset.extra_tags || []).forEach(function (t) { clickable[t] = 1; });
-
-      chips.filter(Boolean).forEach(function (t) {
-        var chip = document.createElement("span");
-        chip.className = "orion-badge";
-        chip.textContent = t;
-        // Only the tags, for now: the dimension chips beside them each map to
-        // a control with its own rules (depth's is hidden unless the type is
-        // Video, "+N" names nothing), so wiring those is a separate decision
-        // rather than a free extension of this one.
-        if (clickable[t]) {
-          chip.className += " orion-badge--action";
-          chip.title = "Show every asset tagged “" + t + "”";
-          // A span is not focusable or announced as actionable on its own, and
-          // this one does something, so it says so and answers the keyboard.
-          chip.setAttribute("role", "button");
-          chip.tabIndex = 0;
-          chip.addEventListener("click", function () { openTag(t); });
-          chip.addEventListener("keydown", function (e) {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();               // Space scrolls otherwise
-              openTag(t);
-            }
-          });
-        }
-        meta.appendChild(chip);
-      });
+      var typeLabel = (TYPE_CHIP[asset.type] || [])[1];
+      if (typeLabel) meta.appendChild(pill(typeLabel, "customer"));
+      if (asset.content_depth) meta.appendChild(pill(asset.content_depth, "vtype"));
+      if (asset.segment) meta.appendChild(pill(asset.segment, "segment"));
     }
 
     /* Facts, and only the ones we hold. An empty stats row beats a row of
      * zeroes implying nobody has watched something we simply never counted. */
     var facts = [];
-    if (asset.external_views) facts.push(asset.external_views + " views on Consensus");
+    if (asset.external_views) facts.push(asset.external_views + " views");
     if (asset.resource_count) facts.push(asset.resource_count + " files");
     if (asset.video_count) facts.push(asset.video_count + " videos");
-    if (asset.uploaded_at) facts.push("Uploaded " + asset.uploaded_at);
-    if (asset.language && asset.language !== "en") facts.push(asset.language.toUpperCase());
     setText("vpStats", facts.join(" \u00b7 "));
 
-    setText("vpDesc", asset.description
-      || "No description in " + (asset.source === "consensus" ? "Consensus" : "SharePoint")
-         + " for this one yet.");
+    setText("vpDesc", asset.description || "No description for this one yet.");
+    renderFactsTable(page, asset);
 
     renderFileList(page, asset);
     renderVmCards(page, asset);
@@ -2129,8 +2079,10 @@
                      // "Download Kit" still means "get the whole kit" --
                      // it just takes one more click, on SharePoint's page,
                      // to press the real button.
-                     asset.source === "consensus" ? "Go to Consensus"
-                                                  : "Download Kit",
+                     // No platform in the label (brief §15): "Open Demo"
+                     // was "Go to Consensus"; a video opens, a kit downloads.
+                     asset.source === "consensus" ? "Open Demo"
+                       : asset.type === "video" ? "Open Video" : "Download Kit",
                      platformHref,
                      asset.source === "consensus" ? "i-send" : "i-file-text"),
           actions.firstChild);
@@ -2428,9 +2380,7 @@
     // and inventing a shorter "what this clip shows" summary would be a
     // guess dressed as a fact, the exact thing this project keeps refusing
     // to ship. Same fallback text as the details page for the same asset.
-    setText("hubFilePreviewDesc", asset.description
-      || "No description in " + (asset.source === "consensus" ? "Consensus" : "SharePoint")
-         + " for this one yet.");
+    setText("hubFilePreviewDesc", asset.description || "No description for this one yet.");
 
     // The Properties table AMP's screenshot showed, built from what Graph
     // and the asset actually give us -- no invented rows (AMP has a
@@ -2896,6 +2846,97 @@
     });
     c.box.appendChild(list);
     return c.box;
+  }
+
+  /* The detail page's Details table: every tag the asset carries, one row
+   * each, after Serge's mockup. Rows we hold nothing for are left out rather
+   * than shown empty. Products are named in full -- this is where "and 2
+   * more" on the card is answered. Tags stay clickable, as they were in the
+   * old chip row (Liwei, 2026-09-16). */
+  var TYPE_LONG = { video: "Video", ldk: "Live Demo Kit (LDK)", vdk: "Video Demo Kit (VDK)",
+                    vm: "Virtual Machine", cad_model: "CAD Dataset" };
+
+  function fullDate(iso) {
+    var d = new Date(iso + "T00:00:00");
+    return isNaN(d) ? iso
+      : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  function renderFactsTable(page, asset) {
+    ensureTagsCss();
+    var card = document.getElementById("vpFacts");
+    if (!card) {
+      card = document.createElement("div");
+      card.id = "vpFacts";
+      card.className = "vp-card hub-facts";
+      var desc = document.getElementById("vpDesc");
+      if (!desc || !desc.parentNode) return;
+      desc.parentNode.insertBefore(card, desc.nextSibling);
+    }
+    card.innerHTML = "";
+
+    var families = (asset.product_families || []).map(familyDisplayName);
+    // The raw product names, when any says more than its family does
+    // ("Creo Parametric" under Creo); all of them, so the row reads whole.
+    var products = asset.products || [];
+    var detailed = products.some(function (p) { return families.indexOf(p) < 0; })
+      ? products : [];
+    var yesNo = function (v) { return v === true ? "Yes" : v === false ? "No" : null; };
+    var rows = [
+      ["Asset type", TYPE_LONG[asset.type] || asset.type],
+      ["Video type", asset.content_depth],
+      ["Products", families.join(", ")],
+      ["Product (detailed)", detailed.join(", ")],
+      ["Segment", asset.segment],
+      ["Stage", asset.funnel_stage],
+      ["Industry", asset.industry],
+      ["Customer", asset.named_customer],
+      ["Language", asset.language ? (LANGUAGE_LABEL[asset.language] || asset.language.toUpperCase()) : null],
+      ["Customer-facing", yesNo(asset.customer_facing)],
+      ["Narrated audio", yesNo(asset.has_narrated_audio)],
+      ["Length", asset.type === "ldk" ? null : durationLabel(asset.duration_seconds)],
+      ["Uploaded", asset.uploaded_at ? fullDate(asset.uploaded_at) : null]
+    ];
+
+    var table = document.createElement("table");
+    table.className = "hub-facts__table";
+    rows.forEach(function (r) {
+      if (!r[1]) return;
+      var tr = table.insertRow();
+      var th = document.createElement("th");
+      th.textContent = r[0];
+      tr.appendChild(th);
+      tr.insertCell().textContent = r[1];
+    });
+
+    var tags = asset.extra_tags || [];
+    if (tags.length) {
+      var tr = table.insertRow();
+      var th = document.createElement("th");
+      th.textContent = "Tags";
+      tr.appendChild(th);
+      var td = tr.insertCell();
+      tags.forEach(function (t) {
+        var chip = document.createElement("span");
+        chip.className = "orion-badge orion-badge--action";
+        chip.textContent = t;
+        chip.title = "Show every asset tagged \u201c" + t + "\u201d";
+        chip.setAttribute("role", "button");
+        chip.tabIndex = 0;
+        chip.addEventListener("click", function () { openTag(t); });
+        chip.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openTag(t); }
+        });
+        td.appendChild(chip);
+      });
+    }
+
+    var head = document.createElement("div");
+    head.className = "vp-card__head";
+    head.innerHTML = '<div class="vp-card__head-title"><svg class="orion-ico">'
+                   + '<use href="#i-hex"/></svg>Details</div>';
+    card.appendChild(head);
+    card.appendChild(table);
   }
 
   function renderFileList(page, asset) {
@@ -3849,7 +3890,7 @@
     // the placeholder did -- would invent a meaning it does not have.
     if (asset.external_views) {
       facts.push(asset.external_views
-        + (asset.external_views === 1 ? " play" : " plays") + " on Consensus");
+        + (asset.external_views === 1 ? " play" : " plays"));
     }
     if (asset.uploaded_at) facts.push("added " + asset.uploaded_at);
     if (facts.length) {
@@ -3952,9 +3993,10 @@
       });
     }
 
-    // The form offers four styles (VIDEO_LEVELS in index.html); the
-    // catalogue only ever classifies three -- Teaser, Overview, Walkthrough.
-    // "Explainer" therefore matches nothing, and filtering on it would hand
+    // The form offers four styles (VIDEO_LEVELS in index.html); assets carry
+    // the five Video Types, and the server maps Teaser / Overview /
+    // Walkthrough onto theirs (models.video_type_filter, 2026-09-30).
+    // "Explainer" has no counterpart and therefore matches nothing, and filtering on it would hand
     // out a clean bill of health that only means the word is unused. So an
     // empty exact match falls back to the product alone, labelled as such.
     query(level)
@@ -4222,6 +4264,20 @@
     return all;
   }
 
+  function showTotal(count) {
+    var title = document.querySelector("#mainTopbar .orion-title");
+    if (!title) return;
+    ensureTagsCss();
+    var el = document.getElementById("hubTotal");
+    if (!el) {
+      el = document.createElement("span");
+      el.id = "hubTotal";
+      el.className = "hub-total";
+      title.appendChild(el);
+    }
+    el.textContent = count.toLocaleString("en-US") + " assets";
+  }
+
   function report(text, isError) {
     var el = document.getElementById("hubApiStatus");
     if (!el) return;
@@ -4296,9 +4352,10 @@
       acc[a.source] = (acc[a.source] || 0) + 1;
       return acc;
     }, {});
-    report(assets.length + " assets · "
-         + (bySource.sharepoint || 0) + " SharePoint · "
-         + (bySource.consensus || 0) + " Consensus");
+    /* The total, beside the page title; nothing floating in the corner and no
+     * split by source (Liwei, 2026-09-30). The corner box stays for errors
+     * only (report(..., true)). */
+    showTotal(assets.length);
     console.info("[hub-api] loaded", assets.length, "assets", bySource);
   }
 

@@ -18,9 +18,8 @@ Decisions this module carries (Liwei):
   Vuforia...) is searchable only, and never a product here. That also keeps
   the divested-product rule (taxonomy.is_excluded), which judges `products`,
   from hiding a video over a product it merely mentions.
-* **Video Type = the `VideoType` column.** The Hub's own values are still
-  Overview / Walkthrough / Teaser; the library's five are mapped onto them
-  here until the Hub switches to the five (brief §15).
+* **Video Type = the `VideoType` column**, whose five values the Hub uses
+  as they are (brief §15; backend.models.VideoType).
 
 What counts as a video asset: a top-level folder whose Demo Type is a known
 type. The migration writes Demo Type LAST, after the file is uploaded, so a
@@ -38,7 +37,7 @@ from dataclasses import dataclass, field
 from backend.integrations.graph.client import GraphClient, SiteRef
 from backend.integrations.graph.sync import _latest_per_item, _relative_path, _with_fields
 from backend.integrations.sync_report import report
-from backend.models import Asset
+from backend.models import Asset, video_type
 from backend.services import sharepoint_mapping as m
 
 log = logging.getLogger(__name__)
@@ -54,14 +53,6 @@ ID_PREFIX = "video-"
 #: handful of test items, emptying it on purpose (Liwei, 2026-09-29: the tests
 #: are deleted before the real migration) is the likelier event.
 SHRINK_GUARD_FROM = 20
-
-#: The library's Video Type (five values, brief §15) onto the Hub's three.
-#: Presenter Support and Other have no Hub value yet and stay blank.
-VIDEO_TYPE_DEPTH = {
-    "Technical Overview": "Overview",
-    "Technical Walkthrough": "Walkthrough",
-    "Technical Teaser": "Teaser",
-}
 
 #: Internal column names on "Demo Video", read 2026-09-29 from the library.
 COLUMNS = {
@@ -161,7 +152,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], VideoSyncResult]:
             language=m.parse_language(_field(fields, "language")),
             segment=segment,
             rails=all_segments[1:],
-            content_depth=VIDEO_TYPE_DEPTH.get(m.clean_text(_field(fields, "video_type"))),
+            content_depth=video_type(m.clean_text(_field(fields, "video_type"))),
             named_customer=m.clean_text(_field(fields, "named_customer")),
             brightcove_id=m.clean_text(_field(fields, "brightcove_id")),
             # The video's own publish date, so a migrated back catalogue does

@@ -10,7 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 
 from backend.deps import get_repo
-from backend.models import ContentDepth, Facets
+from backend.models import ContentDepth, Facets, video_type_filter
 from backend.repositories.base import AssetQuery, AssetRepository
 
 router = APIRouter(prefix="/api/taxonomy", tags=["taxonomy"])
@@ -85,7 +85,7 @@ def get_facets(
         text=q, types=type, products=product, product_families=family,
         umbrella_families=umbrella,
         funnel_stages=stage, segments=segment, languages=language,
-        content_depths=depth, sources=source, tags=tag,
+        content_depths=video_type_filter(depth), sources=source, tags=tag,
         customer_facing=customer_facing, include_older_vms=include_older_vms,
     )
     any_filter = any([q, type, product, family, umbrella, stage, segment,

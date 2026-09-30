@@ -874,3 +874,40 @@ Nothing here is built yet. These are the decisions that the Hub work (Phase 3) b
    - That video could also serve as the card's thumbnail.
 4. **Consensus duplicates:** once the full upload is done, compare it with the Consensus videos,
    then decide how to handle overlaps (`consensus_match` exists).
+
+### Built 2026-09-30: the five Video Types, no source marks, layered tags
+
+These are main-page changes. Checked locally against real data (1,118 assets) by reading the
+page's DOM.
+
+- **Video Type = the five values** (`backend.models.VideoType`). The asset field is still
+  called `content_depth`.
+  - Old spellings (Overview / Walkthrough / Teaser) are mapped wherever they can still appear:
+    - by the model's validator;
+    - when a mirror written before the switch is read;
+    - in `depth=` links, and in the Request form's duplicate check.
+  - The Request form keeps its own four recommendation values (`ContentDepth`, which includes
+    Explainer). Those are written to the SharePoint request list, and nobody asked to change
+    them.
+  - Locally the filter now reads: Technical Overview 104 · Technical Walkthrough 104 · Technical
+    Teaser 80 · Other 2, with Type = Video.
+- **No source marks anywhere a user looks:**
+  - no SharePoint / Consensus badge on cards or on the detail page;
+  - "Go to Consensus" became "Open Demo" (Demo Video items say "Open Video"; kits keep
+    "Download Kit");
+  - "views on Consensus" became "views";
+  - "No description in SharePoint" became "No description for this one yet".
+  - The VM page's links still name the SharePoint page they open. That is a destination, not a
+    source badge.
+- **Card:**
+  - at most three pills: Video Type (amber), Segment (indigo), and the named customer (grey);
+  - then one plain line such as "Creo, Codebeamer and 2 more · Consideration", with every
+    product in the tooltip.
+  - **There is no "+N" chip any more.** Bobcat's "+1" was the hidden ServiceMax.
+- **Detail page:**
+  - pills for the type, the Video Type and the Segment;
+  - a **Details** table with Asset type, Video type, Products (all), Product (detailed),
+    Segment, Stage, Industry, Customer, Language, Customer-facing, Narrated audio, Length,
+    Uploaded and Tags (still clickable). Empty rows are left out.
+- **The bottom-right "N assets · N SharePoint · N Consensus" box is gone** (it still shows
+  errors). The total now sits beside the page title: "1,118 assets".

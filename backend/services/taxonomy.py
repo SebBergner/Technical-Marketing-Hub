@@ -160,10 +160,12 @@ _FUNNEL_ORDER = ("Awareness", "Consideration", "Decision", "Post-Sale")
 #: Depth of treatment. "Technical Tour" is rare (9 uses) and sits alongside
 #: walkthroughs in practice.
 _TAG_DEPTH = {
-    "teaser": "Teaser",
-    "technical overview": "Overview",
-    "technical walkthrough": "Walkthrough",
-    "technical tour": "Walkthrough",
+    "teaser": "Technical Teaser",
+    "technical teaser": "Technical Teaser",
+    "technical overview": "Technical Overview",
+    "technical walkthrough": "Technical Walkthrough",
+    "technical tour": "Technical Walkthrough",
+    "presenter support": "Presenter Support",
 }
 
 #: Industry, a field that is empty across the entire SharePoint catalogue.

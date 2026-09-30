@@ -84,13 +84,11 @@ def test_products_are_hub_products_only_and_the_rest_is_searchable():
     assert a.named_customer == "Vestas"
 
 
-def test_video_type_maps_onto_the_hubs_three_for_now():
-    got = {vt: build(doc_set("X", VideoType=vt))[0][0].content_depth
-           for vt in ("Technical Overview", "Technical Walkthrough", "Technical Teaser",
-                      "Presenter Support", "Other")}
-    assert {k: (v.value if v else None) for k, v in got.items()} == {
-        "Technical Overview": "Overview", "Technical Walkthrough": "Walkthrough",
-        "Technical Teaser": "Teaser", "Presenter Support": None, "Other": None}
+def test_video_type_is_the_librarys_five_as_they_are():
+    """Liwei, 2026-09-29: the Hub uses the library's five Video Types."""
+    for vt in ("Technical Overview", "Technical Walkthrough", "Technical Teaser",
+               "Presenter Support", "Other"):
+        assert build(doc_set("X", VideoType=vt))[0][0].content_depth.value == vt
 
 
 def test_the_stated_customer_facing_and_audio_win_over_the_filename():

@@ -72,7 +72,7 @@ class AssetSource(Base):
 
     products: Mapped[list | None] = mapped_column(JSON, default=list)
     funnel_stage: Mapped[str | None] = mapped_column(String(30), index=True)
-    content_depth: Mapped[str | None] = mapped_column(String(20))
+    content_depth: Mapped[str | None] = mapped_column(String(40))
     language: Mapped[str] = mapped_column(String(10), default="en", index=True)
     segment: Mapped[str | None] = mapped_column(String(40), index=True)
     industry: Mapped[str | None] = mapped_column(String(120))

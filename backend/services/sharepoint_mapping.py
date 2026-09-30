@@ -50,11 +50,11 @@ INT_RE = re.compile(r"(internal[ _-]?only|[_\- ]training[_\- .]|[_\- ]training$)
 
 #: Applied only when the name states it outright. 137/452 do.
 DEPTH_RULES = [
-    (re.compile(r"quick overview", re.I), "Overview"),
-    (re.compile(r"\boverview\b", re.I), "Overview"),
-    (re.compile(r"what.s new", re.I), "Overview"),
-    (re.compile(r"\bwalkthrough\b", re.I), "Walkthrough"),
-    (re.compile(r"\bintroduction\b", re.I), "Teaser"),
+    (re.compile(r"quick overview", re.I), "Technical Overview"),
+    (re.compile(r"\boverview\b", re.I), "Technical Overview"),
+    (re.compile(r"what.s new", re.I), "Technical Overview"),
+    (re.compile(r"\bwalkthrough\b", re.I), "Technical Walkthrough"),
+    (re.compile(r"\bintroduction\b", re.I), "Technical Teaser"),
 ]
 
 #: Kinds a person would pick from a list. CAD is counted but never listed.

@@ -213,6 +213,8 @@ def cmd_from_sheet(args) -> int:
           f"from {len(rep['sheets'])} sheets")
     print(f"  Segment column in the sheet: {'yes' if rep['has_segment_column'] else 'NO'}   "
           f"Customer Facing column: {'yes' if rep['has_customer_facing_column'] else 'NO'}")
+    if rep["skipped_sheets"]:
+        print(f"  sheets skipped (not part of this migration): {rep['skipped_sheets']}")
     if rep["no_gallery"]:
         print(f"  sheets not named '(PTC Gallery)' / '(GXC Gallery)', so Gallery is left blank: "
               f"{rep['no_gallery']}")

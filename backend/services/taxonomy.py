@@ -31,6 +31,9 @@ _FAMILY_PREFIXES = (
     "Kepware", "Codebeamer", "ServiceMax", "Onshape", "Integrity", "Servigistics",
     # Newer PTC brands, seen as Consensus tags 2026-08-27.
     "Orbit", "Jetstream",
+    # Their full names, so a variant rolls up too: "PTC Orbit AI" (Gallery
+    # sheet V29 (2), 2026-09-30) would otherwise be a family of its own.
+    "PTC Orbit", "PTC Jetstream",
 )
 
 #: Every family name we recognise — the prefixes plus whatever the aliases

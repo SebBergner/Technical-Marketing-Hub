@@ -22,6 +22,11 @@ Rules, each from a decision recorded in the plan:
 * Titles: the Proposed Title when there is one, else the gallery title.
   Description: the Short one; the Long one goes to long_description.
 * Audio: stated only when the title says "Audio" or "No Audio".
+* The "XDP VDKs" sheet is skipped: those videos are loaded another way
+  (Seb, via Elio, 2026-09-30).
+* Current? ("this video shows the current software version") is carried
+  into the library as a column of its own; the Hub neither searches nor
+  shows it (Liwei, 2026-09-30).
 
 Nothing here touches SharePoint or Brightcove.
 """
@@ -39,11 +44,16 @@ GALLERIES = ("PTC Gallery", "GXC Gallery")
 
 #: Sheet spelling -> the library's Hub Products option (keys lower-case).
 PRODUCT_SPELLING = {"pure variants": "pure::variants", "jetstream": "PTC Jetstream",
-                    "orbit": "PTC Orbit"}
+                    "orbit": "PTC Orbit",
+                    # Unambiguous typos in V29 (2), 2026-09-30.
+                    "creo creo simulation live": "Creo Simulation Live",
+                    "creo ai": "Creo AI"}
 #: Products whose names do not start with a family prefix.
 OTHER_PRODUCTS = ("PTC Illustrate", "pure::variants", "PTC Jetstream", "PTC Orbit", "PTC Modeler",
                   "IPE", "Mathcad")
 VIDEO_TYPE_SPELLING = {"other/unclear": "Other"}
+#: Sheets that are not part of this migration.
+SKIP_SHEETS = ("XDP VDKs",)
 
 _SEGMENT = re.compile(r"^segments?$", re.I)
 _CUSTOMER_FACING = re.compile(r"^customer[\s_-]*facing\??$", re.I)
@@ -96,13 +106,17 @@ def read(path: str) -> tuple[list[dict], dict]:
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     rows: list[dict] = []
     report = {"sheets": {}, "customers": collections.Counter(), "no_gallery": [],
-              "has_segment_column": False, "has_customer_facing_column": False}
+              "has_segment_column": False, "has_customer_facing_column": False,
+              "skipped_sheets": []}
     for ws in wb.worksheets:
         data = list(ws.iter_rows(values_only=True))
         if not data:
             continue
         head = [str(h).strip() if h is not None else "" for h in data[0]]
         if "Id" not in head:
+            continue
+        if ws.title.strip() in SKIP_SHEETS:
+            report["skipped_sheets"].append(ws.title)
             continue
         col = {h: i for i, h in enumerate(head) if h}
         seg_col = next((h for h in col if _SEGMENT.match(h)), None)
@@ -137,6 +151,7 @@ def read(path: str) -> tuple[list[dict], dict]:
                 "products": "",
                 "named_customer": ", ".join(customers),
                 "customer_facing": _yes_no(g(cf_col)) if cf_col else "",
+                "current": _yes_no(g("Current?")) if "Current?" in col else "",
                 "contains_audio": _audio(title),
                 "original_publish_date": _date(g("Published Date")),
                 "video_type": VIDEO_TYPE_SPELLING.get(vtype.lower(), vtype),

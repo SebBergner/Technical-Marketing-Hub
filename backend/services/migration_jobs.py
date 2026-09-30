@@ -147,6 +147,7 @@ def save_sheet(filename: str, content: bytes, *, uploaded_by: str) -> str:
                   "has_segment_column": report["has_segment_column"],
                   "has_customer_facing_column": report["has_customer_facing_column"],
                   "no_gallery": report["no_gallery"],
+                  "skipped_sheets": report["skipped_sheets"],
                   "customers_from_tags": dict(report["customers"])},
     })
     threading.Thread(target=compute_preview, args=(sheet_id,), daemon=True,

@@ -615,8 +615,11 @@ def test_search_ranks_title_matches_above_description_matches(empty_repo):
     ranked = [a.id for a in empty_repo.list(
         AssetQuery(text="windchill", sort="relevance", limit=10)).items]
 
-    assert ranked == ["exact", "prefix", "buried", "aside"], (
-        "exact title, then opening match, then mid-title, then description — "
+    # Liwei, 2026-09-30: an opening match no longer beats a mid-title one;
+    # within "the query is in the title" the newer comes first (relevance.
+    # order_key). Exact title still first, description-only still last.
+    assert ranked == ["exact", "buried", "prefix", "aside"], (
+        "exact title, then title matches newest first, then description — "
         "and the newest item comes last because it is the least relevant")
 
 

@@ -778,3 +778,99 @@ kept rendition is 1080p.
   - The left nav's product shortcuts are unchanged.
   - Checked locally (15:0x EDT): search, Enter, Esc, "No product matches", Clear all, and values
     set from code. With Type = Virtual Machine, 11 products at (0) were hidden and 4 shown.
+
+## 15. Showing the videos in the Hub: decisions and backlog (Liwei, 2026-09-29 evening)
+
+Nothing here is built yet. These are the decisions that the Hub work (Phase 3) builds on.
+
+### Data
+
+- **Only the final full migration counts.** Liwei will delete every item already in "Demo Video"
+  (tests and the PoC upload). The data the Hub shows comes from the migration run on the final
+  sheet (expected 2026-09-30).
+- **Hub reads "Demo Video" as its own source** (decided 2026-09-28, §10 item 1). **Built
+  2026-09-29 evening, not yet committed:** `backend/integrations/graph/video_sync.py`.
+  - It rides along with every SharePoint sync (the Admin button and the daily schedule), after
+    the VM pages. It fails alone and is reported as `demo_video` in the sync summary. A blank
+    `GRAPH_VIDEO_LIBRARY` switches it off.
+  - Own mirror file `mirror/demo_video.json`. Asset ids are `video-<slug>`, so they never
+    collide with a Demo Catalog kit's slug.
+  - `source` is still "sharepoint", so no new badge appears.
+  - A folder is listed only once its Demo Type is set, which the migration writes last.
+  - Products come from `HubProducts`. Product-term labels outside it, the long description,
+    Video Type / Subtype and Gallery / Section go into a search-only `search_text`.
+  - `VideoType` maps onto the Hub's current three (Presenter Support and Other stay blank)
+    until the five-value switch.
+  - The shrink guard stands aside below 20 indexed videos, so emptying the test items is not
+    refused.
+  - **Measured 2026-09-29 against the live library (read-only, into a temp dir):** 10 of 10
+    folders indexed, 10 videos attributed, 0 orphans. Durations came from Graph's video facet
+    (75–595 s), so **duration already works**. Locally a search for "Creo 10 Top" shows the
+    card with Video, 3:52, SharePoint and Creo.
+
+### Filters
+
+- **Video Type: the Hub uses the library's five values.** They are Technical Overview,
+  Technical Walkthrough, Presenter Support, Technical Teaser and Other.
+  - The Hub's old three map onto them: Overview → Technical Overview, Walkthrough → Technical
+    Walkthrough, Teaser → Technical Teaser.
+  - This covers every asset carrying `content_depth` today (Consensus and SharePoint), not only
+    the new videos.
+- **Product filter and the left nav's "Browse by Product" counts come from `HubProducts`** for
+  these videos, not from the managed-metadata `Product` column.
+- **Products outside the Hub's product list do not enter the Product filter.** Examples are
+  ThingWorx, Vuforia and Onshape. They stay searchable.
+
+### Source badges: removed (the §10 future requirement is now decided)
+
+- **Serge changed his mind: he no longer wants to see source information.** He also no longer
+  needs the Consensus badge as a link, because another control already opens the demo.
+- **Remove every user-facing platform mark.** That includes:
+  - the SharePoint and Consensus badges;
+  - Consensus's leftover tags in the card's chip row;
+  - text such as "No description in Consensus".
+- Which source holds what stays admin knowledge (`/admin`, `/migration`).
+- HLR-C1 (a source label on cards and in filters) is superseded by this decision.
+
+### Tag layout (after Serge's mockup, `Highlevel/Gallery_to_TMH_Import_Playbook.html`)
+
+- **Card:**
+  - at most two coloured primary pills (for example asset type and Video Type);
+  - a named-customer chip;
+  - one plain-text line such as `Windchill, Creo +3 · Consideration`.
+- **Detail page:** a field : value table listing every tag in full. Its rows are Asset type,
+  Video type, Products, Segment, Stage, Industry, Customer, Language, Tags, and so on.
+- Raw Brightcove / gallery tags are indexed for search but not displayed.
+
+### Access (measured 2026-09-29 ~16:30 EDT, read-only, Graph `GET /drives/{id}/root/permissions`)
+
+- The two libraries' permissions are the same **except for one group**:
+  **"GPX TDD Scalable Demo Catalog Visitors" (read) is on Demo Catalog but not on Demo Video.**
+- Demo Catalog does not inherit (`inheritedFrom` null). Demo Video inherits from the site
+  (`inheritedFrom` present).
+- If users reach the Demo Catalog through that group only, they would be refused on Demo Video.
+- **Fix, by a site owner:** in Demo Video's permission settings, stop inheriting and grant that
+  group Read. Alternatively, add the group at site level if it should reach the whole site.
+- Graph cannot list a SharePoint group's members, so who is in the group was not checked.
+- **Fixed 2026-09-29 by Liwei:**
+  - He stopped inheritance on Demo Video and granted that group Read, with no email invitation.
+    SharePoint's dialog said the group has more than 1,000 people.
+  - Re-checked 18:41 EDT (read-only): both libraries list the same 14 principals with the same
+    roles, and neither inherits.
+  - From now on, a permission change on the Demo Catalog must be repeated by hand on Demo Video.
+
+### Storage
+
+- **The EXT-TDD site has 500 GB (Liwei, 2026-09-29).** The V29 estimate for the kept videos is
+  33.53 GB (§13).
+
+### Backlog (not scheduled)
+
+1. **Thumbnails on video cards.** (Duration turned out to arrive from Graph already, see above.) The source is a Brightcove poster or a SharePoint thumbnail; neither is tested yet.
+2. **Newest-published first:** the most recently published videos rank first in search results
+   (`OriginalPublishDate`).
+3. **Several videos in one demo:**
+   - A future SharePoint boolean column **"Preview"** marks which video is the demo's preview.
+   - That video could also serve as the card's thumbnail.
+4. **Consensus duplicates:** once the full upload is done, compare it with the Consensus videos,
+   then decide how to handle overlaps (`consensus_match` exists).

@@ -65,6 +65,8 @@ _MIRROR_FIELDS = (
     # before it is built (backend/integrations/graph/vm_pages.py) and live in
     # PRIVATE_DIR instead.
     "vm",
+    # Search only; see Asset.search_text.
+    "search_text",
 )
 
 #: Under mirror/, and never read as catalogue data: _load_mirror only reads
@@ -124,7 +126,9 @@ def _searchable(record: dict) -> str | None:
     password one character at a time.
     """
     text = record.get("description")
-    extra = (record.get("vm") or {}).get("search_text")
+    extra = " ".join(x for x in ((record.get("vm") or {}).get("search_text"),
+                                 record.get("search_text"),
+                                 record.get("named_customer")) if x)
     return f"{text or ''} {extra}" if extra else text
 
 

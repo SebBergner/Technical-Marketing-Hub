@@ -183,7 +183,8 @@ def _run_sources(repo) -> dict:
         try:
             summary = graph.run_sync(client, repo, "schedule")
             results["sharepoint"] = {"ok": True,
-                                     "vm_pages_ok": (summary.get("vm_pages") or {}).get("ok")}
+                                     "vm_pages_ok": (summary.get("vm_pages") or {}).get("ok"),
+                                     "demo_video_ok": (summary.get("demo_video") or {}).get("ok")}
         except Exception as exc:                          # noqa: BLE001
             log.exception("auto sync: sharepoint failed")
             results["sharepoint"] = {"ok": False, "error": str(exc)[:300]}

@@ -102,6 +102,7 @@ def run_sync(client: GraphClient, repo: AssetRepository, actor: str,
     _save_token(repo, result.delta_token)
     summary = result.as_dict()
     summary["vm_pages"] = _sync_vm_pages(client, repo)
+    summary["demo_video"] = _sync_demo_video(client, repo)
     _record_attempt(repo, ok=True, summary=summary)
     log.info("graph sync by %s: %s", actor, summary)
     return summary
@@ -121,6 +122,22 @@ def _sync_vm_pages(client: GraphClient, repo: AssetRepository) -> dict:
         return {"ok": True, **sync_vm_pages(client, repo, site).as_dict()}
     except Exception as exc:                                 # noqa: BLE001
         log.exception("vm page sync failed")
+        return {"ok": False, "error": str(exc)[:300]}
+
+
+def _sync_demo_video(client: GraphClient, repo: AssetRepository) -> dict:
+    """The "Demo Video" library, the same way: its own source, failing alone.
+
+    Blank `graph_video_library` switches it off (reported as skipped).
+    """
+    from backend.integrations.graph.video_sync import sync_videos
+    if not settings.graph_video_library:
+        return {"ok": None, "skipped": "not configured"}
+    try:
+        site = client.resolve_site(settings.graph_site_url)
+        return {"ok": True, **sync_videos(client, repo, site).as_dict()}
+    except Exception as exc:                                 # noqa: BLE001
+        log.exception("demo video sync failed")
         return {"ok": False, "error": str(exc)[:300]}
 
 

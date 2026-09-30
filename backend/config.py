@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     graph_client_secret: str | None = None
     graph_site_url: str | None = None
     graph_list_name: str = "Demo Catalog"
+    #: The demo-video library the Hub indexes beside the Demo Catalog, as a
+    #: source of its own (backend/integrations/graph/video_sync.py). It rides
+    #: along with every SharePoint sync. Blank switches it off.
+    graph_video_library: str = "Demo Video"
 
     # ---------------------------------------------------------------- Consensus
     # Auth is a body object on every call, not a header — the OpenAPI spec

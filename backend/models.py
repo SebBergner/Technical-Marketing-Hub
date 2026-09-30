@@ -396,6 +396,12 @@ class Asset(AssetBase):
     main_video: str | None = None
     #: VM pages only (type == vm).
     vm: VmDetail | None = None
+    #: Words a search should find that no displayed field carries: for a
+    #: Demo Video asset, the long description, products outside the Hub's
+    #: list (ThingWorx, Vuforia...), the gallery and its section (Liwei,
+    #: 2026-09-29: "不进入 product，能被搜索"). Stored in the mirror and read by
+    #: the search; always null on API responses (json_repo._common skips it).
+    search_text: str | None = None
     #: Every other asset: the VMs whose pages say they run it.
     used_by_vms: list[UsedByVm] = Field(default_factory=list)
 

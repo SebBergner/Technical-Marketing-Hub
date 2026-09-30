@@ -900,7 +900,15 @@ page's DOM.
   - The VM page's links still name the SharePoint page they open. That is a destination, not a
     source badge.
 - **Card:**
-  - at most three pills: Video Type (amber), Segment (indigo), and the named customer (grey);
+  - one row of tags, always present and always in the same order: Video Type, Segment, named
+    customer.
+  - **All tags share one neutral style**, built from theme tokens, so they read on both the
+    light and the dark ground.
+    - Coloured pills per kind (amber / "indigo", which is PTC green here) were tried first and
+      withdrawn the same day (Liwei, 2026-09-30). They were unreadable on the dark theme, and
+      cards with one, two or no tags in different colours looked disordered.
+    - Measured in dark mode: #a7adb6 text on #24272c. Every card's tag row is exactly 22 px,
+      even when empty, so cards line up.
   - then one plain line such as "Creo, Codebeamer and 2 more · Consideration", with every
     product in the tooltip.
   - **There is no "+N" chip any more.** Bobcat's "+1" was the hidden ServiceMax.

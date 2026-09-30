@@ -157,10 +157,12 @@
    *     demo lives -- no SharePoint or Consensus badge, and no badge as a
    *     link either, since the detail page's own button opens the demo.
    *     Which source holds what is admin knowledge (/admin, /migration).
-   *   * The card is layered instead of one row of look-alike chips: at most
-   *     two coloured pills (Video Type, Segment), the named customer as a
-   *     grey chip, then one plain line "Creo, Codebeamer and 2 more ·
-   *     Consideration".
+   *   * The card is layered: one row of tags, always in the same order
+   *     (Video Type, Segment, named customer) and all in one neutral style,
+   *     then one plain line "Creo, Codebeamer and 2 more · Consideration".
+   *     Coloured pills per kind were tried first and withdrawn the same day
+   *     (Liwei, 2026-09-30): unreadable on the dark theme, and cards with
+   *     one, two or no tags in different colours looked disordered.
    *   * The detail page lists every tag in a field : value table (below).
    *   * No "+N" chip. It read as a tag of its own (Bobcat's "+1" was
    *     ServiceMax). On the card the overflow is words, with every product in
@@ -171,12 +173,17 @@
    * noise (Liwei, 2026-09-10).
    */
   var TAGS_CSS =
-    ".hub-card-pills{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 6px}" +
-    ".hub-pill{display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;" +
-    "font-size:11.5px;font-weight:600;line-height:1.4;border:1px solid transparent;white-space:nowrap}" +
-    ".hub-pill--vtype{background:var(--orion-open-bg);color:var(--orion-open-ink);border-color:var(--orion-warn-border)}" +
-    ".hub-pill--segment{background:var(--orion-indigo-soft);color:var(--orion-indigo-strong);border-color:#cfd3f5}" +
-    ".hub-pill--customer{background:var(--orion-surface-3);color:var(--orion-text-2);font-weight:500}" +
+    // One row, always there, so every card's title and text line up whether
+    // it carries three tags or none (one line tall; a long customer name
+    // ellipses rather than wrapping).
+    ".hub-card-pills{display:flex;gap:6px;margin:2px 0 6px;min-height:22px;overflow:hidden}" +
+    // One style for every tag, from theme tokens only, so it reads on both
+    // the light and the dark ground (the "indigo" tokens are PTC green, and
+    // the soft ones have no dark counterpart -- see index.html).
+    ".hub-pill{display:inline-flex;align-items:center;padding:1px 9px;border-radius:999px;" +
+    "font-size:11.5px;font-weight:500;line-height:18px;white-space:nowrap;min-width:0;" +
+    "overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;" +
+    "background:var(--orion-surface-2);color:var(--orion-text-2);border:1px solid var(--orion-border-md)}" +
     ".hub-card-line{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}" +
     ".hub-facts{margin-top:14px}" +
     ".hub-facts__table{width:100%;border-collapse:collapse;font-size:13px}" +
@@ -227,7 +234,7 @@
     if (a.content_depth) pills.appendChild(pill(a.content_depth, "vtype"));
     if (a.segment) pills.appendChild(pill(a.segment, "segment"));
     if (a.named_customer) pills.appendChild(pill(a.named_customer, "customer"));
-    if (pills.childNodes.length) meta.parentNode.insertBefore(pills, meta);
+    meta.parentNode.insertBefore(pills, meta);
 
     var families = cardFamilies(a);
     var line = [familiesText(families, 2), a.funnel_stage].filter(Boolean).join(" · ");

@@ -456,6 +456,22 @@ class Asset(AssetBase):
     used_by_vms: list[UsedByVm] = Field(default_factory=list)
 
 
+class AdvancedSearchHit(BaseModel):
+    """One row of Advanced Search: a demo, and which of its files matched.
+
+    Advanced Search (Liwei, 2026-09-30) also looks inside the folder -- every
+    listed file's name -- so a query can find the demo that HOLDS
+    "Bobcat_03_Engineering.mp4" even when neither its title nor its
+    description says "engineering". `files` is only the files whose names
+    match; the whole list stays on the detail page.
+    """
+    asset: AssetSummary
+    #: Which of the demo's own fields hold every term: "title", "details"
+    #: (description, tags, products...). Empty when only file names matched.
+    matched_in: list[str] = Field(default_factory=list)
+    files: list[AssetResource] = Field(default_factory=list)
+
+
 # ------------------------------------------------------- metadata proposals
 class ProposalState(str, Enum):
     PENDING = "pending"

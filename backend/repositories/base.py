@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from backend.models import (
-    Asset, AssetRequest, AssetSummary, Facets, MetadataProposal, Page,
+    AdvancedSearchHit, Asset, AssetRequest, AssetSummary, Facets, MetadataProposal, Page,
     ProposalSummary,
 )
 
@@ -67,6 +67,15 @@ class AssetRepository(ABC):
 
     @abstractmethod
     def list(self, query: AssetQuery) -> Page[AssetSummary]: ...
+
+    def advanced_search(self, query: AssetQuery) -> "Page[AdvancedSearchHit]":
+        """Search the demos' own fields AND the names of the files in them.
+
+        Not abstract: only the file-backed repository implements it (the SQL
+        one does not store the file list the same way), and the endpoint
+        answers 501 rather than pretending there were no hits.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def save_request(self, request: "AssetRequest") -> None:

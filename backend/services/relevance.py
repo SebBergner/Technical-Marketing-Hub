@@ -153,3 +153,35 @@ def matches(text: str | None, title: str | None,
     Defined as "scores above zero" so membership and ranking cannot disagree.
     """
     return score(text, title, description) > NO_MATCH
+
+
+def names(text: str | None, name: str | None) -> bool:
+    """Whether every term of the query is in a file name.
+
+    File names are written for machines -- "Bobcat_03_Engineering.mp4" --
+    so they are split into words exactly as the query is (`terms()` already
+    treats underscores and dots as separators) and each term must appear
+    somewhere, in any order. Used by Advanced Search only.
+    """
+    wanted = terms(text)
+    if not wanted:
+        return False
+    haystack = " ".join(terms(name))
+    return all(t in haystack for t in wanted)
+
+
+#: Advanced Search's order. A file-name hit is a stronger answer than a word
+#: buried in a description, weaker than the demo's own title saying it.
+_ADVANCED_BAND = {EXACT_TITLE: 5, TITLE_PREFIX: 4, TITLE_WORD: 4,
+                  TITLE_SUBSTRING: 4, TITLE_ALL_TERMS: 3, ANY_FIELD: 1}
+FILE_NAME_BAND = 2
+
+
+def advanced_order_key(text: str | None, title: str | None,
+                       description: str | None, file_hits: int, recency) -> tuple:
+    """Sort key for Advanced Search, best first when sorted descending:
+    band (title > file name > description), then publish date, then span."""
+    band = _ADVANCED_BAND.get(score(text, title, description), 0)
+    if file_hits:
+        band = max(band, FILE_NAME_BAND)
+    return (band, recency, -span(text, title))

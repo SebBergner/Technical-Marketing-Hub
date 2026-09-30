@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from backend.config import settings
 from backend.deps import get_repo
 from backend.integrations.graph.client import GraphClient, GraphError
-from backend.models import Asset, AssetSummary, Page, video_type_filter
+from backend.models import AdvancedSearchHit, Asset, AssetSummary, Page, video_type_filter
 from backend.repositories.base import AssetRepository, AssetQuery
 from backend.routers.graph import require_client
 
@@ -65,6 +65,26 @@ def list_assets(
         include_older_vms=include_older_vms,
         sort=sort, limit=limit, offset=offset,
     ))
+
+
+@router.get("/advanced-search", response_model=Page[AdvancedSearchHit])
+def advanced_search(
+    q: str = Query(min_length=2, description="every term must be in the demo's "
+                   "title, details (description, tags, products...) or a file name"),
+    type: list[str] = Query(default=[]),
+    limit: int = Query(default=30, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    repo: AssetRepository = Depends(get_repo),
+):
+    """Advanced Search: the ordinary search plus the names of every listed
+    file in each demo's folder (Liwei, 2026-09-30). One row per demo, with
+    the files that matched. Declared before `/{asset_id}`, which would
+    otherwise take "advanced-search" for an id."""
+    try:
+        return repo.advanced_search(AssetQuery(text=q, types=type, limit=limit, offset=offset))
+    except NotImplementedError:
+        raise HTTPException(status_code=501,
+                            detail="Advanced Search needs the file-backed catalogue")
 
 
 @router.get("/{asset_id}", response_model=Asset)

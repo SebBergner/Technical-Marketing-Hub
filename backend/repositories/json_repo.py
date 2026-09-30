@@ -39,7 +39,7 @@ from datetime import date
 from typing import Any
 
 from backend.models import (
-    Asset, AssetRequest, AssetStats, AssetSummary, AssetType, Capability, Facets, FacetValue, MetadataProposal,
+    AdvancedSearchHit, Asset, AssetRequest, AssetStats, AssetSummary, AssetType, Capability, Facets, FacetValue, MetadataProposal,
     Page, ProposalState, ProposalSummary, ValueRoadmap, video_type,
 )
 from backend.repositories.base import AssetQuery, AssetRepository
@@ -363,6 +363,53 @@ class JsonAssetRepository(AssetRepository):
             items=[AssetSummary(**self._common(r, stats),
                                 has_roadmap=r["id"] in indexed) for r in window],
             total=len(rows), limit=query.limit, offset=query.offset,
+        )
+
+    def advanced_search(self, query: AssetQuery) -> Page[AdvancedSearchHit]:
+        """Every listed demo whose own fields, or whose files' names, hold
+        every term of the query.
+
+        Goes through `_rows()` with the text taken out, so the filters and the
+        mirror funnel (divestment, older VMs) are exactly the ordinary list's;
+        only the text test differs. "Details" is broader than the ordinary
+        search on purpose -- tags, products, segment and Video Type count too.
+        """
+        stats = self._load("stats")
+        hits = []
+        for record in self._rows(replace(query, text=None)):
+            title = record.get("title")
+            details = " ".join(x for x in (
+                _searchable(record),
+                " ".join(record.get("tags") or []),
+                " ".join(record.get("products") or []),
+                " ".join(record.get("value_drivers") or []),
+                record.get("segment"), record.get("content_depth"),
+                record.get("industry")) if x)
+            own = relevance.score(query.text, title, details)
+            files = [f for f in (record.get("resources") or [])
+                     if relevance.names(query.text, f.get("name"))]
+            if not own and not files:
+                continue
+            matched_in = []
+            if own >= relevance.TITLE_ALL_TERMS:
+                matched_in.append("title")
+            elif own:
+                matched_in.append("details")
+            key = relevance.advanced_order_key(
+                query.text, title, details, len(files),
+                _as_date(record.get("uploaded_at")) or date.min)
+            hits.append((key, record, matched_in, files))
+
+        hits.sort(key=lambda h: h[0], reverse=True)
+        window = hits[query.offset: query.offset + query.limit]
+        indexed = set(self._load("roadmap"))
+        return Page[AdvancedSearchHit](
+            items=[AdvancedSearchHit(
+                       asset=AssetSummary(**self._common(r, stats),
+                                          has_roadmap=r["id"] in indexed),
+                       matched_in=m, files=f)
+                   for _, r, m, f in window],
+            total=len(hits), limit=query.limit, offset=query.offset,
         )
 
     def get(self, asset_id: str) -> Asset | None:

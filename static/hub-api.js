@@ -1519,9 +1519,11 @@
         console.warn("[hub-api] closeRequestView threw", err);
       }
     }
+    closeFilePreview(false);
     closeAssetDetail();
+    closeAdvancedSearch();
     // The hash has to follow, or a refresh reopens the page we just left.
-    if ((location.hash || "").indexOf("#/asset/") === 0) {
+    if (/^#\/(asset|search)\//.test(location.hash || "")) {
       history.pushState(null, "", location.pathname + location.search);
     }
   }
@@ -1955,7 +1957,24 @@
       .catch(function (err) { console.debug("[hub-api] view not counted", err); });
   }
 
-  async function openAssetDetail(id) {
+  /* `fileItemId`: arrived on a shared file link (fileHash) -- open the page
+   * and then that file's preview. */
+  async function openAssetDetail(id, fileItemId) {
+    var page0 = document.getElementById("videoPreviewPage");
+    if (fileItemId && detailAsset && detailAsset.id === id
+        && page0 && page0.classList.contains("active")) {
+      // Already on this demo: just show the file, no reload.
+      renderFileList(page0, detailAsset, tabOf(detailAsset, fileItemId));
+      openFileById(detailAsset, fileItemId);
+      return;
+    }
+    // Back returns to Advanced Search when that is where this came from.
+    var adv = document.getElementById("hubAdvancedPage");
+    if (adv && adv.classList.contains("active")) {
+      detailReturnHash = advancedHash(advState.q);
+    } else if (!(page0 && page0.classList.contains("active"))) {
+      detailReturnHash = null;
+    }
     var asset;
     try {
       asset = await getJSON("/api/assets/" + encodeURIComponent(id));
@@ -1999,7 +2018,7 @@
     setText("vpDesc", asset.description || "No description for this one yet.");
     renderFactsTable(page, asset);
 
-    renderFileList(page, asset);
+    renderFileList(page, asset, fileItemId && tabOf(asset, fileItemId));
     renderVmCards(page, asset);
 
     var drivers = document.getElementById("vpValueDrivers");
@@ -2192,6 +2211,7 @@
      * details render underneath it. Elio's own openRequestView() hides both
      * the topbar and the thread, and this is the same kind of view. */
     document.getElementById("requestViewPage").classList.remove("active");
+    if (adv) adv.classList.remove("active");
     var topbar = document.getElementById("mainTopbar");
     var thread = document.getElementById("mainThread");
     if (topbar) topbar.style.display = "none";
@@ -2204,9 +2224,18 @@
 
     page.classList.add("active");
     page.scrollTop = 0;
-    if (location.hash !== "#/asset/" + encodeURIComponent(id)) {
-      history.pushState(null, "", "#/asset/" + encodeURIComponent(id));
-    }
+    var here = fileItemId ? fileHash(id, fileItemId) : "#/asset/" + encodeURIComponent(id);
+    if (location.hash !== here) history.pushState(null, "", here);
+    if (fileItemId) openFileById(asset, fileItemId);
+  }
+
+  //: Where the details page's Back button goes when it was opened from
+  //: Advanced Search; null means the catalogue, as before.
+  var detailReturnHash = null;
+
+  function tabOf(asset, itemId) {
+    var f = (asset.resources || []).find(function (r) { return r.item_id === itemId; });
+    return f ? fileTab(f) : undefined;
   }
 
   var FILE_ICON = { video: "i-video", document: "i-file-text", image: "i-panel",
@@ -2250,6 +2279,39 @@
     return "/api/assets/" + encodeURIComponent(assetId) + "/files/"
          + encodeURIComponent(itemId) + "/preview";
   }
+
+  /* A link to one file: it opens the demo's detail page with that file's
+   * preview already showing (Liwei, 2026-09-30). Same caveat as Share
+   * Internally on the page itself -- it opens the Hub, so it is for
+   * colleagues, not customers. */
+  function fileHash(assetId, itemId) {
+    return "#/asset/" + encodeURIComponent(assetId) + "/file/" + encodeURIComponent(itemId);
+  }
+
+  function fileShareUrl(assetId, itemId) {
+    return location.origin + location.pathname + fileHash(assetId, itemId);
+  }
+
+  /* Copy, and say so on the button. The clipboard API only exists on a
+   * secure origin (https or localhost); anywhere else the link is shown in a
+   * prompt to copy by hand rather than the button pretending it worked. */
+  function copyShareLink(button, url) {
+    var label = button.innerHTML;
+    var done = function () {
+      button.textContent = "Link copied";
+      setTimeout(function () { button.innerHTML = label; }, 1500);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(url).then(done, function () {
+        window.prompt("Copy this link", url);
+      });
+    } else {
+      window.prompt("Copy this link", url);
+    }
+  }
+
+  var SHARE_TITLE = "Copy a link that opens this file's preview in the Hub "
+                  + "-- for colleagues, not customers.";
 
   //: What gets a Preview button at all. Datasets (zip/rar) and CAD have
   //: nothing Graph's viewer can usefully show -- verified 2026-09-08 that
@@ -2322,6 +2384,12 @@
       +   '<div class="hub-file-preview__main">'
       +     '<iframe class="hub-preview__frame" id="hubFilePreviewFrame"'
       +       ' allow="fullscreen"></iframe>'
+      // What stands in for the frame when the file cannot play inside it --
+      // a Word/PowerPoint/PDF (Office refuses to be framed, see
+      // MODAL_PREVIEWABLE_KINDS) or a zip. Reached through a shared link
+      // (fileHash), where the modal opens by itself: a new tab cannot, since
+      // browsers block a window.open that no click started.
+      +     '<div class="hub-file-preview__stand-in" id="hubFilePreviewStandIn"></div>'
       +     '<div class="hub-file-preview__body">'
       +       '<div class="hub-file-preview__desc" id="hubFilePreviewDesc"></div>'
       +       '<div class="hub-file-preview__table" id="hubFilePreviewInfo"></div>'
@@ -2335,6 +2403,9 @@
       +       '<a class="hub-file-preview__download" id="hubFilePreviewDownload"'
       +         ' target="_blank" rel="noopener">'
       +         '<svg class="orion-ico--sm orion-ico"><use href="#i-clock"/></svg>Download</a>'
+      +       '<button type="button" class="hub-file-preview__share" id="hubFilePreviewShare"'
+      +         ' title="' + SHARE_TITLE + '">'
+      +         '<svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share</button>'
       +     '</div>'
       +   '</div>'
       +   '<div class="hub-file-preview__nav">'
@@ -2347,13 +2418,12 @@
       + '</div>';
     document.body.appendChild(backdrop);
 
-    var shut = function () {
-      backdrop.classList.remove("open");
-      // Blank the src on close, or a video keeps playing behind the page.
-      document.getElementById("hubFilePreviewFrame").src = "about:blank";
-      filePreviewState = null;
-    };
+    var shut = function () { closeFilePreview(true); };
     backdrop.querySelector(".hub-preview__close").addEventListener("click", shut);
+    document.getElementById("hubFilePreviewShare").addEventListener("click", function () {
+      var state = filePreviewState;
+      if (state) copyShareLink(this, fileShareUrl(state.asset.id, state.files[state.index].item_id));
+    });
     backdrop.addEventListener("click", function (e) { if (e.target === backdrop) shut(); });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && backdrop.classList.contains("open")) shut();
@@ -2380,8 +2450,41 @@
     var f = state.files[state.index];
     var asset = state.asset;
 
-    document.getElementById("hubFilePreviewFrame").src = filePreviewUrl(asset.id, f.item_id);
+    var frame = document.getElementById("hubFilePreviewFrame");
+    var standIn = document.getElementById("hubFilePreviewStandIn");
+    if (MODAL_PREVIEWABLE_KINDS.indexOf(f.kind) !== -1) {
+      frame.src = filePreviewUrl(asset.id, f.item_id);
+      frame.style.display = "";
+      standIn.style.display = "none";
+    } else {
+      frame.src = "about:blank";
+      frame.style.display = "none";
+      standIn.style.display = "";
+      var opens = PREVIEWABLE_KINDS.indexOf(f.kind) !== -1;
+      standIn.innerHTML =
+          '<svg class="orion-ico"><use href="#' + (FILE_ICON[f.kind] || "i-file-text") + '"/></svg>'
+        + '<div class="hub-file-preview__stand-in-name">' + escapeHtml(f.name) + '</div>'
+        + '<div class="hub-file-preview__stand-in-note">'
+        + (opens ? "Word, PowerPoint and PDF files open in Office's own viewer, in a new tab."
+                 : "This kind of file has no preview in the browser. Download it to open it.")
+        + '</div>';
+      if (opens) {
+        var open = document.createElement("a");
+        open.className = "btn-primary-sm";
+        open.href = filePreviewUrl(asset.id, f.item_id);
+        open.target = "_blank";
+        open.rel = "noopener";
+        open.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg>Open in browser';
+        standIn.appendChild(open);
+      }
+    }
     document.getElementById("hubFilePreviewTitle").textContent = f.name;
+    // The address bar names the open file, so copying it shares the same
+    // thing as the Share button. replaceState: stepping through files with
+    // Prev/Next should not fill the Back button's history.
+    if (location.hash !== fileHash(asset.id, f.item_id)) {
+      history.replaceState(null, "", fileHash(asset.id, f.item_id));
+    }
 
     // The demo's own description -- there is no per-video one in our data,
     // and inventing a shorter "what this clip shows" summary would be a
@@ -2431,6 +2534,46 @@
     ensureFilePreviewModal();
     renderFilePreview();
     document.getElementById("hubFilePreviewBackdrop").classList.add("open");
+  }
+
+  /* `restoreHash`: closed by the person (×, Esc, backdrop) rather than by a
+   * route change -- the address goes back to the demo's own page. */
+  function closeFilePreview(restoreHash) {
+    var backdrop = document.getElementById("hubFilePreviewBackdrop");
+    if (!backdrop || !backdrop.classList.contains("open")) return;
+    backdrop.classList.remove("open");
+    // Blank the src on close, or a video keeps playing behind the page.
+    document.getElementById("hubFilePreviewFrame").src = "about:blank";
+    var state = filePreviewState;
+    filePreviewState = null;
+    if (restoreHash && state && /\/file\//.test(location.hash)) {
+      history.replaceState(null, "", "#/asset/" + encodeURIComponent(state.asset.id));
+    }
+  }
+
+  /* A shared file link: open that file's preview, stepping through the
+   * files of its own tab. A file no longer listed on the demo (renamed or
+   * removed since the link was made) leaves the detail page open and says
+   * nothing is wrong with the page -- it is the file that is gone. */
+  function openFileById(asset, itemId) {
+    var f = (asset.resources || []).find(function (r) { return r.item_id === itemId; });
+    if (!f) {
+      console.warn("[hub-api] shared file is no longer listed on", asset.id, itemId);
+      return;
+    }
+    var siblings = previewSiblings(asset, f);
+    openFilePreview(asset, siblings, siblings.indexOf(f));
+  }
+
+  /* What Prev/Next steps through: the previewable files of the same tab. A
+   * file that has no preview itself (a zip, reached by a shared link) is
+   * shown on its own rather than dropped into a list it does not belong to. */
+  function previewSiblings(asset, f) {
+    if (PREVIEWABLE_KINDS.indexOf(f.kind) === -1) return [f];
+    return (asset.resources || []).filter(function (r) {
+      return r.item_id && PREVIEWABLE_KINDS.indexOf(r.kind) !== -1
+             && fileTab(r) === fileTab(f);
+    });
   }
 
   /* ── virtual machines ─────────────────────────────────────────────────
@@ -2946,7 +3089,94 @@
     card.appendChild(table);
   }
 
-  function renderFileList(page, asset) {
+  var FILE_TABS = [{ key: "video", label: "Videos" },
+                   { key: "document", label: "Documents" }];
+
+  function fileTab(f) { return f.kind === "video" ? "video" : "document"; }
+
+  function fileFacts(f) {
+    return [f.extension && f.extension.toUpperCase(),
+            f.duration_seconds && durationLabel(f.duration_seconds),
+            fileSize(f.size_bytes),
+            f.width && f.height && (f.width + "×" + f.height),
+            f.audience === "customer_facing" ? "customer-facing"
+              : f.audience === "internal" ? "internal" : null,
+            f.subfolder].filter(Boolean).join(" · ");
+  }
+
+  /* The file name on the details page.
+   *
+   * Seb, review: the old "Preview" pill "looked like a tag", and asked for
+   * the file name itself to be the preview link, with a real Download button
+   * at the far right instead. So the name opens a preview -- the modal for
+   * video/image, a new tab for Word/PowerPoint/PDF (see
+   * MODAL_PREVIEWABLE_KINDS for why not the modal) -- and a CAD dataset
+   * (.zip/.rar) or a resource synced before item_id existed is plain text.
+   * Real <a>s, not string-built ones: an href assigned as a DOM property
+   * needs no attribute-quote escaping. */
+  function detailFileName(asset, f) {
+    var name;
+    if (f.item_id && MODAL_PREVIEWABLE_KINDS.indexOf(f.kind) !== -1) {
+      name = document.createElement("a");
+      name.href = "#";
+      name.title = "Preview";
+      name.addEventListener("click", function (e) {
+        e.preventDefault();
+        var siblings = previewSiblings(asset, f);
+        openFilePreview(asset, siblings, siblings.indexOf(f));
+      });
+    } else if (f.item_id && PREVIEWABLE_KINDS.indexOf(f.kind) !== -1) {
+      name = document.createElement("a");
+      name.href = filePreviewUrl(asset.id, f.item_id);
+      name.target = "_blank";
+      name.rel = "noopener";
+      name.title = "Preview in a new tab";
+    } else {
+      name = document.createElement("span");
+    }
+    name.className = "vp-file__name";
+    name.textContent = f.name;
+    return name;
+  }
+
+  /* One file row: icon, name (built by the caller -- the details page and
+   * Advanced Search open files differently), facts, then Download and Share
+   * at the far right. `.vp-file__facts` has margin-left:auto, which pushes
+   * everything after it right. Both buttons need the file's item_id: it is
+   * what a download resolves and what a shared link names. */
+  function buildFileRow(asset, f, nameEl) {
+    var row = document.createElement("div");
+    row.className = "vp-file";
+    row.innerHTML =
+        '<svg class="orion-ico orion-ico--sm ico-muted"><use href="#'
+      +   (FILE_ICON[f.kind] || "i-file-text") + '"/></svg>'
+      + '<span class="vp-file__facts">' + escapeHtml(fileFacts(f)) + '</span>';
+    row.insertBefore(nameEl, row.lastChild);
+
+    if (f.item_id) {
+      var download = document.createElement("a");
+      download.className = "vp-file__download";
+      download.href = fileDownloadUrl(asset.id, f.item_id);
+      download.target = "_blank";
+      download.rel = "noopener";
+      download.title = "Download";
+      download.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-clock"/></svg>Download';
+      row.appendChild(download);
+
+      var share = document.createElement("button");
+      share.type = "button";
+      share.className = "vp-file__share";
+      share.title = SHARE_TITLE;
+      share.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share';
+      share.addEventListener("click", function () {
+        copyShareLink(share, fileShareUrl(asset.id, f.item_id));
+      });
+      row.appendChild(share);
+    }
+    return row;
+  }
+
+  function renderFileList(page, asset, openTab) {
     var existing = page.querySelector(".vp-files");
     if (existing) existing.remove();
 
@@ -2971,97 +3201,53 @@
     // directly (see that button's own comment for why), but that page is
     // where the real "Download a copy" zip action lives.
 
-    // Prev/Next in the preview modal steps through this list, so it has to
-    // exist before any row's button is wired, not be recomputed per click.
-    // Only the modal-previewable kinds -- a "document" row gets its own
-    // new-tab link below and never joins this list.
-    var previewable = files.filter(function (f) {
-      return f.item_id && MODAL_PREVIEWABLE_KINDS.indexOf(f.kind) !== -1;
+    /* Two tabs, Videos and Documents (Liwei, 2026-09-30). "Documents" is
+     * everything that is not a video -- the PowerPoint and the script, and
+     * also a zipped dataset or an image, since there are only two tabs and
+     * a folder rarely holds more than a couple of those. A tab with nothing
+     * in it stays visible, disabled, so "no videos" reads as a fact rather
+     * than a missing control. */
+    var byTab = { video: [], document: [] };
+    files.forEach(function (f) { byTab[fileTab(f)].push(f); });
+    var active = openTab || (byTab.video.length ? "video" : "document");
+
+    var strip = document.createElement("div");
+    strip.className = "hub-files-tabs";
+    strip.setAttribute("role", "tablist");
+    box.appendChild(strip);
+
+    var panes = {};
+    FILE_TABS.forEach(function (t) {
+      var tab = document.createElement("button");
+      tab.type = "button";
+      tab.className = "hub-files-tab";
+      tab.setAttribute("role", "tab");
+      tab.dataset.tab = t.key;
+      tab.textContent = t.label + " (" + byTab[t.key].length + ")";
+      tab.disabled = !byTab[t.key].length;
+      tab.addEventListener("click", function () { select(t.key); });
+      strip.appendChild(tab);
+
+      var list = document.createElement("div");
+      list.className = "vp-files__list";
+      byTab[t.key].forEach(function (f) {
+        list.appendChild(buildFileRow(asset, f, detailFileName(asset, f)));
+      });
+      panes[t.key] = list;
+      box.appendChild(list);
     });
 
-    var list = document.createElement("div");
-    list.className = "vp-files__list";
-    files.forEach(function (f) {
-      var facts = [f.extension && f.extension.toUpperCase(),
-                   f.duration_seconds && durationLabel(f.duration_seconds),
-                   fileSize(f.size_bytes),
-                   f.width && f.height && (f.width + "\u00d7" + f.height),
-                   f.audience === "customer_facing" ? "customer-facing"
-                     : f.audience === "internal" ? "internal" : null,
-                   f.subfolder].filter(Boolean).join(" \u00b7 ");
-      var row = document.createElement("div");
-      row.className = "vp-file";
-      row.innerHTML =
-          '<svg class="orion-ico orion-ico--sm ico-muted"><use href="#'
-        +   (FILE_ICON[f.kind] || "i-file-text") + '"/></svg>'
-        + '<span class="vp-file__facts">' + escapeHtml(facts) + '</span>';
-
-      // Seb, review: the old "Preview" pill "looked like a tag", and asked
-      // for the file name itself to be the preview link, with a real
-      // Download button at the far right instead. So the name's role and
-      // the button's role have swapped from the previous design: the name
-      // now opens a preview (modal for video/image, a new tab for
-      // Word/PowerPoint/PDF), and Download is its own control, appended
-      // last so the row's flex layout (`.vp-file__facts`'s `margin-left:auto`
-      // already pushes everything before it left) puts it at the true far
-      // right rather than between the name and the facts, where the old
-      // Preview button sat.
-      var isModalPreviewable = previewable.indexOf(f) !== -1;
-      var isTabPreviewable = !isModalPreviewable && f.item_id
-                            && PREVIEWABLE_KINDS.indexOf(f.kind) !== -1;
-
-      if (isModalPreviewable) {
-        var name = document.createElement("a");
-        name.className = "vp-file__name";
-        name.href = "#";
-        name.title = "Preview";
-        name.textContent = f.name;
-        name.addEventListener("click", function (e) {
-          e.preventDefault();
-          openFilePreview(asset, previewable, previewable.indexOf(f));
-        });
-        row.insertBefore(name, row.lastChild);
-      } else if (isTabPreviewable) {
-        // In PREVIEWABLE_KINDS but not MODAL_PREVIEWABLE_KINDS -- today that
-        // is exactly "document" (Word/PowerPoint/PDF). A new tab, not the
-        // modal -- see MODAL_PREVIEWABLE_KINDS for why. A real <a>, not a
-        // string-built one: an href assigned as a DOM property needs no
-        // attribute-quote escaping, unlike the innerHTML this row otherwise
-        // builds with.
-        var name = document.createElement("a");
-        name.className = "vp-file__name";
-        name.href = filePreviewUrl(asset.id, f.item_id);
-        name.target = "_blank";
-        name.rel = "noopener";
-        name.title = "Preview in a new tab";
-        name.textContent = f.name;
-        row.insertBefore(name, row.lastChild);
-      } else {
-        // Nothing to preview -- a CAD dataset (.zip/.rar) or a resource
-        // synced before item_id existed. Plain text; Download below still
-        // covers the first case, neither control applies to the second.
-        var name = document.createElement("span");
-        name.className = "vp-file__name";
-        name.textContent = f.name;
-        row.insertBefore(name, row.lastChild);
-      }
-      list.appendChild(row);
-
-      // Download, its own control, appended after everything else so it
-      // lands at the far right of the row -- every file with an item_id can
-      // be downloaded, whether or not it can also be previewed.
-      if (f.item_id) {
-        var download = document.createElement("a");
-        download.className = "vp-file__download";
-        download.href = fileDownloadUrl(asset.id, f.item_id);
-        download.target = "_blank";
-        download.rel = "noopener";
-        download.title = "Download";
-        download.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-clock"/></svg>Download';
-        row.appendChild(download);
-      }
-    });
-    box.appendChild(list);
+    function select(key) {
+      strip.querySelectorAll(".hub-files-tab").forEach(function (b) {
+        var on = b.dataset.tab === key;
+        b.classList.toggle("hub-files-tab--active", on);
+        b.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      Object.keys(panes).forEach(function (k) {
+        panes[k].style.display = k === key ? "" : "none";
+      });
+    }
+    select(active);
 
     // Only counted, never listed, and said so rather than left as a gap
     // between "9 files" and four rows.
@@ -3098,8 +3284,23 @@
   /* Arriving on a link someone shared, and the back button, are the same
    * thing: read the hash and show whatever it names. */
   function routeFromHash() {
-    var match = /^#\/asset\/(.+)$/.exec(location.hash || "");
+    var hash = location.hash || "";
+    var search = /^#\/search\/(.*)$/.exec(hash);
+    if (search) {
+      closeFilePreview(false);
+      closeAssetDetail();
+      openAdvancedSearch(decodeURIComponent(search[1]));
+      return;
+    }
+    var file = /^#\/asset\/([^/]+)\/file\/([^/]+)$/.exec(hash);
+    if (file) {
+      openAssetDetail(decodeURIComponent(file[1]), decodeURIComponent(file[2]));
+      return;
+    }
+    closeFilePreview(false);
+    var match = /^#\/asset\/(.+)$/.exec(hash);
     if (match) { openAssetDetail(decodeURIComponent(match[1])); return; }
+    closeAdvancedSearch();
     closeAssetDetail();
   }
 
@@ -3128,12 +3329,369 @@
     // reappears on the next refresh.
     var back = document.querySelector("#videoPreviewPage .vp-back");
     if (back) back.addEventListener("click", function () {
+      if (detailReturnHash) {
+        // Synchronously, not via hashchange: Elio's inline onclick has just
+        // put the catalogue back, and a frame of it would flash otherwise.
+        history.pushState(null, "", detailReturnHash);
+        detailReturnHash = null;
+        routeFromHash();
+        return;
+      }
       if (location.hash.indexOf("#/asset/") === 0) {
         history.pushState(null, "", location.pathname + location.search);
       }
       closeAssetDetail();
     });
     routeFromHash();          // honour a link opened cold
+  }
+
+  /* ---------------------------------------------------- advanced search
+   *
+   * Liwei, 2026-09-30: a search that also looks inside each demo -- the name
+   * of every file in its folder (videos, PowerPoint, PDF, Word...) -- and
+   * shows one full-width row per demo, with the files that matched listed
+   * under it, instead of cards. Two ways in: a button beside the main search
+   * box, and an offer in the suggestion strip while someone is searching.
+   *
+   * Its own view (#/search/<query>), built here like everything else, so
+   * index.html stays Elio's. The address carries the query, so a search can
+   * be bookmarked, and Back from a demo opened here returns to the results.
+   */
+  var ADV_PAGE_SIZE = 30;
+  var advState = { q: "", type: "", items: [], total: 0, seq: 0 };
+
+  function advancedHash(q) { return "#/search/" + encodeURIComponent(q || ""); }
+
+  var ADV_CSS =
+    ".hub-adv-open{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;" +
+    "border:1px solid var(--orion-border-md);border-radius:var(--orion-radius-pill);" +
+    "background:var(--orion-surface);color:var(--orion-text);font:inherit;font-size:12.5px;" +
+    "font-weight:600;cursor:pointer;white-space:nowrap}" +
+    ".hub-adv-open:hover{border-color:var(--orion-indigo);color:var(--orion-indigo)}" +
+    ".hub-adv__bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0 8px}" +
+    ".hub-adv__bar .hero-search__field{flex:1 1 320px}" +
+    ".hub-adv__summary{font-size:12.5px;color:var(--orion-text-3);margin:4px 0 14px;min-height:18px}" +
+    ".hub-adv__list{display:flex;flex-direction:column;gap:12px}" +
+    ".hub-adv__hit{display:flex;gap:18px;padding:16px 18px;background:var(--orion-surface-2);" +
+    "border:1px solid var(--orion-border);border-radius:var(--orion-radius)}" +
+    ".hub-adv__thumb{position:relative;flex:0 0 160px;height:90px;border-radius:6px;overflow:hidden;" +
+    "background:#000 center/cover no-repeat;display:block}" +
+    ".hub-adv__main{flex:1;min-width:0}" +
+    ".hub-adv__head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}" +
+    ".hub-adv__title{font-size:15px;font-weight:650;color:var(--orion-text);text-decoration:none}" +
+    ".hub-adv__title:hover{color:var(--orion-link);text-decoration:underline}" +
+    ".hub-adv__desc{margin:6px 0 8px;font-size:12.5px;line-height:1.6;color:var(--orion-text-2);" +
+    "display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}" +
+    ".hub-adv__tags{display:flex;flex-wrap:wrap;gap:6px}" +
+    ".hub-adv__files{margin-top:12px;padding-top:10px;border-top:1px dashed var(--orion-border-md)}" +
+    ".hub-adv__files-head{font-size:12px;font-weight:600;color:var(--orion-text-2);margin-bottom:4px}" +
+    ".hub-adv__more{display:flex;justify-content:center;margin:18px 0}" +
+    ".hub-hl{background:#fde68a;color:#1f2937;border-radius:2px;padding:0 1px}" +
+    ".hub-pill.hub-pill--hit{border-color:#d9a400}" +
+    // Details page: the Videos / Documents tabs over the file list.
+    ".hub-files-tabs{display:flex;gap:4px;margin:4px 0 6px;border-bottom:1px solid var(--orion-border)}" +
+    ".hub-files-tab{border:none;background:none;font:inherit;font-size:13px;font-weight:600;" +
+    "color:var(--orion-text-3);padding:8px 12px;margin-bottom:-1px;border-bottom:2px solid transparent;cursor:pointer}" +
+    ".hub-files-tab:hover:not(:disabled){color:var(--orion-text)}" +
+    ".hub-files-tab--active{color:var(--orion-text);border-bottom-color:var(--orion-indigo)}" +
+    ".hub-files-tab:disabled{opacity:.45;cursor:default}" +
+    // Share, right of Download: same shape, neutral, so Download stays the
+    // primary action of the row.
+    ".vp-file__share{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;padding:4px 10px;" +
+    "font:inherit;font-size:11.5px;font-weight:700;color:var(--orion-text-2);background:var(--orion-surface);" +
+    "border:1px solid var(--orion-border-md);border-radius:var(--orion-radius-pill);cursor:pointer;white-space:nowrap}" +
+    ".vp-file__share:hover{color:var(--orion-text);border-color:var(--orion-text-3)}" +
+    ".vp-file__share svg{width:12px;height:12px}" +
+    ".hub-file-preview__share{margin-top:8px;width:100%;display:flex;align-items:center;justify-content:center;" +
+    "gap:6px;padding:8px 12px;font:inherit;font-size:12.5px;font-weight:700;color:var(--orion-text-2);" +
+    "background:var(--orion-surface);border:1px solid var(--orion-border-md);border-radius:var(--orion-radius-sm);cursor:pointer}" +
+    ".hub-file-preview__share:hover{color:var(--orion-text);border-color:var(--orion-text-3)}" +
+    ".hub-file-preview__share svg{width:13px;height:13px}" +
+    ".hub-file-preview__stand-in{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;" +
+    "justify-content:center;gap:12px;padding:32px;text-align:center;background:var(--orion-surface-2);color:var(--orion-text-2)}" +
+    ".hub-file-preview__stand-in>svg{width:44px;height:44px;color:var(--orion-text-3)}" +
+    ".hub-file-preview__stand-in-name{font-size:15px;font-weight:600;color:var(--orion-text);overflow-wrap:anywhere}" +
+    ".hub-file-preview__stand-in-note{font-size:12.5px;max-width:420px;line-height:1.5}" +
+    ".hub-file-preview__stand-in .btn-primary-sm{flex:none;text-decoration:none}" +
+    "@media (max-width:640px){.hub-adv__hit{flex-direction:column}.hub-adv__thumb{flex-basis:auto;height:140px}" +
+    ".vp-file{flex-wrap:wrap}.vp-file__facts{margin-left:0;flex-basis:100%;order:3}}";
+
+  function ensureAdvCss() {
+    if (document.getElementById("hubAdvCss")) return;
+    var style = document.createElement("style");
+    style.id = "hubAdvCss";
+    style.textContent = ADV_CSS;
+    (document.head || document.body).appendChild(style);
+  }
+
+  /* The query's words, split the way the server splits them
+   * (relevance.terms: letters and digits, underscore a separator). */
+  function queryTerms(q) {
+    return ((q || "").toLowerCase().match(/[\p{L}\p{N}]+/gu) || []);
+  }
+
+  /* Text with every query term marked. Split on the raw text and escape each
+   * piece, so nothing from the catalogue is ever inserted as HTML. */
+  function highlightHtml(text, q) {
+    var ts = queryTerms(q).sort(function (a, b) { return b.length - a.length; });
+    if (!text || !ts.length) return escapeHtml(text || "");
+    var re = new RegExp("(" + ts.map(function (t) {
+      return t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }).join("|") + ")", "giu");
+    return text.split(re).map(function (part, i) {
+      return i % 2 ? '<mark class="hub-hl">' + escapeHtml(part) + "</mark>" : escapeHtml(part);
+    }).join("");
+  }
+
+  function mentions(text, q) {
+    var t = (text || "").toLowerCase();
+    return queryTerms(q).some(function (w) { return t.indexOf(w) !== -1; });
+  }
+
+  function buildAdvancedPage() {
+    var page = document.getElementById("hubAdvancedPage");
+    if (page) return page;
+    ensureAdvCss();
+    ensureTagsCss();
+    page = document.createElement("div");
+    page.className = "video-preview-page";
+    page.id = "hubAdvancedPage";
+    var typeOptions = ['<option value="">All asset types</option>'].concat(
+      Object.keys(TYPE_LABELS).map(function (k) {
+        return '<option value="' + escapeHtml(k) + '">' + escapeHtml(TYPE_LABELS[k]) + "</option>";
+      })).join("");
+    page.innerHTML =
+        '<button class="vp-back" type="button"><svg class="orion-ico orion-ico--sm">'
+      +   '<use href="#i-chevron-left"/></svg>Back to Technical Marketing Hub</button>'
+      + '<div class="vp-head"><div>'
+      +   '<div class="vp-title">Advanced Search</div>'
+      +   '<div class="orion-subtle">Searches every demo’s title, description and tags, '
+      +   'and the name of every file inside it — videos, PowerPoint, PDF, Word and more.</div>'
+      + '</div></div>'
+      + '<form class="hub-adv__bar" id="hubAdvForm">'
+      +   '<div class="hero-search__field"><svg class="orion-ico ico-muted"><use href="#i-search"/></svg>'
+      +     '<input type="text" id="hubAdvInput" autocomplete="off"'
+      +     ' placeholder="Search titles, descriptions, tags and file names…"></div>'
+      +   '<label class="filter-pill">Asset Type: <select id="hubAdvType">' + typeOptions + '</select>'
+      +     '<svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg></label>'
+      + '</form>'
+      + '<div class="hub-adv__summary" id="hubAdvSummary"></div>'
+      + '<div class="hub-adv__list" id="hubAdvList"></div>'
+      + '<div class="hub-adv__more"><button type="button" class="btn-ghost" id="hubAdvMore"'
+      +   ' style="display:none">Show more</button></div>';
+
+    var anchor = document.getElementById("videoPreviewPage");
+    if (anchor) anchor.parentNode.insertBefore(page, anchor);
+    else document.body.appendChild(page);
+
+    page.querySelector(".vp-back").addEventListener("click", function () {
+      history.pushState(null, "", location.pathname + location.search);
+      closeAdvancedSearch();
+    });
+    var input = page.querySelector("#hubAdvInput");
+    var run = debounce(function () {
+      // replaceState: every keystroke is not a place to go Back to.
+      history.replaceState(null, "", advancedHash(input.value.trim()));
+      runAdvancedSearch(input.value.trim(), false);
+    }, 300);
+    input.addEventListener("input", run);
+    page.querySelector("#hubAdvForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      runAdvancedSearch(input.value.trim(), false);
+    });
+    page.querySelector("#hubAdvType").addEventListener("change", function () {
+      advState.type = this.value;
+      runAdvancedSearch(input.value.trim(), false);
+    });
+    page.querySelector("#hubAdvMore").addEventListener("click", function () {
+      runAdvancedSearch(advState.q, true);
+    });
+    return page;
+  }
+
+  function openAdvancedSearch(q) {
+    var page = buildAdvancedPage();
+    document.getElementById("requestViewPage").classList.remove("active");
+    var topbar = document.getElementById("mainTopbar");
+    var thread = document.getElementById("mainThread");
+    if (topbar) topbar.style.display = "none";
+    if (thread) thread.style.display = "none";
+    var wasOpen = page.classList.contains("active");
+    page.classList.add("active");
+    var input = document.getElementById("hubAdvInput");
+    // Coming back from a demo: the results are still here, and where you
+    // were in them matters more than a fresh fetch.
+    if (wasOpen && q === advState.q) return;
+    if (q === advState.q && advState.items.length) { input.value = q; return; }
+    input.value = q;
+    page.scrollTop = 0;
+    runAdvancedSearch(q, false);
+    if (!q) input.focus();
+  }
+
+  function closeAdvancedSearch() {
+    var page = document.getElementById("hubAdvancedPage");
+    if (!page || !page.classList.contains("active")) return;
+    page.classList.remove("active");
+    var detail = document.getElementById("videoPreviewPage");
+    var request = document.getElementById("requestViewPage");
+    if ((detail && detail.classList.contains("active"))
+        || (request && request.classList.contains("active"))) return;
+    var topbar = document.getElementById("mainTopbar");
+    var thread = document.getElementById("mainThread");
+    if (topbar) topbar.style.display = "";
+    if (thread) thread.style.display = "";
+  }
+
+  async function runAdvancedSearch(q, more) {
+    var summary = document.getElementById("hubAdvSummary");
+    var list = document.getElementById("hubAdvList");
+    var moreBtn = document.getElementById("hubAdvMore");
+    var seq = ++advState.seq;          // a slower, older answer must not win
+    if (!more) {
+      advState.q = q;
+      advState.items = [];
+      advState.total = 0;
+      list.innerHTML = "";
+      moreBtn.style.display = "none";
+    }
+    if (queryTerms(q).join("").length < 2) {
+      summary.textContent = "Type at least two characters.";
+      return;
+    }
+    summary.textContent = "Searching…";
+    var params = new URLSearchParams({ q: q, limit: ADV_PAGE_SIZE,
+                                       offset: advState.items.length });
+    if (advState.type) params.append("type", advState.type);
+    var page;
+    try {
+      page = await getJSON("/api/assets/advanced-search?" + params.toString());
+    } catch (err) {
+      if (seq !== advState.seq) return;
+      console.error("[hub-api] advanced search failed", err);
+      summary.textContent = "The search could not be run: " + err.message;
+      return;
+    }
+    if (seq !== advState.seq) return;
+    advState.total = page.total;
+    page.items.forEach(function (hit) {
+      advState.items.push(hit);
+      list.appendChild(renderAdvancedHit(hit, q));
+    });
+    var fileHits = advState.items.reduce(function (n, h) { return n + h.files.length; }, 0);
+    summary.textContent = page.total
+      ? page.total + (page.total === 1 ? " demo" : " demos") + " match “" + q + "”"
+        + (fileHits ? " · " + fileHits + " matching file" + (fileHits === 1 ? "" : "s")
+                      + (advState.items.length < page.total ? " in the demos shown" : "") : "")
+      : "No demo or file matches “" + q + "”.";
+    moreBtn.style.display = advState.items.length < page.total ? "" : "none";
+  }
+
+  function renderAdvancedHit(hit, q) {
+    var a = hit.asset;
+    var href = "#/asset/" + encodeURIComponent(a.id);
+    var row = document.createElement("div");
+    row.className = "hub-adv__hit";
+
+    var thumb = document.createElement("a");
+    thumb.className = "hub-adv__thumb";
+    thumb.href = href;
+    thumb.setAttribute("aria-label", a.title);
+    if (a.thumbnail_url) thumb.style.backgroundImage = "url(" + JSON.stringify(a.thumbnail_url) + ")";
+    row.appendChild(thumb);
+    paintCoverInto(thumb, a);
+
+    var main = document.createElement("div");
+    main.className = "hub-adv__main";
+    row.appendChild(main);
+
+    var head = document.createElement("div");
+    head.className = "hub-adv__head";
+    head.innerHTML = '<a class="hub-adv__title" href="' + escapeHtml(href) + '">'
+                   + highlightHtml(a.title, q) + "</a>";
+    var typeLabel = (TYPE_CHIP[a.type] || [])[1];
+    if (typeLabel) head.appendChild(pill(typeLabel, "customer"));
+    if (a.language) head.appendChild(pill(LANGUAGE_LABEL[a.language] || a.language.toUpperCase(), "lang"));
+    main.appendChild(head);
+
+    var desc = document.createElement("div");
+    desc.className = "hub-adv__desc";
+    desc.innerHTML = highlightHtml(a.description || "No description for this one yet.", q);
+    main.appendChild(desc);
+
+    // Every tag the demo carries, the ones the query names outlined, so a
+    // hit on "details" shows where.
+    var tagValues = [];
+    [a.content_depth, a.segment].concat((a.product_families || []).map(familyDisplayName),
+                                        a.tags || [], a.named_customer ? [a.named_customer] : [])
+      .forEach(function (t) { if (t && tagValues.indexOf(t) === -1) tagValues.push(t); });
+    if (tagValues.length) {
+      var tags = document.createElement("div");
+      tags.className = "hub-adv__tags";
+      tagValues.forEach(function (t) {
+        var p = pill(t, "tag");
+        if (mentions(t, q)) { p.classList.add("hub-pill--hit"); p.innerHTML = highlightHtml(t, q); }
+        tags.appendChild(p);
+      });
+      main.appendChild(tags);
+    }
+
+    if (hit.files.length) {
+      var box = document.createElement("div");
+      box.className = "hub-adv__files";
+      box.innerHTML = '<div class="hub-adv__files-head">Matching files (' + hit.files.length + ")</div>";
+      var list = document.createElement("div");
+      list.className = "vp-files__list";
+      hit.files.forEach(function (f) {
+        var name;
+        if (f.item_id) {
+          // Opens the demo with this file's preview showing -- the same
+          // place a shared file link lands.
+          name = document.createElement("a");
+          name.href = fileHash(a.id, f.item_id);
+          name.title = "Open the demo and preview this file";
+        } else {
+          name = document.createElement("span");
+        }
+        name.className = "vp-file__name";
+        name.innerHTML = highlightHtml(f.name, q);
+        list.appendChild(buildFileRow(a, f, name));
+      });
+      box.appendChild(list);
+      main.appendChild(box);
+    }
+    return row;
+  }
+
+  function wireAdvancedSearch() {
+    ensureAdvCss();
+    // Entry 1: beside the main search box.
+    var field = document.querySelector("#mainTopbar .hero-search__field");
+    if (field && !document.getElementById("hubAdvOpen")) {
+      var open = document.createElement("button");
+      open.type = "button";
+      open.id = "hubAdvOpen";
+      open.className = "hub-adv-open";
+      open.title = "Also search the names of the files inside every demo";
+      open.innerHTML = '<svg class="orion-ico orion-ico--sm"><use href="#i-search"/></svg>Advanced Search';
+      open.addEventListener("click", function () {
+        location.hash = advancedHash(val("hubSearchInput").trim());
+      });
+      field.parentNode.insertBefore(open, field.nextSibling);
+    }
+    // Elio's Request view knows nothing of this page; opening it must still
+    // take this page down, or both would show.
+    var openRequest = window.openRequestView;
+    if (typeof openRequest === "function" && !openRequest.hubWrapped) {
+      window.openRequestView = function () {
+        closeAdvancedSearch();
+        if (/^#\/search\//.test(location.hash || "")) {
+          history.pushState(null, "", location.pathname + location.search);
+        }
+        return openRequest.apply(this, arguments);
+      };
+      window.openRequestView.hubWrapped = true;
+    }
   }
 
   /* -------------------------------------------------- the request intake */
@@ -3732,6 +4290,14 @@
     var host = document.getElementById("hubSuggest");
     if (!host) return;
     var items = suggestionsFor(query);
+    // While someone is searching, offer the search that also reads file
+    // names (Liwei, 2026-09-30) -- last, after any category offer.
+    var q = (query || "").trim();
+    if (queryTerms(q).join("").length >= 2) {
+      items = items.concat([{ page: true,
+        text: "Try Advanced Search for “" + q + "” — also searches file names",
+        run: function () { location.hash = advancedHash(q); } }]);
+    }
     if (!items.length) { host.style.display = "none"; host.innerHTML = ""; return; }
 
     host.innerHTML = "";
@@ -4341,6 +4907,7 @@
     enhanceSearchableSelect("hubFilterProduct", "Search products…", "No product matches");
     wireShareModal();
     wireRequestForm();
+    wireAdvancedSearch();
     wireDetailPage();
     fillProductPills(facets);
     await buildFamilyNav(facets);

@@ -69,7 +69,8 @@ EXTRA = {"hub_products": ("HubProducts", True), "video_type": ("VideoType", True
 COLUMNS = ("brightcove_id", "title", "description", "segments", "products", "customer_facing",
            "hub_products", "video_type", "video_subtype", "named_customer", "gallery",
            "gallery_section", "long_description",
-           "contains_audio", "original_publish_date", "gallery_url", "source", "filename")
+           "contains_audio", "original_publish_date", "gallery_url", "source", "filename",
+           "current")
 
 
 # ───────────────────────────────────────────────────────────── the manifest
@@ -95,6 +96,9 @@ class VideoRecord:
     extra: dict = field(default_factory=dict)
     #: Runtime in seconds, from Brightcove, once enriched.
     duration_s: float | None = None
+    #: The sheet's Current? -- shows the current software version. Written to
+    #: the library's Current column when it has one (OPTIONAL_COLUMNS).
+    current: bool | None = None
 
     @property
     def from_brightcove(self) -> bool:
@@ -136,6 +140,9 @@ def load_manifest(path: str) -> list[VideoRecord]:
         cf = m.as_bool(get("customer_facing"))
         if get("customer_facing") and cf is None:
             problems.append(f"customer_facing {get('customer_facing')!r} is not yes/no")
+        current = m.as_bool(get("current"))
+        if get("current") and current is None:
+            problems.append(f"current {get('current')!r} is not yes/no")
         audio = m.as_bool(get("contains_audio"))
         if get("contains_audio") and audio is None:
             problems.append(f"contains_audio {get('contains_audio')!r} is not yes/no")
@@ -150,7 +157,7 @@ def load_manifest(path: str) -> list[VideoRecord]:
             products=_split(raw.get("products")), customer_facing=cf, contains_audio=audio,
             original_publish_date=published, gallery_url=get("gallery_url"),
             source=source, filename=filename, problems=problems,
-            hub_products=_split(raw.get("hub_products")),
+            hub_products=_split(raw.get("hub_products")), current=current,
             extra={k: get(k) for k in EXTRA if k != "hub_products" and get(k)}))
 
     seen: dict[str, int] = {}
@@ -201,6 +208,26 @@ def video_file_name(r: VideoRecord) -> str:
     return w.safe_folder_name(stem) + ".mp4"
 
 
+def _disambiguate_titles(records: list[VideoRecord]) -> None:
+    groups: dict[str, list[VideoRecord]] = {}
+    for r in records:
+        if r.title:
+            groups.setdefault(r.folder_name.lower(), []).append(r)
+    for same in groups.values():
+        if len({r.brightcove_id for r in same}) < 2:
+            continue
+        for r in same:
+            if r.original_publish_date:
+                r.title = f"{r.title} ({r.original_publish_date.isoformat()})"
+        dated: dict[str, list[VideoRecord]] = {}
+        for r in same:
+            dated.setdefault(r.folder_name.lower(), []).append(r)
+        for still in dated.values():
+            if len({r.brightcove_id for r in still}) > 1:
+                for r in still:
+                    r.title = f"{r.title} ({r.brightcove_id})"
+
+
 def validate(records: list[VideoRecord], choices, terms: w.TermIndex) -> None:
     """Check values against the live library and term store (HLR-A7), and
     that every record ends up complete. Run after `enrich`.
@@ -215,10 +242,15 @@ def validate(records: list[VideoRecord], choices, terms: w.TermIndex) -> None:
     segment_choices = list(choices.get("Segment") or ())
     allowed = {s.lower(): s for s in segment_choices}
 
-    # Two rows that would become the same folder: the second create fails,
-    # and with parallel uploads the two race for it. SharePoint names are
-    # case-insensitive. Both rows are flagged -- which one keeps the name is
-    # the sheet owner's call. V29 had 3 such pairs (2026-09-29).
+    # Different videos with the same title: each gets its publish date on the
+    # end -- "Windchill AI Assistant (2025-06-18)" -- so both can be migrated
+    # (Liwei, 2026-09-30). If the dates match too, the Brightcove ID is added.
+    # The same video twice (one ID) is not renamed: the ID check reports it.
+    _disambiguate_titles(records)
+
+    # Two rows that would still become the same folder: the second create
+    # fails, and with parallel uploads the two race for it. SharePoint names
+    # are case-insensitive.
     by_name: dict[str, list[VideoRecord]] = {}
     for r in records:
         if r.title:
@@ -348,7 +380,7 @@ def plan(records: list[VideoRecord], existing: dict[str, dict],
     return status
 
 
-def fields_for(r: VideoRecord) -> dict:
+def fields_for(r: VideoRecord, optional: dict | None = None) -> dict:
     """The columns written, LAST, once the video is in. Shapes as proven in §9."""
     fields = {
         "Demo_x0020_Type": "Video",
@@ -372,6 +404,8 @@ def fields_for(r: VideoRecord) -> dict:
     for key, (column, _) in EXTRA.items():
         if key != "hub_products" and r.extra.get(key):
             fields[column] = r.extra[key]
+    if r.current is not None and (optional or {}).get("current"):
+        fields[optional["current"]] = r.current
     return fields
 
 
@@ -427,7 +461,7 @@ def migrate_one(client: GraphClient, target: w.LibraryTarget, terms: w.TermIndex
         log.set_item(r.brightcove_id, status="uploaded", file_id=item.get("id"),
                      upload_url=None, uploaded_bytes=size)
 
-    w.write_fields(client, target, folder_id, fields_for(r))
+    w.write_fields(client, target, folder_id, fields_for(r, target.optional_columns))
     if r.products:
         chosen = [terms.get(p) for p in r.products]
         w.write_fields(client, target, folder_id,

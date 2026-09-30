@@ -227,15 +227,44 @@ def test_a_manifest_reports_every_problem_without_stopping(tmp_path):
     assert any("not a video" in p for p in records[3].problems)
 
 
-def test_rows_that_would_share_a_folder_are_both_flagged(tmp_path):
-    """V29 had 3 such pairs (2026-09-29). Case-insensitive, like SharePoint."""
+def test_different_videos_with_one_title_get_their_publish_date(tmp_path):
+    """Liwei, 2026-09-30: a shared title is told apart by the upload date on
+    the end. V29 (2) had 3 such pairs. Case-insensitive, like SharePoint."""
     records = run.load_manifest(write_manifest(tmp_path, [
-        row(bcid="1", title="Creo Simulation Live"), row(bcid="2", title="Other"),
-        row(bcid="3", title="creo simulation live")]))
+        row(bcid="1", title="Creo Simulation Live", date="2024-02-16"), row(bcid="2", title="Other"),
+        row(bcid="3", title="creo simulation live", date="2026-06-05")]))
     run.validate(records, ["PLM", "CAD"], TERMS)
-    assert any("same folder name as row 4" in p for p in records[0].problems)
-    assert any("same folder name as row 2" in p for p in records[2].problems)
-    assert records[1].problems == []
+    assert records[0].title == "Creo Simulation Live (2024-02-16)"
+    assert records[2].title == "creo simulation live (2026-06-05)"
+    assert records[0].problems == records[1].problems == records[2].problems == []
+    assert records[1].title == "Other"
+
+
+def test_the_same_date_too_adds_the_brightcove_id(tmp_path):
+    records = run.load_manifest(write_manifest(tmp_path, [
+        row(bcid="1", title="Twin", date="2024-02-16"), row(bcid="2", title="Twin", date="2024-02-16")]))
+    run.validate(records, ["PLM", "CAD"], TERMS)
+    assert [r.title for r in records] == ["Twin (2024-02-16) (1)", "Twin (2024-02-16) (2)"]
+    assert all(r.problems == [] for r in records)
+
+
+def test_one_video_twice_is_not_renamed_but_reported(tmp_path):
+    records = run.load_manifest(write_manifest(tmp_path, [row(bcid="1", title="Same"),
+                                                          row(bcid="1", title="Same")]))
+    run.validate(records, ["PLM", "CAD"], TERMS)
+    assert records[1].title == "Same"
+    assert any("repeats row 2" in p for p in records[1].problems)
+    assert any("same folder name" in p for p in records[0].problems)
+
+
+def test_current_is_written_only_where_the_library_has_the_column(tmp_path):
+    header = BASE_HEADER + ("current",)
+    records = run.load_manifest(write_manifest(tmp_path, [row() + ["no"], row(bcid="2") + ["maybe"]],
+                                               header=header))
+    assert records[0].current is False
+    assert any("current 'maybe'" in p for p in records[1].problems)
+    assert "Current_x0020_Version" not in run.fields_for(records[0])
+    assert run.fields_for(records[0], {"current": "Current_x0020_Version"})["Current_x0020_Version"] is False
 
 
 def test_unknown_values_are_reported_not_forced(tmp_path):

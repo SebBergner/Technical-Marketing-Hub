@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Iterator
 from urllib.parse import quote
 
@@ -53,6 +53,13 @@ REQUIRED_COLUMNS = ("Demo_x0020_Type", "Segment", "Product", "BrightcoveID",
 #: library's own options, read live, never a copy kept in code.
 CHOICE_COLUMNS = ("Segment", "HubProducts", "VideoType", "VideoSubtype", "Gallery")
 
+#: Columns written only when the library has them, by any of these internal
+#: names. Current (Yes/No): the video shows the current software version --
+#: kept for later, not searched or shown by the Hub (Liwei, 2026-09-30, who
+#: adds the column by hand). Never required, so a library without it still
+#: migrates.
+OPTIONAL_COLUMNS = {"current": ("Current_x0020_Version", "CurrentVersion", "Current")}
+
 
 class MigrationTargetError(GraphError):
     """The library cannot be written to, or must not be."""
@@ -73,6 +80,8 @@ class LibraryTarget:
     product_note_field: str
     #: The library's own options for each of CHOICE_COLUMNS.
     choices: dict
+    #: OPTIONAL_COLUMNS the library has: key -> its internal name.
+    optional_columns: dict = field(default_factory=dict)
 
     @property
     def segment_choices(self) -> tuple[str, ...]:
@@ -132,7 +141,9 @@ class LibraryTarget:
         return cls(site_id=site_id, name=drive.name or name, drive_id=drive.drive_id,
                    list_id=list_id, demo_content_type_id=demo["id"],
                    product_note_field=note,
-                   choices={c: options(c) for c in CHOICE_COLUMNS})
+                   choices={c: options(c) for c in CHOICE_COLUMNS},
+                   optional_columns={k: found for k, names in OPTIONAL_COLUMNS.items()
+                                     if (found := next((n for n in names if n in columns), None))})
 
 
 # ───────────────────────────────────────────────────────────── reading

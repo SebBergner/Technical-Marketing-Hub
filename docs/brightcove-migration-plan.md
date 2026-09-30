@@ -928,3 +928,112 @@ page's DOM.
     Uploaded and Tags (still clickable). Empty rows are left out.
 - **The bottom-right "N assets · N SharePoint · N Consensus" box is gone** (it still shows
   errors). The total now sits beside the page title: "1,118 assets".
+
+## 16. The updated V29 sheet ("Gallery Consolidation V29 (1).xlsx", analysed 2026-09-30 ~16:10 EDT, read-only)
+
+Run through `from-sheet` and then `dry-run --library "Demo Video"`. Nothing was written; the
+dry-run log is `batches/20260930-160607-dry-run.json`. Every Brightcove ID was found, and each
+has a downloadable MP4.
+
+### Totals
+
+- **277 to migrate**, 182 left out (Delete?/Archive?). Rendition sizes are capped at 1080p.
+- **Volume: 37.27 GB**, about 4.8 h at the 2.2 MB/s measured for one stream.
+- **104 rows are valid, 173 invalid.**
+
+### What changed in the sheet
+
+- **A new "XDP VDKs" sheet** (40 rows, 38 kept). It has an "Added as VDK" column, False on 39
+  rows.
+- **New columns on the PTC Gallery sheets:** Segment, Vertical, Customer Facing?, Current?.
+  - Every kept row is Current? = True, except one broken row (below).
+
+### Problems, by count
+
+| Count | Problem |
+|---|---|
+| 126 | **Customer Facing empty.** |
+| 38 | **Duplicate folder names** (same title). |
+| 30 | **Hub Products not in the library.** |
+| 16 | **The same Brightcove ID in two sheets** (XDP VDKs and IPL). |
+| 1 | **A broken row** (column shift). |
+
+- **Customer Facing empty (126):**
+  - CAD 42: the column exists, but it is empty.
+  - Every GXC sheet (52) and the PTC customer sheets (Vestas 14, Garrett 8, Volvo 5+1,
+    X-Intelligence 2, Other 1): these have no Customer Facing column at all. They also lack
+    Segment, Proposed Tags, Video Type, Subtype, Published Date and Proposed Title.
+- **Duplicate titles (38):**
+  - The 16 XDP/IPL pairs.
+  - "Windchill AI Assistant" (PLM and PTC NEXT).
+  - "Creo Simulation Live" (CAD and PTC NEXT).
+  - Vestas: two "Tech Walkthrough No Audio - Kepware Helper and SCPA Ass…".
+- **Hub Products not in the library (30):**
+  - Creo modules: AAX×2, MMX, AMX, CFD, IFX, EZ Tolerance, DEX, PCX, ISDX, HMX, Schematics,
+    Advanced Manufacturing, Composite Design & Manufacturing, Performance Advisor, Ansys
+    Simulation×2.
+  - AI variants: Creo AI×2 / "Creo Ai", ServiceMax AI, PTC Orbit AI.
+  - "Creo Generative Design" (the library has "Creo Generative").
+  - Typos: "Creo Creo Simulation Live"×4, "Creo Piping and Cableing".
+  - ThingWorx×2 (Vestas Service; divested).
+- **Tags read as customers but not customers:** "Product View"×2, "PTC Product View", "Atlas",
+  "Control Center", "Composite Design", "Makersite" (a partner).
+- **The broken row:** XDP "E&HT ADAS Presenter Support" has its columns shifted:
+  - Published Date reads "AMP does n…";
+  - Subtype holds rationale text;
+  - Video Type is False.
+- **No Gallery:** the sheets "XDP VDKs" and "Volvo (Retired)" carry no gallery suffix.
+  "Volvo (Retired)" has 1 kept row.
+
+### Library options
+
+- Already fine: Segment, VideoType (Other/Unclear → Other), VideoSubtype and Gallery. All their
+  values are options.
+- **Vertical** (Industrial, FAD, Med_Tech, EHT, Automotive) has no column in the library.
+
+### V29 (2), same day (~17:10 EDT)
+
+- **CAD Customer Facing? filled.** 41 of the 42 kept rows are now TRUE; "Creo 13 Top Enhancements"
+  (row 72) is still empty. The same 41 rows now read Current? = FALSE. The migration does not
+  use Current?, and this has been asked back.
+- **XDP VDKs are left out of this migration.** Seb, via Elio: they will be loaded another way.
+  - Elio left the Technical Walkthroughs / Overviews on the IPL sheet as well. So 16 IPL videos
+    will be in Demo Video *and* later among the VDKs, and whether the Hub shows both has been
+    asked.
+  - **Still to do in code:** the sheet adapter must skip the "XDP VDKs" sheet. It reads every
+    sheet with an Id column today. The check filtered it out by hand.
+- **Dry-run without XDP VDKs:**
+  - 239 to migrate: new 112, existing 13 (test uploads, to be deleted), invalid 114;
+  - 28.92 GB, about 3.7 h at 2.2 MB/s.
+- **The problems left:**
+  - Customer Facing empty on 84 rows: CAD 1, GXC 52 and the PTC customer sheets 31;
+  - 28 Hub Products not in the list;
+  - 3 pairs of duplicate titles;
+  - 7 tags read as customers.
+- **Files sent to Seb/Elio**, in Liwei's Downloads:
+  - "Gallery V29 migration check v2 - summary (2026-09-30).docx";
+  - "Gallery V29 migration check v2 - issues (2026-09-30).xlsx" (125 issue rows);
+  - they replace the V29 (1) versions.
+
+### Liwei's decisions on V29 (2), 2026-09-30 evening, built the same day
+
+- **XDP VDKs are skipped** by the sheet adapter (`gallery_sheet.SKIP_SHEETS`). The CLI and the
+  /migration preview report which sheets were skipped.
+- **Current?** means "shows the current software version". It is migrated to a Yes/No column
+  Liwei adds by hand. The Hub neither searches nor shows it.
+  - It is written only when the library has the column (`OPTIONAL_COLUMNS`, internal name
+    `Current_x0020_Version`, `CurrentVersion` or `Current`), so a library without it still
+    migrates.
+- **Hub Products missing from the list:** Liwei adds them as options in the library.
+  - Two unambiguous typos are mapped in the adapter: "Creo Creo Simulation Live" → "Creo
+    Simulation Live", "Creo Ai" → "Creo AI".
+  - "PTC Orbit AI" now rolls up to PTC Orbit in the Hub (`taxonomy._FAMILY_PREFIXES`).
+- **Different videos sharing a title** get their publish date on the end, e.g. "Windchill AI
+  Assistant (2026-05-08)". If the dates match too, the Brightcove ID is added. The same video
+  twice is not renamed; it is reported.
+- **Tags read as customers:** uploaded as they are; Liwei settles them with Seb later.
+- **A video on both IPL and XDP VDKs** may appear in the Hub as a video and as a VDK. That is
+  fine.
+- **Re-check (dry-run, read-only), V29 (2):**
+  - 239 to migrate: new 120, existing 13 (test uploads), invalid 106;
+  - the invalid ones are Customer Facing empty ×84 and Hub Products not yet options ×24.

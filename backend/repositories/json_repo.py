@@ -367,6 +367,24 @@ class JsonAssetRepository(AssetRepository):
             total=len(rows), limit=query.limit, offset=query.offset,
         )
 
+    # ─────────────────────────────────────────── promoted on Home
+    def promoted(self) -> dict:
+        state = self._load("promoted") or {}
+        return {"asset_ids": list(state.get("asset_ids") or []),
+                "changed_by": state.get("changed_by"),
+                "changed_at": state.get("changed_at")}
+
+    def set_promoted(self, asset_ids: list[str], actor: str) -> dict:
+        """Replace the whole ordered list. owned/promoted.json -- never
+        mirror/, so no sync can touch it."""
+        with self._lock:
+            self._save("promoted", {
+                "asset_ids": list(dict.fromkeys(asset_ids)),
+                "changed_by": actor,
+                "changed_at": utcnow().isoformat(timespec="seconds"),
+            })
+        return self.promoted()
+
     def advanced_search(self, query: AssetQuery) -> Page[AdvancedSearchHit]:
         """Every listed demo whose own fields, or whose files' names, hold
         every term of the query.

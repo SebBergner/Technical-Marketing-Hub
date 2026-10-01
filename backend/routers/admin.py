@@ -272,6 +272,46 @@ def set_auto_sync(body: AutoSyncIn, actor: str = Depends(admin_or_curator)):
     return _auto_sync_view()
 
 
+#: Home shows every promoted asset; past a dozen it stops being a shortlist.
+MAX_PROMOTED = 12
+
+
+class PromotedIn(BaseModel):
+    asset_ids: list[str] = Field(max_length=MAX_PROMOTED)
+
+
+def _promoted_view(repo: AssetRepository) -> dict:
+    from backend.routers.assets import promoted_summaries   # local: router cycle
+    state = repo.promoted()
+    return {**state, "max": MAX_PROMOTED,
+            "assets": [a.model_dump(mode="json") for a in promoted_summaries(repo)]}
+
+
+@router.get("/promoted", dependencies=[Depends(require_admin)])
+def get_promoted(repo: AssetRepository = Depends(get_repo)):
+    try:
+        return _promoted_view(repo)
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+
+
+@router.put("/promoted")
+def set_promoted(body: PromotedIn, actor: str = Depends(admin_or_curator),
+                 repo: AssetRepository = Depends(get_repo)):
+    """Choose what the Home page features, and in which order (Seb, via
+    Liwei 2026-10-01). The same key as the sync buttons: this edits a
+    Portal-owned list, never SharePoint."""
+    unknown = [i for i in body.asset_ids if repo.get(i) is None]
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"no asset with id {unknown[0]!r}")
+    try:
+        repo.set_promoted(body.asset_ids, actor)
+        log.info("home promotions set by %s: %s", actor, body.asset_ids)
+        return _promoted_view(repo)
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+
+
 def _pending_proposals(repo: AssetRepository) -> int | None:
     """Read-only on purpose: deciding one writes back to SharePoint, which an
     admin session is not allowed to do. Surfaced anyway because the whole

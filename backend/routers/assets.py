@@ -67,6 +67,29 @@ def list_assets(
     ))
 
 
+def promoted_summaries(repo: AssetRepository) -> list[AssetSummary]:
+    """The promoted assets, in their order, through `get()` -- the same
+    funnel as a details page, so a divested or removed asset simply drops
+    out instead of showing as a broken card."""
+    out = []
+    for asset_id in repo.promoted()["asset_ids"]:
+        asset = repo.get(asset_id)
+        if asset is not None:
+            out.append(AssetSummary.model_validate(
+                asset.model_dump(include=set(AssetSummary.model_fields))))
+    return out
+
+
+@router.get("/promoted", response_model=list[AssetSummary])
+def promoted(repo: AssetRepository = Depends(get_repo)):
+    """What the Home page features, in the order chosen on the Admin page.
+    Declared before `/{asset_id}`, like advanced-search."""
+    try:
+        return promoted_summaries(repo)
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+
+
 @router.get("/advanced-search", response_model=Page[AdvancedSearchHit])
 def advanced_search(
     q: str = Query(min_length=2, description="every term must be in the demo's "

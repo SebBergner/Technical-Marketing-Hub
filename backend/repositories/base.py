@@ -68,6 +68,16 @@ class AssetRepository(ABC):
     @abstractmethod
     def list(self, query: AssetQuery) -> Page[AssetSummary]: ...
 
+    def promoted(self) -> dict:
+        """What the Home page features, in order (Seb's "promote" ask, built
+        2026-10-01): {"asset_ids": [...], "changed_by": ..., "changed_at": ...}.
+        Portal-owned, like curation. Not abstract: only the file-backed
+        repository stores it, and the endpoints answer 501 otherwise."""
+        raise NotImplementedError
+
+    def set_promoted(self, asset_ids: list[str], actor: str) -> dict:
+        raise NotImplementedError
+
     def advanced_search(self, query: AssetQuery) -> "Page[AdvancedSearchHit]":
         """Search the demos' own fields AND the names of the files in them.
 

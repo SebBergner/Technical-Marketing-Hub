@@ -64,7 +64,11 @@
    * do not collect. Leaving them filled with sample cards would put invented
    * content beside real content with nothing to tell them apart, which is
    * worse than a shorter page. Set to [] to show them again. */
-  var HIDE_UNTIL_REAL = ["editorsPicksSection", "continueSection"];
+  var HIDE_UNTIL_REAL = ["editorsPicksSection", "continueSection",
+                         // Liwei, 2026-10-01: four product tiles beside a
+                         // seven-product sidebar only confused; gone until
+                         // the Home redesign.
+                         "browseByProductSection"];
 
   /* ---------------------------------------------------------------- mapping */
 
@@ -206,6 +210,14 @@
     (document.head || document.body).appendChild(style);
   }
 
+  /* The Video Type, only for a video (Liwei, 2026-10-01). `content_depth` is
+   * also set on many LDKs and VDKs, and "Video type: Technical Teaser" on a
+   * Live Demo Kit reads as a contradiction. The stored value is untouched;
+   * only where it shows changes. */
+  function videoTypeOf(a) {
+    return a && a.type === "video" ? a.content_depth : null;
+  }
+
   function pill(text, kind) {
     var el = document.createElement("span");
     el.className = "hub-pill hub-pill--" + kind;
@@ -234,7 +246,7 @@
 
     var pills = document.createElement("div");
     pills.className = "hub-card-pills";
-    if (a.content_depth) pills.appendChild(pill(a.content_depth, "vtype"));
+    if (videoTypeOf(a)) pills.appendChild(pill(videoTypeOf(a), "vtype"));
     if (a.segment) pills.appendChild(pill(a.segment, "segment"));
     if (a.named_customer) pills.appendChild(pill(a.named_customer, "customer"));
     meta.parentNode.insertBefore(pills, meta);
@@ -1140,6 +1152,7 @@
     var active = params.toString().length > 0 || !!sortOverride;
 
     markNavActive();
+    renderActiveFilters();
     renderSuggestions(val("hubSearchInput"));
     renderSegmentHeader();
     var reset = document.getElementById("hubResetBtn");
@@ -1402,6 +1415,156 @@
       freshReset.addEventListener("click", clearAll);
     }
     window.hubApplyFilters = applyFilters;   // for anything else that calls it
+  }
+
+  /* ── the filter bar (Liwei, 2026-10-01) ──────────────────────────────
+   *
+   * One row: search, Advanced Search, Asset Type (+ Video Type when it
+   * applies), Product, Segment, and "More filters" for Stage, Language and
+   * Customer-Facing. Under it, every filter that is on as a chip that can be
+   * removed on its own -- including the two the bar has no control for (the
+   * product the sidebar took you to, the tag a details page took you to),
+   * which used to show only as a sidebar highlight or a heading. "Clear all"
+   * at the end of the chips replaces the separate Reset link.
+   *
+   * Elio's controls are moved, not rebuilt, so his markup and the existing
+   * filter wiring (takeOverControls) are untouched. */
+  var MORE_FILTERS = ["hubFilterStage", "hubFilterLanguage", "hubFilterCf"];
+
+  //: Chip label per control. Values come from the option the person sees,
+  //: minus its count: "Windchill (156)" -> "Windchill".
+  var CHIP_LABELS = [
+    ["hubFilterType", "Type"], ["hubFilterVideoType", "Video type"],
+    ["hubFilterProduct", "Product"], ["hubFilterSegment", "Segment"],
+    ["hubFilterStage", "Stage"], ["hubFilterLanguage", "Language"],
+    ["hubFilterCf", "Customer-facing"]
+  ];
+
+  var FILTER_BAR_CSS =
+    "#mainTopbar #hubResetBtn{display:none!important}" +
+    // .hero-search is display:flex, which beats the hidden attribute.
+    ".hub-more-panel[hidden]{display:none}" +
+    // Each dropdown as wide as what it shows, not as its longest option
+    // ("Virtual Machine (7)" made Asset Type 230px while reading "All"),
+    // so the search box keeps the room.
+    "#mainTopbar .filter-pill select{field-sizing:content}" +
+    "#mainTopbar .hero-search__field{min-width:300px}" +
+    ".hub-more-btn{display:inline-flex;align-items:center;gap:6px;padding:10px 13px;font:inherit;font-size:13px;" +
+    "color:var(--orion-text-2);background:var(--orion-surface);border:1px solid var(--orion-border-md);" +
+    "border-radius:var(--orion-radius-sm);cursor:pointer;white-space:nowrap}" +
+    ".hub-more-btn:hover,.hub-more-btn[aria-expanded=true]{border-color:var(--orion-indigo);color:var(--orion-text)}" +
+    ".hub-more-btn svg{width:14px;height:14px;transition:transform .15s}" +
+    ".hub-more-btn[aria-expanded=true] svg{transform:rotate(180deg)}" +
+    ".hub-more-btn__n{min-width:18px;padding:0 5px;border-radius:999px;background:var(--orion-indigo);color:#fff;" +
+    "font-size:11px;font-weight:700;line-height:18px;text-align:center}" +
+    ".hub-more-panel{margin-top:10px}" +
+    ".hub-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px}" +
+    ".hub-chips:empty{display:none}" +
+    ".hub-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 4px 3px 10px;font:inherit;font-size:12.5px;" +
+    "color:var(--orion-text);background:var(--orion-indigo-soft);border:1px solid var(--orion-indigo);" +
+    "border-radius:999px;cursor:pointer}" +
+    ".hub-chip b{font-weight:500;color:var(--orion-text-2)}" +
+    ".hub-chip__x{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;" +
+    "border-radius:50%;font-size:14px;line-height:1;color:var(--orion-text-2)}" +
+    ".hub-chip:hover .hub-chip__x{background:var(--orion-indigo);color:#fff}" +
+    ".hub-chips__clear{border:none;background:none;font:inherit;font-size:12.5px;font-weight:700;" +
+    "color:var(--orion-indigo);cursor:pointer;padding:3px 6px}" +
+    ".hub-chips__clear:hover{text-decoration:underline}";
+
+  function wireFilterBar() {
+    var bar = document.querySelector("#mainTopbar .hero-search");
+    if (!bar || document.getElementById("hubMoreFilters")) return;
+    if (!document.getElementById("hubFilterBarCss")) {
+      var style = document.createElement("style");
+      style.id = "hubFilterBarCss";
+      style.textContent = FILTER_BAR_CSS;
+      (document.head || document.body).appendChild(style);
+    }
+
+    var panel = document.createElement("div");
+    panel.className = "hero-search hub-more-panel";
+    panel.id = "hubMoreFilters";
+    panel.hidden = true;
+    MORE_FILTERS.forEach(function (id) {
+      var control = document.getElementById(id);
+      var pillEl = control && control.closest(".filter-pill");
+      if (pillEl) panel.appendChild(pillEl);
+    });
+
+    var more = document.createElement("button");
+    more.type = "button";
+    more.id = "hubMoreBtn";
+    more.className = "hub-more-btn";
+    more.setAttribute("aria-expanded", "false");
+    more.setAttribute("aria-controls", "hubMoreFilters");
+    more.innerHTML = 'More filters<span class="hub-more-btn__n" hidden></span>'
+                   + '<svg class="orion-ico orion-ico--sm"><use href="#i-chevron-down"/></svg>';
+    more.addEventListener("click", function () {
+      panel.hidden = !panel.hidden;
+      more.setAttribute("aria-expanded", panel.hidden ? "false" : "true");
+    });
+    var reset = document.getElementById("hubResetBtn");
+    bar.insertBefore(more, reset && reset.parentNode === bar ? reset : null);
+    bar.parentNode.insertBefore(panel, bar.nextSibling);
+
+    var chips = document.createElement("div");
+    chips.className = "hub-chips";
+    chips.id = "hubActiveFilters";
+    panel.parentNode.insertBefore(chips, panel.nextSibling);
+    renderActiveFilters();
+  }
+
+  function optionLabel(id) {
+    var el = document.getElementById(id);
+    if (!el || !el.value) return "";
+    var o = el.options && el.options[el.selectedIndex];
+    return (o ? o.textContent : el.value).replace(/\s*\(\d[\d,]*\)\s*$/, "").trim();
+  }
+
+  function renderActiveFilters() {
+    var host = document.getElementById("hubActiveFilters");
+    if (!host) return;
+    host.innerHTML = "";
+    var add = function (name, value, clear) {
+      var chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "hub-chip";
+      chip.title = "Remove this filter";
+      chip.innerHTML = "<b>" + escapeHtml(name) + ":</b> " + escapeHtml(value)
+                     + '<span class="hub-chip__x" aria-hidden="true">&times;</span>';
+      chip.setAttribute("aria-label", "Remove " + name + ": " + value);
+      chip.addEventListener("click", function () { clear(); applyFilters(); });
+      host.appendChild(chip);
+    };
+    if (umbrellaFilter) {
+      add("Product", umbrellaDisplayName(umbrellaFilter), function () { umbrellaFilter = null; });
+    }
+    CHIP_LABELS.forEach(function (c) {
+      var text = optionLabel(c[0]);
+      if (text) add(c[1], text, function () {
+        var el = document.getElementById(c[0]);
+        if (el) el.value = "";
+      });
+    });
+    if (tagFilter) add("Tag", tagFilter, function () { tagFilter = null; });
+    if (val("hubFilterType") === "vm" && val("hubFilterVmVersions") === "all") {
+      add("Versions", "Older VM versions too", function () {
+        var el = document.getElementById("hubFilterVmVersions");
+        if (el) el.value = "";
+      });
+    }
+    if (host.children.length) {
+      var clear = document.createElement("button");
+      clear.type = "button";
+      clear.className = "hub-chips__clear";
+      clear.textContent = "Clear all";
+      clear.addEventListener("click", clearAll);
+      host.appendChild(clear);
+    }
+
+    var n = MORE_FILTERS.filter(function (id) { return !!val(id); }).length;
+    var badge = document.querySelector("#hubMoreBtn .hub-more-btn__n");
+    if (badge) { badge.hidden = !n; badge.textContent = n; }
   }
 
   function clearAll() {
@@ -1778,6 +1941,28 @@
   var PRODUCT_SCOPE_PRIORITY = ["Creo", "Codebeamer", "Windchill", "Jetstream",
                                 "IPE", "ServiceMax", "Orbit"];
 
+  /* Elio's Scope box is green -- the colour of a result. While nothing is
+   * picked it holds a prompt ("Select at least one product."), which then
+   * read as a success (Liwei, 2026-10-01). Neutral until a product is
+   * chosen. Wraps his computeProductScope(), which his inline handlers
+   * look up on window at call time. */
+  function wireScopeState() {
+    var compute = window.computeProductScope;
+    if (typeof compute !== "function" || compute.hubWrapped) return;
+    var mark = function () {
+      var box = document.getElementById("productScopeResult");
+      var picked = document.querySelectorAll("#productScopeRow .stage-pill--active").length;
+      if (box) box.classList.toggle("hub-derived--pending", !picked);
+    };
+    window.computeProductScope = function () {
+      var out = compute.apply(this, arguments);
+      mark();
+      return out;
+    };
+    window.computeProductScope.hubWrapped = true;
+    mark();
+  }
+
   function fillProductPills(facets) {
     var row = document.getElementById("productScopeRow");
     if (!row) return;
@@ -1996,6 +2181,10 @@
     // Same call as the card's duration-chip, same reason to skip it for LDK
     // -- see toCardData().
     setText("vpDuration", asset.type === "ldk" ? "" : durationLabel(asset.duration_seconds));
+    // Hidden when empty: its dark background otherwise shows as a small bar
+    // in the corner of every LDK and of any kit without a length (2026-10-01).
+    var durationChip = document.getElementById("vpDuration");
+    if (durationChip) durationChip.style.display = durationChip.textContent ? "" : "none";
 
     /* The meta row: the two things someone decides on before pressing play,
      * what format it is and how far it goes. Everything else is in the
@@ -2007,16 +2196,17 @@
       meta.innerHTML = "";
       var typeLabel = (TYPE_CHIP[asset.type] || [])[1];
       if (typeLabel) meta.appendChild(pill(typeLabel, "customer"));
-      if (asset.content_depth) meta.appendChild(pill(asset.content_depth, "vtype"));
+      if (videoTypeOf(asset)) meta.appendChild(pill(videoTypeOf(asset), "vtype"));
       if (asset.segment) meta.appendChild(pill(asset.segment, "segment"));
     }
 
     /* Facts, and only the ones we hold. An empty stats row beats a row of
      * zeroes implying nobody has watched something we simply never counted. */
+    /* File counts are not here (Liwei, 2026-10-01): the Files tab carries
+     * them ("Files (9)", "6 videos \u00b7 2 documents \u00b7 1 other"), and a second,
+     * differently worded count under the title only repeated it. */
     var facts = [];
     if (asset.external_views) facts.push(asset.external_views + " views");
-    if (asset.resource_count) facts.push(asset.resource_count + " files");
-    if (asset.video_count) facts.push(asset.video_count + " videos");
     setText("vpStats", facts.join(" \u00b7 "));
 
     setText("vpDesc", asset.description || "No description for this one yet.");
@@ -3176,7 +3366,7 @@
     var yesNo = function (v) { return v === true ? "Yes" : v === false ? "No" : null; };
     var rows = [
       ["Asset type", TYPE_LONG[asset.type] || asset.type],
-      ["Video type", asset.content_depth],
+      ["Video type", videoTypeOf(asset)],
       ["Products", families.join(", ")],
       ["Product (detailed)", detailed.join(", ")],
       ["Segment", asset.segment],
@@ -3351,9 +3541,9 @@
     var box = document.createElement("div");
     box.className = "vp-card vp-files";
 
-    var summary = Object.keys(counts).sort().map(function (kind) {
-      return counts[kind] + " " + kind + (counts[kind] === 1 ? "" : "s");
-    }).join(" \u00b7 ");
+    // Same words and order as Advanced Search: videos, documents, others
+    // (Liwei, 2026-10-01) -- not every raw kind ("dataset", "cad") A to Z.
+    var summary = fileTotalsText(counts);
 
     box.innerHTML = '<div class="vp-card__head"><div class="vp-card__head-title">'
       + '<svg class="orion-ico"><use href="#i-file-text"/></svg>Files in this folder'
@@ -3550,6 +3740,9 @@
     "background:#000 center/cover no-repeat;display:block}" +
     ".hub-adv__main{flex:1;min-width:0}" +
     ".hub-adv__head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}" +
+    "#productScopeResult.hub-derived--pending{border-color:var(--orion-border-md);background:var(--orion-surface-2)}" +
+    "#productScopeResult.hub-derived--pending .derived-output__label{color:var(--orion-text-3)}" +
+    "#productScopeResult.hub-derived--pending .derived-output__value{color:var(--orion-text-2);font-weight:500}" +
     ".hub-adv__count{margin-left:auto;font-size:12px;color:var(--orion-text-3);white-space:nowrap;" +
     "font-variant-numeric:tabular-nums}" +
     // The sidebar's logo and name go Home (wireBrandHome).
@@ -3831,7 +4024,7 @@
     // Every tag the demo carries, the ones the query names outlined, so a
     // hit on "details" shows where.
     var tagValues = [];
-    [a.content_depth, a.segment].concat((a.product_families || []).map(familyDisplayName),
+    [videoTypeOf(a), a.segment].concat((a.product_families || []).map(familyDisplayName),
                                         a.tags || [], a.named_customer ? [a.named_customer] : [])
       .forEach(function (t) { if (t && tagValues.indexOf(t) === -1) tagValues.push(t); });
     if (tagValues.length) {
@@ -4416,24 +4609,11 @@
 
   /* ------------------------------------------------- the suggestion strip */
 
-  /* Someone who searches "windchill" wants the 203 Windchill demos, not to
-   * scroll 165 result cards deciding whether they got them. So when a query
-   * names a category, offer the category above the results.
-   *
-   * The offer is deliberately not always "go to a page". Pages exist for
-   * segments only, and routing a product name to a segment page would lose
-   * assets silently: ThingWorx genuinely splits 64 IoT / 44 PLM, and Arbortext
-   * 11 SLM / 4 PLM, so "go to the IoT page" would quietly drop 44 ThingWorx
-   * demos. A family therefore offers a scope -- show all 111 -- which is
-   * complete, and a segment offers its page, which exists.
-   *
-   *   query names a segment  ->  open that segment's page
-   *   query names a family   ->  filter to all of it, no page needed
-   *   query names a type     ->  same
-   *
-   * One mechanism, and it does not force nineteen pages into being just to
-   * satisfy the search box.
-   */
+  /* Below the search box while someone types: one offer, Advanced Search
+   * (which also reads file names). The category offers that used to sit
+   * here ("Show all 274 Windchill demos", "Browse all 285 Windchill") were
+   * removed on 2026-10-01 (Liwei): two more counts beside the result count,
+   * telling people little the filters and Advanced Search do not. */
   var TYPE_LABELS = { video: "Videos", ldk: "LDKs", vdk: "VDKs",
                       vm: "Virtual Machines", cad_model: "CAD Datasets" };
 
@@ -4445,84 +4625,10 @@
                         fr: "French", es: "Spanish", it: "Italian",
                         ja: "Japanese", ko: "Korean" };
 
-  //: Below this a suggestion is noise. "Show all 1 Consensus Introduction
-  //: demos" costs a click to learn nothing; the results already show it.
-  var SUGGEST_MIN = 5;
-
-  /* Whole-word containment, so "creo overview" still offers Creo while "score"
-   * does not offer SCO.
-   *
-   * Plus a prefix rule for the singular/plural case -- "video" must reach
-   * "Videos", "ldk" must reach "LDKs" -- which only runs one way round: a
-   * query word may extend a label, never the reverse. That direction is what
-   * keeps "score" away from SCO, and it lets three characters be enough, which
-   * this vocabulary needs (ldk, vdk, plm, alm are all three).
-   */
-  function namesCategory(query, label) {
-    var words = query.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(" ");
-    var l = label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-    if (l.length < 3) return false;
-    if ((" " + words.join(" ") + " ").indexOf(" " + l + " ") !== -1) return true;
-    return words.some(function (w) {
-      return w.length >= 3 && l.indexOf(w) === 0;
-    });
-  }
-
-  function suggestionsFor(query) {
-    if (!query || query.trim().length < 3 || !baselineFacets) return [];
-    var out = [];
-    var seg = document.getElementById("hubFilterSegment");
-    var fam = document.getElementById("hubFilterProduct");
-    var typ = document.getElementById("hubFilterType");
-
-    (baselineFacets.product_families || []).forEach(function (f) {
-      if (f.count >= SUGGEST_MIN && namesCategory(query, f.value)
-          && (!fam || fam.value !== f.value)) {
-        out.push({ rank: 1, size: f.value.length, label: f.value,
-                   text: "Show all " + f.count + " " + f.value + " demos",
-                   run: function () { if (fam) fam.value = f.value;
-                                      clearSearchOnly(); applyFilters(); } });
-      }
-    });
-    (baselineFacets.umbrella_families || []).forEach(function (f) {
-      if (HIDDEN_UMBRELLAS.indexOf(f.value) !== -1) return;
-      var label = umbrellaDisplayName(f.value);
-      if (f.count >= SUGGEST_MIN && namesCategory(query, label)) {
-        out.push({ rank: 2, size: label.length, label: label,
-                   text: "Browse all " + f.count + " " + label,
-                   page: true, run: function () { openFamily(f.value); } });
-      }
-    });
-    (baselineFacets.types || []).forEach(function (f) {
-      var label = TYPE_LABELS[f.value];
-      if (label && f.count >= SUGGEST_MIN && namesCategory(query, label)
-          && (!typ || typ.value !== f.value)) {
-        out.push({ rank: 3, size: label.length, label: label,
-                   text: "Show all " + f.count + " " + label,
-                   run: function () { if (typ) typ.value = f.value;
-                                      clearSearchOnly(); applyFilters(); } });
-      }
-    });
-
-    // A product name beats a segment name beats a type; the longest match wins
-    // within a kind, so "Consensus Introduction" is not shadowed by a shorter
-    // family that happens to share a word.
-    out.sort(function (a, b) { return a.rank - b.rank || b.size - a.size; });
-    return out.slice(0, 2);
-  }
-
-  /* Applying a category replaces the free-text search rather than adding to
-   * it: "windchill" AND family=Windchill is the same set, and leaving the text
-   * in place makes the filter bar look like it is doing two things. */
-  function clearSearchOnly() {
-    var el = document.getElementById("hubSearchInput");
-    if (el) el.value = "";
-  }
-
   function renderSuggestions(query) {
     var host = document.getElementById("hubSuggest");
     if (!host) return;
-    var items = suggestionsFor(query);
+    var items = [];
     // While someone is searching, offer the search that also reads file
     // names (Liwei, 2026-09-30) -- last, after any category offer.
     var q = (query || "").trim();
@@ -4682,7 +4788,7 @@
     link.textContent = asset.title || asset.id;
     row.appendChild(link);
 
-    var bits = [asset.content_depth, (asset.product_families || []).join(", "),
+    var bits = [videoTypeOf(asset), (asset.product_families || []).join(", "),
                 asset.type === "ldk" ? "" : durationLabel(asset.duration_seconds)];
     var meta = document.createElement("div");
     meta.className = "orion-subtle";
@@ -4995,55 +5101,6 @@
     if (host) { host.style.display = "none"; host.innerHTML = ""; }
   }
 
-  /* --------------------------------------------------- browse-by-product */
-
-  /* The product tiles ship with counts typed in by hand -- "24 videos, 9 kits,
-   * 1 VDE" for Windchill, which really has 203 assets. Same problem as the
-   * sidebar, and the same answer: ask for the counts, or show none.
-   *
-   * The breakdown per family is exactly what a scoped facet call returns, so
-   * one request per tile gives the real split. Four small parallel requests on
-   * a page that already fetched 946 assets is not worth optimising away.
-   */
-  var TILE_FAMILY = { "logo-windchill": "Windchill", "logo-creo": "Creo",
-                      "logo-servicemax": "ServiceMax",
-                      "logo-codebeamer": "Codebeamer",
-                      "logo-seismic": "Seismic" };
-
-  async function fillProductTiles() {
-    var tiles = document.querySelectorAll("#browseByProductSection .product-tile");
-    await Promise.all(Array.prototype.map.call(tiles, async function (tile) {
-      var use = tile.querySelector("use");
-      var href = use ? (use.getAttribute("href") || "").replace("#", "") : "";
-      var family = TILE_FAMILY[href];
-      var out = tile.querySelector(".product-tile__count");
-      if (!out) return;
-      if (!family) { out.textContent = ""; return; }
-
-      try {
-        var facets = await getJSON("/api/taxonomy?family=" + encodeURIComponent(family));
-        var byType = {};
-        (facets.types || []).forEach(function (t) { byType[t.value] = t.count; });
-        var kits = (byType.ldk || 0) + (byType.vdk || 0);
-        var parts = [];
-        if (byType.video) parts.push(byType.video + " videos");
-        if (kits) parts.push(kits + " kits");
-        out.textContent = parts.join(" \u00b7 ") || facets.total + " assets";
-      } catch (err) {
-        out.textContent = "";      // no number beats a wrong one
-      }
-
-      // The tile looks clickable and now behaves that way, matching the nav.
-      tile.style.cursor = "pointer";
-      tile.addEventListener("click", function () {
-        var el = document.getElementById("hubFilterProduct");
-        if (el) el.value = family;
-        applyFilters();
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      });
-    }));
-  }
-
   /* ------------------------------------------------------------------ boot */
 
   /* Fetch and parse, treating a non-2xx as the failure it is. Reading `.items`
@@ -5138,8 +5195,10 @@
     takeOverControls();
     // After takeOverControls, which swaps each control for a fresh clone.
     enhanceSearchableSelect("hubFilterProduct", "Search products…", "No product matches");
+    wireFilterBar();
     wireShareModal();
     wireRequestForm();
+    wireScopeState();
     wireAdvancedSearch();
     wireDetailPage();
     fillProductPills(facets);
@@ -5148,7 +5207,6 @@
     wireHomeRailLinks();
     markUnavailable(facets);
     markNavActive();
-    fillProductTiles();
     buildSidebarFoot();
 
     // Real content is in place: reveal the thread. See the #mainThread rule in

@@ -1968,6 +1968,7 @@
         && page0 && page0.classList.contains("active")) {
       // Already on this demo: just show the file, no reload.
       renderFileList(page0, detailAsset, tabOf(detailAsset, fileItemId));
+      selectSection("files");
       openFileById(detailAsset, fileItemId);
       return;
     }
@@ -2019,10 +2020,12 @@
     setText("vpStats", facts.join(" \u00b7 "));
 
     setText("vpDesc", asset.description || "No description for this one yet.");
+    ensureDetailLayout(page);
     renderFactsTable(page, asset);
 
     renderFileList(page, asset, fileItemId && tabOf(asset, fileItemId));
     renderVmCards(page, asset);
+    settleSectionTabs(asset);
 
     var drivers = document.getElementById("vpValueDrivers");
     if (drivers) {
@@ -2382,6 +2385,19 @@
         '<div class="hub-preview__box">'
       +   '<div class="hub-preview__bar">'
       +     '<span class="hub-preview__title" id="hubFilePreviewTitle"></span>'
+      // Download and Share in the header, left of the close button (Liwei,
+      // 2026-10-01): at the foot of the side panel a long description and
+      // the properties pushed them out of sight. The header is always
+      // visible, whatever the panel holds. Download is a static element with
+      // its href set per file in renderFilePreview(), as before.
+      +     '<div class="hub-file-preview__actions">'
+      +       '<a class="hub-file-preview__download" id="hubFilePreviewDownload"'
+      +         ' target="_blank" rel="noopener">'
+      +         '<svg class="orion-ico--sm orion-ico"><use href="#i-clock"/></svg>Download</a>'
+      +       '<button type="button" class="hub-file-preview__share" id="hubFilePreviewShare"'
+      +         ' title="' + SHARE_TITLE + '">'
+      +         '<svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share</button>'
+      +     '</div>'
       +     '<button class="hub-preview__close" title="Close">&times;</button>'
       +   '</div>'
       +   '<div class="hub-file-preview__main">'
@@ -2396,19 +2412,6 @@
       +     '<div class="hub-file-preview__body">'
       +       '<div class="hub-file-preview__desc" id="hubFilePreviewDesc"></div>'
       +       '<div class="hub-file-preview__table" id="hubFilePreviewInfo"></div>'
-      // Liwei, 2026-09-10: "在这个popup的右边，属性栏的最下面添加Download
-      // button" -- someone watching the preview and deciding it's the file
-      // they want should not have to close the popup to go find a download
-      // control elsewhere. A static element, href updated per file in
-      // renderFilePreview() below, rather than rebuilt alongside the table
-      // -- the table's own innerHTML is fully replaced on every Prev/Next,
-      // and a button living inside it would need rebuilding for no reason.
-      +       '<a class="hub-file-preview__download" id="hubFilePreviewDownload"'
-      +         ' target="_blank" rel="noopener">'
-      +         '<svg class="orion-ico--sm orion-ico"><use href="#i-clock"/></svg>Download</a>'
-      +       '<button type="button" class="hub-file-preview__share" id="hubFilePreviewShare"'
-      +         ' title="' + SHARE_TITLE + '">'
-      +         '<svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share</button>'
       +     '</div>'
       +   '</div>'
       +   '<div class="hub-file-preview__nav">'
@@ -2644,7 +2647,9 @@
     var roadmap = drivers && drivers.closest(".vp-card");
     if (roadmap) roadmap.style.display = asset.type === "vm" ? "none" : "";
 
-    var anchor = asset.type !== "vm" && roadmap ? roadmap : document.getElementById("vpDesc");
+    var anchor = asset.type !== "vm"
+      ? (document.getElementById("vpSections") || roadmap)
+      : document.getElementById("vpDesc");
     if (!anchor) return;
     var cards = [];
     if (asset.type === "vm" && asset.vm) {
@@ -3015,6 +3020,138 @@
       : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   }
 
+  /* ── details page layout (Liwei, 2026-10-01) ─────────────────────────
+   *
+   *   [ preview            | Details ]      Details beside the preview,
+   *   title, actions, description           capped to its height
+   *   [ Files (N) | Value Roadmap ]        one tab bar, Files first
+   *
+   * Built once by moving Elio's own elements -- his .vp-player and his
+   * Value Roadmap card -- into wrappers, so index.html is untouched and the
+   * page is reused for every asset as before. */
+  var DETAIL_CSS =
+    ".hub-vp-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,380px);gap:20px;" +
+    "align-items:start;margin-bottom:22px}" +
+    ".hub-vp-top .vp-player{margin-bottom:0;max-height:none}" +
+    // The side column is exactly as tall as the preview: the card fills it
+    // and scrolls inside rather than stretching the row.
+    ".hub-vp-side{position:relative;align-self:stretch;min-height:240px}" +
+    ".hub-vp-side .hub-facts{position:absolute;inset:0;margin:0;overflow-y:auto;padding:18px 20px}" +
+    ".hub-vp-side .hub-facts__table th{width:118px}" +
+    ".hub-sections{margin-top:6px}" +
+    ".hub-sections__tabs{display:flex;gap:6px;border-bottom:1px solid var(--orion-border);margin-bottom:14px}" +
+    ".hub-sections__tab{display:inline-flex;align-items:center;gap:7px;border:none;background:none;font:inherit;" +
+    "font-size:14px;font-weight:650;color:var(--orion-text-3);padding:10px 14px;margin-bottom:-1px;" +
+    "border-bottom:2px solid transparent;cursor:pointer}" +
+    ".hub-sections__tab svg{width:16px;height:16px}" +
+    ".hub-sections__tab:hover:not(:disabled){color:var(--orion-text)}" +
+    ".hub-sections__tab--active{color:var(--orion-text);border-bottom-color:var(--orion-indigo)}" +
+    ".hub-sections__tab--active svg{color:var(--orion-indigo)}" +
+    ".hub-sections__tab:disabled{opacity:.45;cursor:default}" +
+    // The tab names the section, so the card's own title would repeat it;
+    // what else sits in the head (the file summary, Re-index) stays.
+    ".hub-sections .vp-card__head-title{display:none}" +
+    ".hub-sections .vp-card__head{justify-content:flex-end}" +
+    "@media (max-width:1180px){.hub-vp-top{grid-template-columns:1fr}" +
+    ".hub-vp-side{min-height:0}.hub-vp-side .hub-facts{position:static}}";
+
+  var SECTIONS = [{ key: "files", label: "Files", icon: "i-file-text", pane: "vpPaneFiles" },
+                  { key: "roadmap", label: "Value Roadmap", icon: "i-target", pane: "vpPaneRoadmap" }];
+
+  function ensureDetailLayout(page) {
+    if (document.getElementById("vpSections")) return;
+    if (!document.getElementById("hubDetailCss")) {
+      var style = document.createElement("style");
+      style.id = "hubDetailCss";
+      style.textContent = DETAIL_CSS;
+      (document.head || document.body).appendChild(style);
+    }
+
+    var player = page.querySelector(".vp-player");
+    if (player) {
+      var top = document.createElement("div");
+      top.className = "hub-vp-top";
+      player.parentNode.insertBefore(top, player);
+      top.appendChild(player);
+      var side = document.createElement("div");
+      side.className = "hub-vp-side";
+      side.id = "vpSide";
+      top.appendChild(side);
+      // A Details card from before the layout existed moves across too.
+      var facts = document.getElementById("vpFacts");
+      if (facts) side.appendChild(facts);
+    }
+
+    var sections = document.createElement("div");
+    sections.className = "hub-sections";
+    sections.id = "vpSections";
+    var strip = document.createElement("div");
+    strip.className = "hub-sections__tabs";
+    strip.setAttribute("role", "tablist");
+    sections.appendChild(strip);
+    SECTIONS.forEach(function (sec) {
+      var tab = document.createElement("button");
+      tab.type = "button";
+      tab.className = "hub-sections__tab";
+      tab.setAttribute("role", "tab");
+      tab.dataset.section = sec.key;
+      tab.innerHTML = '<svg class="orion-ico"><use href="#' + sec.icon + '"/></svg>'
+                    + '<span>' + sec.label + '</span>';
+      tab.addEventListener("click", function () { selectSection(sec.key); });
+      strip.appendChild(tab);
+      var pane = document.createElement("div");
+      pane.id = sec.pane;
+      pane.setAttribute("role", "tabpanel");
+      sections.appendChild(pane);
+    });
+
+    var desc = document.getElementById("vpDesc");
+    if (desc) desc.parentNode.insertBefore(sections, desc.nextSibling);
+    else page.appendChild(sections);
+
+    var drivers = document.getElementById("vpValueDrivers");
+    var roadmap = drivers && drivers.closest(".vp-card");
+    if (roadmap) document.getElementById("vpPaneRoadmap").appendChild(roadmap);
+  }
+
+  function selectSection(key) {
+    var sections = document.getElementById("vpSections");
+    if (!sections) return;
+    sections.querySelectorAll(".hub-sections__tab").forEach(function (t) {
+      var on = t.dataset.section === key;
+      t.classList.toggle("hub-sections__tab--active", on);
+      t.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    SECTIONS.forEach(function (sec) {
+      var pane = document.getElementById(sec.pane);
+      if (pane) pane.style.display = sec.key === key ? "" : "none";
+    });
+  }
+
+  /* After a page's content is in: which tabs have something, their labels,
+   * and which one shows. Files first whenever there are files. A tab with
+   * nothing behind it is greyed rather than hidden, so "no files" reads as a
+   * fact; a page with neither (a VM page) drops the bar altogether. */
+  function settleSectionTabs(asset) {
+    var sections = document.getElementById("vpSections");
+    if (!sections) return;
+    var hasFiles = !!document.querySelector("#vpPaneFiles .vp-files");
+    var hasRoadmap = asset.type !== "vm";
+    var counts = asset.resource_counts || {};
+    var fileTotal = Object.keys(counts).reduce(function (n, k) { return n + (counts[k] || 0); }, 0)
+                    || (asset.resources || []).length;
+    sections.querySelectorAll(".hub-sections__tab").forEach(function (t) {
+      if (t.dataset.section === "files") {
+        t.disabled = !hasFiles;
+        t.querySelector("span").textContent = "Files" + (hasFiles ? " (" + fileTotal + ")" : "");
+      } else {
+        t.disabled = !hasRoadmap;
+      }
+    });
+    sections.style.display = hasFiles || hasRoadmap ? "" : "none";
+    selectSection(hasFiles ? "files" : "roadmap");
+  }
+
   function renderFactsTable(page, asset) {
     ensureTagsCss();
     var card = document.getElementById("vpFacts");
@@ -3022,9 +3159,11 @@
       card = document.createElement("div");
       card.id = "vpFacts";
       card.className = "vp-card hub-facts";
+      var side = document.getElementById("vpSide");
       var desc = document.getElementById("vpDesc");
-      if (!desc || !desc.parentNode) return;
-      desc.parentNode.insertBefore(card, desc.nextSibling);
+      if (side) side.appendChild(card);
+      else if (desc && desc.parentNode) desc.parentNode.insertBefore(card, desc.nextSibling);
+      else return;
     }
     card.innerHTML = "";
 
@@ -3164,8 +3303,12 @@
    * Advanced Search open files differently), facts, then Download and Share
    * at the far right. `.vp-file__facts` has margin-left:auto, which pushes
    * everything after it right. Both buttons need the file's item_id: it is
-   * what a download resolves and what a shared link names. */
-  function buildFileRow(asset, f, nameEl) {
+   * what a download resolves and what a shared link names.
+   *
+   * `noActions`: Advanced Search lists files under a demo, and a Download or
+   * Share there read as acting on the whole demo (Liwei, 2026-10-01). The
+   * file name still opens its preview, where both buttons are. */
+  function buildFileRow(asset, f, nameEl, noActions) {
     var row = document.createElement("div");
     row.className = "vp-file";
     row.innerHTML =
@@ -3174,7 +3317,7 @@
       + '<span class="vp-file__facts">' + escapeHtml(fileFacts(f)) + '</span>';
     row.insertBefore(nameEl, row.lastChild);
 
-    if (f.item_id) {
+    if (f.item_id && !noActions) {
       var download = document.createElement("a");
       download.className = "vp-file__download";
       download.href = fileDownloadUrl(asset.id, f.item_id);
@@ -3282,7 +3425,7 @@
       box.appendChild(note);
     }
 
-    page.appendChild(box);
+    (document.getElementById("vpPaneFiles") || page).appendChild(box);
   }
 
   function linkButton(className, label, href, icon, title) {
@@ -3407,6 +3550,11 @@
     "background:#000 center/cover no-repeat;display:block}" +
     ".hub-adv__main{flex:1;min-width:0}" +
     ".hub-adv__head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}" +
+    ".hub-adv__count{margin-left:auto;font-size:12px;color:var(--orion-text-3);white-space:nowrap;" +
+    "font-variant-numeric:tabular-nums}" +
+    // The sidebar's logo and name go Home (wireBrandHome).
+    ".orion-side__brand .lockup.hub-brand-home{cursor:pointer}" +
+    ".orion-side__brand .lockup.hub-brand-home:hover{color:var(--orion-indigo)}" +
     ".hub-adv__title{font-size:15px;font-weight:650;color:var(--orion-text);text-decoration:none}" +
     ".hub-adv__title:hover{color:var(--orion-link);text-decoration:underline}" +
     ".hub-adv__desc{margin:6px 0 8px;font-size:12.5px;line-height:1.6;color:var(--orion-text-2);" +
@@ -3431,6 +3579,11 @@
     "border:1px solid var(--orion-border-md);border-radius:var(--orion-radius-pill);cursor:pointer;white-space:nowrap}" +
     ".vp-file__share:hover{color:var(--orion-text);border-color:var(--orion-text-3)}" +
     ".vp-file__share svg{width:12px;height:12px}" +
+    ".hub-file-preview__actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex:none}" +
+    ".hub-file-preview__actions + .hub-preview__close{margin-left:4px}" +
+    ".hub-preview__bar .hub-preview__title{min-width:0}" +
+    ".hub-preview__bar .hub-file-preview__download{margin:0;width:auto;padding:5px 12px;font-size:12px}" +
+    ".hub-preview__bar .hub-file-preview__share{margin:0;width:auto;padding:5px 12px;font-size:12px}" +
     ".hub-file-preview__share{margin-top:8px;width:100%;display:flex;align-items:center;justify-content:center;" +
     "gap:6px;padding:8px 12px;font:inherit;font-size:12.5px;font-weight:700;color:var(--orion-text-2);" +
     "background:var(--orion-surface);border:1px solid var(--orion-border-md);border-radius:var(--orion-radius-sm);cursor:pointer}" +
@@ -3616,6 +3769,26 @@
     moreBtn.style.display = advState.items.length < page.total ? "" : "none";
   }
 
+  /* "2 videos · 2 documents · 3 others" -- everything in the demo's folder,
+   * from the complete per-kind counts (resource_counts), so CAD parts that
+   * are counted but never listed are in "others" too. A kind with none is
+   * left out; a demo with no folder (Consensus) gets no line at all rather
+   * than "0 videos", which would claim we looked. */
+  function fileTotalsText(counts) {
+    counts = counts || {};
+    var videos = 0, documents = 0, others = 0;
+    Object.keys(counts).forEach(function (kind) {
+      var n = counts[kind] || 0;
+      if (kind === "video") videos += n;
+      else if (kind === "document") documents += n;
+      else others += n;
+    });
+    return [[videos, "video"], [documents, "document"], [others, "other"]]
+      .filter(function (p) { return p[0] > 0; })
+      .map(function (p) { return p[0] + " " + p[1] + (p[0] === 1 ? "" : "s"); })
+      .join(" · ");
+  }
+
   function renderAdvancedHit(hit, q) {
     var a = hit.asset;
     var href = "#/asset/" + encodeURIComponent(a.id);
@@ -3641,6 +3814,13 @@
     var typeLabel = (TYPE_CHIP[a.type] || [])[1];
     if (typeLabel) head.appendChild(pill(typeLabel, "customer"));
     if (a.language) head.appendChild(pill(LANGUAGE_LABEL[a.language] || a.language.toUpperCase(), "lang"));
+    var totals = fileTotalsText(a.resource_counts);
+    if (totals) {
+      var count = document.createElement("span");
+      count.className = "hub-adv__count";
+      count.textContent = totals;
+      head.appendChild(count);
+    }
     main.appendChild(head);
 
     var desc = document.createElement("div");
@@ -3684,7 +3864,7 @@
         }
         name.className = "vp-file__name";
         name.innerHTML = highlightHtml(f.name, q);
-        list.appendChild(buildFileRow(a, f, name));
+        list.appendChild(buildFileRow(a, f, name, true));
       });
       box.appendChild(list);
       main.appendChild(box);
@@ -3692,8 +3872,32 @@
     return row;
   }
 
+  /* The logo and "Technical Marketing Hub" in the sidebar go Home from
+   * anywhere -- a details page, Advanced Search, the request form, a
+   * filtered grid (Liwei, 2026-10-01). It presses the Home nav item rather
+   * than repeating it, so the two can never disagree about what Home is. */
+  function wireBrandHome() {
+    var lockup = document.querySelector(".orion-side__brand .lockup");
+    if (!lockup || lockup.classList.contains("hub-brand-home")) return;
+    lockup.classList.add("hub-brand-home");
+    lockup.setAttribute("role", "link");
+    lockup.setAttribute("tabindex", "0");
+    lockup.title = "Home";
+    var goHome = function () {
+      var home = document.getElementById("navHome");
+      if (home) home.click();
+      var thread = document.getElementById("mainThread");
+      if (thread) thread.scrollTop = 0;
+    };
+    lockup.addEventListener("click", goHome);
+    lockup.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goHome(); }
+    });
+  }
+
   function wireAdvancedSearch() {
     ensureAdvCss();
+    wireBrandHome();
     // Entry 1: beside the main search box.
     var field = document.querySelector("#mainTopbar .hero-search__field");
     if (field && !document.getElementById("hubAdvOpen")) {

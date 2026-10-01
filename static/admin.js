@@ -1203,6 +1203,135 @@
     });
   }
 
+  /* ── Content dashboard (HLR-F1) ─────────────────────────────────────
+   *
+   * Serge's ask: what the Hub holds by type, product, segment, stage,
+   * customer, industry and age, every chart drilling into the matching
+   * demos. One ranked bar list per dimension -- a single series, so one
+   * hue, with the count written on each row so it reads as a table too.
+   * "Not set" is drawn in grey, last: it is the catalogue's own gap. */
+  var DIM_SHOWN = 8;
+  var contentLoaded = false;
+
+  function loadContent() {
+    return fetch("/api/admin/content")
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(renderContent)
+      .catch(function (err) {
+        $("contentCharts").textContent = "The dashboard could not be loaded: " + err.message;
+      });
+  }
+
+  function renderContent(d) {
+    contentLoaded = true;
+    $("contentAsOf").textContent = d.total.toLocaleString() + " demos · counted "
+      + new Date(d.as_of + "T00:00:00").toLocaleDateString();
+    var totals = $("contentTotals");
+    totals.innerHTML = "";
+    var byType = d.dimensions.find(function (x) { return x.key === "type"; });
+    (byType ? byType.buckets : []).forEach(function (b) {
+      tile(totals, b.count, b.label);
+    });
+    var host = $("contentCharts");
+    host.innerHTML = "";
+    d.dimensions.forEach(function (dim) {
+      if (dim.key === "type") return;          // the tiles above carry it
+      host.appendChild(dimCard(dim));
+    });
+  }
+
+  function dimCard(dim) {
+    var c = card(dim.title);
+    c.querySelector(".card-head").appendChild(el("span", "faint num", dim.of.toLocaleString()));
+    var max = dim.buckets.reduce(function (m, b) { return Math.max(m, b.count); }, 0) || 1;
+    var list = el("div");
+    var rows = dim.buckets.map(function (b) {
+      var unset = b.value === "Not set";
+      var r = el("button", "dim-row" + (unset ? " dim-row--unset" : ""));
+      r.type = "button";
+      var pct = dim.of ? Math.round(b.count / dim.of * 100) : 0;
+      r.title = b.label + ": " + b.count.toLocaleString() + " (" + pct + "% of "
+        + dim.of.toLocaleString() + ") — click to list them";
+      r.appendChild(el("span", "dim-row__label", b.label));
+      var bar = el("span", "dim-row__bar");
+      var fill = el("span");
+      fill.style.width = Math.max(1, Math.round(b.count / max * 100)) + "%";
+      bar.appendChild(fill);
+      r.appendChild(bar);
+      r.appendChild(el("span", "dim-row__n", b.count.toLocaleString()));
+      r.addEventListener("click", function () { openContentSheet(dim, b); });
+      list.appendChild(r);
+      return r;
+    });
+    c.appendChild(list);
+    // Long tails (customers) show the top rows; "Not set" stays visible.
+    var hidden = rows.filter(function (r, i) {
+      return i >= DIM_SHOWN && !r.classList.contains("dim-row--unset");
+    });
+    if (hidden.length) {
+      hidden.forEach(function (r) { r.hidden = true; });
+      var more = el("button", "dim-more", "Show " + hidden.length + " more");
+      more.type = "button";
+      more.addEventListener("click", function () {
+        hidden.forEach(function (r) { r.hidden = false; });
+        more.remove();
+      });
+      c.appendChild(more);
+    }
+    if (dim.note) c.appendChild(el("p", "dim-note", dim.note));
+    return c;
+  }
+
+  function openContentSheet(dim, b) {
+    var body = openSheet(dim.title + ": " + b.label, b.count.toLocaleString() + " demos, newest first");
+    body.textContent = "Loading…";
+    fetch("/api/admin/content/assets?dim=" + encodeURIComponent(dim.key)
+          + "&value=" + encodeURIComponent(b.value))
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (items) {
+        body.innerHTML = "";
+        var t = el("table");
+        var head = t.createTHead().insertRow();
+        ["Demo", "Type", "Date"].forEach(function (h) { head.appendChild(el("th", null, h)); });
+        var tb = t.createTBody();
+        items.forEach(function (a) {
+          var tr = tb.insertRow();
+          var link = el("a", null, a.title);
+          link.href = "/#/asset/" + encodeURIComponent(a.id);
+          link.target = "_blank";
+          link.rel = "noopener";
+          tr.insertCell().appendChild(link);
+          tr.insertCell().textContent = TYPE_WORD[a.type] || a.type;
+          var when = tr.insertCell();
+          when.className = "num faint";
+          when.textContent = a.uploaded_at || "—";
+        });
+        body.appendChild(t);
+      })
+      .catch(function (err) { body.textContent = "Could not load: " + err.message; });
+  }
+
+  /* Overview | Content dashboard. The tab is in the address (#content), so
+   * a refresh or a shared link opens the same one. */
+  function showTab(name) {
+    var content = name === "content";
+    $("tabOverview").hidden = content;
+    $("tabContent").hidden = !content;
+    document.querySelectorAll("#adminTabs .tab").forEach(function (t) {
+      var on = t.dataset.tab === (content ? "content" : "overview");
+      t.classList.toggle("tab--on", on);
+      t.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    if (content && !contentLoaded) loadContent();
+  }
+
+  document.querySelectorAll("#adminTabs .tab").forEach(function (t) {
+    t.addEventListener("click", function () {
+      history.replaceState(null, "", t.dataset.tab === "content" ? "#content" : "#");
+      showTab(t.dataset.tab);
+    });
+  });
+
   function load() {
     return fetch("/api/admin/overview", { headers: { "Accept": "application/json" } })
       .then(function (r) {
@@ -1216,6 +1345,8 @@
         renderIntegrations(d.integrations);
         renderAutoSync(d.auto_sync);
         loadPromoted();
+        contentLoaded = false;
+        showTab(location.hash === "#content" ? "content" : "overview");
         renderCoverage(d.catalogue);
         renderQueues(d);
         renderRanges();

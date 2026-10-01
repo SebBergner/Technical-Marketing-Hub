@@ -272,6 +272,23 @@ def set_auto_sync(body: AutoSyncIn, actor: str = Depends(admin_or_curator)):
     return _auto_sync_view()
 
 
+@router.get("/content", dependencies=[Depends(require_admin)])
+def content_summary(repo: AssetRepository = Depends(get_repo)):
+    """The content dashboard (HLR-F1), counted over what the Hub lists."""
+    from backend.services import content_dashboard
+    return content_dashboard.summary(repo)
+
+
+@router.get("/content/assets", dependencies=[Depends(require_admin)])
+def content_assets(dim: str, value: str, repo: AssetRepository = Depends(get_repo)):
+    """The assets behind one bar of the content dashboard."""
+    from backend.services import content_dashboard
+    try:
+        return content_dashboard.assets_in(repo, dim, value)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no dimension {dim!r}")
+
+
 #: Home shows every promoted asset; past a dozen it stops being a shortlist.
 MAX_PROMOTED = 12
 

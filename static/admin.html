@@ -126,6 +126,28 @@
   .btn-primary{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}
   .btn-primary:hover:not(:disabled){filter:brightness(1.07);background:var(--green)}
 
+  /* tabs ------------------------------------------------------------------ */
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:-4px 0 24px}
+  .tab{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;
+    padding:8px 14px;margin-bottom:-1px;font-weight:600;color:var(--muted)}
+  .tab:hover:not(:disabled){background:none;color:var(--ink)}
+  .tab--on{color:var(--ink);border-bottom-color:var(--green)}
+
+  /* content dashboard ----------------------------------------------------- */
+  .dim-row{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) 52px;gap:10px;
+    align-items:center;width:100%;padding:5px 6px;margin:0 -6px;border:none;border-radius:6px;
+    background:none;text-align:left;font:inherit;font-size:13.5px;color:var(--ink);cursor:pointer}
+  .dim-row:hover:not(:disabled){background:var(--surface-2)}
+  .dim-row:focus-visible{outline:2px solid var(--green);outline-offset:1px}
+  .dim-row__label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dim-row__bar{height:10px;border-radius:0 4px 4px 0;background:var(--surface-2);overflow:hidden}
+  .dim-row__bar>span{display:block;height:100%;border-radius:0 4px 4px 0;background:var(--green)}
+  .dim-row--unset .dim-row__label{color:var(--faint);font-style:italic}
+  .dim-row--unset .dim-row__bar>span{background:var(--faint)}
+  .dim-row__n{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+  .dim-note{font-size:12.5px;color:var(--faint);margin:8px 0 0}
+  .dim-more{margin-top:6px;padding:4px 10px;font-size:12.5px}
+
   /* promoted on Home ----------------------------------------------------- */
   .promo-row{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;
     padding:8px 0;border-top:1px solid var(--border)}
@@ -260,6 +282,13 @@
     </div>
   </header>
 
+  <nav class="tabs" id="adminTabs" role="tablist">
+    <button type="button" class="tab tab--on" role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button type="button" class="tab" role="tab" data-tab="content" aria-selected="false">Content dashboard</button>
+  </nav>
+
+  <div id="tabOverview" role="tabpanel">
+
   <section>
     <div class="section-head"><h2>Connected systems</h2></div>
     <div class="grid grid--2" id="integrations"></div>
@@ -313,6 +342,22 @@
     <div class="card" id="coverage"></div>
   </section>
 
+  </div>
+
+  <!-- HLR-F1: what the Hub holds, at a glance; every bar drills in. -->
+  <div id="tabContent" role="tabpanel" hidden>
+    <section>
+      <div class="section-head">
+        <h2>Content dashboard</h2>
+        <span class="faint" id="contentAsOf"></span>
+      </div>
+      <p class="muted" style="margin:-6px 0 14px">Everything the Hub lists, counted by dimension.
+        Click a bar to see the demos behind it. "Not set" is part of the picture: it is
+        what the catalogue does not yet say.</p>
+      <div class="tiles" id="contentTotals"></div>
+      <div class="grid grid--2" id="contentCharts" style="margin-top:12px"></div>
+    </section>
+  </div>
 </div>
 
 <!-- ── drill-down: one demo, or one source ──────────────────────────── -->

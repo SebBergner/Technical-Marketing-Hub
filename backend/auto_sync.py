@@ -1,6 +1,11 @@
 """The daily sync, switched on and off from the Admin page (Liwei, 2026-09-28).
 
-What it does: once a day, at an hour chosen on the Admin page, run the same
+Twice a day since 2026-09-30 (Seb: one run early morning, one late at night).
+Both hours are chosen on the Admin page, and one switch turns both on or off
+(Liwei). A setting saved before then held a single `hour_utc`; it is read as
+that hour plus the one twelve hours later.
+
+What it does: at each hour chosen on the Admin page, run the same
 two syncs the Admin buttons run -- SharePoint (with the VM pages) and then
 Consensus -- and record how it went. The buttons and the schedule call the
 same functions (`run_sync` in routers/graph.py and routers/consensus.py), so
@@ -50,6 +55,10 @@ LOCK_FILE = "auto_sync.lock"
 #: 06:00 UTC: 02:00 in New York, 14:00 in Shanghai -- the quiet end of the day
 #: for most of the team, and after overnight edits in SharePoint.
 DEFAULT_HOUR_UTC = 6
+#: The two daily runs. The second default is twelve hours on: 14:00 in New
+#: York, 02:00 in Shanghai.
+RUNS_PER_DAY = 2
+DEFAULT_HOURS_UTC = (DEFAULT_HOUR_UTC, (DEFAULT_HOUR_UTC + 12) % 24)
 TICK_SECONDS = 600
 FIRST_TICK_SECONDS = 60
 STALE_LOCK_SECONDS = 3 * 3600
@@ -79,7 +88,22 @@ def load_state(data_dir: str | None = None) -> dict:
         state = {}
     state.setdefault("enabled", False)
     state.setdefault("hour_utc", DEFAULT_HOUR_UTC)
+    if not state.get("hours_utc"):
+        # Saved before there were two runs: keep its hour, add the one twelve
+        # hours later.
+        first = int(state["hour_utc"]) % 24
+        state["hours_utc"] = [first, (first + 12) % 24]
+    state["hours_utc"] = _hours(state["hours_utc"])
     return state
+
+
+def _hours(hours) -> list[int]:
+    """Exactly RUNS_PER_DAY hours, each 0-23, in the order given."""
+    hours = [int(h) % 24 for h in ([hours] if isinstance(hours, int) else list(hours))]
+    defaults = list(DEFAULT_HOURS_UTC)
+    while len(hours) < RUNS_PER_DAY:
+        hours.append(defaults[len(hours)])
+    return hours[:RUNS_PER_DAY]
 
 
 def save_state(state: dict, data_dir: str | None = None) -> None:
@@ -89,33 +113,45 @@ def save_state(state: dict, data_dir: str | None = None) -> None:
     _atomic_write(path, state)
 
 
-def configure(enabled: bool, hour_utc: int, actor: str,
+def configure(enabled: bool, hours_utc, actor: str,
               data_dir: str | None = None, now: datetime | None = None) -> dict:
+    """`hours_utc`: the two run hours (an int alone sets the first, as before)."""
     now = now or _now()
     state = load_state(data_dir)
     if enabled and not state.get("enabled"):
         # The schedule starts counting from here -- see the module docstring.
         state["enabled_at"] = now.isoformat(timespec="seconds")
-    state.update(enabled=bool(enabled), hour_utc=int(hour_utc) % 24,
+    if isinstance(hours_utc, int):
+        hours_utc = [hours_utc] + state["hours_utc"][1:]
+    hours = _hours(hours_utc)
+    state.update(enabled=bool(enabled), hours_utc=hours,
+                 # Kept for anything that still reads one hour.
+                 hour_utc=hours[0],
                  changed_by=actor, changed_at=now.isoformat(timespec="seconds"))
     save_state(state, data_dir)
-    log.info("auto sync %s at %02d:00 UTC by %s",
-             "enabled" if enabled else "disabled", state["hour_utc"], actor)
+    log.info("auto sync %s at %s UTC by %s", "enabled" if enabled else "disabled",
+             " and ".join(f"{h:02d}:00" for h in hours), actor)
     return state
 
 
 def last_slot(hour_utc: int, now: datetime) -> datetime:
-    """The most recent moment the schedule said "sync now"."""
+    """The most recent moment one daily hour said "sync now"."""
     slot = now.replace(hour=hour_utc, minute=0, second=0, microsecond=0)
     return slot if slot <= now else slot - timedelta(days=1)
+
+
+def _latest_slot(state: dict, now: datetime) -> datetime:
+    """The most recent moment any of the daily hours said "sync now"."""
+    return max(last_slot(h, now) for h in state["hours_utc"])
 
 
 def next_slot(state: dict, now: datetime | None = None) -> datetime | None:
     if not state.get("enabled"):
         return None
     now = now or _now()
-    return last_slot(state["hour_utc"], now) + timedelta(days=1) \
-        if not is_due(state, now) else now
+    if is_due(state, now):
+        return now
+    return min(last_slot(h, now) + timedelta(days=1) for h in state["hours_utc"])
 
 
 def is_due(state: dict, now: datetime | None = None) -> bool:
@@ -128,7 +164,7 @@ def is_due(state: dict, now: datetime | None = None) -> bool:
     if not state.get("enabled"):
         return False
     now = now or _now()
-    slot = last_slot(state["hour_utc"], now)
+    slot = _latest_slot(state, now)
     covered = [t for t in (_parse((state.get("last_run") or {}).get("started_at")),
                            _parse(state.get("enabled_at"))) if t]
     return not covered or slot > max(covered)

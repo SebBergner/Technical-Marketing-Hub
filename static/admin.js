@@ -151,8 +151,17 @@
     var c1 = card("SharePoint");
     row(c1, "Credentials", sp.configured ? "configured" : "missing",
         sp.configured ? "pill--ok" : "pill--bad");
-    row(c1, "Library", sp.library || "—");
-    row(c1, "Assets", sp.assets);
+    /* One row per library the sync indexes, each with its own count
+     * (Liwei, 2026-09-30): the card used to name the Demo Catalog alone. */
+    var libs = sp.libraries || [{ name: sp.library, assets: sp.assets }];
+    libs.forEach(function (lib) {
+      var bad = lib.ok === false;
+      row(c1, lib.name || "—",
+          (lib.assets == null ? "—" : lib.assets.toLocaleString() + " assets")
+            + (bad ? " · last sync failed" : ""),
+          bad ? "pill--bad" : null);
+      if (bad && lib.error) row(c1, lib.name + " error", lib.error);
+    });
     var f1 = freshness(sp.days_since_success);
     row(c1, "Last successful sync", f1[0], f1[1]);
     if (sp.last_attempt_ok === false) {
@@ -251,7 +260,7 @@
   function renderAutoSync(a) {
     var host = $("integrations");
     if (!a || !host) return;
-    var c = card("Daily automatic sync");
+    var c = card("Automatic sync, twice a day");
     c.classList.add("card--wide");
     var head = c.querySelector(".card-head");
 
@@ -259,26 +268,39 @@
     var box = el("input");
     box.type = "checkbox";
     box.checked = !!a.enabled;
-    box.setAttribute("aria-label", "Daily automatic sync");
+    box.setAttribute("aria-label", "Automatic sync, twice a day");
     toggle.appendChild(box);
     toggle.appendChild(el("span", "switch__track"));
     toggle.appendChild(el("span", "switch__label", a.enabled ? "On" : "Off"));
     head.appendChild(toggle);
 
-    var hour = el("select");
-    for (var h = 0; h < 24; h++) {
-      var o = el("option", null, two(h) + ":00 UTC  (" + localHour(h) + " your time)");
-      o.value = String(h);
-      if (h === a.hour_utc) o.selected = true;
-      hour.appendChild(o);
+    /* Two runs a day, both hours chosen here, one switch for both (Seb /
+     * Liwei, 2026-09-30). */
+    var hoursNow = a.hours_utc || [a.hour_utc];
+    var pickers = hoursNow.map(function (selected, i) {
+      var sel = el("select");
+      sel.setAttribute("aria-label", (i === 0 ? "First" : "Second") + " daily run");
+      for (var h = 0; h < 24; h++) {
+        var o = el("option", null, two(h) + ":00 UTC  (" + localHour(h) + " your time)");
+        o.value = String(h);
+        if (h === selected) o.selected = true;
+        sel.appendChild(o);
+      }
+      return sel;
+    });
+
+    function setDisabled(v) {
+      box.disabled = v;
+      pickers.forEach(function (p) { p.disabled = v; });
     }
 
     function save() {
-      box.disabled = hour.disabled = true;
+      setDisabled(true);
       fetch("/api/admin/auto-sync", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: box.checked, hour_utc: +hour.value })
+        body: JSON.stringify({ enabled: box.checked,
+                               hours_utc: pickers.map(function (p) { return +p.value; }) })
       })
         .then(function (r) {
           return r.json().catch(function () { return {}; }).then(function (body) {
@@ -288,17 +310,19 @@
         })
         .then(function () { load(); })
         .catch(function (err) {
-          box.disabled = hour.disabled = false;
+          setDisabled(false);
           box.checked = !!a.enabled;
           window.alert("Could not change the schedule:\n\n" + err.message);
         });
     }
     box.addEventListener("change", save);
-    hour.addEventListener("change", save);
+    pickers.forEach(function (p) { p.addEventListener("change", save); });
 
-    var t = row(c, "Runs daily at", "");
-    t.querySelector("dd").textContent = "";
-    t.querySelector("dd").appendChild(hour);
+    pickers.forEach(function (p, i) {
+      var t = row(c, i === 0 ? "First run daily at" : "Second run daily at", "");
+      t.querySelector("dd").textContent = "";
+      t.querySelector("dd").appendChild(p);
+    });
 
     row(c, "Next run", a.enabled ? when(a.next_run_at) : "off",
         a.enabled ? null : "pill--off");
@@ -329,10 +353,11 @@
 
     var note = el("p", "muted");
     note.style.cssText = "font-size:12px;margin:10px 0 0;line-height:1.5";
-    note.textContent = "Runs the two syncs below — SharePoint (with the VM pages), then "
-      + "Consensus — on this environment only; staging and production each have "
-      + "their own switch. Turning it on does not sync now: the first run is the "
-      + "next time the hour comes round. If App Service has put the site to sleep "
+    note.textContent = "Twice a day, at the two hours above, runs the syncs below — "
+      + "SharePoint (the Demo Catalog, Demo Video and the VM pages), then Consensus — "
+      + "on this environment only; staging and production each have their own "
+      + "switch, and it turns both runs on or off. Turning it on does not sync now: "
+      + "the first run is the next time one of the hours comes round. If App Service has put the site to sleep "
       + "at that hour (\"Always On\" off), the run happens on the next visit instead.";
     c.appendChild(note);
 

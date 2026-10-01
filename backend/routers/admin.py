@@ -97,6 +97,38 @@ def _iso_age_days(stamp: str | None) -> float | None:
     return round((datetime.now(timezone.utc) - when).total_seconds() / 86400, 1)
 
 
+def _sharepoint_libraries(repo: AssetRepository) -> list[dict]:
+    """Everything one SharePoint sync indexes, one row each.
+
+    The card showed the Demo Catalog alone: one library name, one count.
+    The same sync has also read the VM pages (2026-09-23) and the "Demo
+    Video" library (2026-09-30), each with a mirror of its own, so each gets
+    its own row and count (Liwei, 2026-09-30). A further source is one more
+    entry here. `ok` is that source's part of the last attempt (the Demo
+    Catalog's own outcome is the card's "Last attempt").
+    """
+    from backend.integrations.graph.video_sync import SOURCE_SYSTEM as VIDEO
+    from backend.integrations.graph.vm_pages import SOURCE_SYSTEM as VM_PAGES
+    last = (repo.sync_state("sharepoint") if hasattr(repo, "sync_state") else {}) or {}
+    result = last.get("last_result") or {}
+    count = getattr(repo, "count_source_rows", None)
+    rows = [
+        {"name": settings.graph_list_name, "source": "sharepoint", "summary_key": None},
+        {"name": settings.graph_video_library, "source": VIDEO, "summary_key": "demo_video"},
+        {"name": "Virtual Machines pages", "source": VM_PAGES, "summary_key": "vm_pages"},
+    ]
+    out = []
+    for r in rows:
+        if not r["name"]:
+            continue                      # switched off (e.g. GRAPH_VIDEO_LIBRARY blank)
+        part = result.get(r["summary_key"]) if r["summary_key"] else None
+        out.append({"name": r["name"], "source": r["source"],
+                    "assets": count(r["source"]) if count else None,
+                    "ok": part.get("ok") if isinstance(part, dict) else None,
+                    "error": part.get("error") if isinstance(part, dict) else None})
+    return out
+
+
 def _source_state(repo: AssetRepository, source: str) -> dict:
     state = repo.sync_state(source) if hasattr(repo, "sync_state") else {}
     return {
@@ -156,6 +188,7 @@ def overview(repo: AssetRepository = Depends(get_repo)):
                 "site_url": settings.graph_site_url,
                 "library": settings.graph_list_name,
                 **_source_state(repo, "sharepoint"),
+                "libraries": _sharepoint_libraries(repo),
             },
             "consensus": {
                 "v1_configured": settings.consensus_configured,
@@ -199,7 +232,11 @@ def overview(repo: AssetRepository = Depends(get_repo)):
 # ───────────────────────────────────────────────────────── the daily sync
 class AutoSyncIn(BaseModel):
     enabled: bool
-    hour_utc: int = Field(default=auto_sync.DEFAULT_HOUR_UTC, ge=0, le=23)
+    #: The two daily run hours (UTC), one switch for both (Liwei, 2026-09-30).
+    hours_utc: list[int] | None = Field(default=None, min_length=1,
+                                        max_length=auto_sync.RUNS_PER_DAY)
+    #: The single hour an older page sends; sets the first run only.
+    hour_utc: int | None = Field(default=None, ge=0, le=23)
 
 
 def _auto_sync_view() -> dict:
@@ -207,7 +244,8 @@ def _auto_sync_view() -> dict:
     upcoming = auto_sync.next_slot(state)
     return {
         "enabled": state["enabled"],
-        "hour_utc": state["hour_utc"],
+        "hours_utc": state["hours_utc"],
+        "hour_utc": state["hours_utc"][0],
         "changed_by": state.get("changed_by"),
         "changed_at": state.get("changed_at"),
         "next_run_at": upcoming.isoformat(timespec="seconds") if upcoming else None,
@@ -226,7 +264,11 @@ def set_auto_sync(body: AutoSyncIn, actor: str = Depends(admin_or_curator)):
     The same key as the sync buttons (admin_or_curator): the schedule does
     nothing a button press could not, it only presses it daily.
     """
-    auto_sync.configure(body.enabled, body.hour_utc, actor)
+    if body.hours_utc is not None and any(not 0 <= h <= 23 for h in body.hours_utc):
+        raise HTTPException(status_code=422, detail="each hour must be 0-23")
+    hours = body.hours_utc if body.hours_utc is not None else (
+        body.hour_utc if body.hour_utc is not None else auto_sync.load_state()["hours_utc"])
+    auto_sync.configure(body.enabled, hours, actor)
     return _auto_sync_view()
 
 

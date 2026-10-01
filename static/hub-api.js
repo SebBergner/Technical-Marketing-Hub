@@ -57,18 +57,17 @@
   var PAGE_SIZE = 200;
   var MAX_PAGES = 20;           // 4,000 assets; the catalogue is ~950
   var FUNNEL_UNKNOWN = "";
-  var RAIL_SIZE = 6;
 
   /* Sections the landing page shows that we have no honest data for. Editor's
    * Picks needs curation nobody has done; Continue needs per-user history we
    * do not collect. Leaving them filled with sample cards would put invented
    * content beside real content with nothing to tell them apart, which is
    * worse than a shorter page. Set to [] to show them again. */
+  //: Elio's landing sections, all replaced by the Home built in buildHome()
+  //: (Liwei, 2026-10-01). Hidden by class, not removed: index.html is his.
   var HIDE_UNTIL_REAL = ["editorsPicksSection", "continueSection",
-                         // Liwei, 2026-10-01: four product tiles beside a
-                         // seven-product sidebar only confused; gone until
-                         // the Home redesign.
-                         "browseByProductSection"];
+                         "browseByProductSection", "latestUploadsSection",
+                         "mostViewedSection"];
 
   /* ---------------------------------------------------------------- mapping */
 
@@ -843,45 +842,237 @@
     label();
   }
 
-  /* -------------------------------------------------------------- the rails */
+  /* ── Home (Liwei, 2026-10-01: option A of the Home discussion) ────────
+   *
+   * Search is the main job, so the page under the search bar only does what
+   * the sidebar and the filters cannot:
+   *
+   *   What's in the Hub      the catalogue by type, each a way in
+   *   Featured               chosen on the Admin page (Seb's "promote"),
+   *                          in that order; absent when nothing is promoted
+   *   Start from a product   the same products as the sidebar, with what
+   *                          each holds
+   *   Recently published     every type (Liwei, 2026-10-01). A video's
+   *                          date is when it was published; a SharePoint
+   *                          kit's is its folder's last edit (381 kits read
+   *                          2024-05 from one bulk edit, measured
+   *                          2026-10-01), so a kit's row says "updated"
+   *                          rather than passing an edit off as new.
+   *
+   * Built here, replacing Elio's rails; shown only while nothing is
+   * searched or filtered (LANDING). */
+  var HOME_RECENT = 6;
+  var HOME_TYPE_ORDER = ["video", "ldk", "vdk", "cad_model", "vm"];
+  var HOME_TYPE_WORD = { video: ["video", "videos"], ldk: ["LDK", "LDKs"],
+                         vdk: ["VDK", "VDKs"], cad_model: ["CAD dataset", "CAD datasets"],
+                         vm: ["virtual machine", "virtual machines"] };
 
-  /* Replace the cards inside one curated row, leaving its heading alone. */
-  function fillRail(sectionId, assets) {
-    var row = document.querySelector("#" + sectionId + " .asset-row");
-    if (!row) return 0;
-    row.innerHTML = "";
-    assets.forEach(function (a) { row.appendChild(buildCard(a)); });
-    return assets.length;
+  var HOME_CSS =
+    "#hubHome .section{margin-bottom:28px}" +
+    ".hub-home-types{display:flex;flex-wrap:wrap;gap:8px}" +
+    ".hub-home-type{display:inline-flex;align-items:baseline;gap:6px;padding:8px 14px;font:inherit;" +
+    "font-size:13px;color:var(--orion-text-2);background:var(--orion-surface);" +
+    "border:1px solid var(--orion-border-md);border-radius:999px;cursor:pointer}" +
+    ".hub-home-type b{font-size:15px;font-weight:700;color:var(--orion-text);font-variant-numeric:tabular-nums}" +
+    ".hub-home-type:hover{border-color:var(--orion-indigo);color:var(--orion-text)}" +
+    ".hub-home-products{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}" +
+    ".hub-home-product{display:flex;align-items:center;gap:12px;padding:14px 16px;text-align:left;font:inherit;" +
+    "background:var(--orion-surface);border:1px solid var(--orion-border-md);border-radius:var(--orion-radius);cursor:pointer}" +
+    ".hub-home-product:hover{border-color:var(--orion-indigo)}" +
+    ".hub-home-product .nav-mark{width:26px;height:26px;flex:none}" +
+    ".hub-home-product__name{font-size:14px;font-weight:650;color:var(--orion-text)}" +
+    ".hub-home-product__meta{font-size:12px;color:var(--orion-text-3);font-variant-numeric:tabular-nums}" +
+    ".hub-home-recent{display:flex;flex-direction:column;background:var(--orion-surface);" +
+    "border:1px solid var(--orion-border);border-radius:var(--orion-radius)}" +
+    ".hub-home-recent__row{display:flex;align-items:center;gap:14px;padding:10px 14px;text-decoration:none;" +
+    "color:inherit;border-top:1px solid var(--orion-border)}" +
+    ".hub-home-recent__row:first-child{border-top:none}" +
+    ".hub-home-recent__row:hover{background:var(--orion-surface-2)}" +
+    ".hub-home-recent__thumb{position:relative;flex:none;width:96px;height:54px;border-radius:6px;overflow:hidden;" +
+    "background:#000 center/cover no-repeat}" +
+    ".hub-home-recent__text{flex:1;min-width:0}" +
+    ".hub-home-recent__title{font-size:13.5px;font-weight:600;color:var(--orion-text);overflow:hidden;" +
+    "text-overflow:ellipsis;white-space:nowrap}" +
+    ".hub-home-recent__meta{font-size:12px;color:var(--orion-text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+    ".hub-home-recent__when{flex:none;font-size:12px;color:var(--orion-text-3);white-space:nowrap}" +
+    ".hub-home-more{border:none;background:none;font:inherit;font-size:13px;font-weight:700;" +
+    "color:var(--orion-indigo);cursor:pointer;padding:0}" +
+    ".hub-home-more:hover{text-decoration:underline}";
+
+  function homeSection(id, icon, title, sub) {
+    var section = document.createElement("div");
+    section.className = "section";
+    section.id = id;
+    section.innerHTML =
+        '<div class="section-head"><div class="section-head__title">'
+      +   '<svg class="orion-ico ico-green"><use href="#' + icon + '"/></svg> '
+      +   escapeHtml(title)
+      +   (sub ? ' <span class="section-head__sub">' + escapeHtml(sub) + '</span>' : '')
+      + '</div></div>';
+    return section;
   }
 
-  function byNewest(a, b) {
-    return String(b.uploaded_at || "").localeCompare(String(a.uploaded_at || ""));
+  /* "today", "3 days ago", "2 weeks ago"; past a month, the date itself. */
+  function whenLabel(iso) {
+    var then = new Date(String(iso).slice(0, 10) + "T00:00:00");
+    var days = Math.floor((Date.now() - then.getTime()) / 86400000);
+    if (isNaN(days)) return "";
+    if (days <= 0) return "today";
+    if (days === 1) return "yesterday";
+    if (days < 14) return days + " days ago";
+    if (days < 31) return Math.floor(days / 7) + " weeks ago";
+    return fullDate(iso);
   }
 
-  function byViews(a, b) {
-    return (b.external_views || b.stats?.views || 0)
-         - (a.external_views || a.stats?.views || 0);
+  /* Go to a filtered view of the catalogue from Home. */
+  function homeGo(set) {
+    CONTROLS.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+    umbrellaFilter = null;
+    tagFilter = null;
+    sortOverride = null;
+    set();
+    applyFilters();
+    var thread = document.getElementById("mainThread");
+    if (thread) thread.scrollTop = 0;
   }
 
-  function fillRails(assets) {
-    fillRail("latestUploadsSection",
-             assets.filter(function (a) { return a.uploaded_at; })
-                   .sort(byNewest).slice(0, RAIL_SIZE));
-
-    // Only Consensus reports view counts, so this rail is Consensus-heavy by
-    // nature rather than by choice. Assets with none are excluded outright
-    // instead of padding the row with zeroes.
-    fillRail("mostViewedSection",
-             assets.filter(function (a) { return (a.external_views || 0) > 0; })
-                   .sort(byViews).slice(0, RAIL_SIZE));
-
-    // A class, not an inline style: hubApplyFilters() resets
-    // `style.display = ''` on these sections every time no filter is active,
-    // so an inline hide lasts only until the next keystroke.
+  function buildHome(assets, facets) {
     HIDE_UNTIL_REAL.forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.classList.add("hub-hidden");
     });
+    var thread = document.getElementById("mainThread");
+    if (!thread || document.getElementById("hubHome")) return;
+    if (!document.getElementById("hubHomeCss")) {
+      var style = document.createElement("style");
+      style.id = "hubHomeCss";
+      style.textContent = HOME_CSS;
+      (document.head || document.body).appendChild(style);
+    }
+    var home = document.createElement("div");
+    home.id = "hubHome";
+    var before = document.getElementById("continueSection");
+    thread.insertBefore(home, before && before.parentNode === thread ? before : null);
+
+    // What's in the Hub
+    var counts = {};
+    (facets.types || []).forEach(function (t) { counts[t.value] = t.count; });
+    var typesSection = homeSection("hubHomeTypes", "i-layers", "What's in the Hub");
+    var types = document.createElement("div");
+    types.className = "hub-home-types";
+    HOME_TYPE_ORDER.forEach(function (t) {
+      var n = counts[t];
+      if (!n) return;
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "hub-home-type";
+      b.innerHTML = "<b>" + n.toLocaleString() + "</b>" + escapeHtml(HOME_TYPE_WORD[t][n === 1 ? 0 : 1]);
+      b.addEventListener("click", function () {
+        homeGo(function () { document.getElementById("hubFilterType").value = t; });
+      });
+      types.appendChild(b);
+    });
+    typesSection.appendChild(types);
+    home.appendChild(typesSection);
+
+    // Featured -- filled when the promoted list arrives; absent if empty.
+    var featured = homeSection("hubHomeFeatured", "i-star", "Featured",
+                               "picked by the Technical Marketing team");
+    featured.style.display = "none";
+    var grid = document.createElement("div");
+    grid.className = "asset-grid";
+    featured.appendChild(grid);
+    home.appendChild(featured);
+    getJSON("/api/assets/promoted").then(function (items) {
+      if (!items.length) return;
+      items.forEach(function (a) { grid.appendChild(buildCard(a)); });
+      featured.style.display = "";
+    }).catch(function (err) {
+      console.warn("[hub-api] promoted demos not loaded", err);
+    });
+
+    // Start from a product
+    var byUmbrella = {};
+    assets.forEach(function (a) {
+      (a.umbrella_families || []).forEach(function (u) {
+        var c = byUmbrella[u] || (byUmbrella[u] = { videos: 0, kits: 0 });
+        if (a.type === "video") c.videos += 1;
+        else if (a.type === "ldk" || a.type === "vdk") c.kits += 1;
+      });
+    });
+    var productsSection = homeSection("hubHomeProducts", "i-box", "Start from a product");
+    var tiles = document.createElement("div");
+    tiles.className = "hub-home-products";
+    (facets.umbrella_families || []).forEach(function (f) {
+      if (HIDDEN_UMBRELLAS.indexOf(f.value) !== -1 || !f.count) return;
+      var c = byUmbrella[f.value] || { videos: 0, kits: 0 };
+      var split = [c.videos && (c.videos + (c.videos === 1 ? " video" : " videos")),
+                   c.kits && (c.kits + (c.kits === 1 ? " kit" : " kits"))]
+        .filter(Boolean).join(" · ");
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "hub-home-product";
+      b.innerHTML = navMarkHtml(f.value)
+        + '<span><span class="hub-home-product__name">' + escapeHtml(umbrellaDisplayName(f.value))
+        + '</span><br><span class="hub-home-product__meta">'
+        + f.count + (f.count === 1 ? " demo" : " demos") + (split ? " · " + split : "")
+        + "</span></span>";
+      b.addEventListener("click", function () { openFamily(f.value); });
+      tiles.appendChild(b);
+    });
+    productsSection.appendChild(tiles);
+    home.appendChild(productsSection);
+
+    // Recently published videos
+    var recent = assets.filter(function (a) { return a.uploaded_at; })
+      .sort(function (a, b) { return String(b.uploaded_at).localeCompare(String(a.uploaded_at)); })
+      .slice(0, HOME_RECENT);
+    if (recent.length) {
+      var recentSection = homeSection("hubHomeRecent", "i-clock", "Recently published demos",
+                                      "videos by publish date · kits by last update");
+      var list = document.createElement("div");
+      list.className = "hub-home-recent";
+      recent.forEach(function (a) {
+        var row = document.createElement("a");
+        row.className = "hub-home-recent__row";
+        row.href = "#/asset/" + encodeURIComponent(a.id);
+        var thumb = document.createElement("span");
+        thumb.className = "hub-home-recent__thumb";
+        if (a.thumbnail_url) thumb.style.backgroundImage = "url(" + JSON.stringify(a.thumbnail_url) + ")";
+        paintCoverInto(thumb, a);
+        row.appendChild(thumb);
+        var text = document.createElement("span");
+        text.className = "hub-home-recent__text";
+        text.innerHTML = '<div class="hub-home-recent__title">' + escapeHtml(a.title) + '</div>'
+          + '<div class="hub-home-recent__meta">'
+          + escapeHtml([(TYPE_CHIP[a.type] || [])[1], videoTypeOf(a),
+                        (a.product_families || []).map(familyDisplayName).join(", ")]
+                         .filter(Boolean).join(" · "))
+          + '</div>';
+        row.appendChild(text);
+        var when = document.createElement("span");
+        when.className = "hub-home-recent__when";
+        var dated = a.type === "video" ? "Published " : "Updated ";
+        when.textContent = (a.type === "video" ? "" : "updated ") + whenLabel(a.uploaded_at);
+        when.title = dated + fullDate(a.uploaded_at);
+        row.appendChild(when);
+        list.appendChild(row);
+      });
+      recentSection.appendChild(list);
+      var more = document.createElement("button");
+      more.type = "button";
+      more.className = "hub-home-more";
+      more.style.marginTop = "10px";
+      more.textContent = "Everything, newest first →";
+      more.addEventListener("click", function () {
+        homeGo(function () { sortOverride = "recent"; });
+      });
+      recentSection.appendChild(more);
+      home.appendChild(recentSection);
+    }
   }
 
   /* ------------------------------------------------------------- the sidebar */
@@ -997,7 +1188,7 @@
   var CONTROLS = ["hubSearchInput", "hubFilterType", "hubFilterProduct",
                   "hubFilterSegment", "hubFilterStage", "hubFilterLanguage",
                   "hubFilterCf", "hubFilterVideoType"];
-  var LANDING = ["continueSection", "latestUploadsSection", "mostViewedSection",
+  var LANDING = ["hubHome", "continueSection", "latestUploadsSection", "mostViewedSection",
                  "browseByProductSection", "editorsPicksSection"];
   //: One request's ceiling, enforced server-side (`le=200` in assets.py) --
   //: not a UI choice, so raising it here would just get clamped back. A
@@ -1761,39 +1952,6 @@
         window.scrollTo({ top: 0, behavior: "smooth" });
       });
     });
-  }
-
-  /* The homepage rails' own "View all" links -- Elio's static `href="#"`,
-   * never wired to anything. Found 2026-09-09.
-   *
-   * Latest Uploads reuses the exact clearAll() + sortOverride mechanism the
-   * sidebar's own "Latest Uploads" nav item already uses just above, since
-   * that is the identical destination -- the whole catalogue, newest first.
-   *
-   * Most Viewed has no honest destination to link to yet: its own backend
-   * sort key (`most_viewed`) ranks by `stats.views`, which nothing
-   * increments (docs/HANDOVER-DEVELOPMENT.md §9 item 5), so it would rank
-   * everything by zero. The homepage rail itself stays -- it is a narrow,
-   * honest slice (only assets with a real Consensus `external_views`,
-   * client-side) -- but "View all" of it has nowhere real to go until that
-   * sort is fixed, so it is hidden rather than wired to a page that would
-   * look ranked but is not.
-   */
-  function wireHomeRailLinks() {
-    var latest = document.querySelector("#latestUploadsSection .section-head__link");
-    if (latest) {
-      latest.addEventListener("click", function (e) {
-        e.preventDefault();
-        exitOverlays();
-        clearAll();
-        sortOverride = "recent";
-        applyFilters();
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      });
-    }
-
-    var mostViewed = document.querySelector("#mostViewedSection .section-head__link");
-    if (mostViewed) mostViewed.classList.add("hub-hidden");
   }
 
   /* Nav entries that cannot do anything.
@@ -5179,7 +5337,7 @@
     // hubApplyFilters() has already run once on load and filled the pool from
     // the hardcoded cards, so this replaces rather than pre-empts it.
     window.HUB_ASSET_POOL = assets.map(buildCard);
-    fillRails(assets);
+    buildHome(assets, facets);
 
     fillSelect("hubFilterProduct", (facets.product_families || facets.products || [])
       .filter(function (f) { return HIDDEN_UMBRELLAS.indexOf(f.value) === -1; }),
@@ -5204,7 +5362,6 @@
     fillProductPills(facets);
     await buildFamilyNav(facets);
     wireNav(facets);
-    wireHomeRailLinks();
     markUnavailable(facets);
     markNavActive();
     buildSidebarFoot();

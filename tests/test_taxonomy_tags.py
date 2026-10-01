@@ -145,3 +145,13 @@ def test_an_unknown_topic_survives_verbatim_including_their_typo():
 def test_blank_tags_never_reach_the_page():
     assert unclassified_tags(None) == []
     assert unclassified_tags(["", "   "]) == []
+
+
+def test_ptc_prefixed_products_join_the_short_family():
+    """'PTC Jetstream' (Demo Video) and 'Jetstream' (SharePoint) are one
+    family, not two entries in the Product filter (2026-10-01)."""
+    from backend.services import taxonomy
+    assert taxonomy.family_of("PTC Jetstream") == taxonomy.family_of("Jetstream") == "Jetstream"
+    assert taxonomy.family_of("PTC Orbit AI") == taxonomy.family_of("Orbit") == "Orbit"
+    assert taxonomy.families_of(["PTC Orbit", "Orbit"]) == ["Orbit"]
+    assert taxonomy.umbrella_of("PTC Jetstream") == "PTC Jetstream"

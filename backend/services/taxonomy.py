@@ -36,6 +36,15 @@ _FAMILY_PREFIXES = (
     "PTC Orbit", "PTC Jetstream",
 )
 
+#: One family per product, whichever way it is spelled. The full-name
+#: prefixes above made "PTC Jetstream" a family beside "Jetstream" (Demo
+#: Video assets say "PTC Jetstream", SharePoint's column says "Jetstream"),
+#: so the Product filter listed both and a filter on one missed the other
+#: (found 2026-10-01: 2 Jetstream and 6 Orbit assets). The short name is the
+#: family -- the one stored requests, the request form and the front end's
+#: display names already use.
+_FAMILY_CANONICAL = {"PTC Orbit": "Orbit", "PTC Jetstream": "Jetstream"}
+
 #: Every family name we recognise — the prefixes plus whatever the aliases
 #: resolve to. Used to decide whether a bare word is a product at all.
 def known_families() -> set[str]:
@@ -108,7 +117,7 @@ def family_of(product: str | None) -> str | None:
         return alias
     for prefix in _FAMILY_PREFIXES:
         if name.lower().startswith(prefix.lower()):
-            return prefix
+            return _FAMILY_CANONICAL.get(prefix, prefix)
     return name
 
 

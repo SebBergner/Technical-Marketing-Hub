@@ -53,3 +53,22 @@ def test_same_day_results_fall_back_to_the_tighter_title():
     a = relevance.order_key("bmx", "BMX Overview", None, "2025-01-01")
     b = relevance.order_key("bmx", "Creo Behavioral Modeling (BMX)", None, "2025-01-01")
     assert a > b
+
+
+def test_a_short_word_only_matches_a_whole_word(tmp_path):
+    """Liwei, 2026-10-01: "E&HT" split into "e" and "ht" and returned 176
+    results, because "e" is inside nearly every title."""
+    repo = repo_with(tmp_path, [
+        ("E&HT - ADAS (Technical Overview)", "2026-01-01", None),
+        ("The Bobcat Intelligent Product Lifecycle", "2026-01-01", "lightweight"),
+        ("Windchill AI Assistant", "2026-01-01", None),
+        ("Maintenance Planning", "2026-01-01", None),
+    ])
+    assert titles(repo, "E&HT") == ["E&HT - ADAS (Technical Overview)"]
+    assert titles(repo, "ai") == ["Windchill AI Assistant"]
+
+
+def test_a_longer_word_still_matches_inside_words():
+    assert relevance.score("wind", "Windchill PDMLink") > 0
+    assert relevance.score("creo 11", "Creo 11.0 Overview") > 0
+    assert relevance.names("e&ht", "E&HT_ADAS.mp4") and not relevance.names("ht", "Bobcat_Light.mp4")

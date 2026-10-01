@@ -77,11 +77,15 @@
     return m + ":" + (s < 10 ? "0" : "") + s;
   }
 
+  //: The year only when it is not this one: "21 May" alone read the same
+  //: for 2024 and 2026 (2026-10-01).
   function uploadedLabel(iso) {
     if (!iso) return "";
     var d = new Date(iso + "T00:00:00");
     if (isNaN(d)) return "";
-    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    var opts = { day: "numeric", month: "short" };
+    if (d.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
+    return d.toLocaleDateString("en-GB", opts);
   }
 
   /* The stats line, assembled from whatever the record actually has.
@@ -92,7 +96,10 @@
     var bits = [];
     if (a.external_views) bits.push(a.external_views + " views");
     if (a.resource_count) bits.push(a.resource_count + " files");
-    if (a.uploaded_at) bits.push("Uploaded " + uploadedLabel(a.uploaded_at));
+    // A video's date is when it was published; a kit's is its SharePoint
+    // folder's last edit (see buildHome), so it says "Updated".
+    if (a.uploaded_at) bits.push((a.type === "video" ? "Published " : "Updated ")
+                                 + uploadedLabel(a.uploaded_at));
     return bits.join(" · ");
   }
 
@@ -1345,6 +1352,10 @@
     markNavActive();
     renderActiveFilters();
     renderSuggestions(val("hubSearchInput"));
+    // The catalogue total reads as a second, contradicting result count
+    // beside "showing 200 of 285" (2026-10-01); it shows on Home only.
+    var total = document.getElementById("hubTotal");
+    if (total) total.style.display = active ? "none" : "";
     renderSegmentHeader();
     var reset = document.getElementById("hubResetBtn");
     if (reset) reset.style.display = active ? "inline-flex" : "none";
@@ -1411,7 +1422,7 @@
       var node = heading.firstChild;
       while (node) {
         if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
-          node.textContent = sortOverride === "recent" ? " Latest uploads "
+          node.textContent = sortOverride === "recent" ? " Recently published "
                            : tagFilter ? " All assets tagged “" + tagFilter + "” "
                            : umbrellaFilter ? " All " + umbrellaDisplayName(umbrellaFilter) + " assets "
                            : seg ? " All " + seg + " assets "
@@ -1890,6 +1901,22 @@
     }
   }
 
+  /* Elio's "Latest Uploads" nav item, renamed to match Home (2026-10-01):
+   * newest first by date, where a kit's date is its last edit, is
+   * "recently published or updated" -- not uploads. Renamed before
+   * wireNav(), which finds items by the text on screen. */
+  var RECENT_NAV_LABEL = "Recently published";
+
+  function renameRecentNav() {
+    document.querySelectorAll(".orion-side .orion-navitem .label").forEach(function (label) {
+      label.childNodes.forEach(function (n) {
+        if (n.nodeType === Node.TEXT_NODE && n.textContent.trim() === "Latest Uploads") {
+          n.textContent = " " + RECENT_NAV_LABEL;
+        }
+      });
+    });
+  }
+
   function wireNav(facets) {
     var families = {}, stages = {}, umbrellas = {};
     (facets.product_families || []).forEach(function (f) { families[f.value] = 1; });
@@ -1914,7 +1941,8 @@
 
       var target = null;
       if (canonical === "Home") target = { control: null };
-      else if (canonical === "Latest Uploads") target = { control: null, sort: "recent" };
+      else if (canonical === "Latest Uploads" || canonical === RECENT_NAV_LABEL)
+        target = { control: null, sort: "recent" };
       else if (NAV_TYPE[canonical]) target = { control: "hubFilterType", value: NAV_TYPE[canonical] };
       // A product family is a destination, not a filter toggle: it clears
       // everything else, because that is what a nav item promises.
@@ -3978,8 +4006,12 @@
   function highlightHtml(text, q) {
     var ts = queryTerms(q).sort(function (a, b) { return b.length - a.length; });
     if (!text || !ts.length) return escapeHtml(text || "");
+    // Words of one or two letters only as whole words, as the server
+    // matches them (relevance.SHORT_TERM): "e" from "E&HT" must not light up
+    // every "e" on the page.
     var re = new RegExp("(" + ts.map(function (t) {
-      return t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      var esc = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return t.length <= 2 ? "(?<![\\p{L}\\p{N}])" + esc + "(?![\\p{L}\\p{N}])" : esc;
     }).join("|") + ")", "giu");
     return text.split(re).map(function (part, i) {
       return i % 2 ? '<mark class="hub-hl">' + escapeHtml(part) + "</mark>" : escapeHtml(part);
@@ -3987,8 +4019,11 @@
   }
 
   function mentions(text, q) {
-    var t = (text || "").toLowerCase();
-    return queryTerms(q).some(function (w) { return t.indexOf(w) !== -1; });
+    var words = queryTerms(text);
+    var joined = " " + words.join(" ") + " ";
+    return queryTerms(q).some(function (w) {
+      return w.length <= 2 ? joined.indexOf(" " + w + " ") !== -1 : joined.indexOf(w) !== -1;
+    });
   }
 
   function buildAdvancedPage() {
@@ -4279,7 +4314,10 @@
     if (typeof openRequest === "function" && !openRequest.hubWrapped) {
       window.openRequestView = function () {
         closeAdvancedSearch();
-        if (/^#\/search\//.test(location.hash || "")) {
+        closeFilePreview(false);
+        // Opened from a details page or Advanced Search, the address still
+        // named that page, and a refresh went back there (2026-10-01).
+        if (/^#\/(search|asset)\//.test(location.hash || "")) {
           history.pushState(null, "", location.pathname + location.search);
         }
         return openRequest.apply(this, arguments);
@@ -5371,6 +5409,7 @@
     wireDetailPage();
     fillProductPills(facets);
     await buildFamilyNav(facets);
+    renameRecentNav();
     wireNav(facets);
     markUnavailable(facets);
     markNavActive();

@@ -48,6 +48,43 @@ def terms(text: str | None) -> list[str]:
     return [t.lower() for t in _TOKEN.findall(text or "")]
 
 
+#: A word this short only counts as a whole word (Liwei, 2026-10-01).
+#: Searching "E&HT" split into "e" and "ht", and "e" is inside nearly every
+#: title, so the query returned 176 results instead of the one E&HT demo;
+#: "ai" likewise matched "maintenance" and "chain". Longer words still match
+#: inside words, so "wind" keeps finding "Windchill".
+SHORT_TERM = 2
+
+
+def _is_short(term: str) -> bool:
+    return len(term) <= SHORT_TERM
+
+
+def _bounded(phrase: str, wanted: list[str]) -> str:
+    """The phrase as a pattern, with a word boundary on any end that is a
+    short word. Normalised text is single-space-separated tokens, so a
+    boundary is "not next to a non-space"."""
+    start = r"(?<!\S)" if _is_short(wanted[0]) else ""
+    end = r"(?!\S)" if _is_short(wanted[-1]) else ""
+    return start + re.escape(phrase) + end
+
+
+def _has(text: str, term: str) -> bool:
+    """One query word in normalised text, by the short-word rule."""
+    if _is_short(term):
+        return f" {term} " in f" {text} "
+    return term in text
+
+
+def _find_end(text: str, term: str) -> int:
+    """Where the first occurrence of `term` ends in `text`, or -1."""
+    if _is_short(term):
+        m = re.search(rf"(?<!\S){re.escape(term)}(?!\S)", text)
+        return m.end() if m else -1
+    at = text.find(term)
+    return at + len(term) if at >= 0 else -1
+
+
 def score(text: str | None, title: str | None, description: str | None = None) -> int:
     """How well one record answers a query. 0 means it does not.
 
@@ -62,23 +99,24 @@ def score(text: str | None, title: str | None, description: str | None = None) -
     name = (title or "").strip().lower()
     normalised_title = " ".join(terms(name))
 
+    wanted = terms(text)
+    pattern = _bounded(phrase, wanted)
     if normalised_title == phrase:
         return EXACT_TITLE
-    if normalised_title.startswith(phrase):
+    if re.match(pattern, normalised_title):
         return TITLE_PREFIX
-    if re.search(rf"\b{re.escape(phrase)}", normalised_title):
-        # Word boundary at the START only. "windchill" must match
-        # "Windchill PDMLink"; requiring a boundary at the end too would
-        # reject it.
+    if re.search(rf"\b{pattern}", normalised_title):
+        # Word boundary at the START only (plus the end when the last word
+        # is short). "windchill" must match "Windchill PDMLink"; requiring
+        # a boundary at the end too would reject it.
         return TITLE_WORD
-    if phrase in normalised_title:
+    if re.search(pattern, normalised_title):
         return TITLE_SUBSTRING
 
-    wanted = terms(text)
-    if all(t in normalised_title for t in wanted):
+    if all(_has(normalised_title, t) for t in wanted):
         return TITLE_ALL_TERMS
     haystack = f"{normalised_title} {' '.join(terms(description))}"
-    if all(t in haystack for t in wanted):
+    if all(_has(haystack, t) for t in wanted):
         return ANY_FIELD
     return NO_MATCH
 
@@ -107,10 +145,10 @@ def span(text: str | None, title: str | None) -> int:
         return _NO_SPAN
     furthest = 0
     for term in wanted:
-        at = name.find(term)
-        if at < 0:
+        end = _find_end(name, term)
+        if end < 0:
             return _NO_SPAN
-        furthest = max(furthest, at + len(term))
+        furthest = max(furthest, end)
     return furthest
 
 
@@ -167,7 +205,7 @@ def names(text: str | None, name: str | None) -> bool:
     if not wanted:
         return False
     haystack = " ".join(terms(name))
-    return all(t in haystack for t in wanted)
+    return all(_has(haystack, t) for t in wanted)
 
 
 #: Advanced Search's order. A file-name hit is a stronger answer than a word

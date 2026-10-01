@@ -32,6 +32,16 @@ def no_daily_sync_loop(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def never_reach_brightcove(monkeypatch):
+    """The Demo Video sync now reads posters from Brightcove whenever the
+    settings name an account, and a developer's .env may well do so. Tests
+    that want a Brightcove client build one with a mock transport and pass
+    it in; nothing reaches the real account through the settings."""
+    monkeypatch.setattr(settings, "brightcove_client_id", "")
+    monkeypatch.setattr(settings, "brightcove_client_secret", "")
+
+
+@pytest.fixture(autouse=True)
 def no_migration_runs(monkeypatch):
     """A developer's .env may enable migration runs on their machine; the
     suite must never start or resume one against the real tenant. Tests of

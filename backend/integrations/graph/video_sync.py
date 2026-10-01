@@ -91,6 +91,9 @@ class VideoSyncResult:
     skipped_no_demo_type: int = 0
     orphan_files: int = 0
     library: str | None = None
+    #: Videos given their Brightcove poster as thumbnail; None when Brightcove
+    #: is not configured here, so "not looked up" never reads as "none found".
+    posters: int | None = None
     errors: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
@@ -101,7 +104,8 @@ class VideoSyncResult:
             examined=self.assets + self.skipped_no_demo_type,
             skipped={"no_demo_type": self.skipped_no_demo_type},
             details={"library": self.library, "resources": self.resources,
-                     "orphan_files": self.orphan_files, "errors": self.errors},
+                     "orphan_files": self.orphan_files, "posters": self.posters,
+                     "errors": self.errors},
         )
 
 
@@ -193,10 +197,43 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], VideoSyncResult]:
     return [Asset.model_validate(a) for a in assets.values()], result
 
 
+def add_posters(assets: list[Asset], result: VideoSyncResult, brightcove) -> None:
+    """Each video's Brightcove poster as its thumbnail (Liwei, 2026-10-01).
+
+    Every migrated video carries its BrightcoveID (155 of 155 on 2026-10-01)
+    and none had a thumbnail, so their cards showed the placeholder cube. The
+    address is stored, not the image: it is Brightcove's public CDN, and the
+    card already falls back to its cover if an image ever fails to load.
+
+    Read-only, and it fails alone: a Brightcove problem leaves the videos
+    without posters and says so in the report; the library sync stands.
+    """
+    if brightcove is None:
+        return
+    wanted = [a.brightcove_id for a in assets if a.brightcove_id and not a.thumbnail_url]
+    try:
+        found = brightcove.cover_images(wanted)
+    except Exception as exc:                                   # noqa: BLE001
+        log.warning("brightcove posters failed: %s", exc)
+        result.errors.append(f"posters: {str(exc)[:200]}")
+        result.posters = 0
+        return
+    result.posters = 0
+    for asset in assets:
+        src = found.get(str(asset.brightcove_id or ""))
+        if src and not asset.thumbnail_url:
+            asset.thumbnail_url = src
+            result.posters += 1
+
+
 def sync_videos(client: GraphClient, repo, site: SiteRef | None = None,
-                library: str | None = None) -> VideoSyncResult:
-    """Read the whole library and replace this source's mirror."""
+                library: str | None = None, brightcove=None) -> VideoSyncResult:
+    """Read the whole library and replace this source's mirror.
+
+    `brightcove`: the client posters are read with; by default the one the
+    settings describe, if any."""
     from backend.config import settings
+    from backend.integrations.brightcove import get_brightcove_client
 
     library = library if library is not None else settings.graph_video_library
     site = site or client.resolve_site()
@@ -207,6 +244,8 @@ def sync_videos(client: GraphClient, repo, site: SiteRef | None = None,
     page = client.delta(drive.drive_id)
     assets, result = build_assets(_with_fields(client, drive, page.items))
     result.library = library
+    add_posters(assets, result,
+                brightcove if brightcove is not None else get_brightcove_client())
 
     counter = getattr(repo, "count_source_rows", None)
     previous = counter(SOURCE_SYSTEM) if counter else 0
@@ -214,5 +253,6 @@ def sync_videos(client: GraphClient, repo, site: SiteRef | None = None,
                              allow_shrink=previous < SHRINK_GUARD_FROM)
     if stamp := getattr(repo, "record_sync", None):
         stamp(SOURCE_SYSTEM)
-    log.info("demo video sync: %d video(s) from %r", result.assets, library)
+    log.info("demo video sync: %d video(s) from %r, %s poster(s)",
+             result.assets, library, result.posters)
     return result

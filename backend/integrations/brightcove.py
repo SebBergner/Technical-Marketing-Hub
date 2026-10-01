@@ -76,6 +76,38 @@ class BrightcoveClient:
     def video(self, video_id: str) -> dict | None:
         return self._get(f"/videos/{video_id}")
 
+    #: The CMS API takes up to 10 comma-separated ids in one GET /videos/.
+    BATCH = 10
+
+    def cover_images(self, video_ids: list[str]) -> dict[str, str]:
+        """Each video's poster image, by id. (Not named "posters": the suite
+        refuses any public name here that reads like a write, "post" included.)
+        Brightcove's 1280x720 still on
+        its public image CDN (cf-images...boltdns.net), which a browser loads
+        with no sign-in (checked 2026-10-01). The 160x90 "thumbnail" is the
+        fallback only -- too small for a card.
+
+        Ten ids per request. A batch that answers 404 (an id that no longer
+        exists can do that) is retried one id at a time, so one deleted video
+        does not cost its nine neighbours their posters.
+        """
+        out: dict[str, str] = {}
+        ids = [str(i) for i in dict.fromkeys(video_ids) if i]
+        for start in range(0, len(ids), self.BATCH):
+            chunk = ids[start:start + self.BATCH]
+            videos = self._get("/videos/" + ",".join(chunk))
+            if videos is None and len(chunk) > 1:
+                videos = [v for v in (self._get(f"/videos/{i}") for i in chunk) if v]
+            if isinstance(videos, dict):
+                videos = [videos]
+            for v in videos or []:
+                images = v.get("images") or {}
+                src = ((images.get("poster") or {}).get("src")
+                       or (images.get("thumbnail") or {}).get("src") or "")
+                if src.startswith("https://"):
+                    out[str(v.get("id"))] = src
+        return out
+
     def playlist_video_ids(self, playlist_id: str) -> list[str]:
         playlist = self._get(f"/playlists/{playlist_id}") or {}
         return [str(v) for v in playlist.get("video_ids") or []]

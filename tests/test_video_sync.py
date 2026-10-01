@@ -199,3 +199,73 @@ def test_a_blank_library_setting_switches_it_off(monkeypatch):
     monkeypatch.setattr(settings, "graph_video_library", "")
     assert graph_router._sync_demo_video(object(), repo=None) == {
         "ok": None, "skipped": "not configured"}
+
+
+# ─────────────────────────────────────────── Brightcove posters (2026-10-01)
+POSTER = ("https://cf-images.us-east-1.prod.boltdns.net/v1/static/2088006836001/"
+          "a/b/1280x720/match/image.jpg")
+
+
+def brightcove_for(videos, calls=None):
+    """A Brightcove CMS that knows `videos` ({id: images}); 404 for a batch
+    that names any id it does not know, as a missing id can."""
+    from backend.integrations.brightcove import BrightcoveClient
+
+    def handler(request):
+        if request.url.host == "oauth.brightcove.com":
+            return httpx.Response(200, json={"access_token": "t", "expires_in": 300})
+        assert request.method == "GET", "posters are read-only"
+        ids = request.url.path.rsplit("/", 1)[1].split(",")
+        if calls is not None:
+            calls.append(ids)
+        if any(i not in videos for i in ids):
+            return httpx.Response(404)
+        body = [{"id": i, "images": videos[i]} for i in ids]
+        return httpx.Response(200, json=body if len(ids) > 1 else body[0])
+
+    return BrightcoveClient("2088006836001", "id", "secret",
+                            transport=httpx.MockTransport(handler), verify=True)
+
+
+def test_a_migrated_video_gets_its_brightcove_poster(tmp_path):
+    repo = JsonAssetRepository(str(tmp_path))
+    items = [doc_set("Vestas", BrightcoveID="111"), doc_set("Hill", BrightcoveID="222")]
+    bc = brightcove_for({"111": {"poster": {"src": POSTER}},
+                         "222": {"thumbnail": {"src": POSTER + "?small"}}})
+    result = vs.sync_videos(client_for(handler_for(items)), repo, brightcove=bc)
+
+    assert result.posters == 2
+    assert repo.get("video-vestas").thumbnail_url == POSTER
+    assert repo.get("video-hill").thumbnail_url == POSTER + "?small", "thumbnail when no poster"
+
+
+def test_one_missing_video_does_not_cost_the_rest_their_posters(tmp_path):
+    repo = JsonAssetRepository(str(tmp_path))
+    calls = []
+    items = [doc_set("Vestas", BrightcoveID="111"), doc_set("Gone", BrightcoveID="999")]
+    bc = brightcove_for({"111": {"poster": {"src": POSTER}}}, calls)
+    result = vs.sync_videos(client_for(handler_for(items)), repo, brightcove=bc)
+
+    assert result.posters == 1
+    assert repo.get("video-vestas").thumbnail_url == POSTER
+    assert repo.get("video-gone").thumbnail_url is None
+    assert calls[0] == ["111", "999"], "asked as one batch first"
+
+
+def test_a_brightcove_failure_leaves_the_library_sync_standing(tmp_path):
+    class Broken:
+        def cover_images(self, ids):
+            raise RuntimeError("Brightcove token refused: HTTP 401")
+
+    repo = JsonAssetRepository(str(tmp_path))
+    result = vs.sync_videos(client_for(handler_for([doc_set("Vestas", BrightcoveID="1")])),
+                            repo, brightcove=Broken())
+    assert result.assets == 1 and repo.count_source_rows("demo_video") == 1
+    assert result.posters == 0 and "401" in result.errors[0]
+
+
+def test_without_brightcove_settings_no_poster_is_looked_up(tmp_path):
+    repo = JsonAssetRepository(str(tmp_path))
+    result = vs.sync_videos(client_for(handler_for([doc_set("Vestas", BrightcoveID="1")])), repo)
+    assert result.posters is None, "not configured reads differently from none found"
+    assert repo.get("video-vestas").thumbnail_url is None

@@ -3389,6 +3389,14 @@
     "background:var(--orion-surface);color:var(--orion-text);font:inherit;font-size:12.5px;" +
     "font-weight:600;cursor:pointer;white-space:nowrap}" +
     ".hub-adv-open:hover{border-color:var(--orion-indigo);color:var(--orion-indigo)}" +
+    // PTC green, not blue (Liwei, 2026-09-30). index.html colours these with
+    // var(--orion-accent, #5b6cff), and --orion-accent is defined nowhere, so
+    // the blue fallback always showed. The ids raise specificity: this sheet
+    // sits in <head>, before index.html's own rules in <body>.
+    "#hubSuggest .hub-suggest__btn:hover{border-color:var(--orion-indigo)}" +
+    "#hubSuggest .hub-suggest__btn--page{border-color:var(--orion-indigo);color:var(--orion-indigo)}" +
+    "#hubSuggest .hub-suggest__btn--page:hover{background:var(--orion-indigo-soft)}" +
+    "body .hub-seg__fam:hover{border-color:var(--orion-indigo)}" +
     ".hub-adv__bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0 8px}" +
     ".hub-adv__bar .hero-search__field{flex:1 1 320px}" +
     ".hub-adv__summary{font-size:12.5px;color:var(--orion-text-3);margin:4px 0 14px;min-height:18px}" +

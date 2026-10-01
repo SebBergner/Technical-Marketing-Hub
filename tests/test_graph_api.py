@@ -346,3 +346,56 @@ def test_preview_of_an_unknown_asset_is_404(client, repo_with_a_file):
 def test_preview_without_graph_configured_is_503(client, repo_with_a_file):
     response = client.get(f"/api/assets/a-kit/files/{FILE_ITEM_ID}/preview")
     assert response.status_code == 503
+
+
+# ─────────────────────── a Demo Video asset's files live in that library
+VIDEO_DRIVE_ID = "drive-demo-video"
+
+
+def two_library_handler():
+    """Both libraries exist; each answers only for its own drive id, like Graph."""
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if ":/sites/" in path or path.endswith(f"/sites/{SITE_URL.split('/sites/')[1]}"):
+            return httpx.Response(200, json={
+                "id": SITE_ID, "displayName": "EXT-TDD", "webUrl": SITE_URL})
+        if path.endswith(f"/sites/{SITE_ID}/drives"):
+            return httpx.Response(200, json={"value": [
+                {"id": DRIVE_ID, "name": "Demo Catalog"},
+                {"id": VIDEO_DRIVE_ID, "name": "Demo Video"}]})
+        if path.endswith(f"/drives/{VIDEO_DRIVE_ID}/items/{FILE_ITEM_ID}"):
+            seen.append("item")
+            return httpx.Response(200, json={
+                "id": FILE_ITEM_ID, "@microsoft.graph.downloadUrl": "https://video/signed"})
+        if path.endswith(f"/drives/{VIDEO_DRIVE_ID}/items/{FILE_ITEM_ID}/preview"):
+            seen.append("preview")
+            return httpx.Response(200, json={"getUrl": "https://video/embed"})
+        return httpx.Response(404, json={"error": {"code": "itemNotFound", "message": path}})
+    return handler, seen
+
+
+@pytest.fixture()
+def repo_with_a_video(repo):
+    repo.replace_source_rows([Asset(
+        id="video-creo-10-top-enhancements", type=AssetType.VIDEO, title="Creo 10",
+        resources=[AssetResource(name="Creo 10.mp4", kind="video", item_id=FILE_ITEM_ID)],
+    )], "demo_video")
+    return repo
+
+
+def test_a_demo_video_file_is_fetched_from_the_demo_video_library(client, repo_with_a_video):
+    """Liwei, 2026-09-30: every migrated video failed with "SharePoint did not
+    return a download link" -- the item id was looked up in the Demo Catalog."""
+    handler, seen = two_library_handler()
+    with_graph(handler)
+
+    r = client.get(f"/api/assets/video-creo-10-top-enhancements/files/{FILE_ITEM_ID}/download",
+                   follow_redirects=False)
+    assert r.status_code == 302 and r.headers["location"] == "https://video/signed"
+
+    r = client.get(f"/api/assets/video-creo-10-top-enhancements/files/{FILE_ITEM_ID}/preview",
+                   follow_redirects=False)
+    assert r.status_code == 302 and r.headers["location"] == "https://video/embed"
+    assert seen == ["item", "preview"]

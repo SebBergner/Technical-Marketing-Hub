@@ -151,6 +151,7 @@ def test_the_sync_writes_its_own_mirror_and_the_catalogue_lists_it(tmp_path):
     assert [a.id for a in page.items] == ["video-vestas"], "Product filter reads HubProducts"
     got = repo.get("video-creo-10-top-enhancements")
     assert got.main_video == "Creo 10 Top Enhancements_Technical Overview.mp4"
+    assert repo.get("video-vestas").long_description == "turbine blade quality",         "the detail page shows it at the end of Details"
 
 
 def test_a_missing_library_is_an_error_not_an_empty_catalogue(tmp_path):

@@ -192,6 +192,9 @@
     ".hub-facts__table td{padding:8px 0;color:var(--orion-text);border-top:1px solid var(--orion-border)}" +
     ".hub-facts__table tr:first-child th,.hub-facts__table tr:first-child td{border-top:none}" +
     ".hub-facts__table td .orion-badge{margin:0 6px 4px 0}" +
+    ".hub-facts__long{margin-top:14px;padding-top:12px;border-top:1px solid var(--orion-border)}" +
+    ".hub-facts__long-label{font-size:13px;font-weight:500;color:var(--orion-text-2);margin-bottom:6px}" +
+    ".hub-facts__long-text{font-size:13.5px;line-height:1.6;color:var(--orion-text);white-space:pre-line}" +
     ".hub-total{margin-left:10px;font-size:13px;font-weight:500;color:var(--orion-text-3);" +
     "vertical-align:middle;white-space:nowrap}";
 
@@ -3087,6 +3090,24 @@
                    + '<use href="#i-hex"/></svg>Details</div>';
     card.appendChild(head);
     card.appendChild(table);
+
+    /* The sheet's Long Description, last in the section (Liwei,
+     * 2026-09-30). Prose, so a block under the table rather than one more
+     * row squeezed beside a 170px label. Demo Video assets only; nothing is
+     * drawn when there is none. */
+    if (asset.long_description && asset.long_description !== asset.description) {
+      var long = document.createElement("div");
+      long.className = "hub-facts__long";
+      var label = document.createElement("div");
+      label.className = "hub-facts__long-label";
+      label.textContent = "Detail Description";
+      var text = document.createElement("div");
+      text.className = "hub-facts__long-text";
+      text.textContent = asset.long_description;
+      long.appendChild(label);
+      long.appendChild(text);
+      card.appendChild(long);
+    }
   }
 
   var FILE_TABS = [{ key: "video", label: "Videos" },

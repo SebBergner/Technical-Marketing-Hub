@@ -67,6 +67,8 @@ _MIRROR_FIELDS = (
     "vm",
     # Search only; see Asset.search_text.
     "search_text",
+    # Detail page only; see Asset.long_description.
+    "long_description",
 )
 
 #: Under mirror/, and never read as catalogue data: _load_mirror only reads
@@ -425,6 +427,7 @@ class JsonAssetRepository(AssetRepository):
             has_roadmap=roadmap is not None,
             resources=record.get("resources") or [],
             main_video=record.get("main_video"),
+            long_description=record.get("long_description"),
             rails=own.get("rails") or [],
             is_editor_pick=bool(own.get("is_editor_pick")),
             value_roadmap=self._to_roadmap(roadmap),

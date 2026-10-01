@@ -1037,3 +1037,20 @@ has a downloadable MP4.
 - **Re-check (dry-run, read-only), V29 (2):**
   - 239 to migrate: new 120, existing 13 (test uploads), invalid 106;
   - the invalid ones are Customer Facing empty ×84 and Hub Products not yet options ×24.
+
+### After the first full run (2026-09-30 evening)
+
+- **Liwei migrated V29 (2) to Demo Video and synced staging.** The Hub showed the videos: 596
+  Videos in total, 4 Video Types. 155 are in the library (read 2026-09-30).
+- **Bug: download and preview failed on every migrated video** ("SharePoint did not return a
+  download link").
+  - The file endpoints looked the item id up in the Demo Catalog drive.
+  - Fixed: `routers/assets._asset_drive` picks the "Demo Video" drive for `video-*` assets.
+  - Checked locally against the live library: both now return 302 to SharePoint's
+    download.aspx / embed.aspx.
+- **Not changed:** the write-back of accepted metadata proposals (`graph/writeback.py`) still
+  targets the Demo Catalog only. Proposals on Demo Video assets would not reach SharePoint.
+- **New: the Long Description** is stored on Demo Video assets (`Asset.long_description`) and
+  shown as "Detail Description" at the end of the detail page's Details section.
+  - 155 of 155 videos have one.
+  - **Staging needs a SharePoint sync after the deploy** before it shows.

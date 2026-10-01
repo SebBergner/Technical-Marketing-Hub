@@ -446,6 +446,10 @@ class Asset(AssetBase):
     main_video: str | None = None
     #: VM pages only (type == vm).
     vm: VmDetail | None = None
+    #: Demo Video assets: the sheet's Long Description (the short one is
+    #: `description`). Detail page only, shown at the end of the Details
+    #: section (Liwei, 2026-09-30).
+    long_description: str | None = None
     #: Words a search should find that no displayed field carries: for a
     #: Demo Video asset, the long description, products outside the Hub's
     #: list (ThingWorx, Vuforia...), the gallery and its section (Liwei,

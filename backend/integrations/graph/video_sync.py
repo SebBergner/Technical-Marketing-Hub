@@ -163,6 +163,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], VideoSyncResult]:
             web_url=item.get("webUrl"),
             source_item_id=item.get("id"),
             search_text=_search_text(fields, hub_products),
+            long_description=m.clean_text(_field(fields, "long_description")),
         )
         stated[name] = (m.as_bool(_field(fields, "customer_facing")),
                         m.as_bool(_field(fields, "has_audio")))

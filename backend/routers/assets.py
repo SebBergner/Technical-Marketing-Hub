@@ -173,13 +173,24 @@ def _require_listed_file(asset_id: str, item_id: str, repo: AssetRepository) -> 
             detail=f"'{item_id}' is not a file listed on asset '{asset_id}'")
 
 
-def _demo_catalog_drive(client: GraphClient):
+def _asset_drive(client: GraphClient, asset_id: str):
+    """The library this asset's files are in.
+
+    A file's item id only resolves in its own drive. Demo Video assets
+    (backend/integrations/graph/video_sync.py, ids "video-...") live in that
+    library; everything else here is the Demo Catalog. Asking the Demo
+    Catalog for a Demo Video file returned nothing, so download and preview
+    failed on every migrated video (Liwei, 2026-09-30).
+    """
+    from backend.integrations.graph.video_sync import ID_PREFIX
+    library = (settings.graph_video_library if asset_id.startswith(ID_PREFIX)
+               and settings.graph_video_library else settings.graph_list_name)
     site = client.resolve_site()
-    drive = client.find_drive(site.site_id, settings.graph_list_name)
+    drive = client.find_drive(site.site_id, library)
     if drive is None:
         raise HTTPException(
             status_code=502,
-            detail=f"no drive named {settings.graph_list_name!r} on {site.web_url}")
+            detail=f"no drive named {library!r} on {site.web_url}")
     return drive
 
 
@@ -197,7 +208,7 @@ def download_file(asset_id: str, item_id: str,
     """
     _require_listed_file(asset_id, item_id, repo)
     try:
-        drive = _demo_catalog_drive(client)
+        drive = _asset_drive(client, asset_id)
         url = client.download_url(drive.drive_id, item_id)
     except GraphError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
@@ -235,7 +246,7 @@ def preview_file(asset_id: str, item_id: str,
     """
     _require_listed_file(asset_id, item_id, repo)
     try:
-        drive = _demo_catalog_drive(client)
+        drive = _asset_drive(client, asset_id)
         url = client.preview(drive.drive_id, item_id)
     except GraphError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc

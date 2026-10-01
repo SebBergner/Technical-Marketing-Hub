@@ -1639,12 +1639,17 @@
     // ("Virtual Machine (7)" made Asset Type 230px while reading "All"),
     // so the search box keeps the room.
     "#mainTopbar .filter-pill select{field-sizing:content}" +
-    "#mainTopbar .hero-search__field{min-width:300px}" +
-    ".hub-more-btn{display:inline-flex;align-items:center;gap:6px;padding:10px 13px;font:inherit;font-size:13px;" +
-    "color:var(--orion-text-2);background:var(--orion-surface);border:1px solid var(--orion-border-md);" +
+    "#mainTopbar .hero-search__field{min-width:360px}" +
+    // Built to the filter pills' own measurements (Seb, 2026-10-01: it
+    // "looks strange" beside them): same 46px height, the value colour for
+    // its text, the arrow at the same inset.
+    ".hub-more-btn{position:relative;display:inline-flex;align-items:center;gap:8px;" +
+    "padding:10px 32px 10px 13px;font:inherit;font-size:13px;line-height:24px;" +
+    "color:var(--orion-text);background:var(--orion-surface);border:1px solid var(--orion-border-md);" +
     "border-radius:var(--orion-radius-sm);cursor:pointer;white-space:nowrap}" +
-    ".hub-more-btn:hover,.hub-more-btn[aria-expanded=true]{border-color:var(--orion-indigo);color:var(--orion-text)}" +
-    ".hub-more-btn svg{width:14px;height:14px;transition:transform .15s}" +
+    ".hub-more-btn:hover,.hub-more-btn[aria-expanded=true]{border-color:var(--orion-indigo)}" +
+    ".hub-more-btn svg{position:absolute;right:11px;width:14px;height:14px;color:var(--orion-text-3);" +
+    "pointer-events:none;transition:transform .15s}" +
     ".hub-more-btn[aria-expanded=true] svg{transform:rotate(180deg)}" +
     ".hub-more-btn__n{min-width:18px;padding:0 5px;border-radius:999px;background:var(--orion-indigo);color:#fff;" +
     "font-size:11px;font-weight:700;line-height:18px;text-align:center}" +
@@ -3875,11 +3880,16 @@
   function advancedHash(q) { return "#/search/" + encodeURIComponent(q || ""); }
 
   var ADV_CSS =
-    ".hub-adv-open{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;" +
-    "border:1px solid var(--orion-border-md);border-radius:var(--orion-radius-pill);" +
-    "background:var(--orion-surface);color:var(--orion-text);font:inherit;font-size:12.5px;" +
-    "font-weight:600;cursor:pointer;white-space:nowrap}" +
-    ".hub-adv-open:hover{border-color:var(--orion-indigo);color:var(--orion-indigo)}" +
+    // Inside the search field, at its right end, set off by a divider
+    // (Liwei, 2026-10-01): part of the search, the way Gmail and Drive put
+    // their search options in the box, rather than a fifth control beside
+    // the filters it is not one of.
+    ".hub-adv-open{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;margin:-4px -6px -4px 4px;" +
+    "padding:4px 6px 4px 12px;border:none;border-left:1px solid var(--orion-border-md);border-radius:0;" +
+    "background:none;color:var(--orion-indigo);font:inherit;font-size:12.5px;font-weight:600;" +
+    "cursor:pointer;white-space:nowrap}" +
+    ".hub-adv-open:hover{text-decoration:underline}" +
+    ".hub-adv-open:focus-visible{outline:2px solid var(--orion-indigo);outline-offset:2px}" +
     // PTC green, not blue (Liwei, 2026-09-30). index.html colours these with
     // var(--orion-accent, #5b6cff), and --orion-accent is defined nowhere, so
     // the blue fallback always showed. The ids raise specificity: this sheet
@@ -4257,11 +4267,11 @@
       open.id = "hubAdvOpen";
       open.className = "hub-adv-open";
       open.title = "Also search the names of the files inside every demo";
-      open.innerHTML = '<svg class="orion-ico orion-ico--sm"><use href="#i-search"/></svg>Advanced Search';
+      open.innerHTML = '<svg class="orion-ico orion-ico--sm"><use href="#i-file-text"/></svg>Advanced Search';
       open.addEventListener("click", function () {
         location.hash = advancedHash(val("hubSearchInput").trim());
       });
-      field.parentNode.insertBefore(open, field.nextSibling);
+      field.appendChild(open);
     }
     // Elio's Request view knows nothing of this page; opening it must still
     // take this page down, or both would show.

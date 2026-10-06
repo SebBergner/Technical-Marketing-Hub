@@ -55,7 +55,12 @@ def repo(tmp_path, monkeypatch):
 def client_as(monkeypatch, user):
     from app import app
     from backend.auth import get_current_user
+    from backend.routers.graph import require_client
     app.dependency_overrides[get_current_user] = lambda: user
+    # No Graph needed: a partner is refused before anything is fetched. Without
+    # this the test passed only where .env holds Graph credentials -- CI has
+    # none and answered 503 "not configured" (deploy run 37485766967).
+    app.dependency_overrides[require_client] = lambda: object()
     return TestClient(app, base_url="http://localhost")
 
 

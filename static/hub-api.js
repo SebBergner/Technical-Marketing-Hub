@@ -3775,6 +3775,18 @@
     // directly (see that button's own comment for why), but that page is
     // where the real "Download a copy" zip action lives.
 
+    /* A partner on a demo whose SharePoint folder is closed to partners
+     * gets the file names without the ids that open them (the server strips
+     * them; 2026-10-06), so every row is plain text -- this says why. */
+    if (asset.files_locked) {
+      var locked = document.createElement("div");
+      locked.className = "vp-files__note";
+      locked.style.margin = "0 0 10px";
+      locked.textContent = "These files can't be previewed or downloaded with your account. "
+        + "Ask your PTC contact if you need them.";
+      box.appendChild(locked);
+    }
+
     /* Two tabs, Videos and Documents (Liwei, 2026-09-30). "Documents" is
      * everything that is not a video -- the PowerPoint and the script, and
      * also a zipped dataset or an image, since there are only two tabs and

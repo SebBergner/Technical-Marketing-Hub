@@ -317,6 +317,10 @@ def auth_callback(request: Request):
         "name": claims.get("name"),
         "roles": [str(r) for r in claims.get("roles") or []][:20],
         "groups": _curator_groups(claims),
+        # A guest's token names its home identity provider in `idp`; a
+        # member's normally carries none, or PTC's own tenant.
+        "external": bool(claims.get("idp")) and str(claims.get("tid") or "").lower()
+                    not in str(claims.get("idp")).lower(),
         "signed_in_at": int(time.time()),
     }
     log.info("signed in: %s", claims.get("preferred_username") or claims["oid"])

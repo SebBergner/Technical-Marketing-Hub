@@ -173,6 +173,14 @@ class Settings(BaseSettings):
     #: the custom domain answers -- before that it points everyone at nothing.
     custom_domain: str = ""
 
+    #: Partners reach SharePoint through this group; the Hub lets a partner
+    #: download from a demo folder only where this group holds Read there
+    #: (backend/integrations/graph/partner_access.py, 2026-10-06).
+    partner_group_name: str = "GPX TDD Scalable Demo Catalog Visitors"
+    #: Signed-in users whose email is in one of these domains are PTC people;
+    #: anyone else (guest accounts) counts as a partner. Comma-separated.
+    internal_email_domains: str = "ptc.com"
+
     # ------------------------------------------------ the admin bridge (temporary)
     #: A single shared credential for the Admin page, for the stretch before
     #: Entra SSO exists. Deliberately NOT a replacement for it:

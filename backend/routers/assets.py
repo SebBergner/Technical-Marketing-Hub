@@ -6,7 +6,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from backend.config import settings
-from backend.deps import get_repo
+from backend.deps import CurrentUser, get_current_user, get_repo
 from backend.integrations.graph.client import GraphClient, GraphError
 from backend.models import AdvancedSearchHit, Asset, AssetSummary, Page, video_type_filter
 from backend.repositories.base import AssetRepository, AssetQuery
@@ -98,25 +98,44 @@ def advanced_search(
     limit: int = Query(default=30, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     repo: AssetRepository = Depends(get_repo),
+    user: CurrentUser = Depends(get_current_user),
 ):
     """Advanced Search: the ordinary search plus the names of every listed
     file in each demo's folder (Liwei, 2026-09-30). One row per demo, with
     the files that matched. Declared before `/{asset_id}`, which would
     otherwise take "advanced-search" for an id."""
     try:
-        return repo.advanced_search(AssetQuery(text=q, types=type, limit=limit, offset=offset))
+        page = repo.advanced_search(AssetQuery(text=q, types=type, limit=limit, offset=offset))
     except NotImplementedError:
         raise HTTPException(status_code=501,
                             detail="Advanced Search needs the file-backed catalogue")
+    if user.is_partner:
+        page.items = [h.model_copy(update={"files": _without_file_ids(h.files)})
+                      if _locked_for(user, h.asset) else h for h in page.items]
+    return page
+
+
+def _locked_for(user: CurrentUser, asset) -> bool:
+    """A partner on a demo whose SharePoint folder is closed to partners."""
+    return bool(getattr(asset, "partner_restricted", False)) and user.is_partner
+
+
+def _without_file_ids(resources: list) -> list:
+    """The files, listed by name, without the ids that open or download them."""
+    return [r.model_copy(update={"item_id": None}) for r in resources]
 
 
 @router.get("/{asset_id}", response_model=Asset)
-def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo)):
+def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo),
+              user: CurrentUser = Depends(get_current_user)):
     asset = repo.get(asset_id)
     if asset is None:
         if repo.is_hidden(asset_id):
             raise HTTPException(status_code=404, detail="This demo is hidden from the Hub.")
         raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
+    if _locked_for(user, asset):
+        asset = asset.model_copy(update={"resources": _without_file_ids(asset.resources),
+                                         "files_locked": True})
     return asset
 
 
@@ -181,6 +200,15 @@ def record_view(asset_id: str, repo: AssetRepository = Depends(get_repo)):
     _record(repo, "view", asset_id)
 
 
+def _require_partner_access(asset_id: str, repo: AssetRepository, user: CurrentUser) -> None:
+    """Partners may not open or download a file from a demo whose SharePoint
+    folder is closed to the partner group (2026-10-06)."""
+    asset = repo.get(asset_id)
+    if asset is not None and _locked_for(user, asset):
+        raise HTTPException(status_code=403,
+                            detail="These files are not available to your account.")
+
+
 def _require_listed_file(asset_id: str, item_id: str, repo: AssetRepository) -> None:
     """Both file endpoints below need this same check: `item_id` must belong
     to a resource actually listed on this asset. Graph would happily resolve
@@ -222,7 +250,8 @@ def _asset_drive(client: GraphClient, asset_id: str):
 @router.get("/{asset_id}/files/{item_id}/download")
 def download_file(asset_id: str, item_id: str,
                   repo: AssetRepository = Depends(get_repo),
-                  client: GraphClient = Depends(require_client)):
+                  client: GraphClient = Depends(require_client),
+                  user: CurrentUser = Depends(get_current_user)):
     """A file inside a SharePoint asset's folder, resolved and handed off.
 
     Redirects to Graph's pre-authenticated download URL rather than proxying
@@ -232,6 +261,7 @@ def download_file(asset_id: str, item_id: str,
     stored; this endpoint exists only to mint one on demand.
     """
     _require_listed_file(asset_id, item_id, repo)
+    _require_partner_access(asset_id, repo, user)
     try:
         drive = _asset_drive(client, asset_id)
         url = client.download_url(drive.drive_id, item_id)
@@ -260,7 +290,8 @@ def download_file(asset_id: str, item_id: str,
 @router.get("/{asset_id}/files/{item_id}/preview")
 def preview_file(asset_id: str, item_id: str,
                  repo: AssetRepository = Depends(get_repo),
-                 client: GraphClient = Depends(require_client)):
+                 client: GraphClient = Depends(require_client),
+                 user: CurrentUser = Depends(get_current_user)):
     """An embeddable viewer for a file, so it can be looked at before deciding
     to download it.
 
@@ -270,6 +301,7 @@ def preview_file(asset_id: str, item_id: str,
     presumably) PDF and images all resolve through the same Graph call.
     """
     _require_listed_file(asset_id, item_id, repo)
+    _require_partner_access(asset_id, repo, user)
     try:
         drive = _asset_drive(client, asset_id)
         url = client.preview(drive.drive_id, item_id)

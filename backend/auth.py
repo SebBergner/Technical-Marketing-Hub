@@ -108,6 +108,25 @@ class CurrentUser:
     #: True when running with auth disabled, so callers and diagnostics can
     #: tell "a real curator" from "nobody, and nothing is enforced".
     is_dev_principal: bool = False
+    #: The sign-in came through another directory (a guest account): its ID
+    #: token named an outside identity provider. Recorded at sign-in.
+    external: bool = False
+
+    @property
+    def is_partner(self) -> bool:
+        """A guest account -- a partner -- rather than PTC staff (2026-10-06).
+
+        External by the token, or an email outside the internal domains: a
+        partner's guest account signs in with their own address
+        (someone@parametricdesign.it). The local development principal is
+        never one."""
+        if self.is_dev_principal:
+            return False
+        if self.external:
+            return True
+        domain = (self.email or "").rsplit("@", 1)[-1].strip().lower()
+        internal = {d.strip().lower() for d in settings.internal_email_domains.split(",") if d.strip()}
+        return not domain or domain not in internal
 
     @property
     def can_curate(self) -> bool:
@@ -120,6 +139,7 @@ class CurrentUser:
             "is_authenticated": self.is_authenticated,
             "is_dev_principal": self.is_dev_principal,
             "can_curate": self.can_curate,
+            "is_partner": self.is_partner,
         }
 
 
@@ -254,6 +274,7 @@ def _principal_from_session(request: Request) -> CurrentUser:
         name=user.get("name") or email,
         object_id=user.get("oid"),
         provider="aad",
+        external=bool(user.get("external")),
         roles=_map_roles(claim_values, user.get("email"), user.get("oid"),
                          user.get("username")),
         is_authenticated=True,

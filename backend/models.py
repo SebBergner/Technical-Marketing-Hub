@@ -384,6 +384,9 @@ class AssetBase(BaseModel):
     #: (backend/integrations/graph/demo_pages.py). For a page-only demo it is
     #: also `web_url`.
     page_url: str | None = None
+    #: The partner group may not download from this demo's folder in
+    #: SharePoint (partner_access.py); partners get its files' names only.
+    partner_restricted: bool = False
 
     # cross-references — the four ID spaces the Portal exists to correlate
     source_item_id: str | None = None         # SharePoint list item
@@ -465,6 +468,9 @@ class Asset(AssetBase):
     #: last changed (so an unchanged page's web parts are not re-read).
     page_folder: str | None = None
     page_modified: str | None = None
+    #: Set on the response for a partner on a partner-restricted demo: the
+    #: files are listed without the ids that open or download them.
+    files_locked: bool = False
     #: Every other asset: the VMs whose pages say they run it.
     used_by_vms: list[UsedByVm] = Field(default_factory=list)
 

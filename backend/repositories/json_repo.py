@@ -80,6 +80,7 @@ _MIRROR_FIELDS = (
 #: signed-in person may see. Rebuilt by every VM sync, like the rest of mirror/.
 PRIVATE_DIR = "private"
 VM_SECRETS_FILE = "vm_credentials.json"
+PARTNER_ACCESS_FILE = "partner_access.json"
 
 #: The Type filter's own options, in the order Elio's dropdown shows them --
 #: always present in facets().types, even at zero, same reasoning as
@@ -363,7 +364,13 @@ class JsonAssetRepository(AssetRepository):
         # Hidden from the Hub on the Admin page (owned/hidden.json): out of
         # every read here, at the funnel, like a retired item.
         hidden = self._load("hidden") or {}
-        return [r for r in rows if r["id"] not in hidden] if hidden else rows
+        if hidden:
+            rows = [r for r in rows if r["id"] not in hidden]
+        closed = {k for k, v in self.partner_access().items() if v}
+        if closed:
+            rows = [{**r, "partner_restricted": True} if r.get("source_item_id") in closed else r
+                    for r in rows]
+        return rows
 
     def _load(self, name: str) -> dict[str, dict]:
         return _read(self._owned_path(name), {})
@@ -465,6 +472,28 @@ class JsonAssetRepository(AssetRepository):
                                 has_roadmap=r["id"] in indexed) for r in window],
             total=len(rows), limit=query.limit, offset=query.offset,
         )
+
+    # ─────────────────────────────────────────── partner access
+    def partner_access(self) -> dict[str, bool]:
+        """{folder item id: closed to partners}, as the last sync read it.
+        Under mirror/private/ -- rebuilt by every sync, never catalogue rows."""
+        path = os.path.join(self.mirror_dir, PRIVATE_DIR, PARTNER_ACCESS_FILE)
+        if not os.path.exists(path):
+            return {}
+        stamp = os.path.getmtime(path)
+        cached = self._mirror_cache.get(path)
+        if cached is None or cached[0] != stamp:
+            cached = (stamp, _read(path, {}))
+            self._mirror_cache[path] = cached
+        return cached[1]
+
+    def replace_partner_access(self, access: dict[str, bool]) -> None:
+        folder = os.path.join(self.mirror_dir, PRIVATE_DIR)
+        os.makedirs(folder, exist_ok=True)
+        path = os.path.join(folder, PARTNER_ACCESS_FILE)
+        with self._lock:
+            _atomic_write(path, access)
+            self._invalidate(path)
 
     # ─────────────────────────────────────────── hidden from the Hub
     def hidden(self) -> list[dict]:
@@ -1183,6 +1212,7 @@ class JsonAssetRepository(AssetRepository):
             title=record["title"], description=record.get("description"),
             web_url=record.get("web_url"),
             page_url=record.get("page_url"),
+            partner_restricted=bool(record.get("partner_restricted")),
             products=record.get("products") or [],
             product_families=taxonomy.families_of(record.get("products")),
             umbrella_families=taxonomy.umbrellas_of(record.get("products")),

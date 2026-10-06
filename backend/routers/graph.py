@@ -104,6 +104,7 @@ def run_sync(client: GraphClient, repo: AssetRepository, actor: str,
     summary["vm_pages"] = _sync_vm_pages(client, repo)
     summary["demo_video"] = _sync_demo_video(client, repo)
     summary["demo_pages"] = _sync_demo_pages(client, repo)
+    summary["partner_access"] = _sync_partner_access(client, repo)
     _record_attempt(repo, ok=True, summary=summary)
     log.info("graph sync by %s: %s", actor, summary)
     return summary
@@ -123,6 +124,20 @@ def _sync_vm_pages(client: GraphClient, repo: AssetRepository) -> dict:
         return {"ok": True, **sync_vm_pages(client, repo, site).as_dict()}
     except Exception as exc:                                 # noqa: BLE001
         log.exception("vm page sync failed")
+        return {"ok": False, "error": str(exc)[:300]}
+
+
+def _sync_partner_access(client: GraphClient, repo: AssetRepository) -> dict:
+    """Which demo folders the partner group may download from: read after
+    the libraries, failing alone (partner_access.py)."""
+    from backend.integrations.graph.partner_access import sync_partner_access
+    if not hasattr(repo, "replace_partner_access"):
+        return {"ok": None, "skipped": "repository has no partner access store"}
+    try:
+        site = client.resolve_site(settings.graph_site_url)
+        return {"ok": True, **sync_partner_access(client, repo, site).as_dict()}
+    except Exception as exc:                                 # noqa: BLE001
+        log.exception("partner access sync failed")
         return {"ok": False, "error": str(exc)[:300]}
 
 

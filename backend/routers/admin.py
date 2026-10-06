@@ -109,6 +109,7 @@ def _sharepoint_libraries(repo: AssetRepository) -> list[dict]:
     """
     from backend.integrations.graph.video_sync import SOURCE_SYSTEM as VIDEO
     from backend.integrations.graph.vm_pages import SOURCE_SYSTEM as VM_PAGES
+    from backend.integrations.graph.demo_pages import SOURCE_SYSTEM as DEMO_PAGES
     last = (repo.sync_state("sharepoint") if hasattr(repo, "sync_state") else {}) or {}
     result = last.get("last_result") or {}
     count = getattr(repo, "count_source_rows", None)
@@ -116,16 +117,28 @@ def _sharepoint_libraries(repo: AssetRepository) -> list[dict]:
         {"name": settings.graph_list_name, "source": "sharepoint", "summary_key": None},
         {"name": settings.graph_video_library, "source": VIDEO, "summary_key": "demo_video"},
         {"name": "Virtual Machines pages", "source": VM_PAGES, "summary_key": "vm_pages"},
+        # 2026-10-05/06: the Demo Catalog's pages, and which demo folders
+        # partners may download from. Both ride along with the same sync.
+        {"name": "Demo Catalog pages", "source": DEMO_PAGES, "summary_key": "demo_pages",
+         "unit": "pages"},
+        {"name": "Partner downloads", "source": None, "summary_key": "partner_access"},
     ]
     out = []
     for r in rows:
         if not r["name"]:
             continue                      # switched off (e.g. GRAPH_VIDEO_LIBRARY blank)
         part = result.get(r["summary_key"]) if r["summary_key"] else None
-        out.append({"name": r["name"], "source": r["source"],
-                    "assets": count(r["source"]) if count else None,
-                    "ok": part.get("ok") if isinstance(part, dict) else None,
-                    "error": part.get("error") if isinstance(part, dict) else None})
+        entry = {"name": r["name"], "source": r["source"],
+                 "assets": count(r["source"]) if count and r["source"] else None,
+                 "unit": r.get("unit", "assets"),
+                 "ok": part.get("ok") if isinstance(part, dict) else None,
+                 "error": part.get("error") if isinstance(part, dict) else None}
+        if r["summary_key"] == "partner_access":
+            access = repo.partner_access() if hasattr(repo, "partner_access") else {}
+            closed = sum(1 for v in access.values() if v)
+            entry["text"] = (f"{closed} of {len(access)} folders closed to partners"
+                             if access else "not checked yet")
+        out.append(entry)
     return out
 
 

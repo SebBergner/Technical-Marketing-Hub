@@ -157,7 +157,8 @@
     libs.forEach(function (lib) {
       var bad = lib.ok === false;
       row(c1, lib.name || "—",
-          (lib.assets == null ? "—" : lib.assets.toLocaleString() + " assets")
+          (lib.text || (lib.assets == null ? "—"
+                        : lib.assets.toLocaleString() + " " + (lib.unit || "assets")))
             + (bad ? " · last sync failed" : ""),
           bad ? "pill--bad" : null);
       if (bad && lib.error) row(c1, lib.name + " error", lib.error);
@@ -978,6 +979,27 @@
       });
   }
 
+  /* One line per run: what each part of the SharePoint sync did. The
+   * summary held them all along; only "N skipped" was ever shown. */
+  function syncDetail(s) {
+    if (!s) return "";
+    var parts = [];
+    if (s.skipped_total !== undefined) parts.push(s.skipped_total + " skipped");
+    var named = [["demo_video", "Demo Video"], ["vm_pages", "VM pages"], ["demo_pages", "Demo pages"]];
+    named.forEach(function (n) {
+      var p = s[n[0]];
+      if (!p) return;
+      var n2 = p.indexed != null ? p.indexed : p.vms;      // VM pages count "vms"
+      parts.push(n[1] + (p.ok === false ? " failed" : p.ok === true
+        ? (n2 != null ? " " + n2 : " ✓") : " skipped"));
+    });
+    var pa = s.partner_access;
+    if (pa) parts.push(pa.ok === false ? "Partner check failed"
+      : "Partners: " + pa.restricted + " of " + pa.folders + " closed"
+        + (pa.errors && pa.errors.length ? " (" + pa.errors.length + " unread)" : ""));
+    return parts.join(" · ");
+  }
+
   function openSourceSheet(source) {
     fetch("/api/admin/source/" + encodeURIComponent(source))
       .then(function (r) { return r.json(); })
@@ -1011,9 +1033,7 @@
             tr.appendChild(el("td", "r num",
               run.summary && run.summary.indexed !== undefined
                 ? run.summary.indexed : "—"));
-            tr.appendChild(el("td", "faint", run.error
-              || (run.summary && run.summary.skipped_total !== undefined
-                ? run.summary.skipped_total + " skipped" : "")));
+            tr.appendChild(el("td", "faint", run.error || syncDetail(run.summary)));
             rb.appendChild(tr);
           });
           rt.appendChild(rb);

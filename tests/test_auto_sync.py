@@ -240,6 +240,13 @@ def test_the_sharepoint_card_lists_every_library_the_sync_covers(tmp_path, monke
     assert (rows["Demo Video"]["assets"], rows["Demo Video"]["ok"],
             rows["Demo Video"]["error"]) == (1, False, "library unreachable")
     assert rows["Virtual Machines pages"]["ok"] is True
+    assert rows["Partner downloads"]["text"] == "not checked yet"
+
+    # 2026-10-06: the partner check and the Demo Catalog pages get rows too.
+    repo.replace_partner_access({"F-1": True, "F-2": False, "F-3": False})
+    rows = {r["name"]: r for r in _sharepoint_libraries(repo)}
+    assert rows["Partner downloads"]["text"] == "1 of 3 folders closed to partners"
+    assert rows["Demo Catalog pages"]["unit"] == "pages"
 
     monkeypatch.setattr(settings, "graph_video_library", "")
     assert "Demo Video" not in {r["name"] for r in _sharepoint_libraries(repo)}

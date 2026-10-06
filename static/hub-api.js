@@ -2360,6 +2360,15 @@
       asset = await getJSON("/api/assets/" + encodeURIComponent(id));
     } catch (err) {
       console.error("[hub-api] could not load asset", id, err);
+      // A link to a demo that has been hidden or removed used to do nothing
+      // at all (2026-10-06): say so, and go back to the catalogue.
+      if (/HTTP 404/.test(String(err && err.message))) {
+        report("That demo is not available in the Hub.", true);
+        if (location.hash.indexOf("#/asset/") === 0) {
+          history.replaceState(null, "", location.pathname + location.search);
+        }
+        closeAssetDetail();
+      }
       return;
     }
     detailAsset = asset;
@@ -2494,7 +2503,10 @@
                      // to press the real button.
                      // No platform in the label (brief §15): "Open Demo"
                      // was "Go to Consensus"; a video opens, a kit downloads.
+                     // A demo known only from its page has nothing to
+                     // download: its button opens the page (2026-10-05).
                      asset.source === "consensus" ? "Open Demo"
+                       : isPageOnly(asset) ? "Open demo page"
                        : asset.type === "video" ? "Open Video" : "Download Kit",
                      platformHref,
                      asset.source === "consensus" ? "i-send" : "i-file-text"),
@@ -2523,6 +2535,23 @@
     // verb should still say "copy" since that's the only thing the button
     // does; Liwei's final call was Elio's original wording.
     var actions = page.querySelector(".vp-actions");
+    /* The demo's SharePoint page, when it has one besides its folder: a
+     * quiet text link, not a third button (Liwei, 2026-10-05). A page-only
+     * demo already opens its page from the main button. */
+    var pageLink = document.getElementById("vpPageLink");
+    if (pageLink) pageLink.remove();
+    if (actions && asset.page_url && !isPageOnly(asset)) {
+      pageLink = document.createElement("a");
+      pageLink.id = "vpPageLink";
+      pageLink.className = "hub-page-link";
+      pageLink.href = asset.page_url;
+      pageLink.target = "_blank";
+      pageLink.rel = "noopener";
+      pageLink.title = "The demo's page on the EXT-TDD SharePoint site";
+      pageLink.textContent = "Demo page \u2197";
+      actions.appendChild(pageLink);
+    }
+
     if (actions && !document.getElementById("vpCopyLink")) {
       var copy = document.createElement("button");
       copy.className = "btn-ghost";
@@ -3809,6 +3838,12 @@
     (document.getElementById("vpPaneFiles") || page).appendChild(box);
   }
 
+  /* Listed from its SharePoint page alone: no project folder, so no files
+   * (backend/integrations/graph/demo_pages.py). */
+  function isPageOnly(asset) {
+    return !!asset.page_url && asset.page_url === asset.web_url;
+  }
+
   function linkButton(className, label, href, icon, title) {
     var a = document.createElement("a");
     a.className = className;
@@ -3939,6 +3974,9 @@
     "#productScopeResult.hub-derived--pending{border-color:var(--orion-border-md);background:var(--orion-surface-2)}" +
     "#productScopeResult.hub-derived--pending .derived-output__label{color:var(--orion-text-3)}" +
     "#productScopeResult.hub-derived--pending .derived-output__value{color:var(--orion-text-2);font-weight:500}" +
+    ".hub-page-link{align-self:center;font-size:12.5px;color:var(--orion-text-3);text-decoration:none;" +
+    "white-space:nowrap;padding:0 4px}" +
+    ".hub-page-link:hover{color:var(--orion-link);text-decoration:underline}" +
     ".hub-adv__count{margin-left:auto;font-size:12px;color:var(--orion-text-3);white-space:nowrap;" +
     "font-variant-numeric:tabular-nums}" +
     // The sidebar's logo and name go Home (wireBrandHome).

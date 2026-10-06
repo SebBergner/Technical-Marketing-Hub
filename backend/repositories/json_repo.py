@@ -32,11 +32,13 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import threading
 from collections import Counter
 from dataclasses import replace
 from datetime import date
 from typing import Any
+from urllib.parse import parse_qs, unquote, urlparse
 
 from backend.models import (
     AdvancedSearchHit, Asset, AssetRequest, AssetStats, AssetSummary, AssetType, Capability, Facets, FacetValue, MetadataProposal,
@@ -69,6 +71,8 @@ _MIRROR_FIELDS = (
     "search_text",
     # Detail page only; see Asset.long_description.
     "long_description",
+    # Demo pages (backend/integrations/graph/demo_pages.py).
+    "page_url", "page_folder", "page_modified",
 )
 
 #: Under mirror/, and never read as catalogue data: _load_mirror only reads
@@ -132,6 +136,90 @@ def _searchable(record: dict) -> str | None:
                                  record.get("search_text"),
                                  record.get("named_customer")) if x)
     return f"{text or ''} {extra}" if extra else text
+
+
+def _folder_key(text: str | None) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", (text or "").lower()))
+
+
+def _catalog_folder(record: dict) -> str | None:
+    """The Demo Catalog folder a demo lives in, from its address
+    (".../DocSetHome.aspx?id=/sites/EXT-TDD/Demo%20Catalog/<folder>").
+
+    The `id` parameter is read as a parameter, so a folder named
+    "Codebeamer FA&D Overview" keeps its "&" (it is %26 in the address)."""
+    url = record.get("web_url") or ""
+    query = parse_qs(urlparse(url).query).get("id")
+    path = query[0] if query else unquote(urlparse(url).path)
+    match = re.search(r"/Demo Catalog/([^/]+)", path)
+    return match.group(1) if match else None
+
+
+def _apply_demo_pages(tagged: list[tuple[str, dict]],
+                      divested_folders: set[str] = frozenset(),
+                      show_page_links: bool = False,
+                      show_page_only: bool = True) -> list[tuple[str, dict]]:
+    """Demo pages, matched to the demos their pages describe (Liwei, 2026-10-05).
+
+    A page pointing at a folder the Hub lists adds to that demo -- its
+    thumbnail and a link to the page -- and is not listed itself. A page with
+    no such folder IS the demo: listed from the page alone, with no files.
+    Decided here, at read time, so a folder that gains its Demo Type later
+    starts matching without the page sync running again. Copies, never the
+    cached records.
+
+    `show_page_links` is the Admin switch (owned/hub_settings.json, off by
+    default -- Liwei, 2026-10-05: management has not agreed on exposing
+    SharePoint). Off, no page address leaves the server: the demo keeps its
+    page thumbnail, a page-only demo is still listed, but neither carries a
+    link to the page.
+
+    `show_page_only`, the second switch (on by default): off, demos known
+    only from their page are not listed at all; pages still lend their
+    thumbnail to the demos whose folders they describe."""
+    pages = [r for src, r in tagged if src == "demo_pages"]
+    if not pages:
+        return tagged
+    folders = {}
+    for src, r in tagged:
+        if src == "sharepoint":
+            key = _folder_key(_catalog_folder(r))
+            if key:
+                folders[key] = r["id"]
+    # Two pages on one folder: the most recently changed one speaks for it.
+    by_target: dict[str, dict] = {}
+    unmatched = []
+    for page in pages:
+        key = _folder_key(page.get("page_folder"))
+        if key and key in divested_folders:
+            # The page's own Product column may name something current
+            # (Integrity Lifecycle Manager's page says Codebeamer), but the
+            # demo it describes is divested: it stays out with its folder.
+            continue
+        target = folders.get(key)
+        if target is None and not key:
+            # No folder in the page's web parts: a folder named exactly like
+            # the page is the same demo (Lamborghini IPL's page links no files
+            # but its folder exists -- 2026-10-06), so the two are not listed
+            # twice.
+            target = folders.get(_folder_key(page.get("title")))
+        if target is None:
+            unmatched.append(page)
+        elif str(page.get("page_modified") or "") >= str(by_target.get(target, {}).get("page_modified") or ""):
+            by_target[target] = page
+    out = []
+    for src, r in tagged:
+        if src == "demo_pages":
+            continue
+        page = by_target.get(r["id"]) if src == "sharepoint" else None
+        if page:
+            r = {**r, "page_url": page.get("page_url") if show_page_links else None,
+                 "thumbnail_url": page.get("thumbnail_url") or r.get("thumbnail_url")}
+        out.append((src, r))
+    if show_page_only:
+        out.extend(("demo_pages", p if show_page_links else {**p, "page_url": None, "web_url": None})
+                   for p in unmatched)
+    return out
 
 
 def _dedupe_by_id(tagged: list[tuple[str, dict]]) -> list[dict]:
@@ -230,6 +318,7 @@ class JsonAssetRepository(AssetRepository):
         invalidate explicitly via `_invalidate`.
         """
         tagged: list[tuple[str, dict]] = []
+        divested_folders: set[str] = set()
         if os.path.isdir(self.mirror_dir):
             for name in sorted(os.listdir(self.mirror_dir)):
                 if not name.endswith(".json"):
@@ -258,13 +347,23 @@ class JsonAssetRepository(AssetRepository):
                 # in fourteen places. The sync also declines to index them, so
                 # this is the guarantee rather than the mechanism: it holds even
                 # against a mirror written by an older build.
-                tagged.extend((source, record) for record in cached[1]
-                              if not taxonomy.is_excluded(record.get("products")))
+                for record in cached[1]:
+                    if not taxonomy.is_excluded(record.get("products")):
+                        tagged.append((source, record))
+                    elif source == "sharepoint":
+                        divested_folders.add(_folder_key(_catalog_folder(record)))
         identity = self._load("identity")
         # Retired items keep their identity row but leave the catalogue.
         live = [(src, r) for src, r in tagged
                 if not (identity.get(r["id"], {}) or {}).get("retired_at")]
-        return _dedupe_by_id(live)
+        switches = self.hub_settings()
+        rows = _dedupe_by_id(_apply_demo_pages(live, divested_folders,
+                                               switches["show_demo_page_links"],
+                                               switches["show_page_only_demos"]))
+        # Hidden from the Hub on the Admin page (owned/hidden.json): out of
+        # every read here, at the funnel, like a retired item.
+        hidden = self._load("hidden") or {}
+        return [r for r in rows if r["id"] not in hidden] if hidden else rows
 
     def _load(self, name: str) -> dict[str, dict]:
         return _read(self._owned_path(name), {})
@@ -366,6 +465,55 @@ class JsonAssetRepository(AssetRepository):
                                 has_roadmap=r["id"] in indexed) for r in window],
             total=len(rows), limit=query.limit, offset=query.offset,
         )
+
+    # ─────────────────────────────────────────── hidden from the Hub
+    def hidden(self) -> list[dict]:
+        """Demos an admin has hidden, most recent first."""
+        state = self._load("hidden") or {}
+        items = [{"asset_id": k, **v} for k, v in state.items()]
+        return sorted(items, key=lambda i: i.get("hidden_at") or "", reverse=True)
+
+    def is_hidden(self, asset_id: str) -> bool:
+        return asset_id in (self._load("hidden") or {})
+
+    def hide(self, asset_id: str, actor: str) -> list[dict]:
+        """Hide one listed demo. Its title and type are kept with the entry,
+        because a hidden demo is no longer readable through get()."""
+        asset = self.get(asset_id)
+        if asset is None:
+            raise KeyError(asset_id)
+        with self._lock:
+            state = self._load("hidden") or {}
+            state[asset_id] = {"title": asset.title, "type": getattr(asset.type, "value", asset.type),
+                               "hidden_by": actor,
+                               "hidden_at": utcnow().isoformat(timespec="seconds")}
+            self._save("hidden", state)
+        return self.hidden()
+
+    def unhide(self, asset_id: str) -> list[dict]:
+        with self._lock:
+            state = self._load("hidden") or {}
+            state.pop(asset_id, None)
+            self._save("hidden", state)
+        return self.hidden()
+
+    # ─────────────────────────────────────────── Hub display settings
+    def hub_settings(self) -> dict:
+        state = self._load("hub_settings") or {}
+        return {"show_demo_page_links": bool(state.get("show_demo_page_links")),
+                # On unless switched off: these demos (Lamborghini IPL...) are
+                # why the page source exists.
+                "show_page_only_demos": bool(state.get("show_page_only_demos", True)),
+                "changed_by": state.get("changed_by"), "changed_at": state.get("changed_at")}
+
+    def set_hub_settings(self, actor: str, **values) -> dict:
+        """Portal-owned display switches (owned/hub_settings.json)."""
+        with self._lock:
+            state = self._load("hub_settings") or {}
+            state.update(values, changed_by=actor,
+                         changed_at=utcnow().isoformat(timespec="seconds"))
+            self._save("hub_settings", state)
+        return self.hub_settings()
 
     # ─────────────────────────────────────────── promoted on Home
     def promoted(self) -> dict:
@@ -844,6 +992,11 @@ class JsonAssetRepository(AssetRepository):
                 rows.append(entry)
         return list(reversed(rows))[:limit]
 
+    def source_rows(self, source_system: str) -> list[dict]:
+        """One source's mirror rows as stored -- for a sync that keeps state
+        on its own rows (demo_pages remembers which folder a page points at)."""
+        return list(_read(self._mirror_path(source_system), []))
+
     def count_source_rows(self, source_system: str) -> int:
         """How many mirror rows one source currently contributes."""
         return len(_read(os.path.join(self.mirror_dir, f"{source_system}.json"), []))
@@ -1029,6 +1182,7 @@ class JsonAssetRepository(AssetRepository):
             source=record.get("source") or "sharepoint",
             title=record["title"], description=record.get("description"),
             web_url=record.get("web_url"),
+            page_url=record.get("page_url"),
             products=record.get("products") or [],
             product_families=taxonomy.families_of(record.get("products")),
             umbrella_families=taxonomy.umbrellas_of(record.get("products")),

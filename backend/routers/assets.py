@@ -114,6 +114,8 @@ def advanced_search(
 def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo)):
     asset = repo.get(asset_id)
     if asset is None:
+        if repo.is_hidden(asset_id):
+            raise HTTPException(status_code=404, detail="This demo is hidden from the Hub.")
         raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
     return asset
 

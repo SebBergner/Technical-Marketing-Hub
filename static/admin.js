@@ -1332,6 +1332,192 @@
     });
   });
 
+  /* ── Hub display switches ─────────────────────────────────────────────
+   * One for now: links from the Hub to a demo's SharePoint page. Off by
+   * default while management decides whether to expose SharePoint (Liwei,
+   * 2026-10-05); when off the server sends no page address at all. */
+  function loadHubSettings() {
+    return fetch("/api/admin/hub-settings")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (s) { if (s) renderHubSettings(s); });
+  }
+
+  var HUB_SWITCHES = [
+    { key: "show_page_only_demos", title: "Demos with only a SharePoint page",
+      note: "Demos that have a page under SitePages/Demo Catalog but no project folder "
+          + "(Lamborghini IPL, for example). Hidden, they are not listed in the Hub at all; "
+          + "demos with a folder keep their page thumbnail either way. Shown by default." },
+    { key: "show_demo_page_links", title: "Links to SharePoint demo pages",
+      note: "The “Demo page” link on a demo that has a SharePoint page, and the "
+          + "“Open demo page” button on a demo known only from its page. Hidden, no "
+          + "page address is sent to the browser. Download Kit and Open Video are not "
+          + "affected. Hidden by default." }
+  ];
+
+  function renderHubSettings(s) {
+    var host = $("hubDisplay");
+    if (!host) return;
+    host.innerHTML = "";
+    var head = el("div", "card-head");
+    head.appendChild(el("h2", null, "SharePoint demo pages"));
+    host.appendChild(head);
+    var status = el("div", "promo-status faint",
+      s.changed_at ? "Last changed " + new Date(s.changed_at).toLocaleString()
+                     + (s.changed_by ? " by " + s.changed_by : "") : "Never changed: the defaults apply.");
+    HUB_SWITCHES.forEach(function (sw) {
+      var row = el("div", "promo-row");
+      row.style.gridTemplateColumns = "1fr auto";
+      var text = el("div");
+      text.appendChild(el("div", "promo-row__title", sw.title));
+      text.appendChild(el("div", "promo-row__meta", sw.note));
+      row.appendChild(text);
+      var toggle = el("label", "switch");
+      var box = el("input");
+      box.type = "checkbox";
+      box.checked = !!s[sw.key];
+      box.setAttribute("aria-label", sw.title);
+      toggle.appendChild(box);
+      toggle.appendChild(el("span", "switch__track"));
+      toggle.appendChild(el("span", "switch__label", s[sw.key] ? "Shown" : "Hidden"));
+      row.appendChild(toggle);
+      host.appendChild(row);
+      box.addEventListener("change", function () {
+        box.disabled = true;
+        status.textContent = "Saving…";
+        var body = {};
+        body[sw.key] = box.checked;
+        fetch("/api/admin/hub-settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        }).then(renderHubSettings).catch(function (err) {
+          box.checked = !box.checked;
+          box.disabled = false;
+          status.textContent = "Not saved: " + err.message;
+          status.className = "promo-status err";
+        });
+      });
+    });
+    host.appendChild(status);
+  }
+
+  /* ── Hidden demos ─────────────────────────────────────────────────────
+   * Liwei, 2026-10-06: hide a demo from the Hub from here, the way Featured
+   * picks are made -- search, Hide; Unhide to bring it back. Admin sign-in
+   * only. Nothing changes in SharePoint or Consensus, and a sync does not
+   * bring a hidden demo back. */
+  function loadHidden() {
+    return fetch("/api/admin/hidden")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (items) { if (items) renderHidden(items); });
+  }
+
+  function renderHidden(items) {
+    var host = $("hiddenDemos");
+    if (!host) return;
+    host.innerHTML = "";
+    var head = el("div", "card-head");
+    head.appendChild(el("h2", null, "Hidden from the Hub"));
+    head.appendChild(el("span", "faint num", String(items.length)));
+    host.appendChild(head);
+    host.appendChild(el("p", "muted",
+      "A hidden demo is gone from every list, search, Featured and the content dashboard, "
+      + "for everyone; its old links say it is not in the Hub. SharePoint and Consensus are "
+      + "not changed, and syncing does not bring it back."));
+    var status = el("div", "promo-status faint");
+    var act = function (method, url, body) {
+      status.textContent = "Saving…";
+      status.className = "promo-status faint";
+      fetch(url, {
+        method: method,
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+      }).then(function (r) {
+        if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
+          throw new Error(b.detail || ("HTTP " + r.status));
+        });
+        return r.json();
+      }).then(renderHidden).catch(function (err) {
+        status.textContent = "Not saved: " + err.message;
+        status.className = "promo-status err";
+      });
+    };
+
+    var list = el("div");
+    if (!items.length) list.appendChild(el("div", "faint", "Nothing hidden."));
+    items.forEach(function (h) {
+      var r = el("div", "promo-row");
+      r.appendChild(el("span", "promo-row__n", ""));
+      var info = el("div");
+      info.appendChild(el("div", "promo-row__title", h.title || h.asset_id));
+      info.appendChild(el("div", "promo-row__meta",
+        [TYPE_WORD[h.type] || h.type, "hidden " + new Date(h.hidden_at).toLocaleString()]
+          .filter(Boolean).join(" · ")));
+      r.appendChild(info);
+      var actions = el("div", "promo-row__actions");
+      var unhide = el("button", null, "Unhide");
+      unhide.addEventListener("click", function () {
+        act("DELETE", "/api/admin/hidden/" + encodeURIComponent(h.asset_id));
+      });
+      actions.appendChild(unhide);
+      r.appendChild(actions);
+      list.appendChild(r);
+    });
+    host.appendChild(list);
+
+    var add = el("div", "promo-add");
+    var label = el("label", null, "Hide a demo");
+    var input = el("input");
+    input.type = "search";
+    input.placeholder = "Search by title…";
+    input.autocomplete = "off";
+    label.appendChild(input);
+    add.appendChild(label);
+    var results = el("div", "promo-results");
+    add.appendChild(results);
+    host.appendChild(add);
+    host.appendChild(status);
+
+    var timer = null;
+    input.addEventListener("input", function () {
+      clearTimeout(timer);
+      var q = input.value.trim();
+      timer = setTimeout(function () {
+        results.innerHTML = "";
+        if (q.length < 2) return;
+        fetch("/api/assets?limit=8&q=" + encodeURIComponent(q))
+          .then(function (r) { return r.json(); })
+          .then(function (page) {
+            results.innerHTML = "";
+            if (!page.items.length) { results.appendChild(el("div", "faint", "No demo matches.")); return; }
+            page.items.forEach(function (a) {
+              var r = el("div", "promo-row");
+              r.appendChild(el("span", "promo-row__n", ""));
+              var info = el("div");
+              var title = el("a", "promo-row__title", a.title);
+              title.href = "/#/asset/" + encodeURIComponent(a.id);
+              title.target = "_blank";
+              title.rel = "noopener";
+              info.appendChild(title);
+              info.appendChild(el("div", "promo-row__meta", promoMeta(a)));
+              r.appendChild(info);
+              var hide = el("button", null, "Hide");
+              hide.addEventListener("click", function () {
+                act("POST", "/api/admin/hidden", { asset_id: a.id });
+              });
+              var acts = el("div", "promo-row__actions");
+              acts.appendChild(hide);
+              r.appendChild(acts);
+              results.appendChild(r);
+            });
+          });
+      }, 250);
+    });
+  }
+
   function load() {
     return fetch("/api/admin/overview", { headers: { "Accept": "application/json" } })
       .then(function (r) {
@@ -1345,6 +1531,8 @@
         renderIntegrations(d.integrations);
         renderAutoSync(d.auto_sync);
         loadPromoted();
+        loadHubSettings();
+        loadHidden();
         contentLoaded = false;
         showTab(location.hash === "#content" ? "content" : "overview");
         renderCoverage(d.catalogue);

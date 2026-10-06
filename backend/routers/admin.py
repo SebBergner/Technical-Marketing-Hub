@@ -289,6 +289,75 @@ def content_assets(dim: str, value: str, repo: AssetRepository = Depends(get_rep
         raise HTTPException(status_code=404, detail=f"no dimension {dim!r}")
 
 
+class HideIn(BaseModel):
+    asset_id: str
+
+
+@router.get("/hidden", dependencies=[Depends(require_admin)])
+def list_hidden(repo: AssetRepository = Depends(get_repo)):
+    try:
+        return repo.hidden()
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+
+
+@router.post("/hidden", dependencies=[Depends(require_admin)])
+def hide_demo(body: HideIn, repo: AssetRepository = Depends(get_repo)):
+    """Hide a demo from the Hub -- every list, search and page -- without
+    touching SharePoint or Consensus. Admin sign-in only (Liwei, 2026-10-06):
+    not the curator key the sync buttons accept."""
+    try:
+        items = repo.hide(body.asset_id, "admin-session")
+    except KeyError:
+        raise HTTPException(status_code=422, detail=f"no listed demo with id {body.asset_id!r}")
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+    log.info("demo hidden from the Hub: %s", body.asset_id)
+    return items
+
+
+@router.delete("/hidden/{asset_id}", dependencies=[Depends(require_admin)])
+def unhide_demo(asset_id: str, repo: AssetRepository = Depends(get_repo)):
+    try:
+        items = repo.unhide(asset_id)
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+    log.info("demo unhidden: %s", asset_id)
+    return items
+
+
+class HubSettingsIn(BaseModel):
+    #: Links from the Hub to a demo's SharePoint page ("Demo page" and "Open
+    #: demo page"). Off by default: whether to expose SharePoint is not yet
+    #: agreed (Liwei, 2026-10-05).
+    show_demo_page_links: bool | None = None
+    #: Demos known only from their SharePoint page (no project folder) listed
+    #: in the Hub at all. On by default.
+    show_page_only_demos: bool | None = None
+
+
+@router.get("/hub-settings", dependencies=[Depends(require_admin)])
+def get_hub_settings(repo: AssetRepository = Depends(get_repo)):
+    try:
+        return repo.hub_settings()
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+
+
+@router.put("/hub-settings")
+def set_hub_settings(body: HubSettingsIn, actor: str = Depends(admin_or_curator),
+                     repo: AssetRepository = Depends(get_repo)):
+    try:
+        values = body.model_dump(exclude_none=True)
+        if not values:
+            raise HTTPException(status_code=422, detail="nothing to change")
+        state = repo.set_hub_settings(actor, **values)
+        log.info("hub settings by %s: %s", actor, body.model_dump())
+        return state
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+
+
 #: Home shows every promoted asset; past a dozen it stops being a shortlist.
 MAX_PROMOTED = 12
 

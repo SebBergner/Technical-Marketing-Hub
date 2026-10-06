@@ -68,6 +68,26 @@ class AssetRepository(ABC):
     @abstractmethod
     def list(self, query: AssetQuery) -> Page[AssetSummary]: ...
 
+    def hidden(self) -> list[dict]:
+        """Demos hidden from the Hub on the Admin page; file-backed only."""
+        raise NotImplementedError
+
+    def is_hidden(self, asset_id: str) -> bool:
+        return False
+
+    def hide(self, asset_id: str, actor: str) -> list[dict]:
+        raise NotImplementedError
+
+    def unhide(self, asset_id: str) -> list[dict]:
+        raise NotImplementedError
+
+    def hub_settings(self) -> dict:
+        """Display switches set on the Admin page; file-backed repository only."""
+        raise NotImplementedError
+
+    def set_hub_settings(self, actor: str, **values) -> dict:
+        raise NotImplementedError
+
     def promoted(self) -> dict:
         """What the Home page features, in order (Seb's "promote" ask, built
         2026-10-01): {"asset_ids": [...], "changed_by": ..., "changed_at": ...}.

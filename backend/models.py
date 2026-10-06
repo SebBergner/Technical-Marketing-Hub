@@ -380,6 +380,10 @@ class AssetBase(BaseModel):
     #: Where to open this on its own platform. On list responses because a grid
     #: card links out; a Consensus result is useless without it.
     web_url: str | None = None
+    #: The demo's page under SitePages/Demo Catalog, when it has one
+    #: (backend/integrations/graph/demo_pages.py). For a page-only demo it is
+    #: also `web_url`.
+    page_url: str | None = None
 
     # cross-references — the four ID spaces the Portal exists to correlate
     source_item_id: str | None = None         # SharePoint list item
@@ -456,6 +460,11 @@ class Asset(AssetBase):
     #: 2026-09-29: "不进入 product，能被搜索"). Stored in the mirror and read by
     #: the search; always null on API responses (json_repo._common skips it).
     search_text: str | None = None
+    #: Demo pages only, mirror only: the Demo Catalog folder the page points
+    #: at, which json_repo matches to that folder's demo, and when the page
+    #: last changed (so an unchanged page's web parts are not re-read).
+    page_folder: str | None = None
+    page_modified: str | None = None
     #: Every other asset: the VMs whose pages say they run it.
     used_by_vms: list[UsedByVm] = Field(default_factory=list)
 

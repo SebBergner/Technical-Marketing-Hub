@@ -39,6 +39,7 @@ AGE_TIERS = ["Under 1 year", "1–2 years", "2–4 years", "4–7 years", "7+ ye
 
 WHERE_LABEL = {"catalog": "SharePoint · Demo Catalog",
                "demo_video": "SharePoint · Demo Video",
+               "page": "SharePoint · Demo page only",
                "consensus": "Consensus"}
 
 
@@ -61,7 +62,10 @@ def _age_tier(a: AssetSummary, today: date) -> list[str]:
 def _where(a: AssetSummary) -> list[str]:
     if a.source == "consensus":
         return ["consensus"]
-    # Demo Video assets carry the "video-" id prefix (video_sync.py).
+    # Demo Video assets carry the "video-" id prefix (video_sync.py), demos
+    # known only from their page "page-" (demo_pages.py).
+    if a.id.startswith("page-"):
+        return ["page"]
     return ["demo_video" if a.id.startswith("video-") else "catalog"]
 
 

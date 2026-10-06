@@ -678,7 +678,12 @@
       .forEach(function (f) {
         var o = document.createElement("option");
         o.value = f.value;
-        o.textContent = (labels[f.value] || displayName(f.value)) + " (" + f.count + ")";
+        // A rename in our display maps wins over the markup's label, so a
+        // product name is changed in one place (IPE: Elio's markup still
+        // says "PTC Ignite"; the name is "PTC Ignition", 2026-10-06).
+        var renamed = displayName(f.value);
+        var label = renamed !== f.value ? renamed : (labels[f.value] || f.value);
+        o.textContent = label + " (" + f.count + ")";
         el.appendChild(o);
       });
   }
@@ -1818,7 +1823,9 @@
    * "PTC Ignite" -- Elio and Seb's rename of IPE, 2026-09-08. The backend
    * still calls it "IPE" everywhere (taxonomy.py, the umbrella facet, the
    * ?umbrella= query param); only the label changes here. */
-  var UMBRELLA_DISPLAY = { "IPE": "PTC Ignite" };
+  //: "PTC Ignition" since 2026-10-06 (feedback to Liwei: "it's PTC
+  //: Ignition not PTC Ignite"); "PTC Ignite" before that.
+  var UMBRELLA_DISPLAY = { "IPE": "PTC Ignition" };
   function umbrellaDisplayName(value) { return UMBRELLA_DISPLAY[value] || value; }
 
   /* The same kind of display-only rename, for `product_families` rather
@@ -1842,7 +1849,7 @@
    * both call sites below only ever submit the raw family value, never the
    * label -- so a plain one-way map is enough and cannot collide with the
    * umbrella one. */
-  var FAMILY_DISPLAY = { "IPE": "PTC Ignite", "Jetstream": "PTC Jetstream",
+  var FAMILY_DISPLAY = { "IPE": "PTC Ignition", "Jetstream": "PTC Jetstream",
                          "Orbit": "PTC Orbit" };
   function familyDisplayName(value) { return FAMILY_DISPLAY[value] || value; }
 

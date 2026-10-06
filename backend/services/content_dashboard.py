@@ -31,7 +31,7 @@ TYPE_LABEL = {"video": "Videos", "ldk": "LDKs", "vdk": "VDKs",
               "cad_model": "CAD datasets", "vm": "Virtual machines"}
 
 #: Same renames the Hub's own pages show (hub-api.js UMBRELLA_DISPLAY).
-PRODUCT_LABEL = {"IPE": "PTC Ignite"}
+PRODUCT_LABEL = {"IPE": "PTC Ignition"}
 
 #: HLR-D4's tiers (New under 1 year, 1-2, 2-4, older), with 7+ split out:
 #: HLR-D5's "collecting dust" threshold.

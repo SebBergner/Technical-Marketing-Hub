@@ -501,7 +501,7 @@ or similar) rather than fixing three files again.
 | `paintCover()` | generates a coloured cover with the product mark for the **455 assets with no thumbnail**. Earlier version used title initials, which collided ("NOV" ×3) |
 | `consensusUrl()` | must use `a.internal_title \|\| a.title` — see §3 |
 | `buildFamilyNav()` | rewrites `.orion-side__body` fresh on every load from `facets.umbrella_families` — Elio's own static markup for this group is never shown, only 4 of its 8 sample items even exist there. Skips `HIDDEN_UMBRELLAS`, relabels via `UMBRELLA_DISPLAY` (§8.6). Counts were deliberately **removed** from Browse-by-Product (see §8.2) |
-| `UMBRELLA_DISPLAY` / `HIDDEN_UMBRELLAS` | the display-layer rename/hide for umbrella families (IPE → "PTC Ignite", Servigistics hidden) — see §8.6. The backend never learns of either; both are presentation only |
+| `UMBRELLA_DISPLAY` / `HIDDEN_UMBRELLAS` | the display-layer rename/hide for umbrella families (IPE → "PTC Ignition" since 2026-10-06, "PTC Ignite" before; Servigistics hidden) — see §8.6. The backend never learns of either; both are presentation only |
 | `HIDDEN_SEGMENTS = ["IoT"]` | same pattern, older and separately introduced (before this doc's 09-03 revision, undocumented until now): IoT held 78 assets before the divested-products cut (§1.4) and 1 after, so it is filtered out of the Segment dropdown at the `fillSelect("hubFilterSegment", ...)` call site. The segment itself and its data are untouched -- this hides one dropdown option, nothing else |
 | `rescoreSelect()` | keeps facet counts honest as filters change |
 | `clampDescription()` | Consensus descriptions run to 1194 characters and made tiles absurdly tall |

@@ -189,7 +189,11 @@ def test_the_shared_admin_sign_in_must_name_an_operator(client, tmp_path):
     assert (log["operator"], log["via"]) == ("Liwei Chen", "admin-session")
 
 
-def test_an_sso_curator_is_recorded_as_themselves(client, tmp_path):
+def test_an_sso_curator_is_recorded_as_themselves(client, tmp_path, monkeypatch):
+    """Recorded by their own identity. Since 2026-10-06 the page needs the
+    Run Brightcove migration permission (Administrators by default), so Seb
+    is made one -- the curator role alone no longer opens it."""
+    monkeypatch.setattr(settings, "hub_admin_emails", "seb@ptc.com")
     sid = upload(client, tmp_path, headers=CURATOR)
     r = client.post("/api/migration/brightcove/runs", headers=CURATOR,
                     json=body(sid, operator="someone else"))
@@ -201,6 +205,11 @@ def test_an_sso_curator_is_recorded_as_themselves(client, tmp_path):
 def test_a_signed_in_non_curator_cannot_use_the_page(client):
     viewer = easyauth_headers("viewer@ptc.com")
     assert client.get("/api/migration/brightcove/status", headers=viewer).status_code == 403
+
+
+def test_the_curator_role_alone_does_not_open_the_page(client):
+    """Its own permission (Liwei, 2026-10-06): Edit metadata is not enough."""
+    assert client.get("/api/migration/brightcove/status", headers=CURATOR).status_code == 403
 
 
 def test_the_library_is_fixed_so_no_name_is_asked_but_a_wrong_one_is_refused(client, tmp_path):

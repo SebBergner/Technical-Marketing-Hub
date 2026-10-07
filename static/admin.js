@@ -1331,25 +1331,829 @@
       .catch(function (err) { body.textContent = "Could not load: " + err.message; });
   }
 
-  /* Overview | Content dashboard. The tab is in the address (#content), so
-   * a refresh or a shared link opens the same one. */
+  /* Overview | Content dashboard | Users & groups. The tab is in the
+   * address (#content, #access), so a refresh or a shared link opens the
+   * same one. */
+  var PANELS = { overview: "tabOverview", content: "tabContent", access: "tabAccess",
+                 activity: "tabActivity" };
+
+  function tabFromHash() {
+    var name = location.hash.replace("#", "");
+    return PANELS[name] ? name : "overview";
+  }
+
   function showTab(name) {
-    var content = name === "content";
-    $("tabOverview").hidden = content;
-    $("tabContent").hidden = !content;
+    if (!PANELS[name]) name = "overview";
+    Object.keys(PANELS).forEach(function (k) { $(PANELS[k]).hidden = k !== name; });
     document.querySelectorAll("#adminTabs .tab").forEach(function (t) {
-      var on = t.dataset.tab === (content ? "content" : "overview");
+      var on = t.dataset.tab === name;
       t.classList.toggle("tab--on", on);
       t.setAttribute("aria-selected", on ? "true" : "false");
     });
-    if (content && !contentLoaded) loadContent();
+    if (name === "content" && !contentLoaded) loadContent();
+    if (name === "access") loadAccess();
+    if (name === "activity") { renderActRanges(); loadActivity(); }
   }
 
   document.querySelectorAll("#adminTabs .tab").forEach(function (t) {
     t.addEventListener("click", function () {
-      history.replaceState(null, "", t.dataset.tab === "content" ? "#content" : "#");
+      history.replaceState(null, "", t.dataset.tab === "overview" ? "#" : "#" + t.dataset.tab);
       showTab(t.dataset.tab);
     });
+  });
+
+  /* ── Users & groups (backend/access.py, 2026-10-06) ───────────────────
+   * Groups on the left, the chosen one on the right. Built-in groups keep
+   * their names; PTC employees and Partners have no member list (sign-in
+   * fills them); Administrators always have every permission. Whatever the
+   * server refuses comes back as a message beside the Save button. */
+  var ug = { data: null, selected: "administrators", draft: null };
+
+  function canManageUsers() {
+    return (session.permissions || []).indexOf("manage_users") >= 0;
+  }
+
+  function loadAccess() {
+    return fetch("/api/admin/access")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d) renderAccess(d); });
+  }
+
+  function renderAccess(d) {
+    ug.data = d;
+    if (ug.selected !== null && !groupById(ug.selected)) ug.selected = d.groups[0].id;
+    ug.draft = null;
+    renderGroups();
+    renderAudit(d.audit);
+  }
+
+  function groupById(id) {
+    return ug.data.groups.filter(function (g) { return g.id === id; })[0];
+  }
+
+  function memberCount(g) {
+    if (g.auto === "members") return "everyone with a PTC account";
+    if (g.auto === "guests") return "everyone with a guest account";
+    var n = g.members.length;
+    if (g.id === "administrators") {
+      n += ug.data.bootstrap_admins.filter(function (e) {
+        return g.members.indexOf(e) < 0;
+      }).length;
+    }
+    return n + " member" + (n === 1 ? "" : "s");
+  }
+
+  function renderGroups() {
+    var host = $("ugGroups");
+    host.innerHTML = "";
+    var list = el("div", "ug-list");
+    ug.data.groups.forEach(function (g) {
+      var b = el("button", "ug-item" + (g.id === ug.selected ? " ug-item--on" : ""));
+      b.type = "button";
+      b.appendChild(el("div", "ug-item__name", g.name));
+      b.appendChild(el("div", "ug-item__meta",
+        memberCount(g) + " · " + g.permissions.length + " permission"
+        + (g.permissions.length === 1 ? "" : "s")));
+      b.addEventListener("click", function () {
+        ug.selected = g.id;
+        ug.draft = null;
+        ug.memberFilter = "";
+        renderGroups();
+      });
+      list.appendChild(b);
+    });
+    if (canManageUsers()) {
+      var add = el("button", null, "+ New group");
+      add.type = "button";
+      add.addEventListener("click", function () {
+        ug.selected = null;
+        ug.draft = { name: "", description: "", permissions: ["view_hub"], members: [] };
+        renderGroups();
+      });
+      list.appendChild(add);
+    }
+    host.appendChild(list);
+    host.appendChild(renderEditor());
+  }
+
+  function textField(label, value, max, onInput) {
+    var l = el("label", null, label);
+    var input = el("input");
+    input.value = value;
+    input.maxLength = max;
+    input.addEventListener("input", function () { onInput(input.value); });
+    l.appendChild(input);
+    return l;
+  }
+
+  function renderEditor() {
+    var creating = ug.selected === null;
+    var g = creating ? { id: null, name: "", builtin: false, auto: null,
+                         description: "", permissions: [], members: [] }
+                     : groupById(ug.selected);
+    if (!ug.draft) {
+      ug.draft = { name: g.name, description: g.description || "",
+                   permissions: g.permissions.slice(), members: g.members.slice() };
+    }
+    var draft = ug.draft;
+    var editable = canManageUsers();
+    var c = el("div", "card");
+
+    var head = el("div", "card-head");
+    if (g.builtin || !editable) {
+      head.appendChild(el("h2", null, g.name));
+      if (g.builtin) head.appendChild(el("span", "pill pill--off", "built in"));
+      c.appendChild(head);
+      if (g.description) c.appendChild(el("p", "muted", g.description));
+    } else {
+      c.appendChild(textField(creating ? "New group name" : "Name", draft.name, 80,
+        function (v) { draft.name = v; }));
+      var desc = textField("Description", draft.description, 300,
+        function (v) { draft.description = v; });
+      desc.style.marginTop = "10px";
+      c.appendChild(desc);
+    }
+
+    // Permissions
+    var pf = el("div", "ug-field");
+    pf.appendChild(el("h3", null, "Permissions"));
+    var perms = el("div", "ug-perms");
+    var fixed = g.id === "administrators" || !editable;
+    ug.data.catalogue.forEach(function (p) {
+      var row = el("label", "ug-perm");
+      var box = el("input");
+      box.type = "checkbox";
+      box.checked = draft.permissions.indexOf(p.id) >= 0;
+      box.disabled = fixed;
+      box.addEventListener("change", function () {
+        draft.permissions = draft.permissions.filter(function (x) { return x !== p.id; });
+        if (box.checked) draft.permissions.push(p.id);
+      });
+      row.appendChild(box);
+      var text = el("span", null, p.label);
+      text.appendChild(el("small", null, p.description));
+      row.appendChild(text);
+      perms.appendChild(row);
+    });
+    pf.appendChild(perms);
+    if (g.id === "administrators") {
+      pf.appendChild(el("div", "faint", "Administrators always have every permission."));
+    }
+    c.appendChild(pf);
+
+    // Members
+    var mf = el("div", "ug-field");
+    mf.appendChild(el("h3", null, "Members"));
+    if (g.auto) {
+      mf.appendChild(el("div", "muted", g.auto === "guests"
+        ? "Everyone who signs in with a guest account (a partner). Filled at sign-in."
+        : "Everyone who signs in with a PTC account. Filled at sign-in."));
+    } else {
+      mf.appendChild(renderMembers(g, draft, editable));
+    }
+    c.appendChild(mf);
+
+    if (!editable) {
+      c.appendChild(el("p", "faint", "Viewing only: changing groups needs the "
+        + "Manage users & groups permission."));
+      return c;
+    }
+    var actions = el("div", "ug-actions");
+    var status = el("span", "promo-status faint");
+    var save = el("button", "btn-primary", creating ? "Create group" : "Save");
+    save.type = "button";
+    save.addEventListener("click", function () {
+      var body = {};
+      if (g.id !== "administrators") body.permissions = draft.permissions;
+      if (!g.builtin) { body.name = draft.name; body.description = draft.description; }
+      if (!g.auto) body.members = draft.members;
+      sendAccess(creating ? "POST" : "PUT",
+        creating ? "/api/admin/access/groups"
+                 : "/api/admin/access/groups/" + encodeURIComponent(g.id),
+        body, status, creating ? draft.name : null);
+    });
+    actions.appendChild(save);
+    if (!creating) {
+      var reset = el("button", null, "Undo changes");
+      reset.type = "button";
+      reset.addEventListener("click", function () { ug.draft = null; renderGroups(); });
+      actions.appendChild(reset);
+    }
+    actions.appendChild(status);
+    /* Rarely used, so small, red and pushed to the far right, away from
+     * Save (Liwei, 2026-10-07). Confirmed in place rather than with
+     * window.confirm(), which some browsers suppress -- the Claude browser
+     * pane answers it "cancel" without showing anything. */
+    if (!g.builtin && !creating) {
+      var danger = el("div", "ug-danger");
+      var del = el("button", "btn-danger", "Delete group");
+      del.type = "button";
+      del.addEventListener("click", function () {
+        danger.innerHTML = "";
+        danger.appendChild(el("span", "ug-danger__q",
+          "Delete “" + g.name + "”? Its members lose whatever only this group gave them."));
+        var yes = el("button", "btn-danger btn-danger--solid", "Delete");
+        yes.type = "button";
+        yes.addEventListener("click", function () {
+          ug.selected = "administrators";
+          sendAccess("DELETE", "/api/admin/access/groups/" + encodeURIComponent(g.id),
+            null, status);
+        });
+        var no = el("button", "btn-small", "Cancel");
+        no.type = "button";
+        no.addEventListener("click", function () { renderGroups(); });
+        danger.appendChild(yes);
+        danger.appendChild(no);
+        no.focus();
+      });
+      danger.appendChild(del);
+      actions.appendChild(danger);
+    }
+    c.appendChild(actions);
+    return c;
+  }
+
+  /* Members as a table, not tags (Liwei, 2026-10-07): a group of a hundred
+   * has to stay readable. A count and a filter on top, a list that scrolls
+   * inside a fixed height, and an add box that takes many addresses at once
+   * -- pasted from Outlook as "Name <a@ptc.com>; ..." or one per line. The
+   * filter only redraws the rows, so typing in it keeps its focus. */
+  var EMAILS = /[^\s<>,;"'()]+@[^\s<>,;"'()]+\.[^\s<>,;"'()]+/g;
+
+  function renderMembers(g, draft, editable) {
+    var box = el("div");
+    var byEmail = {};
+    ug.data.users.forEach(function (u) {
+      [u.email, u.username].forEach(function (e) { if (e) byEmail[e] = u; });
+    });
+    var fixed = g.id === "administrators" ? ug.data.bootstrap_admins.filter(function (e) {
+      return draft.members.indexOf(e) < 0;
+    }) : [];
+    var saved = g.members;
+    var added = draft.members.filter(function (m) { return saved.indexOf(m) < 0; });
+    var removed = saved.filter(function (m) { return draft.members.indexOf(m) < 0; });
+
+    var bar = el("div", "ug-mbar");
+    bar.appendChild(el("span", "ug-mbar__count",
+      (draft.members.length + fixed.length) + " member"
+      + (draft.members.length + fixed.length === 1 ? "" : "s")));
+    var filter = el("input");
+    filter.type = "search";
+    filter.placeholder = "Filter by name or email…";
+    filter.value = ug.memberFilter || "";
+    bar.appendChild(filter);
+    box.appendChild(bar);
+
+    if (added.length || removed.length) {
+      box.appendChild(el("div", "ug-pending",
+        [added.length ? added.length + " to add" : "",
+         removed.length ? removed.length + " to remove" : ""].filter(Boolean).join(", ")
+        + " — not saved yet. Press Save to apply."));
+    }
+
+    var wrap = el("div", "ug-mtable");
+    var t = el("table");
+    var hr = t.createTHead().insertRow();
+    ["Email", "Name", "Last sign-in", ""].forEach(function (h) { hr.appendChild(el("th", null, h)); });
+    var tb = t.createTBody();
+    wrap.appendChild(t);
+    box.appendChild(wrap);
+    var shown = el("div", "faint ug-mfoot");
+    box.appendChild(shown);
+
+    var rows = fixed.map(function (e) { return { email: e, fixed: true }; })
+      .concat(draft.members.map(function (e) {
+        return { email: e, fresh: added.indexOf(e) >= 0 };
+      }));
+
+    function drawRows() {
+      var q = (filter.value || "").trim().toLowerCase();
+      ug.memberFilter = filter.value;
+      tb.innerHTML = "";
+      var n = 0;
+      rows.forEach(function (r) {
+        var u = byEmail[r.email];
+        var name = (u && u.name) || "";
+        if (q && r.email.indexOf(q) < 0 && name.toLowerCase().indexOf(q) < 0) return;
+        n += 1;
+        var tr = tb.insertRow();
+        var em = tr.insertCell();
+        em.textContent = r.email;
+        if (r.fresh) em.appendChild(el("span", "pill pill--warn ug-tag", "new"));
+        tr.insertCell().textContent = name || "—";
+        var when = tr.insertCell();
+        when.className = "num faint";
+        when.textContent = u && u.last_seen ? new Date(u.last_seen).toLocaleDateString()
+                                            : "never";
+        var act = tr.insertCell();
+        act.className = "r";
+        if (r.fixed) {
+          var note = el("span", "faint", "HUB_ADMIN_EMAILS");
+          note.title = "Named in the app settings; change it in Azure.";
+          act.appendChild(note);
+        } else if (editable) {
+          var x = el("button", "ug-remove", "Remove");
+          x.type = "button";
+          x.addEventListener("click", function () {
+            draft.members = draft.members.filter(function (v) { return v !== r.email; });
+            renderGroups();
+          });
+          act.appendChild(x);
+        }
+      });
+      if (!rows.length) {
+        var empty = tb.insertRow().insertCell();
+        empty.colSpan = 4;
+        empty.className = "faint";
+        empty.textContent = "No members yet.";
+      }
+      shown.textContent = q ? n + " of " + rows.length + " shown" : "";
+    }
+    filter.addEventListener("input", drawRows);
+    drawRows();
+
+    if (editable) {
+      var addRow = el("div", "ug-add");
+      var input = el("textarea");
+      input.rows = 2;
+      input.placeholder = "Add people: one or more addresses, e.g. pasted from Outlook "
+        + "(“Name <a@ptc.com>; …”) or one per line";
+      input.setAttribute("aria-label", "Addresses to add");
+      var addBtn = el("button", null, "Add");
+      addBtn.type = "button";
+      var msg = el("div", "faint ug-mfoot");
+      var addMembers = function () {
+        var found = (input.value.toLowerCase().match(EMAILS) || []);
+        if (!found.length) { msg.textContent = "No email address found in that text."; return; }
+        var fresh = found.filter(function (e, i) {
+          return found.indexOf(e) === i && draft.members.indexOf(e) < 0;
+        });
+        draft.members = draft.members.concat(fresh);
+        ug.memberFilter = "";
+        renderGroups();
+      };
+      addBtn.addEventListener("click", addMembers);
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addMembers(); }
+      });
+      addRow.appendChild(input);
+      addRow.appendChild(addBtn);
+      box.appendChild(addRow);
+      box.appendChild(msg);
+
+      // People who have signed in and are not in the group yet, one click each.
+      var candidates = ug.data.users.filter(function (u) {
+        var e = u.email || u.username;
+        return e && draft.members.indexOf(e) < 0 && fixed.indexOf(e) < 0;
+      });
+      if (candidates.length) {
+        var pick = el("select", "ug-pick");
+        var first = document.createElement("option");
+        first.value = "";
+        first.textContent = "…or add someone who has signed in (" + candidates.length + ")";
+        pick.appendChild(first);
+        candidates.forEach(function (u) {
+          var o = document.createElement("option");
+          o.value = u.email || u.username;
+          o.textContent = (u.name ? u.name + " — " : "") + o.value;
+          pick.appendChild(o);
+        });
+        pick.addEventListener("change", function () {
+          if (!pick.value) return;
+          draft.members = draft.members.concat([pick.value]);
+          renderGroups();
+        });
+        box.appendChild(pick);
+      }
+    }
+    return box;
+  }
+
+  function sendAccess(method, url, body, status, createdName) {
+    status.textContent = "Saving…";
+    status.className = "promo-status faint";
+    fetch(url, {
+      method: method,
+      headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    }).then(function (r) {
+      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
+        var detail = b.detail;
+        if (Array.isArray(detail)) detail = detail.map(function (x) { return x.msg; }).join("; ");
+        throw new Error(detail || ("HTTP " + r.status));
+      });
+      return r.json();
+    }).then(function (d) {
+      if (createdName) {
+        var made = d.groups.filter(function (g) { return g.name === createdName.trim(); })[0];
+        if (made) ug.selected = made.id;
+      }
+      renderAccess(d);
+    }).catch(function (err) {
+      status.textContent = "Not saved: " + err.message;
+      status.className = "promo-status err";
+    });
+  }
+
+  function groupNames(ids) {
+    return ids.map(function (id) {
+      var g = groupById(id);
+      return g ? g.name : id;
+    }).join(", ");
+  }
+
+  /* A bulk add of a hundred people is one change; its log line names the
+   * first few and counts the rest (the full list is on hover). */
+  function shortList(items) {
+    return items.length <= 3 ? items.join(", ")
+      : items.slice(0, 3).join(", ") + " and " + (items.length - 3) + " more";
+  }
+
+  function fullChange(e) {
+    // A create or delete records the group's lists as they were, not a diff.
+    return ["permissions", "members"].map(function (k) {
+      if (!e[k]) return "";
+      if (Array.isArray(e[k])) return e[k].length ? k + ": " + e[k].join(", ") : "";
+      return [e[k].added.length ? k + " added: " + e[k].added.join(", ") : "",
+              e[k].removed.length ? k + " removed: " + e[k].removed.join(", ") : ""]
+        .filter(Boolean).join("\n");
+    }).filter(Boolean).join("\n");
+  }
+
+  function describeChange(e) {
+    if (e.action === "create") return "created";
+    if (e.action === "delete") return "deleted";
+    var parts = [];
+    if (e.name) parts.push("renamed from “" + e.name.from + "”");
+    ["permissions", "members"].forEach(function (k) {
+      if (!e[k]) return;
+      if (e[k].added.length) parts.push(k + " added: " + shortList(e[k].added));
+      if (e[k].removed.length) parts.push(k + " removed: " + shortList(e[k].removed));
+    });
+    return parts.join("; ") || "updated";
+  }
+
+  function renderAudit(entries) {
+    var host = $("ugAudit");
+    host.innerHTML = "";
+    if (!entries.length) {
+      host.appendChild(el("div", "faint", "No changes yet."));
+      return;
+    }
+    var t = el("table");
+    var hr = t.createTHead().insertRow();
+    ["When", "Who", "Group", "Change"].forEach(function (h) { hr.appendChild(el("th", null, h)); });
+    var tb = t.createTBody();
+    entries.forEach(function (e) {
+      var tr = tb.insertRow();
+      var when = tr.insertCell();
+      when.className = "num faint";
+      when.textContent = new Date(e.at).toLocaleString();
+      tr.insertCell().textContent = (e.actor || "").replace(/^(user|dev):/, "");
+      tr.insertCell().textContent = e.group_name || e.group;
+      var what = tr.insertCell();
+      what.textContent = describeChange(e);
+      what.title = fullChange(e);
+    });
+    host.appendChild(t);
+  }
+
+  /* ── Sign-ins (backend/activity.py, 2026-10-07) ───────────────────────
+   * Who is active now, who signed in over a period, and the log itself.
+   * One period drives the tiles, People and the log, so the three always
+   * agree; it sits in a bar that stays in view, and every heading names it
+   * (Liwei, 2026-10-07). "Active" is a request in the last few minutes: the
+   * server keeps no session, so it cannot know who still has a tab open.
+   * What anyone viewed or downloaded is not on this tab -- that waits for
+   * management's answer on per-user tracking. */
+  var ACT_RANGES = [
+    { id: "today", label: "Today" },
+    { id: "7d", label: "7 days" },
+    { id: "30d", label: "30 days" },
+    { id: "all", label: "All time" },
+    { id: "custom", label: "Custom" }
+  ];
+  var act = { range: "7d", from: "", to: "", q: "", pq: "", user: null, userLabel: "",
+              offset: 0, limit: 50, people: [] };
+  var actTimer = null;
+
+  function startOfToday() {
+    var d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function dateInput(d) {
+    var m = d.getMonth() + 1, day = d.getDate();
+    return d.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (day < 10 ? "0" : "") + day;
+  }
+
+  /* A yyyy-mm-dd from a date input, as the reader's own midnight. */
+  function localDay(value) {
+    var p = value.split("-");
+    return new Date(+p[0], +p[1] - 1, +p[2]);
+  }
+
+  function actBounds() {
+    var today = startOfToday();
+    if (act.range === "all") return {};
+    if (act.range === "today") return { since: today.toISOString() };
+    if (act.range === "custom") {
+      var out = {};
+      if (act.from) out.since = localDay(act.from).toISOString();
+      // "To" includes that whole day.
+      if (act.to) out.until = new Date(localDay(act.to).getTime() + 86400000).toISOString();
+      return out;
+    }
+    var days = act.range === "30d" ? 30 : 7;
+    return { since: new Date(today.getTime() - (days - 1) * 86400000).toISOString() };
+  }
+
+  function periodLabel() {
+    if (act.range !== "custom") {
+      return ACT_RANGES.filter(function (r) { return r.id === act.range; })[0].label;
+    }
+    var fmt = function (v) {
+      return localDay(v).toLocaleDateString(undefined, { month: "short", day: "numeric",
+                                                         year: "numeric" });
+    };
+    if (act.from && act.to) return act.from === act.to ? fmt(act.from)
+                                                       : fmt(act.from) + " – " + fmt(act.to);
+    if (act.from) return "since " + fmt(act.from);
+    if (act.to) return "until " + fmt(act.to);
+    return "All time";
+  }
+
+  function ago(iso) {
+    var mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+    if (mins < 1) return "just now";
+    if (mins < 60) return mins + " min ago";
+    var hours = Math.round(mins / 60);
+    if (hours < 24) return hours + " h ago";
+    return new Date(iso).toLocaleDateString();
+  }
+
+  function account(external) { return external ? "Guest" : "PTC"; }
+
+  function loadActivity() {
+    var params = actBounds();
+    params.today = startOfToday().toISOString();
+    params.offset = act.offset;
+    params.limit = act.limit;
+    if (act.q) params.q = act.q;
+    if (act.user) params.user = act.user;
+    var qs = Object.keys(params).map(function (k) {
+      return k + "=" + encodeURIComponent(params[k]);
+    }).join("&");
+    // Group names for the People table come from the Users & groups data.
+    var groupsReady = ug.data ? Promise.resolve() : fetch("/api/admin/access")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d) ug.data = d; });
+    return groupsReady.then(function () {
+      return fetch("/api/admin/activity?" + qs);
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d) renderActivity(d); });
+  }
+
+  function setRange(id) {
+    act.range = id;
+    act.offset = 0;
+    if (id === "custom" && !act.from && !act.to) {
+      // Start from the last seven days, which the person then narrows.
+      var today = startOfToday();
+      act.from = dateInput(new Date(today.getTime() - 6 * 86400000));
+      act.to = dateInput(today);
+    }
+    renderActRanges();
+    loadActivity();
+  }
+
+  function renderActRanges() {
+    var host = $("actRanges");
+    host.innerHTML = "";
+    ACT_RANGES.forEach(function (r) {
+      var b = el("button", null, r.label);
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(r.id === act.range));
+      b.addEventListener("click", function () { setRange(r.id); });
+      host.appendChild(b);
+    });
+    $("actCustom").hidden = act.range !== "custom";
+    $("actFrom").value = act.from;
+    $("actTo").value = act.to;
+    $("actFrom").max = $("actTo").max = dateInput(new Date());
+  }
+
+  ["actFrom", "actTo"].forEach(function (id) {
+    $(id).addEventListener("change", function () {
+      act.from = $("actFrom").value;
+      act.to = $("actTo").value;
+      if (act.from && act.to && act.from > act.to) {
+        // Swapped rather than refused: the intent is plain.
+        var t = act.from; act.from = act.to; act.to = t;
+        $("actFrom").value = act.from;
+        $("actTo").value = act.to;
+      }
+      act.offset = 0;
+      loadActivity();
+    });
+  });
+
+  function actGroups(ids) {
+    return ug.data ? groupNames(ids || []) : "";
+  }
+
+  function renderActivity(d) {
+    var label = periodLabel();
+    $("actTitle").textContent = "Sign-ins · " + label;
+    $("actPeopleTitle").textContent = "People · " + label;
+    $("actLogTitle").textContent = "Sign-in log · " + label;
+
+    var tiles = $("actTiles");
+    tiles.innerHTML = "";
+    tile(tiles, d.counts.active, "Active now", "a request in the last " + d.active_minutes + " min");
+    tile(tiles, d.counts.today_people, "Signed in today", "people");
+    tile(tiles, d.counts.window_people, "People", d.counts.guests + " guest"
+      + (d.counts.guests === 1 ? "" : "s"));
+    tile(tiles, d.counts.window_sign_ins, "Sign-ins", null);
+
+    // Active now -- always the last few minutes, whatever the period.
+    $("actActiveNote").textContent = "a request in the last " + d.active_minutes
+      + " minutes, whatever the period";
+    var host = $("actActive");
+    host.innerHTML = "";
+    if (!d.active.length) {
+      host.appendChild(el("div", "faint", "Nobody right now."));
+    } else {
+      var t = el("table");
+      var hr = t.createTHead().insertRow();
+      ["Name", "Email", "Account", "Groups", "Last request"].forEach(function (h) {
+        hr.appendChild(el("th", null, h));
+      });
+      var tb = t.createTBody();
+      d.active.forEach(function (a) {
+        var tr = tb.insertRow();
+        var name = tr.insertCell();
+        name.appendChild(el("span", "act-dot"));
+        name.appendChild(document.createTextNode(a.name || "—"));
+        tr.insertCell().textContent = a.user || "—";
+        tr.insertCell().textContent = account(a.external);
+        tr.insertCell().textContent = actGroups(a.groups) || "—";
+        var when = tr.insertCell();
+        when.className = "num faint";
+        when.textContent = ago(a.last_active);
+      });
+      host.appendChild(t);
+    }
+
+    act.people = d.people;
+    drawPeople();
+    renderLogFilter();
+
+    // The log
+    host = $("actLog");
+    host.innerHTML = "";
+    var log = d.log;
+    if (!log.items.length) {
+      host.appendChild(el("div", "faint", act.user
+        ? "No sign-ins by this person in this period."
+        : "No sign-ins match."));
+    } else {
+      var lt = el("table");
+      var lhr = lt.createTHead().insertRow();
+      ["When", "Name", "Email", "Account"].forEach(function (h) {
+        lhr.appendChild(el("th", null, h));
+      });
+      var ltb = lt.createTBody();
+      log.items.forEach(function (e) {
+        var tr = ltb.insertRow();
+        var when = tr.insertCell();
+        when.className = "num faint";
+        when.textContent = new Date(e.at).toLocaleString();
+        tr.insertCell().textContent = e.name || "—";
+        tr.insertCell().textContent = e.user || "—";
+        tr.insertCell().textContent = account(e.external);
+      });
+      host.appendChild(lt);
+    }
+    var pager = $("actPager");
+    pager.innerHTML = "";
+    var first = log.total ? log.offset + 1 : 0;
+    var lastRow = Math.min(log.offset + log.limit, log.total);
+    pager.appendChild(el("span", "faint", "Showing " + first + "–" + lastRow + " of "
+      + log.total.toLocaleString() + " sign-ins"));
+    var nav = el("div", "pager__nav");
+    var back = el("button", null, "← Previous");
+    back.disabled = log.offset <= 0;
+    back.addEventListener("click", function () {
+      act.offset = Math.max(0, act.offset - act.limit);
+      loadActivity();
+    });
+    var fwd = el("button", null, "Next →");
+    fwd.disabled = lastRow >= log.total;
+    fwd.addEventListener("click", function () {
+      act.offset += act.limit;
+      loadActivity();
+    });
+    nav.appendChild(back);
+    nav.appendChild(fwd);
+    pager.appendChild(nav);
+
+    $("actNote").textContent = (d.recorded_since
+      ? "Sign-ins recorded since " + new Date(d.recorded_since).toLocaleString() + ". "
+      : "No sign-ins recorded yet. ")
+      + "What people view or download is counted on the Overview, not per person.";
+  }
+
+  /* People in the period, filtered in the browser: the whole list is
+   * already here, so typing narrows it at once. A click narrows the log to
+   * that person. */
+  function drawPeople() {
+    var host = $("actPeople");
+    host.innerHTML = "";
+    var q = act.pq.toLowerCase();
+    var rows = act.people.filter(function (p) {
+      return !q || (p.user || "").indexOf(q) >= 0 || (p.name || "").toLowerCase().indexOf(q) >= 0;
+    });
+    $("actPeopleCount").textContent = q
+      ? rows.length + " of " + act.people.length + " people shown"
+      : act.people.length + " " + (act.people.length === 1 ? "person" : "people");
+    if (!rows.length) {
+      host.appendChild(el("div", "faint", act.people.length
+        ? "Nobody matches." : "Nobody signed in in this period."));
+      return;
+    }
+    var pt = el("table");
+    var phr = pt.createTHead().insertRow();
+    ["Name", "Email", "Account", "Groups", "Sign-ins", "Last sign-in", "Last active"]
+      .forEach(function (h, i) { phr.appendChild(el("th", i === 4 ? "r" : null, h)); });
+    var ptb = pt.createTBody();
+    rows.forEach(function (p) {
+      var tr = ptb.insertRow();
+      tr.className = "act-person";
+      tr.title = "Show this person's sign-ins in the log";
+      tr.insertCell().textContent = p.name || "—";
+      tr.insertCell().textContent = p.user || "—";
+      tr.insertCell().textContent = account(p.external);
+      tr.insertCell().textContent = actGroups(p.groups) || "—";
+      var n = tr.insertCell();
+      n.className = "r num";
+      n.textContent = p.sign_ins;
+      var last = tr.insertCell();
+      last.className = "num faint";
+      last.textContent = p.last_sign_in ? new Date(p.last_sign_in).toLocaleString() : "—";
+      var seen = tr.insertCell();
+      seen.className = "num faint";
+      seen.textContent = p.last_active ? ago(p.last_active) : "—";
+      tr.addEventListener("click", function () {
+        act.user = p.oid;
+        act.userLabel = p.name || p.user || p.oid;
+        act.offset = 0;
+        loadActivity().then(function () {
+          $("actLog").scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+      });
+    });
+    host.appendChild(pt);
+  }
+
+  /* Who the log is narrowed to, in which period, and the ways out. */
+  function renderLogFilter() {
+    var filter = $("actFilter");
+    filter.innerHTML = "";
+    filter.hidden = !act.user;
+    if (!act.user) return;
+    filter.appendChild(el("span", null, "Showing sign-ins of " + act.userLabel
+      + " · " + periodLabel()));
+    if (act.range !== "all") {
+      var all = el("button", null, "All time for this person");
+      all.type = "button";
+      all.addEventListener("click", function () { setRange("all"); });
+      filter.appendChild(all);
+    }
+    var clear = el("button", null, "Show everyone");
+    clear.type = "button";
+    clear.addEventListener("click", function () {
+      act.user = null;
+      act.offset = 0;
+      loadActivity();
+    });
+    filter.appendChild(clear);
+  }
+
+  $("actSearch").addEventListener("input", function (e) {
+    var value = e.target.value;
+    clearTimeout(actTimer);
+    actTimer = setTimeout(function () {
+      act.q = value.trim();
+      act.offset = 0;
+      loadActivity();
+    }, 250);
+  });
+
+  $("actPeopleSearch").addEventListener("input", function (e) {
+    act.pq = e.target.value.trim();
+    drawPeople();
   });
 
   /* ── Hub display switches ─────────────────────────────────────────────
@@ -1554,7 +2358,7 @@
         loadHubSettings();
         loadHidden();
         contentLoaded = false;
-        showTab(location.hash === "#content" ? "content" : "overview");
+        showTab(tabFromHash());
         renderCoverage(d.catalogue);
         renderQueues(d);
         renderRanges();
@@ -1569,11 +2373,15 @@
       });
   }
 
+  /* How this browser got in -- a signed-in person with View Admin ("sso")
+   * or the shared password ("password") -- and what it may do. */
+  var session = { via: null, permissions: [] };
+
   function boot() {
     fetch("/api/admin/session").then(function (r) { return r.json(); })
       .then(function (s) {
-        if (!s.configured) { show("offView"); return; }
-        if (!s.signed_in) { show("loginView"); return; }
+        session = s;
+        if (!s.signed_in) { show(s.configured ? "loginView" : "offView"); return; }
         load();
       });
   }
@@ -1586,7 +2394,7 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: $("u").value, password: $("p").value }),
     }).then(function (r) {
-      if (r.ok) { $("p").value = ""; load(); return; }
+      if (r.ok) { $("p").value = ""; boot(); return; }
       // One message for both halves -- see the endpoint's own docstring.
       $("loginErr").textContent = r.status === 503
         ? "No admin is configured on this deployment."
@@ -1595,6 +2403,9 @@
   });
 
   $("logoutBtn").addEventListener("click", function () {
+    // A signed-in person leaves the Hub session itself; the shared password
+    // only drops its own cookie.
+    if (session.via === "sso") { location.assign("/logout"); return; }
     fetch("/api/admin/logout", { method: "POST" }).then(function () {
       show("loginView");
     });

@@ -6,7 +6,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from backend.admin_auth import admin_or_curator
+from backend.access import Perm
+from backend.admin_auth import require_perm
 from backend.deps import CurrentUser, get_repo, require_authenticated, require_curator
 from backend.integrations.consensus_oauth import (
     ConsensusOAuth, ConsensusOAuthError, NotAuthorised, get_oauth,
@@ -268,7 +269,7 @@ def share_to_consensus(
 def sync(allow_downgrade: bool = False,
          repo: AssetRepository = Depends(get_repo),
          client: ConsensusClient = Depends(get_client),
-         actor: str = Depends(admin_or_curator)):
+         actor: str = Depends(require_perm(Perm.RUN_SYNC))):
     """Index public Consensus demos as catalogue entries.
 
     Needs the curator role, or an Admin sign-in — see the same note on

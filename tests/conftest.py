@@ -72,3 +72,16 @@ def never_reach_consensus(monkeypatch):
     oauth_module._singleton = None
     yield
     oauth_module._singleton = None
+
+
+@pytest.fixture(autouse=True)
+def access_files_in_tmp(tmp_path_factory, monkeypatch):
+    """Users & groups (backend/access.py) live in owned/ under DATA_DIR, which
+    most tests share with the developer's real data. A sign-in in a test
+    would otherwise be recorded in their users.json, and groups edited on
+    their Admin page would change what the tests see. Each test gets the
+    built-in groups and nobody signed in."""
+    import backend.access as access
+    folder = tmp_path_factory.mktemp("access")
+    monkeypatch.setattr(access, "_owned", lambda name: str(folder / name))
+    access._cache.clear()

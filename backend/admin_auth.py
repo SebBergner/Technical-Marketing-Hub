@@ -21,15 +21,12 @@ what it may unlock is bounded by what is safe to do anonymously:
               §8.5/§8.4 of the handover exist precisely because an
               unattributable write there is the failure mode to avoid.
 
-`require_admin` therefore gates only the first two, and nothing in this file
-grants the curator role.
-
-One exception, deliberate and temporary (Liwei, 2026-09-29): STARTING a
-Brightcove migration run on /migration, which writes to SharePoint, accepts
-this sign-in too, because production has no SSO yet. It is only allowed with
-a typed operator name, kept in the run's batch log, so each run is traceable
-to a person by more than the shared credential. When production has SSO it
-becomes curator-only. See backend/routers/migration.py.
+Since 2026-10-06 the Hub has users, groups and permissions (backend/access.py)
+and this sign-in is one more way to hold them: every permission except Edit
+metadata, which writes SharePoint columns. `require_perm` below is the single
+gate both go through. It stays, for the transition, until ADMIN_PASSWORD is
+removed from the app settings (Liwei, 2026-10-06); with it blank this module
+grants nothing.
 
 Mechanics
 ---------
@@ -46,7 +43,7 @@ is the same someone who can read every other secret there. Both halves blank
 means no admin exists at all — `admin_configured` is checked before the
 comparison, never after.
 
-Delete this module when SSO lands.
+Delete the shared half of this module once ADMIN_PASSWORD is gone everywhere.
 """
 from __future__ import annotations
 
@@ -144,52 +141,38 @@ def has_admin_session(request: Request) -> bool:
         return False
 
 
-async def require_admin(request: Request) -> None:
-    """Gate for the Admin page's own endpoints.
+def require_perm(perm):
+    """Gate one endpoint on one permission (backend/access.py). Returns who is
+    acting, for the log line and the "changed by" fields:
 
-    503 rather than 401 when nothing is configured: the caller has not failed
-    to authenticate, there is simply nobody to authenticate as, and saying so
-    is the difference between "wrong password" and "this deployment has no
-    admin".
+    * ``user:<email>`` -- a signed-in person whose groups give the permission;
+    * ``admin-session`` -- the shared Admin sign-in, which has every
+      permission but Edit metadata (see access.ADMIN_SESSION_PERMS);
+    * ``dev:<email>`` -- the local development principal.
+
+    401 for nobody, 403 for somebody who lacks it: the second can be helped by
+    an administrator, the first needs to sign in.
     """
-    if not settings.admin_configured:
-        raise HTTPException(
-            status_code=503,
-            detail="No admin is configured on this deployment. Set "
-                   "ADMIN_USERNAME and ADMIN_PASSWORD to enable the Admin page.")
-    if not has_admin_session(request):
-        raise HTTPException(status_code=401, detail="Admin sign-in required.")
-
-
-async def admin_or_curator(request: Request) -> str:
-    """Either key opens the sync endpoints: the real curator role, or this
-    temporary admin session. Returns which one, for the log line.
-
-    Kept as one dependency rather than two endpoints so there is a single
-    code path to audit — and so removing the admin half when SSO lands is a
-    deletion here, not a hunt through the routers.
-    """
+    from backend.access import ADMIN_SESSION_PERMS
     from backend.auth import principal_from_request   # local: avoids a cycle
 
-    user = principal_from_request(request)
-    if user.can_curate:
-        return f"curator:{user.email}"
-    if has_admin_session(request):
-        return "admin-session"
+    value = getattr(perm, "value", perm)
 
-    # 401 vs 403 on the two ways to fail, which are not the same failure:
-    # somebody signed in and lacking the role can be helped by an
-    # administrator, while somebody signed in as nobody needs to sign in
-    # first. Anonymous therefore stays 401 — the answer this endpoint gave
-    # before the admin session existed, and what test_auth.py pins.
-    if user.is_authenticated or user.is_dev_principal:
-        raise HTTPException(
-            status_code=403,
-            detail="This action needs the curator role. Ask an administrator to add "
-                   "you to a group listed in AUTH_CURATOR_GROUPS.")
-    raise HTTPException(
-        status_code=401,
-        detail=("Sign-in required: the curator role, or an Admin sign-in."
-                if settings.admin_configured else
-                "Sign-in required. This app expects Azure App Service Easy Auth "
-                "(Entra ID) in front of it."))
+    async def dependency(request: Request) -> str:
+        user = principal_from_request(request)
+        session = value in ADMIN_SESSION_PERMS and has_admin_session(request)
+        if user.is_authenticated and user.can(value):
+            return f"user:{user.email}"
+        if session:
+            return "admin-session"
+        if user.is_dev_principal and user.can(value):
+            return f"dev:{user.email}"
+        if user.is_authenticated:
+            raise HTTPException(
+                status_code=403,
+                detail="Your account does not have permission for this. Ask a Hub "
+                       "administrator to add you to a group that has it.")
+        raise HTTPException(status_code=401, detail="Sign-in required.")
+
+    dependency.__name__ = f"require_{value}"
+    return dependency

@@ -265,7 +265,7 @@ def test_curator_may_curate(enforcing, client):
 def test_forbidden_message_says_how_to_get_access(enforcing, client):
     response = client.post("/api/curation/propose",
                            headers=easyauth_headers("viewer@ptc.com"))
-    assert "AUTH_CURATOR_GROUPS" in response.json()["detail"]
+    assert "Edit metadata" in response.json()["detail"]
 
 
 def test_reads_stay_open_to_the_platform_gate(enforcing, client):
@@ -369,11 +369,12 @@ def test_no_admin_credentials_means_no_admin_page_at_all(
     passes only on a machine without one is not a test."""
     monkeypatch.setattr(settings, "admin_username", "")
     monkeypatch.setattr(settings, "admin_password", "")
-    assert client.get("/api/admin/session").json() == {
-        "configured": False, "signed_in": False}
+    session = client.get("/api/admin/session").json()
+    assert (session["configured"], session["signed_in"]) == (False, False)
     assert client.post("/api/admin/login",
                        json={"username": "", "password": ""}).status_code == 503
-    assert client.get("/api/admin/overview").status_code == 503
+    # 401 since 2026-10-06, not 503: a signed-in administrator is a way in now.
+    assert client.get("/api/admin/overview").status_code == 401
 
 
 def test_the_wrong_password_does_not_sign_anyone_in(enforcing, admin_configured, client):

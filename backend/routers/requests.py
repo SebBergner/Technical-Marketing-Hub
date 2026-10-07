@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
+from backend.access import Perm
 from backend.auth import CurrentUser, get_current_user, require_authenticated
 from backend.config import settings
 from backend.deps import get_repo
@@ -54,6 +55,16 @@ class RequestAccepted(AssetRequest):
     attachments_rejected: list[str] = []
 
 
+async def may_create(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    """"Create new demo" (backend/access.py). An anonymous visitor exists only
+    where sign-in is not enforced, and may still submit, as before. A
+    dependency, so it is refused before the body is even validated."""
+    if user.is_authenticated and not user.can(Perm.CREATE_DEMO):
+        raise HTTPException(status_code=403,
+                            detail="Your account does not have permission to create demos.")
+    return user
+
+
 @router.post("", response_model=RequestAccepted, status_code=201)
 async def submit_request(
     body: AssetRequestCreate,
@@ -67,7 +78,7 @@ async def submit_request(
     # anonymous submission simply keeps whatever requester_name/email the
     # requester typed, exactly like before Easy Auth existed. Liwei,
     # 2026-09-09.
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(may_create),
 ) -> RequestAccepted:
     """Record a request locally, then push it to SharePoint."""
     return await _submit(body, [], repo, user)
@@ -78,7 +89,7 @@ async def submit_request_with_files(
     request: str = Form(...),
     files: list[UploadFile] = File(default=[]),
     repo: AssetRepository = Depends(get_repo),
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(may_create),
 ) -> RequestAccepted:
     """The same submission, with attachments.
 

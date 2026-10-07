@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
+from backend.access import Perm
 from backend.config import settings
 from backend.deps import CurrentUser, get_current_user, get_repo
 from backend.integrations.graph.client import GraphClient, GraphError
@@ -109,15 +110,19 @@ def advanced_search(
     except NotImplementedError:
         raise HTTPException(status_code=501,
                             detail="Advanced Search needs the file-backed catalogue")
-    if user.is_partner:
-        page.items = [h.model_copy(update={"files": _without_file_ids(h.files)})
-                      if _locked_for(user, h.asset) else h for h in page.items]
+    page.items = [h.model_copy(update={"files": _without_file_ids(h.files)})
+                  if _locked_for(user, h.asset) else h for h in page.items]
     return page
 
 
 def _locked_for(user: CurrentUser, asset) -> bool:
-    """A partner on a demo whose SharePoint folder is closed to partners."""
-    return bool(getattr(asset, "partner_restricted", False)) and user.is_partner
+    """A partner on a demo whose SharePoint folder is closed to partners --
+    or somebody whose groups allow neither Preview nor Download (2026-10-06),
+    for whom an id that opens a file is of no use."""
+    if bool(getattr(asset, "partner_restricted", False)) and user.is_partner:
+        return True
+    return ((user.is_authenticated or user.is_dev_principal)
+            and not (user.can(Perm.PREVIEW) or user.can(Perm.DOWNLOAD)))
 
 
 def _without_file_ids(resources: list) -> list:
@@ -209,6 +214,15 @@ def _require_partner_access(asset_id: str, repo: AssetRepository, user: CurrentU
                             detail="These files are not available to your account.")
 
 
+def _require_perm(user: CurrentUser, perm: Perm) -> None:
+    """Preview and Download are permissions of their own (backend/access.py).
+    Only checked for somebody: an anonymous caller exists only where sign-in
+    is not enforced, and is treated as before groups existed."""
+    if (user.is_authenticated or user.is_dev_principal) and not user.can(perm):
+        raise HTTPException(status_code=403,
+                            detail="Your account does not have permission for this.")
+
+
 def _require_listed_file(asset_id: str, item_id: str, repo: AssetRepository) -> None:
     """Both file endpoints below need this same check: `item_id` must belong
     to a resource actually listed on this asset. Graph would happily resolve
@@ -260,6 +274,7 @@ def download_file(asset_id: str, item_id: str,
     never at list time"). That URL expires in about an hour, so it is never
     stored; this endpoint exists only to mint one on demand.
     """
+    _require_perm(user, Perm.DOWNLOAD)
     _require_listed_file(asset_id, item_id, repo)
     _require_partner_access(asset_id, repo, user)
     try:
@@ -300,6 +315,7 @@ def preview_file(asset_id: str, item_id: str,
     One endpoint for every kind: video, Word, PowerPoint and (untested but
     presumably) PDF and images all resolve through the same Graph call.
     """
+    _require_perm(user, Perm.PREVIEW)
     _require_listed_file(asset_id, item_id, repo)
     _require_partner_access(asset_id, repo, user)
     try:

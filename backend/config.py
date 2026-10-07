@@ -181,6 +181,11 @@ class Settings(BaseSettings):
     #: anyone else (guest accounts) counts as a partner. Comma-separated.
     internal_email_domains: str = "ptc.com"
 
+    #: The Hub's administrators from the start, comma-separated emails: always
+    #: in the Administrators group (backend/access.py), whatever the Admin page
+    #: says, so the Hub can never be left with nobody able to manage it.
+    hub_admin_emails: str = ""
+
     # ------------------------------------------------ the admin bridge (temporary)
     #: A single shared credential for the Admin page, for the stretch before
     #: Entra SSO exists. Deliberately NOT a replacement for it:

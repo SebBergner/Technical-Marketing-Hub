@@ -1,17 +1,19 @@
-"""The Admin page's own endpoints: sign-in, and one aggregated overview.
+"""The Admin page's own endpoints: sign-in, one aggregated overview, and
+users & groups.
 
-Everything here is behind `require_admin` except the two session routes and
-PUT /auto-sync (which takes the sync buttons' key, `admin_or_curator`), and
-the overview is a single call on purpose. The alternative — the page fanning
+Every route needs the "View Admin" permission (backend/access.py) except the
+three session routes; a change needs its own permission on top -- Manage the
+Home page, Run sync, Manage users & groups. The shared Admin sign-in
+(backend/admin_auth.py) holds all of them while it still exists. The overview
+is a single call on purpose. The alternative — the page fanning
 out to /api/debug/backend, /api/auth/me, /api/consensus/oauth/status,
 /api/taxonomy and the repository — would have spread an admin view across
 five endpoints with five different audiences, some of them public. One
 endpoint keeps "what an admin may see" in one place, where it can be read.
 
 Nothing here writes to SharePoint. The sync buttons on the page call
-/api/graph/sync and /api/consensus/sync, which accept an admin session by way
-of `admin_or_curator`; approving a metadata proposal deliberately does not,
-and stays curator-only until SSO exists.
+/api/graph/sync and /api/consensus/sync (Run sync); approving a metadata
+proposal needs Edit metadata, which the shared sign-in never has.
 """
 from __future__ import annotations
 
@@ -19,12 +21,13 @@ import logging
 import os
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
+from backend import access
+from backend.access import ADMIN_SESSION_PERMS, Perm
 from backend.admin_auth import (
-    admin_or_curator, clear_session, has_admin_session, issue_session, require_admin,
-    verify_password,
+    clear_session, has_admin_session, issue_session, require_perm, verify_password,
 )
 from backend import auto_sync
 from backend.auth import security_warnings
@@ -37,6 +40,10 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
+#: Every Admin page call needs the page itself; a change needs its own
+#: permission on top (backend/access.py).
+VIEW_ADMIN = Depends(require_perm(Perm.VIEW_ADMIN))
+
 
 class LoginIn(BaseModel):
     username: str
@@ -45,15 +52,25 @@ class LoginIn(BaseModel):
 
 @router.get("/session")
 def session_state(request: Request):
-    """Whether this browser is signed in — and whether an admin exists at all.
+    """Whether this browser may open the Admin page, and how.
 
     Deliberately public: the page has to know which of three things to render
     (the form, the dashboard, or "no admin configured on this deployment")
     before it can authenticate, and none of those answers is a secret.
+    `signed_in` is true for a signed-in person with View Admin, as well as
+    for the shared Admin sign-in; `via` says which.
     """
+    from backend.auth import principal_from_request
+    user = principal_from_request(request)
+    person = user.is_authenticated and user.can(Perm.VIEW_ADMIN)
+    password = has_admin_session(request)
     return {
         "configured": settings.admin_configured,
-        "signed_in": has_admin_session(request),
+        "signed_in": person or password,
+        "via": "sso" if person else ("password" if password else None),
+        "user": user.as_dict() if person else None,
+        "permissions": sorted(user.permissions) if person else (
+            sorted(ADMIN_SESSION_PERMS) if password else []),
     }
 
 
@@ -164,7 +181,7 @@ _COVERAGE_FIELDS = ("segment", "products", "funnel_stage", "content_depth",
                     "description", "thumbnail_url")
 
 
-@router.get("/overview", dependencies=[Depends(require_admin)])
+@router.get("/overview", dependencies=[VIEW_ADMIN])
 def overview(repo: AssetRepository = Depends(get_repo)):
     """One payload, in the order the page reads it."""
     oauth = get_oauth()
@@ -270,11 +287,11 @@ def _auto_sync_view() -> dict:
     }
 
 
-@router.put("/auto-sync")
-def set_auto_sync(body: AutoSyncIn, actor: str = Depends(admin_or_curator)):
+@router.put("/auto-sync", dependencies=[VIEW_ADMIN])
+def set_auto_sync(body: AutoSyncIn, actor: str = Depends(require_perm(Perm.RUN_SYNC))):
     """Switch the daily sync on or off, and choose its hour (UTC).
 
-    The same key as the sync buttons (admin_or_curator): the schedule does
+    The same permission as the sync buttons (Run sync): the schedule does
     nothing a button press could not, it only presses it daily.
     """
     if body.hours_utc is not None and any(not 0 <= h <= 23 for h in body.hours_utc):
@@ -285,14 +302,14 @@ def set_auto_sync(body: AutoSyncIn, actor: str = Depends(admin_or_curator)):
     return _auto_sync_view()
 
 
-@router.get("/content", dependencies=[Depends(require_admin)])
+@router.get("/content", dependencies=[VIEW_ADMIN])
 def content_summary(repo: AssetRepository = Depends(get_repo)):
     """The content dashboard (HLR-F1), counted over what the Hub lists."""
     from backend.services import content_dashboard
     return content_dashboard.summary(repo)
 
 
-@router.get("/content/assets", dependencies=[Depends(require_admin)])
+@router.get("/content/assets", dependencies=[VIEW_ADMIN])
 def content_assets(dim: str, value: str, repo: AssetRepository = Depends(get_repo)):
     """The assets behind one bar of the content dashboard."""
     from backend.services import content_dashboard
@@ -306,7 +323,7 @@ class HideIn(BaseModel):
     asset_id: str
 
 
-@router.get("/hidden", dependencies=[Depends(require_admin)])
+@router.get("/hidden", dependencies=[VIEW_ADMIN])
 def list_hidden(repo: AssetRepository = Depends(get_repo)):
     try:
         return repo.hidden()
@@ -314,28 +331,30 @@ def list_hidden(repo: AssetRepository = Depends(get_repo)):
         raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
 
 
-@router.post("/hidden", dependencies=[Depends(require_admin)])
-def hide_demo(body: HideIn, repo: AssetRepository = Depends(get_repo)):
+@router.post("/hidden", dependencies=[VIEW_ADMIN])
+def hide_demo(body: HideIn, repo: AssetRepository = Depends(get_repo),
+              actor: str = Depends(require_perm(Perm.MANAGE_HOME))):
     """Hide a demo from the Hub -- every list, search and page -- without
-    touching SharePoint or Consensus. Admin sign-in only (Liwei, 2026-10-06):
-    not the curator key the sync buttons accept."""
+    touching SharePoint or Consensus. Manage the Home page, on the Admin page
+    (Liwei, 2026-10-06: never the curator key alone)."""
     try:
-        items = repo.hide(body.asset_id, "admin-session")
+        items = repo.hide(body.asset_id, actor)
     except KeyError:
         raise HTTPException(status_code=422, detail=f"no listed demo with id {body.asset_id!r}")
     except NotImplementedError:
         raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
-    log.info("demo hidden from the Hub: %s", body.asset_id)
+    log.info("demo hidden from the Hub by %s: %s", actor, body.asset_id)
     return items
 
 
-@router.delete("/hidden/{asset_id}", dependencies=[Depends(require_admin)])
-def unhide_demo(asset_id: str, repo: AssetRepository = Depends(get_repo)):
+@router.delete("/hidden/{asset_id}", dependencies=[VIEW_ADMIN])
+def unhide_demo(asset_id: str, repo: AssetRepository = Depends(get_repo),
+                actor: str = Depends(require_perm(Perm.MANAGE_HOME))):
     try:
         items = repo.unhide(asset_id)
     except NotImplementedError:
         raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
-    log.info("demo unhidden: %s", asset_id)
+    log.info("demo unhidden by %s: %s", actor, asset_id)
     return items
 
 
@@ -349,7 +368,7 @@ class HubSettingsIn(BaseModel):
     show_page_only_demos: bool | None = None
 
 
-@router.get("/hub-settings", dependencies=[Depends(require_admin)])
+@router.get("/hub-settings", dependencies=[VIEW_ADMIN])
 def get_hub_settings(repo: AssetRepository = Depends(get_repo)):
     try:
         return repo.hub_settings()
@@ -357,8 +376,8 @@ def get_hub_settings(repo: AssetRepository = Depends(get_repo)):
         raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
 
 
-@router.put("/hub-settings")
-def set_hub_settings(body: HubSettingsIn, actor: str = Depends(admin_or_curator),
+@router.put("/hub-settings", dependencies=[VIEW_ADMIN])
+def set_hub_settings(body: HubSettingsIn, actor: str = Depends(require_perm(Perm.MANAGE_HOME)),
                      repo: AssetRepository = Depends(get_repo)):
     try:
         values = body.model_dump(exclude_none=True)
@@ -386,7 +405,7 @@ def _promoted_view(repo: AssetRepository) -> dict:
             "assets": [a.model_dump(mode="json") for a in promoted_summaries(repo)]}
 
 
-@router.get("/promoted", dependencies=[Depends(require_admin)])
+@router.get("/promoted", dependencies=[VIEW_ADMIN])
 def get_promoted(repo: AssetRepository = Depends(get_repo)):
     try:
         return _promoted_view(repo)
@@ -394,12 +413,12 @@ def get_promoted(repo: AssetRepository = Depends(get_repo)):
         raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
 
 
-@router.put("/promoted")
-def set_promoted(body: PromotedIn, actor: str = Depends(admin_or_curator),
+@router.put("/promoted", dependencies=[VIEW_ADMIN])
+def set_promoted(body: PromotedIn, actor: str = Depends(require_perm(Perm.MANAGE_HOME)),
                  repo: AssetRepository = Depends(get_repo)):
     """Choose what the Home page features, and in which order (Seb, via
-    Liwei 2026-10-01). The same key as the sync buttons: this edits a
-    Portal-owned list, never SharePoint."""
+    Liwei 2026-10-01). Manage the Home page: this edits a Portal-owned list,
+    never SharePoint."""
     unknown = [i for i in body.asset_ids if repo.get(i) is None]
     if unknown:
         raise HTTPException(status_code=422, detail=f"no asset with id {unknown[0]!r}")
@@ -449,7 +468,7 @@ def _tally(events: list[dict], key: str = "event") -> dict:
     return out
 
 
-@router.get("/usage", dependencies=[Depends(require_admin)])
+@router.get("/usage", dependencies=[VIEW_ADMIN])
 def usage(since: str | None = None, until: str | None = None,
           repo: AssetRepository = Depends(get_repo)):
     """What the Hub itself was used for, in a window.
@@ -521,7 +540,7 @@ def _daily(events: list[dict]) -> list[dict]:
     return [days[d] for d in sorted(days)]
 
 
-@router.get("/usage/asset/{asset_id}", dependencies=[Depends(require_admin)])
+@router.get("/usage/asset/{asset_id}", dependencies=[VIEW_ADMIN])
 def usage_for_asset(asset_id: str, since: str | None = None,
                     until: str | None = None,
                     repo: AssetRepository = Depends(get_repo)):
@@ -558,7 +577,7 @@ def usage_for_asset(asset_id: str, since: str | None = None,
     }
 
 
-@router.get("/source/{source}", dependencies=[Depends(require_admin)])
+@router.get("/source/{source}", dependencies=[VIEW_ADMIN])
 def source_detail(source: str, repo: AssetRepository = Depends(get_repo)):
     """One source's own page: how its syncs have gone.
 
@@ -623,7 +642,7 @@ BREAKDOWNS = {
 }
 
 
-@router.get("/usage/breakdown", dependencies=[Depends(require_admin)])
+@router.get("/usage/breakdown", dependencies=[VIEW_ADMIN])
 def usage_breakdown(dimension: str = "demo", since: str | None = None,
                     until: str | None = None, q: str | None = None,
                     sort: str = "view", limit: int = 25, offset: int = 0,
@@ -700,7 +719,7 @@ def usage_breakdown(dimension: str = "demo", since: str | None = None,
     }
 
 
-@router.get("/usage/untouched", dependencies=[Depends(require_admin)])
+@router.get("/usage/untouched", dependencies=[VIEW_ADMIN])
 def usage_untouched(since: str | None = None, until: str | None = None,
                     q: str | None = None, limit: int = 25, offset: int = 0,
                     repo: AssetRepository = Depends(get_repo)):
@@ -726,3 +745,76 @@ def usage_untouched(since: str | None = None, until: str | None = None,
     rows.sort(key=lambda r: (r["label"] or "").lower())
     return {"total_rows": len(rows), "rows": rows[offset:offset + limit],
             "offset": offset, "limit": limit, "touched": len(touched)}
+
+
+# ────────────────────────────────────────────────────────── users & groups
+MANAGE_USERS = require_perm(Perm.MANAGE_USERS)
+
+
+class GroupIn(BaseModel):
+    name: str | None = Field(default=None, max_length=80)
+    description: str | None = Field(default=None, max_length=300)
+    permissions: list[str] | None = None
+    members: list[str] | None = Field(default=None, max_length=500)
+
+
+def _access_view() -> dict:
+    return {
+        "catalogue": access.catalogue(),
+        "groups": access.load_state()["groups"],
+        "bootstrap_admins": sorted(access._bootstrap_admins()),
+        "users": access.users_view(),
+        "audit": access.audit_log(100),
+    }
+
+
+@router.get("/access", dependencies=[VIEW_ADMIN])
+def get_access():
+    """Groups, their permissions and members, who has signed in, and the
+    audit log -- the Users & groups tab in one call."""
+    return _access_view()
+
+
+@router.post("/access/groups", dependencies=[VIEW_ADMIN], status_code=201)
+def create_group(body: GroupIn, actor: str = Depends(MANAGE_USERS)):
+    try:
+        access.create_group(body.name or "", body.description or "",
+                            body.permissions or [], body.members or [], actor)
+    except access.AccessError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return _access_view()
+
+
+@router.put("/access/groups/{group_id}", dependencies=[VIEW_ADMIN])
+def update_group(group_id: str, body: GroupIn, actor: str = Depends(MANAGE_USERS)):
+    try:
+        access.update_group(group_id, actor, **body.model_dump(exclude_none=True))
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no group {group_id!r}")
+    except access.AccessError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return _access_view()
+
+
+@router.delete("/access/groups/{group_id}", dependencies=[VIEW_ADMIN])
+def delete_group(group_id: str, actor: str = Depends(MANAGE_USERS)):
+    try:
+        access.delete_group(group_id, actor)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no group {group_id!r}")
+    except access.AccessError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return _access_view()
+
+
+# ─────────────────────────────────────────────────────────────── sign-ins
+@router.get("/activity", dependencies=[VIEW_ADMIN])
+def get_activity(since: str | None = None, until: str | None = None,
+                 today: str | None = None, q: str | None = None, user: str | None = None,
+                 offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500)):
+    """The Sign-ins tab: who is active now, sign-ins in a window, and the log
+    (backend/activity.py). Bounds come from the browser, as for /usage."""
+    from backend import activity
+    return activity.report(since=since, until=until, today=today, q=q, user=user,
+                           offset=offset, limit=limit)
+

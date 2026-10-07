@@ -162,6 +162,75 @@
   .promo-results{margin-top:6px}
   .promo-status{font-size:12.5px;min-height:18px;margin-top:8px}
 
+  /* users & groups ----------------------------------------------------- */
+  .ug{display:grid;grid-template-columns:minmax(220px,280px) minmax(0,1fr);gap:16px;
+    align-items:start}
+  @media (max-width:760px){.ug{grid-template-columns:1fr}}
+  .ug-list{display:grid;gap:6px}
+  .ug-item{display:block;width:100%;text-align:left;padding:10px 12px}
+  .ug-item--on{border-color:var(--green);background:var(--green-soft)}
+  .ug-item__name{font-weight:600}
+  .ug-item__meta{font-size:12px;color:var(--muted);margin-top:2px}
+  .ug-perms{display:grid;gap:2px;margin:6px 0 4px}
+  .ug-perm{display:grid;grid-template-columns:20px 1fr;gap:6px;align-items:start;
+    padding:5px 0;font-size:13.5px;color:var(--ink)}
+  .ug-perm input{margin:3px 0 0;padding:0}
+  .ug-perm small{display:block;color:var(--muted);font-size:12px}
+  .ug-field{margin-top:14px}
+  .ug-field > h3{font-size:12px;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--faint);margin:0 0 4px}
+  /* members: a count and filter, then a table that scrolls in a fixed height */
+  .ug-mbar{display:flex;gap:10px;align-items:center;margin:4px 0 8px}
+  .ug-mbar__count{font-weight:600;white-space:nowrap}
+  .ug-mbar input{flex:1;min-width:0;padding:6px 10px}
+  .ug-pending{font-size:12.5px;color:var(--amber);background:var(--amber-soft);
+    border-radius:6px;padding:6px 10px;margin-bottom:8px}
+  .ug-mtable{max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:8px}
+  .ug-mtable table{font-size:13px}
+  .ug-mtable th{position:sticky;top:0;background:var(--surface);padding:8px 10px 6px;z-index:1}
+  .ug-mtable td{padding:6px 10px;overflow-wrap:anywhere}
+  .ug-mtable tr:first-child td{border-top:none}
+  .ug-tag{margin-left:6px;font-size:10px;padding:1px 6px}
+  .ug-remove{padding:3px 9px;font-size:12px}
+  .ug-mfoot{font-size:12px;min-height:16px;margin-top:4px}
+  .ug-add{display:flex;gap:6px;margin-top:10px;align-items:stretch}
+  .ug-add textarea{flex:1;min-width:0;font:inherit;font-size:13px;padding:8px 10px;
+    border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--ink);
+    resize:vertical}
+  .ug-pick{font:inherit;font-size:13px;padding:6px 8px;border-radius:8px;width:100%;
+    border:1px solid var(--border);background:var(--surface);color:var(--ink);margin-top:4px}
+  .ug-actions{display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap}
+  .ug-actions .promo-status{margin-top:0}
+  .ug-danger{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;
+    justify-content:flex-end}
+  .ug-danger__q{font-size:12.5px;color:var(--red)}
+  .btn-danger{padding:4px 10px;font-size:12px;color:var(--red);border-color:var(--red-soft);
+    background:var(--surface)}
+  .btn-danger:hover:not(:disabled){background:var(--red-soft)}
+  .btn-danger--solid{background:var(--red);border-color:var(--red);color:#fff;font-weight:600}
+  .btn-danger--solid:hover:not(:disabled){background:var(--red);filter:brightness(1.1)}
+  .btn-small{padding:4px 10px;font-size:12px}
+
+  /* sign-ins ----------------------------------------------------------- */
+  .act-search{padding:6px 10px;font-size:13px;min-width:0;width:240px;max-width:100%}
+  .act-period{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:10px;
+    align-items:center;padding:10px 0;margin:-10px 0 14px;background:var(--bg);
+    border-bottom:1px solid var(--border)}
+  .act-period__label{font-size:11px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.04em;color:var(--faint)}
+  .act-custom{display:flex;gap:8px;align-items:center}
+  .act-custom label{display:flex;gap:6px;align-items:center}
+  .act-custom input{padding:4px 8px;font-size:12.5px}
+  .act-filter{display:flex;gap:8px;align-items:center;margin-bottom:8px;font-size:13px}
+  .act-filter button{padding:3px 10px;font-size:12px}
+  #actPeople,#actActive{max-height:440px;overflow:auto}
+  #actPeople th,#actActive th{position:sticky;top:0;background:var(--surface);z-index:1}
+  .act-person{cursor:pointer}
+  .act-person:hover td{background:var(--surface-2)}
+  .act-note{font-size:12px;margin-top:10px}
+  .act-dot{display:inline-block;width:8px;height:8px;border-radius:50%;
+    background:var(--green);margin-right:6px;vertical-align:middle}
+
   /* login -------------------------------------------------------------- */
   .login{max-width:360px;margin:12vh auto;}
   .login .card{display:grid;gap:12px}
@@ -246,8 +315,9 @@
       <button class="btn-primary" style="width:100%" type="submit">Sign in</button>
     </form>
     <p class="faint" style="font-size:12px;margin:0">
-      A shared account, in place until single sign-on is configured. Actions
-      taken here are not attributed to a person.
+      Hub administrators who are signed in open this page directly. This shared
+      account remains for the transition; actions taken with it are not
+      attributed to a person.
     </p>
   </div>
 </div>
@@ -255,10 +325,10 @@
 <!-- ── not configured ───────────────────────────────────────────────── -->
 <div class="login" id="offView" hidden>
   <div class="card">
-    <h1>No admin configured</h1>
+    <h1>No access to Admin</h1>
     <p class="muted" style="margin:0">
-      This deployment has no <code>ADMIN_USERNAME</code> / <code>ADMIN_PASSWORD</code>
-      set, so the Admin page is switched off entirely.
+      Your account is not in a group with the <b>View Admin</b> permission. Ask a
+      Hub administrator to add you on the Users &amp; groups tab.
     </p>
   </div>
 </div>
@@ -285,6 +355,8 @@
   <nav class="tabs" id="adminTabs" role="tablist">
     <button type="button" class="tab tab--on" role="tab" data-tab="overview" aria-selected="true">Overview</button>
     <button type="button" class="tab" role="tab" data-tab="content" aria-selected="false">Content dashboard</button>
+    <button type="button" class="tab" role="tab" data-tab="access" aria-selected="false">Users &amp; groups</button>
+    <button type="button" class="tab" role="tab" data-tab="activity" aria-selected="false">Sign-ins</button>
   </nav>
 
   <div id="tabOverview" role="tabpanel">
@@ -362,6 +434,68 @@
         what the catalogue does not yet say.</p>
       <div class="tiles" id="contentTotals"></div>
       <div class="grid grid--2" id="contentCharts" style="margin-top:12px"></div>
+    </section>
+  </div>
+
+  <!-- Who signed in when, and who is around now (2026-10-07). -->
+  <div id="tabActivity" role="tabpanel" hidden>
+    <!-- One period for the tiles, People and the log; it stays in view while
+         scrolling so the tables never look unfiltered. Active now is always
+         the last few minutes. -->
+    <div class="act-period">
+      <span class="act-period__label">Period</span>
+      <div class="ranges" id="actRanges"></div>
+      <div class="act-custom" id="actCustom" hidden>
+        <label>From <input type="date" id="actFrom"></label>
+        <label>To <input type="date" id="actTo"></label>
+      </div>
+    </div>
+    <section>
+      <div class="section-head"><h2 id="actTitle">Sign-ins</h2></div>
+      <div class="tiles" id="actTiles"></div>
+    </section>
+    <section>
+      <div class="section-head">
+        <h2>Active now</h2>
+        <span class="faint" id="actActiveNote"></span>
+      </div>
+      <div class="card tablewrap" id="actActive"></div>
+    </section>
+    <section>
+      <div class="section-head">
+        <h2 id="actPeopleTitle">People</h2>
+        <input id="actPeopleSearch" class="act-search" type="search"
+               placeholder="Filter by name or email…" aria-label="Filter people">
+      </div>
+      <div class="card tablewrap" id="actPeople"></div>
+      <div class="faint act-note" id="actPeopleCount"></div>
+    </section>
+    <section>
+      <div class="section-head">
+        <h2 id="actLogTitle">Sign-in log</h2>
+        <input id="actSearch" class="act-search" type="search"
+               placeholder="Filter by name or email…" aria-label="Filter the sign-in log">
+      </div>
+      <div class="act-filter" id="actFilter" hidden></div>
+      <div class="card tablewrap" id="actLog"></div>
+      <div class="pager" id="actPager"></div>
+      <p class="faint act-note" id="actNote"></p>
+    </section>
+  </div>
+
+  <!-- Who may do what: groups, their permissions and members (2026-10-06). -->
+  <div id="tabAccess" role="tabpanel" hidden>
+    <section>
+      <div class="section-head"><h2>Groups</h2></div>
+      <p class="muted" style="margin:-6px 0 14px">A person may do whatever any of their
+        groups allows. PTC employees and Partners fill themselves at sign-in; other groups
+        list their members here. Kept in the Hub only &mdash; nothing is written to
+        SharePoint or Entra.</p>
+      <div class="ug" id="ugGroups"></div>
+    </section>
+    <section>
+      <div class="section-head"><h2>Change log</h2></div>
+      <div class="card tablewrap" id="ugAudit"></div>
     </section>
   </div>
 </div>

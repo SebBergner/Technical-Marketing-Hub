@@ -6,7 +6,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.config import settings
-from backend.admin_auth import admin_or_curator
+from backend.access import Perm
+from backend.admin_auth import require_perm
 from backend.deps import CurrentUser, get_repo, require_authenticated, require_curator
 from backend.integrations.graph.client import (
     GraphClient, GraphError, GraphPermissionError, get_graph_client,
@@ -68,7 +69,7 @@ def verify(user: CurrentUser = Depends(require_authenticated),
 
 @router.post("/sync")
 def sync(full: bool = False, repo: AssetRepository = Depends(get_repo),
-         actor: str = Depends(admin_or_curator),
+         actor: str = Depends(require_perm(Perm.RUN_SYNC)),
          client: GraphClient = Depends(require_client)):
     """Pull the Demo Catalog and replace the mirror.
 

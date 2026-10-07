@@ -4,13 +4,11 @@ One page, /migration, for every content migration, so that each new one is a
 section there rather than another top-level name (Liwei, 2026-09-28).
 Brightcove Gallery is the first; its plan is docs/brightcove-migration-plan.md.
 
-Who may use it (Liwei, 2026-09-29, plan §14): an SSO curator, or the shared
-admin sign-in -- `admin_or_curator`, the key the sync buttons already take.
-That includes STARTING a run, which writes to SharePoint: a deliberate,
-temporary exception to backend/admin_auth.py's rule, made because
-production has no SSO yet. The shared sign-in must therefore type an
-operator name, kept in the batch log; a curator is recorded by their own
-identity. When production has SSO, starting becomes curator-only.
+Who may use it: the "Run Brightcove migration" permission (backend/access.py,
+2026-10-06; Administrators by default), or the shared admin sign-in while it
+still exists. That includes STARTING a run, which writes to SharePoint. The
+shared sign-in must therefore type an operator name, kept in the batch log; a
+signed-in person is recorded by their own identity.
 """
 from __future__ import annotations
 
@@ -21,7 +19,8 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
-from backend.admin_auth import admin_or_curator
+from backend.access import Perm
+from backend.admin_auth import require_perm
 from backend.config import settings
 from backend.integrations.graph.client import GraphClient, GraphError, get_graph_client
 from backend.services import brightcove_migration as bc
@@ -29,8 +28,11 @@ from backend.services import migration_jobs as jobs
 
 log = logging.getLogger(__name__)
 
+#: Its own permission (Liwei, 2026-10-06): a run uploads to SharePoint.
+RUN_MIGRATION = require_perm(Perm.RUN_MIGRATION)
+
 router = APIRouter(prefix="/api/migration", tags=["migration"],
-                   dependencies=[Depends(admin_or_curator)])
+                   dependencies=[Depends(RUN_MIGRATION)])
 
 #: Seb's V29 was 0.2 MB; this leaves room without inviting anything else.
 MAX_SHEET_BYTES = 20 * 1024 * 1024
@@ -44,7 +46,7 @@ def graph_client_or_none() -> GraphClient | None:
 def _operator(actor: str, typed: str | None) -> str:
     """Who is starting this. A curator is who they signed in as; the shared
     admin sign-in has no identity of its own, so a name must be typed."""
-    if actor.startswith("curator:"):
+    if actor.startswith(("user:", "dev:")):
         return actor.split(":", 1)[1]
     name = (typed or "").strip()
     if len(name) < 2:
@@ -56,7 +58,7 @@ def _operator(actor: str, typed: str | None) -> str:
 
 @router.get("/brightcove/status")
 def brightcove_status(client: GraphClient | None = Depends(graph_client_or_none),
-                      actor: str = Depends(admin_or_curator)):
+                      actor: str = Depends(RUN_MIGRATION)):
     """Everything the Brightcove section shows, in one read-only call.
 
     Reads the whole library on every call. At the planned size (~260 demos,
@@ -83,7 +85,7 @@ def brightcove_status(client: GraphClient | None = Depends(graph_client_or_none)
             "site_name": os.getenv("WEBSITE_SITE_NAME") or "local",
             "slot": os.getenv("WEBSITE_SLOT_NAME") or "local",
         },
-        "actor": {"kind": "curator" if actor.startswith("curator:") else "admin-session",
+        "actor": {"kind": "admin-session" if actor == "admin-session" else "curator",
                   "name": actor.split(":", 1)[1] if ":" in actor else None},
         "runner_enabled": settings.migration_runner_enabled,
         "graph": {"configured": client is not None, "error": error},
@@ -99,7 +101,7 @@ def brightcove_status(client: GraphClient | None = Depends(graph_client_or_none)
 
 # ─────────────────────────────────────────────────────────────── sheets
 @router.post("/brightcove/sheets")
-async def upload_sheet(file: UploadFile = File(...), actor: str = Depends(admin_or_curator)):
+async def upload_sheet(file: UploadFile = File(...), actor: str = Depends(RUN_MIGRATION)):
     """Keep the workbook, convert it, and start its preview. Writes nothing
     to SharePoint or Brightcove."""
     if not (file.filename or "").lower().endswith(".xlsx"):
@@ -150,7 +152,7 @@ class ResumeIn(BaseModel):
 
 
 @router.post("/brightcove/runs")
-def start_run(body: RunIn, actor: str = Depends(admin_or_curator)):
+def start_run(body: RunIn, actor: str = Depends(RUN_MIGRATION)):
     operator = _operator(actor, body.operator)
     if body.limit is not None and body.limit < 1:
         raise HTTPException(status_code=422, detail="The limit must be at least 1.")
@@ -172,7 +174,7 @@ def run_progress(batch_id: str):
 
 
 @router.post("/brightcove/runs/{batch_id}/pause")
-def pause_run(batch_id: str, actor: str = Depends(admin_or_curator)):
+def pause_run(batch_id: str, actor: str = Depends(RUN_MIGRATION)):
     if jobs.run_status(batch_id) is None:
         raise HTTPException(status_code=404, detail="No such run.")
     jobs.pause(batch_id)
@@ -181,7 +183,7 @@ def pause_run(batch_id: str, actor: str = Depends(admin_or_curator)):
 
 
 @router.post("/brightcove/runs/{batch_id}/resume")
-def resume_run(batch_id: str, body: ResumeIn, actor: str = Depends(admin_or_curator)):
+def resume_run(batch_id: str, body: ResumeIn, actor: str = Depends(RUN_MIGRATION)):
     if jobs.run_status(batch_id) is None:
         raise HTTPException(status_code=404, detail="No such run.")
     operator = _operator(actor, body.operator)

@@ -5487,6 +5487,40 @@
     console.info("[hub-api] loaded", assets.length, "assets", bySource);
   }
 
+  /* ── what this person may do (backend/access.py, 2026-10-06) ─────────
+   *
+   * The server refuses whatever a person's groups do not allow; this only
+   * hides the controls that would be refused, so nobody is offered a button
+   * that answers "not permitted". One class on <html> per missing
+   * permission, and CSS does the hiding -- the links are built in many
+   * places, but every one of them points at the same two endpoints, and the
+   * request form is opened from one nav item. Nothing is hidden until the
+   * answer arrives, and nothing at all if it never does.
+   */
+  var PERMISSION_CSS =
+    ".hub-no-download a[href$='/download']{display:none !important}" +
+    ".hub-no-preview a[href$='/preview']{display:none !important}" +
+    ".hub-no-create_demo #navRequestAsset{display:none !important}";
+
+  function applyPermissions() {
+    fetch("/api/auth/me")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var granted = d && d.user && d.user.permissions;
+        if (!granted) return;
+        var style = document.createElement("style");
+        style.id = "hubPermissionCss";
+        style.textContent = PERMISSION_CSS;
+        (document.head || document.documentElement).appendChild(style);
+        ["download", "preview", "create_demo"].forEach(function (p) {
+          document.documentElement.classList.toggle("hub-no-" + p, granted.indexOf(p) < 0);
+        });
+      })
+      .catch(function () {});
+  }
+
+  applyPermissions();
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", load);
   } else {

@@ -438,3 +438,35 @@ def test_a_complete_oidc_deployment_is_quiet(oidc, monkeypatch):
     monkeypatch.setattr(settings, "oidc_redirect_uri", "https://tmh.ptcxc.com/auth/callback")
     monkeypatch.setattr(settings, "auth_curator_oids", OID)
     assert security_warnings() == []
+
+
+# ─────────────────────────────────────────── users & groups (2026-10-06)
+def test_a_sign_in_is_remembered_for_the_admin_page(oidc, fake, client):
+    from backend import access
+    sign_in(client)
+    [user] = access.known_users()
+    assert (user["oid"], user["email"], user["name"], user["external"]) == (
+        OID, "person@ptc.com", "Test Person", False)
+
+
+def test_a_sign_in_is_logged_and_its_person_shows_as_active(oidc, fake, client):
+    from backend import activity
+    sign_in(client)
+    client.get("/api/auth/me")
+    report = activity.report()
+    assert [e["user"] for e in report["log"]["items"]] == ["person@ptc.com"]
+    assert [a["oid"] for a in report["active"]] == [OID]
+
+
+def test_without_view_the_hub_only_the_admin_side_stays_open(oidc, fake, client, monkeypatch):
+    """A group can lose "View the Hub"; the gate then refuses the Hub itself
+    but leaves the pages that check their own permissions reachable."""
+    from backend import access
+    monkeypatch.setattr(settings, "hub_admin_emails", "")
+    access.update_group(access.EMPLOYEES, "test", permissions=["preview"])
+    sign_in(client)
+    assert client.get("/").status_code == 403
+    assert client.get("/api/assets").status_code == 403
+    assert client.get("/api/auth/me").status_code == 200
+    assert client.get("/api/admin/overview").status_code == 403, "its own check, not the gate's"
+

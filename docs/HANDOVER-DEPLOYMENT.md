@@ -606,6 +606,47 @@ sync can run end to end on Azure itself.
 
 ---
 
+## 5b. Users & groups (2026-10-06)
+
+Who may do what is decided in the Hub itself (`backend/access.py`): a fixed
+list of permissions, groups on **Admin → Users & groups**, members kept by
+hand there. Three groups are built in:
+
+| Group | Members | Default permissions |
+|---|---|---|
+| Administrators | listed on the page **plus everyone in `HUB_ADMIN_EMAILS`** | all, always |
+| PTC employees | automatic: every member (non-guest) account | view, preview, download, internal content, create demo |
+| Partners | automatic: every guest account | view, preview, download |
+
+**To do on each slot (production and staging), once:** set the app setting
+`HUB_ADMIN_EMAILS` to the administrators' sign-in addresses, comma-separated.
+Until it is set (or someone is added on the page with the shared password),
+nobody can open Admin by SSO -- the shared `ADMIN_USERNAME`/`ADMIN_PASSWORD`
+still works and holds every permission except Edit metadata. It stays as the
+transition way in; remove `ADMIN_PASSWORD` from the app settings when SSO
+admins are working, and it grants nothing.
+
+Changes on deploy: `/migration` needs "Run Brightcove migration"
+(Administrators by default) -- the curator settings (`AUTH_CURATOR_*`) no
+longer open it, they only grant Edit metadata. Hiding demos, Featured and the
+display switches need View Admin + Manage the Home page; the sync buttons and
+the daily-sync setting need Run sync.
+
+Data, all in `owned/` and to be backed up with it: `access.json` (groups),
+`access_audit.jsonl` (every change, by whom), `users.json` (who has signed
+in, for the member picker), `signin_events.jsonl` (every SSO sign-in) and
+`activity.json` (each person's last request). Each slot has its own, like
+the rest of `owned/`.
+
+**Admin → Sign-ins** (2026-10-07) shows who is active now (a request in the
+last 15 minutes -- the server keeps no session, so "online" can only mean
+"recently active"), people and sign-ins per period, and the sign-in log.
+What people view or download is still recorded anonymously; per-person usage
+waits for management's decision (see `backend/activity.py` for where it
+would go).
+
+---
+
 ## 6. Rollback
 
 The deploy is a code push, so rollback is a git operation:

@@ -323,6 +323,16 @@ def auth_callback(request: Request):
                     not in str(claims.get("idp")).lower(),
         "signed_in_at": int(time.time()),
     }
+    from backend import access
+    access.record_sign_in(oid=str(claims["oid"]), email=claims.get("email"),
+                          username=claims.get("preferred_username"),
+                          name=claims.get("name"),
+                          external=request.session["user"]["external"])
+    from backend import activity
+    activity.record_sign_in(oid=str(claims["oid"]),
+                            email=claims.get("email") or claims.get("preferred_username"),
+                            name=claims.get("name"),
+                            external=request.session["user"]["external"])
     log.info("signed in: %s", claims.get("preferred_username") or claims["oid"])
     return RedirectResponse(next_url, status_code=302)
 
@@ -352,7 +362,18 @@ async def require_sign_in(request: Request, call_next):
     if settings.auth_mode != AuthMode.OIDC.value or request.url.path in OPEN_PATHS:
         return await call_next(request)
     if session_user(request) is not None:
-        return await call_next(request)
+        from backend import activity
+        from backend.auth import principal_from_request
+        activity.note_request(principal_from_request(request))
+        if _may_view_hub(request):
+            return await call_next(request)
+        if request.url.path.startswith("/api/"):
+            return JSONResponse({"detail": "Your account does not have access to the Hub."},
+                                status_code=403)
+        return _page("No access to the Hub",
+                     "You're signed in, but your account isn't in a group that may "
+                     "view the Hub. Ask a Hub administrator for access.", 403,
+                     action=("/logout", "Sign out"))
     if request.url.path.startswith("/api/"):
         return JSONResponse({"detail": "Sign-in required.", "login": "/login"},
                             status_code=401, headers={SIGN_IN_HEADER: "/login"})
@@ -365,6 +386,24 @@ async def require_sign_in(request: Request, call_next):
         return JSONResponse({"detail": "Sign-in required."}, status_code=401)
     target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
     return RedirectResponse("/login?next=" + quote(target, safe=""), status_code=302)
+
+
+#: Reachable with a session but without "View the Hub": the Admin and
+#: migration pages check their own permissions, and the static files they
+#: load say nothing about the catalogue.
+_NOT_HUB_PREFIXES = ("/admin", "/api/admin/", "/migration", "/api/migration/",
+                     "/api/auth/", "/static/")
+
+
+def _may_view_hub(request: Request) -> bool:
+    """The "View the Hub" permission (backend/access.py), for everything but
+    the pages that check their own."""
+    path = request.url.path
+    if path.startswith(_NOT_HUB_PREFIXES):
+        return True
+    from backend.access import Perm
+    from backend.auth import principal_from_request
+    return principal_from_request(request).can(Perm.VIEW_HUB)
 
 
 #: Fetched by the browser without anyone navigating. Used only for clients

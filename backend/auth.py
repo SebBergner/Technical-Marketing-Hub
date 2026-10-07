@@ -111,6 +111,9 @@ class CurrentUser:
     #: The sign-in came through another directory (a guest account): its ID
     #: token named an outside identity provider. Recorded at sign-in.
     external: bool = False
+    #: `preferred_username` (the UPN) in oidc mode; matched alongside `email`
+    #: when deciding group membership (backend/access.py).
+    username: str | None = None
 
     @property
     def is_partner(self) -> bool:
@@ -132,6 +135,15 @@ class CurrentUser:
     def can_curate(self) -> bool:
         return Role.CURATOR.value in self.roles
 
+    @property
+    def permissions(self) -> frozenset[str]:
+        """What this person may do -- the union of their groups (backend/access.py)."""
+        from backend.access import permissions_of
+        return permissions_of(self)
+
+    def can(self, perm) -> bool:
+        return getattr(perm, "value", perm) in self.permissions
+
     def as_dict(self) -> dict:
         return {
             "email": self.email, "name": self.name, "object_id": self.object_id,
@@ -140,6 +152,7 @@ class CurrentUser:
             "is_dev_principal": self.is_dev_principal,
             "can_curate": self.can_curate,
             "is_partner": self.is_partner,
+            "permissions": sorted(self.permissions),
         }
 
 
@@ -275,6 +288,7 @@ def _principal_from_session(request: Request) -> CurrentUser:
         object_id=user.get("oid"),
         provider="aad",
         external=bool(user.get("external")),
+        username=user.get("username"),
         roles=_map_roles(claim_values, user.get("email"), user.get("oid"),
                          user.get("username")),
         is_authenticated=True,
@@ -332,13 +346,14 @@ async def require_authenticated(
 async def require_curator(
     user: CurrentUser = Depends(require_authenticated),
 ) -> CurrentUser:
-    """For anything that will eventually write to SharePoint."""
-    if not user.can_curate:
+    """For anything that will eventually write to SharePoint: the "Edit
+    metadata" permission, which the AUTH_CURATOR_* settings still grant."""
+    from backend.access import Perm
+    if not user.can(Perm.EDIT_METADATA):
         raise HTTPException(
             status_code=403,
-            detail="This action needs the curator role. Ask an administrator to add "
-                   "you to AUTH_CURATOR_OIDS, AUTH_CURATOR_EMAILS or a group in "
-                   "AUTH_CURATOR_GROUPS.",
+            detail="This action needs the Edit metadata permission. Ask an "
+                   "administrator to add you to a group that has it.",
         )
     return user
 

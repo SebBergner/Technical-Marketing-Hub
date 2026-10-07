@@ -1417,6 +1417,8 @@
       b.addEventListener("click", function () {
         ug.selected = g.id;
         ug.draft = null;
+        ug.editing = false;
+        ug.flash = "";
         ug.memberFilter = "";
         renderGroups();
       });
@@ -1428,6 +1430,8 @@
       add.addEventListener("click", function () {
         ug.selected = null;
         ug.draft = { name: "", description: "", permissions: ["view_hub"], members: [] };
+        ug.editing = true;
+        ug.flash = "";
         renderGroups();
       });
       list.appendChild(add);
@@ -1456,16 +1460,44 @@
                    permissions: g.permissions.slice(), members: g.members.slice() };
     }
     var draft = ug.draft;
-    var editable = canManageUsers();
+    /* Read-only until Edit is pressed, and read-only again once saved
+     * (Liwei, 2026-10-07): with every field always open, a saved group
+     * looked exactly like an unsaved one. A new group starts in Edit. */
+    var canManage = canManageUsers();
+    var editable = canManage && (ug.editing || creating);
     var c = el("div", "card");
 
     var head = el("div", "card-head");
     if (g.builtin || !editable) {
-      head.appendChild(el("h2", null, g.name));
-      if (g.builtin) head.appendChild(el("span", "pill pill--off", "built in"));
+      var title = el("div", "ug-title");
+      title.appendChild(el("h2", null, g.name));
+      if (g.builtin) title.appendChild(el("span", "pill pill--off", "built in"));
+      head.appendChild(title);
+      if (canManage && !editable) {
+        var tools = el("div", "ug-title");
+        if (ug.flash) tools.appendChild(el("span", "ug-flash", ug.flash));
+        // Administrators' permissions and members are fixed or come from
+        // settings except the member list, so Edit is offered everywhere.
+        var edit = el("button", "btn-small", "Edit");
+        edit.type = "button";
+        edit.addEventListener("click", function () {
+          ug.editing = true;
+          ug.flash = "";
+          ug.draft = null;
+          renderGroups();
+        });
+        tools.appendChild(edit);
+        head.appendChild(tools);
+      } else if (editable) {
+        head.appendChild(el("span", "pill pill--warn", "editing"));
+      }
       c.appendChild(head);
       if (g.description) c.appendChild(el("p", "muted", g.description));
     } else {
+      var editHead = el("div", "card-head");
+      editHead.appendChild(el("h2", null, creating ? "New group" : "Edit group"));
+      editHead.appendChild(el("span", "pill pill--warn", "editing"));
+      c.appendChild(editHead);
       c.appendChild(textField(creating ? "New group name" : "Name", draft.name, 80,
         function (v) { draft.name = v; }));
       var desc = textField("Description", draft.description, 300,
@@ -1513,11 +1545,12 @@
     }
     c.appendChild(mf);
 
-    if (!editable) {
+    if (!canManage) {
       c.appendChild(el("p", "faint", "Viewing only: changing groups needs the "
         + "Manage users & groups permission."));
       return c;
     }
+    if (!editable) return c;
     var actions = el("div", "ug-actions");
     var status = el("span", "promo-status faint");
     var save = el("button", "btn-primary", creating ? "Create group" : "Save");
@@ -1533,12 +1566,17 @@
         body, status, creating ? draft.name : null);
     });
     actions.appendChild(save);
-    if (!creating) {
-      var reset = el("button", null, "Undo changes");
-      reset.type = "button";
-      reset.addEventListener("click", function () { ug.draft = null; renderGroups(); });
-      actions.appendChild(reset);
-    }
+    // Cancel drops the changes and leaves Edit; for a new group, it drops the group.
+    var cancel = el("button", null, "Cancel");
+    cancel.type = "button";
+    cancel.addEventListener("click", function () {
+      ug.draft = null;
+      ug.editing = false;
+      ug.flash = "";
+      if (creating) ug.selected = ug.data.groups[0].id;
+      renderGroups();
+    });
+    actions.appendChild(cancel);
     actions.appendChild(status);
     /* Rarely used, so small, red and pushed to the far right, away from
      * Save (Liwei, 2026-10-07). Confirmed in place rather than with
@@ -1748,6 +1786,10 @@
         var made = d.groups.filter(function (g) { return g.name === createdName.trim(); })[0];
         if (made) ug.selected = made.id;
       }
+      // Back to read-only, saying so.
+      ug.editing = false;
+      ug.flash = method === "DELETE" ? "Group deleted" : method === "POST" ? "Group created"
+                                                                         : "Saved";
       renderAccess(d);
     }).catch(function (err) {
       status.textContent = "Not saved: " + err.message;

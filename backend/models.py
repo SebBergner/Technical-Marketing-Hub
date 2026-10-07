@@ -387,6 +387,11 @@ class AssetBase(BaseModel):
     #: The partner group may not download from this demo's folder in
     #: SharePoint (partner_access.py); partners get its files' names only.
     partner_restricted: bool = False
+    #: Internal (2026-10-07): only "Access internal content" opens its files.
+    #: `internal_source` says why -- "sharepoint" (the folder is closed to
+    #: partners there) or "hub" (marked on the Hub).
+    internal: bool = False
+    internal_source: str | None = None
 
     # cross-references — the four ID spaces the Portal exists to correlate
     source_item_id: str | None = None         # SharePoint list item

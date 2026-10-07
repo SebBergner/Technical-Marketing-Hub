@@ -638,6 +638,16 @@ in, for the member picker), `signin_events.jsonl` (every SSO sign-in) and
 `activity.json` (each person's last request). Each slot has its own, like
 the rest of `owned/`.
 
+**Open / Internal** (2026-10-07, Admin → Content access, and a switch on a
+demo's page): an Internal demo shows its card and description to everyone,
+but its files (preview, download, file links, Download Kit) open only for
+groups with **Access internal content** -- PTC employees by default, not
+Partners. A demo is Internal when its SharePoint folder is closed to the
+partner group (read at every sync, as since 2026-10-06; opened only in
+SharePoint) or when it is marked on the Hub (`owned/content_access.json`,
+needs **Manage content access**). This replaces the partner-only rule: a
+partner put in a group with Access internal content does get those files.
+
 **Admin → Sign-ins** (2026-10-07) shows who is active now (a request in the
 last 15 minutes -- the server keeps no session, so "online" can only mean
 "recently active"), people and sign-ins per period, and the sign-in log.

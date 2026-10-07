@@ -1,17 +1,22 @@
 """Asset catalogue endpoints."""
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from backend.access import Perm
+from backend.admin_auth import require_perm
 from backend.config import settings
 from backend.deps import CurrentUser, get_current_user, get_repo
 from backend.integrations.graph.client import GraphClient, GraphError
 from backend.models import AdvancedSearchHit, Asset, AssetSummary, Page, video_type_filter
 from backend.repositories.base import AssetRepository, AssetQuery
 from backend.routers.graph import require_client
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
 
@@ -116,10 +121,14 @@ def advanced_search(
 
 
 def _locked_for(user: CurrentUser, asset) -> bool:
-    """A partner on a demo whose SharePoint folder is closed to partners --
-    or somebody whose groups allow neither Preview nor Download (2026-10-06),
-    for whom an id that opens a file is of no use."""
-    if bool(getattr(asset, "partner_restricted", False)) and user.is_partner:
+    """Files listed by name only, without the ids that open them, for:
+
+    * an Internal demo (2026-10-07) -- closed to partners in SharePoint, or
+      marked on the Hub -- and somebody without "Access internal content".
+      Partners lack it by default, which is the 2026-10-06 partner rule;
+    * somebody whose groups allow neither Preview nor Download (2026-10-06).
+    """
+    if getattr(asset, "internal", False) and not user.can(Perm.INTERNAL):
         return True
     return ((user.is_authenticated or user.is_dev_principal)
             and not (user.can(Perm.PREVIEW) or user.can(Perm.DOWNLOAD)))
@@ -206,8 +215,9 @@ def record_view(asset_id: str, repo: AssetRepository = Depends(get_repo)):
 
 
 def _require_partner_access(asset_id: str, repo: AssetRepository, user: CurrentUser) -> None:
-    """Partners may not open or download a file from a demo whose SharePoint
-    folder is closed to the partner group (2026-10-06)."""
+    """Nobody without "Access internal content" opens or downloads a file
+    from an Internal demo -- which includes every demo whose SharePoint
+    folder is closed to the partner group (2026-10-06/07)."""
     asset = repo.get(asset_id)
     if asset is not None and _locked_for(user, asset):
         raise HTTPException(status_code=403,
@@ -335,3 +345,27 @@ def preview_file(asset_id: str, item_id: str,
     # and left.
     _record(repo, "preview", asset_id, **_file_facts(repo, asset_id, item_id))
     return RedirectResponse(url, status_code=302)
+
+
+class AccessIn(BaseModel):
+    level: str
+
+
+@router.put("/{asset_id}/access")
+def set_access(asset_id: str, body: AccessIn, repo: AssetRepository = Depends(get_repo),
+               actor: str = Depends(require_perm(Perm.MANAGE_ACCESS))):
+    """Mark a demo Internal, or Open again (2026-10-07). Hub-owned data only
+    (owned/content_access.json); SharePoint is never written. Opening a demo
+    whose folder SharePoint closes to partners changes nothing: it stays
+    Internal until the folder is opened there."""
+    if body.level not in ("open", "internal"):
+        raise HTTPException(status_code=422, detail="level must be 'open' or 'internal'")
+    try:
+        result = repo.set_access(asset_id, body.level, actor)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+    log.info("access of %s set to %s by %s", asset_id, body.level, actor)
+    return result
+

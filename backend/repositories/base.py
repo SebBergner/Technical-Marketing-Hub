@@ -81,6 +81,13 @@ class AssetRepository(ABC):
     def unhide(self, asset_id: str) -> list[dict]:
         raise NotImplementedError
 
+    def content_access(self) -> list[dict]:
+        """Demos marked Internal in the Hub (2026-10-07); file-backed only."""
+        raise NotImplementedError
+
+    def set_access(self, asset_id: str, level: str, actor: str) -> dict:
+        raise NotImplementedError
+
     def hub_settings(self) -> dict:
         """Display switches set on the Admin page; file-backed repository only."""
         raise NotImplementedError

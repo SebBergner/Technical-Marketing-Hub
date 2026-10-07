@@ -747,6 +747,17 @@ def usage_untouched(since: str | None = None, until: str | None = None,
             "offset": offset, "limit": limit, "touched": len(touched)}
 
 
+# ──────────────────────────────────────────────────────── content access
+@router.get("/content-access", dependencies=[VIEW_ADMIN])
+def get_content_access(repo: AssetRepository = Depends(get_repo)):
+    """Every Internal demo and why (2026-10-07). Changes go through
+    PUT /api/assets/{id}/access, which the detail page uses too."""
+    try:
+        return repo.content_access()
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+
+
 # ────────────────────────────────────────────────────────── users & groups
 MANAGE_USERS = require_perm(Perm.MANAGE_USERS)
 

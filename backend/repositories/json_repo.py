@@ -36,7 +36,7 @@ import re
 import threading
 from collections import Counter
 from dataclasses import replace
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -101,6 +101,14 @@ def _atomic_write(path: str, payload: Any) -> None:
     with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(payload, fh, indent=2, ensure_ascii=False, default=str)
     os.replace(tmp, path)
+
+
+def _ts(stamp: str | None) -> float:
+    """An ISO time as a number for sorting; 0 for none."""
+    try:
+        return datetime.fromisoformat(stamp).timestamp() if stamp else 0.0
+    except ValueError:
+        return 0.0
 
 
 def _read(path: str, default: Any) -> Any:
@@ -370,6 +378,15 @@ class JsonAssetRepository(AssetRepository):
         if closed:
             rows = [{**r, "partner_restricted": True} if r.get("source_item_id") in closed else r
                     for r in rows]
+        # Internal (2026-10-07): a folder SharePoint closes to partners, or a
+        # demo marked so on the Hub (owned/content_access.json). Either way,
+        # only "Access internal content" opens its files.
+        marked = self._load("content_access") or {}
+        if closed or marked:
+            rows = [{**r, "internal": True,
+                     "internal_source": "sharepoint" if r.get("partner_restricted") else "hub"}
+                    if r.get("partner_restricted") or r["id"] in marked else r
+                    for r in rows]
         return rows
 
     def _load(self, name: str) -> dict[str, dict]:
@@ -525,6 +542,41 @@ class JsonAssetRepository(AssetRepository):
             state.pop(asset_id, None)
             self._save("hidden", state)
         return self.hidden()
+
+    # ─────────────────────────────────────────── Open / Internal
+    def content_access(self) -> list[dict]:
+        """Every Internal demo, and why: marked on the Hub (can be opened
+        again here) or closed to partners in SharePoint (changed there)."""
+        marked = self._load("content_access") or {}
+        out = []
+        for r in self._load_mirror():
+            if not r.get("internal"):
+                continue
+            mark = marked.get(r["id"]) or {}
+            out.append({"asset_id": r["id"], "title": r.get("title"), "type": r.get("type"),
+                        "source": r.get("internal_source"),
+                        "marked_by": mark.get("by"), "marked_at": mark.get("at"),
+                        "also_marked": bool(mark) and r.get("internal_source") == "sharepoint"})
+        return sorted(out, key=lambda i: (i["source"] != "hub", -_ts(i.get("marked_at")),
+                                          (i.get("title") or "").lower()))
+
+    def set_access(self, asset_id: str, level: str, actor: str) -> dict:
+        """Mark one listed demo Internal, or Open again. Opening only removes
+        the Hub's own mark: a folder SharePoint closes stays Internal."""
+        if level not in ("open", "internal"):
+            raise ValueError(level)
+        if self.get(asset_id) is None:
+            raise KeyError(asset_id)
+        with self._lock:
+            state = self._load("content_access") or {}
+            if level == "internal":
+                state[asset_id] = {"by": actor, "at": utcnow().isoformat(timespec="seconds")}
+            else:
+                state.pop(asset_id, None)
+            self._save("content_access", state)
+        asset = self.get(asset_id)
+        return {"asset_id": asset_id, "internal": asset.internal,
+                "internal_source": asset.internal_source}
 
     # ─────────────────────────────────────────── Hub display settings
     def hub_settings(self) -> dict:
@@ -1213,6 +1265,8 @@ class JsonAssetRepository(AssetRepository):
             web_url=record.get("web_url"),
             page_url=record.get("page_url"),
             partner_restricted=bool(record.get("partner_restricted")),
+            internal=bool(record.get("internal")),
+            internal_source=record.get("internal_source"),
             products=record.get("products") or [],
             product_families=taxonomy.families_of(record.get("products")),
             umbrella_families=taxonomy.umbrellas_of(record.get("products")),

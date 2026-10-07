@@ -358,6 +358,7 @@
   <nav class="tabs" id="adminTabs" role="tablist">
     <button type="button" class="tab tab--on" role="tab" data-tab="overview" aria-selected="true">Overview</button>
     <button type="button" class="tab" role="tab" data-tab="content" aria-selected="false">Content dashboard</button>
+    <button type="button" class="tab" role="tab" data-tab="internal" aria-selected="false">Content access</button>
     <button type="button" class="tab" role="tab" data-tab="access" aria-selected="false">Users &amp; groups</button>
     <button type="button" class="tab" role="tab" data-tab="activity" aria-selected="false">Sign-ins</button>
   </nav>
@@ -437,6 +438,19 @@
         what the catalogue does not yet say.</p>
       <div class="tiles" id="contentTotals"></div>
       <div class="grid grid--2" id="contentCharts" style="margin-top:12px"></div>
+    </section>
+  </div>
+
+  <!-- Open / Internal per demo (2026-10-07). -->
+  <div id="tabInternal" role="tabpanel" hidden>
+    <section>
+      <div class="section-head"><h2>Content access</h2></div>
+      <p class="muted" style="margin:-6px 0 14px">An <b>Internal</b> demo shows its card,
+        description and details to everyone, but its files open only for people whose groups
+        have <b>Access internal content</b> (PTC employees by default, not Partners). A demo is
+        Internal when its SharePoint folder is closed to partners, or when it is marked here or
+        on its own page. Marks are kept in the Hub only; SharePoint is never changed.</p>
+      <div class="card" id="caList"></div>
     </section>
   </div>
 

@@ -194,6 +194,14 @@
     "font-size:11.5px;font-weight:500;line-height:18px;white-space:nowrap;min-width:0;" +
     "overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;" +
     "background:var(--orion-surface-2);color:var(--orion-text-2);border:1px solid var(--orion-border-md)}" +
+    // Internal (2026-10-07): amber on both grounds, so it reads as a caution
+    // rather than one more tag.
+    ".hub-pill--internal{color:#b5641a;background:rgba(214,140,40,.13);" +
+    "border-color:rgba(214,140,40,.5);font-weight:600}" +
+    ".hub-access-btn{margin-left:2px;padding:1px 9px;border-radius:999px;font:inherit;" +
+    "font-size:11.5px;line-height:18px;cursor:pointer;background:none;" +
+    "color:var(--orion-text-2);border:1px dashed var(--orion-border-md)}" +
+    ".hub-access-btn:hover{color:var(--orion-text);border-style:solid}" +
     ".hub-card-line{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}" +
     ".hub-facts{margin-top:14px}" +
     ".hub-facts__table{width:100%;border-collapse:collapse;font-size:13px}" +
@@ -2405,6 +2413,7 @@
       if (typeLabel) meta.appendChild(pill(typeLabel, "customer"));
       if (videoTypeOf(asset)) meta.appendChild(pill(videoTypeOf(asset), "vtype"));
       if (asset.segment) meta.appendChild(pill(asset.segment, "segment"));
+      renderAccessMark(meta, asset);
     }
 
     /* Facts, and only the ones we hold. An empty stats row beats a row of
@@ -2483,6 +2492,9 @@
 
       var platformHref = asset.source === "consensus"
         ? consensusUrl(asset) : asset.web_url;
+      // Files locked for this person (an Internal demo, 2026-10-07): no
+      // Download Kit either -- it is the same files, one page further on.
+      if (asset.files_locked && asset.source !== "consensus") platformHref = null;
       if (platformHref) {
         actions.insertBefore(
           linkButton("btn-primary-sm vp-platform",
@@ -5487,6 +5499,56 @@
     console.info("[hub-api] loaded", assets.length, "assets", bySource);
   }
 
+  /* ── Open / Internal on a demo's page (2026-10-07) ─────────────────────
+   *
+   * Everyone sees an "Internal" tag, so nobody shares such a demo outside
+   * PTC by mistake. People with "Manage content access" also get a small
+   * switch beside it. A demo closed to partners in SharePoint is Internal
+   * there and opened only there, so it gets the tag and no switch.
+   */
+  function renderAccessMark(meta, asset) {
+    if (asset.internal) {
+      var tag = pill("Internal", "internal");
+      tag.title = asset.internal_source === "sharepoint"
+        ? "Closed to partners in SharePoint. Files open only for people with access to internal content."
+        : "Marked Internal on the Hub. Files open only for people with access to internal content.";
+      meta.appendChild(tag);
+    }
+    if (asset.internal_source === "sharepoint") return;
+    hubPermissions.then(function (granted) {
+      if (granted.indexOf("manage_content_access") < 0 || detailAsset !== asset) return;
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "hub-access-btn";
+      btn.textContent = asset.internal ? "Make Open" : "Make Internal";
+      btn.title = asset.internal
+        ? "Let everyone who may preview and download open this demo's files"
+        : "Only people with access to internal content will open this demo's files";
+      btn.addEventListener("click", function () {
+        btn.disabled = true;
+        fetch("/api/assets/" + encodeURIComponent(asset.id) + "/access", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ level: asset.internal ? "open" : "internal" }),
+        }).then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        }).then(function (d) {
+          asset.internal = d.internal;
+          asset.internal_source = d.internal_source;
+          meta.querySelectorAll(".hub-pill--internal, .hub-access-btn").forEach(function (n) {
+            n.remove();
+          });
+          renderAccessMark(meta, asset);
+        }).catch(function (err) {
+          btn.disabled = false;
+          report("Could not change this demo's access: " + err.message, true);
+        });
+      });
+      meta.appendChild(btn);
+    });
+  }
+
   /* ── what this person may do (backend/access.py, 2026-10-06) ─────────
    *
    * The server refuses whatever a person's groups do not allow; this only
@@ -5502,12 +5564,15 @@
     ".hub-no-preview a[href$='/preview']{display:none !important}" +
     ".hub-no-create_demo #navRequestAsset{display:none !important}";
 
+  /* What this person may do, once known; [] if it never arrives. */
+  var hubPermissions = Promise.resolve([]);
+
   function applyPermissions() {
-    fetch("/api/auth/me")
+    hubPermissions = fetch("/api/auth/me")
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
         var granted = d && d.user && d.user.permissions;
-        if (!granted) return;
+        if (!granted) return [];
         var style = document.createElement("style");
         style.id = "hubPermissionCss";
         style.textContent = PERMISSION_CSS;
@@ -5515,8 +5580,9 @@
         ["download", "preview", "create_demo"].forEach(function (p) {
           document.documentElement.classList.toggle("hub-no-" + p, granted.indexOf(p) < 0);
         });
+        return granted;
       })
-      .catch(function () {});
+      .catch(function () { return []; });
   }
 
   applyPermissions();

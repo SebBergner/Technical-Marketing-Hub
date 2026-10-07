@@ -68,6 +68,7 @@ class Perm(str, Enum):
     CREATE_DEMO = "create_demo"
     EDIT_METADATA = "edit_metadata"
     MANAGE_HOME = "manage_home"
+    MANAGE_ACCESS = "manage_content_access"
     RUN_SYNC = "run_sync"
     RUN_MIGRATION = "run_migration"
     VIEW_ADMIN = "view_admin"
@@ -80,12 +81,15 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
     (Perm.PREVIEW, "Preview files", "Open a demo's files in the preview."),
     (Perm.DOWNLOAD, "Download files", "Download a demo's files."),
     (Perm.INTERNAL, "Access internal content",
-     "Preview and download demos marked Internal."),
+     "Preview and download Internal demos: marked so on the Hub, or closed to "
+     "partners in SharePoint."),
     (Perm.CREATE_DEMO, "Create new demo", "Submit a new demo request."),
     (Perm.EDIT_METADATA, "Edit metadata",
      "Review metadata proposals and write them back to SharePoint."),
     (Perm.MANAGE_HOME, "Manage the Home page",
      "Choose Featured demos, hide demos and switch the Hub's display options."),
+    (Perm.MANAGE_ACCESS, "Manage content access",
+     "Mark demos Internal or Open, on the Admin page and on a demo's page."),
     (Perm.RUN_SYNC, "Run sync", "Sync SharePoint and Consensus, and set the daily sync."),
     (Perm.RUN_MIGRATION, "Run Brightcove migration",
      "Use the migration page, which uploads videos to SharePoint."),

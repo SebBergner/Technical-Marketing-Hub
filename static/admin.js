@@ -1334,8 +1334,8 @@
   /* Overview | Content dashboard | Users & groups. The tab is in the
    * address (#content, #access), so a refresh or a shared link opens the
    * same one. */
-  var PANELS = { overview: "tabOverview", content: "tabContent", access: "tabAccess",
-                 activity: "tabActivity" };
+  var PANELS = { overview: "tabOverview", content: "tabContent", internal: "tabInternal",
+                 access: "tabAccess", activity: "tabActivity" };
 
   function tabFromHash() {
     var name = location.hash.replace("#", "");
@@ -1352,6 +1352,7 @@
     });
     if (name === "content" && !contentLoaded) loadContent();
     if (name === "access") loadAccess();
+    if (name === "internal") loadContentAccess();
     if (name === "activity") { renderActRanges(); loadActivity(); }
   }
 
@@ -1858,6 +1859,143 @@
       what.title = fullChange(e);
     });
     host.appendChild(t);
+  }
+
+  /* ── Content access: Open / Internal (2026-10-07) ─────────────────────
+   * Every Internal demo and why. Two ways in, one rule out: a demo whose
+   * SharePoint folder is closed to partners is Internal automatically (and
+   * opened only there); any other demo can be marked Internal here or on
+   * its own page. Only "Access internal content" opens an Internal demo's
+   * files; everyone else sees its card and description. */
+  function canManageAccess() {
+    return (session.permissions || []).indexOf("manage_content_access") >= 0;
+  }
+
+  function loadContentAccess() {
+    return fetch("/api/admin/content-access")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (items) { if (items) renderContentAccess(items); });
+  }
+
+  function setAccess(assetId, level, status) {
+    status.textContent = "Saving…";
+    status.className = "promo-status faint";
+    return fetch("/api/assets/" + encodeURIComponent(assetId) + "/access", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ level: level }),
+    }).then(function (r) {
+      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
+        throw new Error(b.detail || ("HTTP " + r.status));
+      });
+      return r.json();
+    }).then(function () { return loadContentAccess(); })
+      .catch(function (err) {
+        status.textContent = "Not saved: " + err.message;
+        status.className = "promo-status err";
+      });
+  }
+
+  function renderContentAccess(items) {
+    var host = $("caList");
+    host.innerHTML = "";
+    var manage = canManageAccess();
+    var hub = items.filter(function (i) { return i.source === "hub"; });
+    var sp = items.filter(function (i) { return i.source === "sharepoint"; });
+
+    var head = el("div", "card-head");
+    head.appendChild(el("h2", null, "Internal demos"));
+    head.appendChild(el("span", "faint num", hub.length + " marked here · " + sp.length
+      + " closed in SharePoint"));
+    host.appendChild(head);
+    var status = el("div", "promo-status faint");
+
+    var list = el("div");
+    if (!items.length) list.appendChild(el("div", "faint", "Every demo is Open."));
+    items.forEach(function (i) {
+      var r = el("div", "promo-row");
+      r.appendChild(el("span", "promo-row__n", ""));
+      var info = el("div");
+      var title = el("a", "promo-row__title", i.title || i.asset_id);
+      title.href = "/#/asset/" + encodeURIComponent(i.asset_id);
+      title.target = "_blank";
+      title.rel = "noopener";
+      info.appendChild(title);
+      var why = i.source === "sharepoint"
+        ? "Closed to partners in SharePoint — open it there to make it Open"
+        : "Marked Internal" + (i.marked_by ? " by " + i.marked_by.replace(/^(user|dev):/, "") : "")
+          + (i.marked_at ? " · " + new Date(i.marked_at).toLocaleString() : "");
+      info.appendChild(el("div", "promo-row__meta",
+        [TYPE_WORD[i.type] || i.type, why].filter(Boolean).join(" · ")));
+      r.appendChild(info);
+      var acts = el("div", "promo-row__actions");
+      if (i.source === "sharepoint") {
+        acts.appendChild(el("span", "pill pill--off", "SharePoint"));
+      } else if (manage) {
+        var open = el("button", null, "Make Open");
+        open.type = "button";
+        open.addEventListener("click", function () { setAccess(i.asset_id, "open", status); });
+        acts.appendChild(open);
+      }
+      r.appendChild(acts);
+      list.appendChild(r);
+    });
+    host.appendChild(list);
+
+    if (manage) {
+      var add = el("div", "promo-add");
+      var label = el("label", null, "Mark a demo Internal");
+      var input = el("input");
+      input.type = "search";
+      input.placeholder = "Search by title…";
+      input.autocomplete = "off";
+      label.appendChild(input);
+      add.appendChild(label);
+      var results = el("div", "promo-results");
+      add.appendChild(results);
+      host.appendChild(add);
+      var internalIds = items.map(function (i) { return i.asset_id; });
+      var timer = null;
+      input.addEventListener("input", function () {
+        clearTimeout(timer);
+        var q = input.value.trim();
+        timer = setTimeout(function () {
+          results.innerHTML = "";
+          if (q.length < 2) return;
+          fetch("/api/assets?limit=8&q=" + encodeURIComponent(q))
+            .then(function (r) { return r.json(); })
+            .then(function (page) {
+              results.innerHTML = "";
+              var hits = page.items.filter(function (a) { return internalIds.indexOf(a.id) < 0; });
+              if (!hits.length) {
+                results.appendChild(el("div", "faint", "No Open demo matches."));
+                return;
+              }
+              hits.forEach(function (a) {
+                var r = el("div", "promo-row");
+                r.appendChild(el("span", "promo-row__n", ""));
+                var info = el("div");
+                info.appendChild(el("div", "promo-row__title", a.title));
+                info.appendChild(el("div", "promo-row__meta", promoMeta(a)));
+                r.appendChild(info);
+                var mark = el("button", null, "Make Internal");
+                mark.type = "button";
+                mark.addEventListener("click", function () {
+                  setAccess(a.id, "internal", status);
+                });
+                var acts2 = el("div", "promo-row__actions");
+                acts2.appendChild(mark);
+                r.appendChild(acts2);
+                results.appendChild(r);
+              });
+            });
+        }, 250);
+      });
+    } else {
+      host.appendChild(el("p", "faint", "Viewing only: marking demos needs the "
+        + "Manage content access permission."));
+    }
+    host.appendChild(status);
   }
 
   /* ── Sign-ins (backend/activity.py, 2026-10-07) ───────────────────────

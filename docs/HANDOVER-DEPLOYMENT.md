@@ -655,9 +655,10 @@ last 15 minutes -- the server keeps no session, so "online" can only mean
 partner's sign-in is logged only as "external user at T", partners have no
 per-person activity and are not kept in `users.json`; identity written
 before that is removed at app start (`activity.scrub_partners()`). PTC
-people are named. What people view or download is still recorded anonymously; per-person usage
-waits for management's decision (see `backend/activity.py` for where it
-would go).
+people are named. Since 2026-10-09 every view, preview, download and search
+carries the PTC person's address (`user` in `usage_events.jsonl`); a
+partner's carries only `external: true`. Admin -> Sign-ins shows each PTC
+person's counts and, on a click, what they used.
 
 ---
 

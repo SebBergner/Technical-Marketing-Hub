@@ -29,12 +29,12 @@ the page can say external users are around without saying who.
 `scrub_partners()` removes identity written before this rule; the app runs
 it at startup and it does nothing once the files are clean.
 
-What is deliberately NOT recorded here: what anyone viewed or downloaded.
-The usage events (`usage_events.jsonl`) stay anonymous until per-user
-tracking for PTC people is added (agreed 2026-10-07). The place to add it is
-`_record()` in routers/assets.py -- the same `user` key as here (the
-lower-cased email), so the two can be joined on this tab; partners stay
-anonymous there too.
+What PTC people viewed, previewed, downloaded and searched for (2026-10-09)
+is in the usage events (`usage_events.jsonl`): `_record()` in
+routers/assets.py adds the same `user` key as here (the lower-cased PTC
+address), or only `external: true` for a partner. `attach_usage()` and
+`person_usage()` below join the two for this tab. Events from before then
+carry neither and stay anonymous.
 """
 from __future__ import annotations
 
@@ -225,6 +225,90 @@ def scrub_partners() -> dict:
     if any(done.values()):
         log.info("partner identity removed from the activity records: %s", done)
     return done
+
+
+# ─────────────────────────────────────────────── what PTC people did (2026-10-09)
+#: The usage events that carry a PTC person (routers/assets.py `_who`).
+USAGE_KINDS = ("view", "preview", "download", "search")
+
+
+def _within(events: list[dict], since: str | None, until: str | None) -> list[dict]:
+    """By time, not by string: the browser's bounds and our stamps are
+    written differently (".000Z" against "+00:00")."""
+    lo, hi = _parse(since), _parse(until)
+    out = []
+    for e in events:
+        at = _parse(e.get("at"))
+        if at is None or (lo and at < lo) or (hi and at >= hi):
+            continue
+        out.append(e)
+    return out
+
+
+def attach_usage(rep: dict, events: list[dict], *, since: str | None = None,
+                 until: str | None = None) -> dict:
+    """Add each PTC person's views, previews, downloads and searches in the
+    period to the report's people -- and anyone who used the Hub in the
+    period without signing in during it (a session lasts a day). External
+    use is one anonymous total."""
+    window = [e for e in _within(events, since, until) if e.get("event") in USAGE_KINDS]
+    by_user: dict[str, dict] = {}
+    external = 0
+    for e in window:
+        if e.get("external"):
+            external += 1
+            continue
+        email = e.get("user")
+        if not email:
+            continue                     # anonymous: before 2026-10-09, or no sign-in
+        counts = by_user.setdefault(email, {k: 0 for k in USAGE_KINDS})
+        counts[e["event"]] += 1
+        counts["last_used"] = max(counts.get("last_used") or "", e.get("at") or "")
+
+    people = {p.get("user"): p for p in rep["people"] if p.get("user")}
+    known = {}
+    for u in access.users_view():
+        for key in (u.get("email"), u.get("username")):
+            if key:
+                known[key] = u
+    for email in by_user:
+        if email not in people:
+            u = known.get(email) or {}
+            p = {"oid": u.get("oid"), "user": email, "name": u.get("name"), "sign_ins": 0,
+                 "last_sign_in": None, "last_active": None, "groups": u.get("groups", [])}
+            rep["people"].append(p)
+            people[email] = p
+    for email, p in people.items():
+        p["usage"] = {k: v for k, v in (by_user.get(email) or {}).items()}
+        for k in USAGE_KINDS:
+            p["usage"].setdefault(k, 0)
+    rep["people"].sort(key=lambda p: max(p.get("last_sign_in") or "",
+                                         (p.get("usage") or {}).get("last_used") or ""),
+                       reverse=True)
+    rep["counts"]["window_people"] = len(rep["people"])
+    rep["counts"]["window_usage"] = {k: sum(1 for e in window if e["event"] == k)
+                                     for k in USAGE_KINDS}
+    rep["counts"]["window_external_usage"] = external
+    return rep
+
+
+def person_usage(events: list[dict], email: str, titles: dict[str, str], *,
+                 since: str | None = None, until: str | None = None,
+                 offset: int = 0, limit: int = 50) -> dict:
+    """One PTC person's views, previews, downloads and searches, newest
+    first. Only ever looked up by a PTC address: partner events carry none."""
+    email = (email or "").strip().lower()
+    mine = [e for e in _within(events, since, until)
+            if e.get("event") in USAGE_KINDS and e.get("user") == email and email]
+    mine.sort(key=lambda e: e.get("at") or "", reverse=True)
+    items = []
+    for e in mine[offset:offset + limit]:
+        items.append({"at": e.get("at"), "event": e["event"], "asset_id": e.get("asset_id"),
+                      "title": titles.get(e.get("asset_id")) if e.get("asset_id") else None,
+                      "file": e.get("file"), "q": e.get("q"), "results": e.get("results")})
+    return {"user": email, "total": len(mine), "offset": offset, "limit": limit,
+            "counts": {k: sum(1 for e in mine if e["event"] == k) for k in USAGE_KINDS},
+            "items": items}
 
 
 # ───────────────────────────────────────────────────────────────── reading

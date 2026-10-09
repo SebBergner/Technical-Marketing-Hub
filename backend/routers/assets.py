@@ -169,7 +169,20 @@ def _file_facts(repo: AssetRepository, asset_id: str, item_id: str) -> dict:
     return {"item_id": item_id}
 
 
-def _record(repo: AssetRepository, event: str, asset_id: str | None = None, **fields) -> None:
+def _who(user: CurrentUser | None) -> dict:
+    """Who an event belongs to (meeting 2026-10-07): a PTC person by their
+    PTC address -- they agree to activity tracking in their employment
+    agreement -- and a partner only as "external", never who. Nothing for an
+    anonymous caller or the local development principal."""
+    if user is None or not user.is_authenticated:
+        return {}
+    if user.is_partner:
+        return {"external": True}
+    return {"user": (user.email or "").strip().lower() or None}
+
+
+def _record(repo: AssetRepository, event: str, asset_id: str | None = None,
+            user: CurrentUser | None = None, **fields) -> None:
     """Best-effort usage event. A repository without the method (SQL) or a
     disk hiccup must never turn a working page or download into a 500 — the
     counter exists to inform, not to gate."""
@@ -177,7 +190,7 @@ def _record(repo: AssetRepository, event: str, asset_id: str | None = None, **fi
     if recorder is None:
         return
     try:
-        recorder(event, asset_id=asset_id, **fields)
+        recorder(event, asset_id=asset_id, **fields, **_who(user))
     except Exception:                                    # noqa: BLE001
         log.warning("could not record a %s event", event, exc_info=True)
 
@@ -188,7 +201,8 @@ class SearchEventIn(BaseModel):
 
 
 @router.post("/search-event", status_code=204)
-def record_search(body: SearchEventIn, repo: AssetRepository = Depends(get_repo)):
+def record_search(body: SearchEventIn, repo: AssetRepository = Depends(get_repo),
+                  user: CurrentUser = Depends(get_current_user)):
     """What someone searched for, and how many results they got.
 
     Posted by the page once typing settles, NOT derived from the /api/assets
@@ -203,15 +217,16 @@ def record_search(body: SearchEventIn, repo: AssetRepository = Depends(get_repo)
     query = (body.q or "").strip()
     if not query:
         return
-    _record(repo, "search", None, q=query[:120], results=max(0, body.results))
+    _record(repo, "search", None, user, q=query[:120], results=max(0, body.results))
 
 
 @router.post("/{asset_id}/view", status_code=204)
-def record_view(asset_id: str, repo: AssetRepository = Depends(get_repo)):
+def record_view(asset_id: str, repo: AssetRepository = Depends(get_repo),
+                user: CurrentUser = Depends(get_current_user)):
     """Fire-and-forget from the preview page."""
     if repo.get(asset_id) is None:
         raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
-    _record(repo, "view", asset_id)
+    _record(repo, "view", asset_id, user)
 
 
 def _require_partner_access(asset_id: str, repo: AssetRepository, user: CurrentUser) -> None:
@@ -308,7 +323,7 @@ def download_file(asset_id: str, item_id: str,
     # "点击下载的又是什么"). An asset-level counter could say a kit was
     # downloaded forty times and never say whether people took the talk track
     # or the .mp4 -- which is the part that tells you what to make more of.
-    _record(repo, "download", asset_id, **_file_facts(repo, asset_id, item_id))
+    _record(repo, "download", asset_id, user, **_file_facts(repo, asset_id, item_id))
     return RedirectResponse(url, status_code=302)
 
 
@@ -343,7 +358,7 @@ def preview_file(asset_id: str, item_id: str,
     # Plenty of people watch a walkthrough and never download anything, and
     # without this they are indistinguishable from people who opened the page
     # and left.
-    _record(repo, "preview", asset_id, **_file_facts(repo, asset_id, item_id))
+    _record(repo, "preview", asset_id, user, **_file_facts(repo, asset_id, item_id))
     return RedirectResponse(url, status_code=302)
 
 

@@ -230,6 +230,7 @@
   #actPeople th,#actActive th{position:sticky;top:0;background:var(--surface);z-index:1}
   .act-person{cursor:pointer}
   .act-person:hover td{background:var(--surface-2)}
+  .act-person--on td{background:var(--green-soft)}
   .act-note{font-size:12px;margin-top:10px}
   .act-ext{font-size:12.5px;margin-bottom:8px}
   .act-dot{display:inline-block;width:8px;height:8px;border-radius:50%;
@@ -487,6 +488,16 @@
       </div>
       <div class="card tablewrap" id="actPeople"></div>
       <div class="faint act-note" id="actPeopleCount"></div>
+    </section>
+    <!-- One PTC person's views, previews, downloads and searches (2026-10-09). -->
+    <section id="actPersonSection" hidden>
+      <div class="section-head">
+        <h2 id="actPersonTitle">Activity</h2>
+        <button type="button" id="actPersonClose" class="btn-small">Close</button>
+      </div>
+      <div class="tiles" id="actPersonTiles" style="margin-bottom:12px"></div>
+      <div class="card tablewrap" id="actPerson"></div>
+      <div class="pager" id="actPersonPager"></div>
     </section>
     <section>
       <div class="section-head">

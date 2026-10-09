@@ -822,10 +822,33 @@ def delete_group(group_id: str, actor: str = Depends(MANAGE_USERS)):
 @router.get("/activity", dependencies=[VIEW_ADMIN])
 def get_activity(since: str | None = None, until: str | None = None,
                  today: str | None = None, q: str | None = None, user: str | None = None,
-                 offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500)):
-    """The Sign-ins tab: who is active now, sign-ins in a window, and the log
+                 offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500),
+                 repo: AssetRepository = Depends(get_repo)):
+    """The Sign-ins tab: who is active now, sign-ins in a window, the log, and
+    each PTC person's views, previews, downloads and searches in the window
     (backend/activity.py). Bounds come from the browser, as for /usage."""
     from backend import activity
-    return activity.report(since=since, until=until, today=today, q=q, user=user,
-                           offset=offset, limit=limit)
+    report = activity.report(since=since, until=until, today=today, q=q, user=user,
+                             offset=offset, limit=limit)
+    return activity.attach_usage(report, _events(repo, None, None), since=since, until=until)
+
+
+@router.get("/activity/person", dependencies=[VIEW_ADMIN])
+def get_person_activity(email: str, since: str | None = None, until: str | None = None,
+                        offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500),
+                        repo: AssetRepository = Depends(get_repo)):
+    """What one PTC person viewed, previewed, downloaded and searched for in
+    the window (2026-10-09). Partners cannot be looked up: their events carry
+    no address."""
+    from backend import activity
+    events = _events(repo, None, None)
+    mine = (email or "").strip().lower()
+    ids = {e.get("asset_id") for e in events if e.get("asset_id") and e.get("user") == mine}
+    titles = {}
+    for asset_id in ids:
+        asset = repo.get(asset_id)
+        if asset is not None:
+            titles[asset_id] = asset.title
+    return activity.person_usage(events, email, titles, since=since, until=until,
+                                 offset=offset, limit=limit)
 

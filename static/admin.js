@@ -2013,8 +2013,8 @@
     { id: "all", label: "All time" },
     { id: "custom", label: "Custom" }
   ];
-  var act = { range: "7d", from: "", to: "", q: "", pq: "", user: null, userLabel: "",
-              offset: 0, limit: 50, people: [] };
+  var act = { range: "7d", from: "", to: "", q: "", pq: "", user: null, email: null,
+              userLabel: "", offset: 0, personOffset: 0, limit: 50, people: [] };
   var actTimer = null;
 
   function startOfToday() {
@@ -2161,6 +2161,12 @@
     tile(tiles, d.counts.window_people, "PTC people", null);
     tile(tiles, d.counts.window_sign_ins, "Sign-ins", d.counts.window_external_sign_ins
       ? d.counts.window_external_sign_ins + " by external users" : null);
+    var u = d.counts.window_usage || {};
+    tile(tiles, (u.view || 0) + (u.preview || 0) + (u.download || 0) + (u.search || 0),
+      "Views, previews, downloads, searches",
+      (u.download || 0) + " downloads"
+        + (d.counts.window_external_usage
+          ? " · " + d.counts.window_external_usage + " by external users" : ""));
 
     // Active now -- always the last few minutes, whatever the period.
     $("actActiveNote").textContent = "a request in the last " + d.active_minutes
@@ -2198,6 +2204,7 @@
     act.people = d.people;
     drawPeople();
     renderLogFilter();
+    loadPerson();
 
     // The log
     host = $("actLog");
@@ -2253,13 +2260,26 @@
     $("actNote").textContent = (d.recorded_since
       ? "Sign-ins recorded since " + new Date(d.recorded_since).toLocaleString() + ". "
       : "No sign-ins recorded yet. ")
-      + "External users (partners) are recorded anonymously: when, never who. "
-      + "What people view or download is counted on the Overview, not per person.";
+      + "PTC people are recorded by name (views, previews, downloads, searches); "
+      + "external users (partners) only anonymously: when and what, never who.";
   }
 
   /* People in the period, filtered in the browser: the whole list is
    * already here, so typing narrows it at once. A click narrows the log to
-   * that person. */
+   * that person: their sign-ins in the log, and what they used above it. */
+  var USAGE_COLS = [
+    { key: "view", label: "Views" },
+    { key: "preview", label: "Previews" },
+    { key: "download", label: "Downloads" },
+    { key: "search", label: "Searches" }
+  ];
+
+  function lastSeen(p) {
+    var times = [p.last_active, p.last_sign_in, (p.usage || {}).last_used]
+      .filter(Boolean).sort();
+    return times.length ? times[times.length - 1] : null;
+  }
+
   function drawPeople() {
     var host = $("actPeople");
     host.innerHTML = "";
@@ -2269,44 +2289,152 @@
     });
     $("actPeopleCount").textContent = q
       ? rows.length + " of " + act.people.length + " people shown"
-      : act.people.length + " " + (act.people.length === 1 ? "person" : "people");
+      : act.people.length + " " + (act.people.length === 1 ? "person" : "people")
+        + " · click a person to see what they used";
     if (!rows.length) {
       host.appendChild(el("div", "faint", act.people.length
-        ? "Nobody matches." : "Nobody signed in in this period."));
+        ? "Nobody matches." : "No PTC people used the Hub in this period."));
       return;
     }
     var pt = el("table");
     var phr = pt.createTHead().insertRow();
-    ["Name", "Email", "Groups", "Sign-ins", "Last sign-in", "Last active"]
-      .forEach(function (h, i) { phr.appendChild(el("th", i === 3 ? "r" : null, h)); });
+    ["Name", "Email", "Groups", "Sign-ins"].concat(USAGE_COLS.map(function (c) {
+      return c.label;
+    })).concat(["Last seen"]).forEach(function (h, i) {
+      phr.appendChild(el("th", i >= 3 && i <= 7 ? "r" : null, h));
+    });
     var ptb = pt.createTBody();
     rows.forEach(function (p) {
       var tr = ptb.insertRow();
-      tr.className = "act-person";
-      tr.title = "Show this person's sign-ins in the log";
+      tr.className = "act-person" + (act.email === p.user ? " act-person--on" : "");
+      tr.title = "Show what this person used, and their sign-ins";
       tr.insertCell().textContent = p.name || "—";
       tr.insertCell().textContent = p.user || "—";
       tr.insertCell().textContent = actGroups(p.groups) || "—";
       var n = tr.insertCell();
       n.className = "r num";
       n.textContent = p.sign_ins;
-      var last = tr.insertCell();
-      last.className = "num faint";
-      last.textContent = p.last_sign_in ? new Date(p.last_sign_in).toLocaleString() : "—";
+      USAGE_COLS.forEach(function (c) {
+        var cell = tr.insertCell();
+        var v = (p.usage || {})[c.key] || 0;
+        cell.className = "r num" + (v ? "" : " faint");
+        cell.textContent = v;
+      });
       var seen = tr.insertCell();
       seen.className = "num faint";
-      seen.textContent = p.last_active ? ago(p.last_active) : "—";
+      var when = lastSeen(p);
+      seen.textContent = when ? ago(when) : "—";
       tr.addEventListener("click", function () {
-        act.user = p.oid;
+        // Somebody who used the Hub without signing in during the period has
+        // no sign-ins to show; "-" matches none rather than everyone.
+        act.user = p.oid || "-";
+        act.email = p.user;
         act.userLabel = p.name || p.user || p.oid;
         act.offset = 0;
+        act.personOffset = 0;
         loadActivity().then(function () {
-          $("actLog").scrollIntoView({ behavior: "smooth", block: "center" });
+          $("actPersonSection").scrollIntoView({ behavior: "smooth", block: "start" });
         });
       });
     });
     host.appendChild(pt);
   }
+
+  /* One person's views, previews, downloads and searches in the period. */
+  var EVENT_WORD = { view: "Opened", preview: "Previewed", download: "Downloaded",
+                     search: "Searched" };
+
+  function loadPerson() {
+    var section = $("actPersonSection");
+    section.hidden = !act.email;
+    if (!act.email) return Promise.resolve();
+    var params = actBounds();
+    params.email = act.email;
+    params.offset = act.personOffset || 0;
+    params.limit = 50;
+    var qs = Object.keys(params).map(function (k) {
+      return k + "=" + encodeURIComponent(params[k]);
+    }).join("&");
+    return fetch("/api/admin/activity/person?" + qs)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d) renderPerson(d); });
+  }
+
+  function renderPerson(d) {
+    $("actPersonTitle").textContent = "What " + act.userLabel + " used · " + periodLabel();
+    var tiles = $("actPersonTiles");
+    tiles.innerHTML = "";
+    USAGE_COLS.forEach(function (c) { tile(tiles, d.counts[c.key], c.label, null); });
+    var host = $("actPerson");
+    host.innerHTML = "";
+    if (!d.items.length) {
+      host.appendChild(el("div", "faint", "Nothing used in this period. What each person "
+        + "uses is recorded from October 2026 on."));
+    } else {
+      var t = el("table");
+      var hr = t.createTHead().insertRow();
+      ["When", "What", "Demo or search", "Detail"].forEach(function (h) {
+        hr.appendChild(el("th", null, h));
+      });
+      var tb = t.createTBody();
+      d.items.forEach(function (e) {
+        var tr = tb.insertRow();
+        var when = tr.insertCell();
+        when.className = "num faint";
+        when.textContent = new Date(e.at).toLocaleString();
+        tr.insertCell().textContent = EVENT_WORD[e.event] || e.event;
+        var what = tr.insertCell();
+        if (e.event === "search") {
+          what.textContent = "“" + (e.q || "") + "”";
+        } else if (e.asset_id) {
+          var a = el("a", null, e.title || e.asset_id);
+          a.href = "/#/asset/" + encodeURIComponent(e.asset_id);
+          a.target = "_blank";
+          a.rel = "noopener";
+          what.appendChild(a);
+        } else {
+          what.textContent = "—";
+        }
+        var detail = tr.insertCell();
+        detail.className = "faint";
+        detail.textContent = e.event === "search"
+          ? (e.results === 0 ? "no results" : e.results + " result" + (e.results === 1 ? "" : "s"))
+          : (e.file || "");
+      });
+      host.appendChild(t);
+    }
+    var pager = $("actPersonPager");
+    pager.innerHTML = "";
+    var first = d.total ? d.offset + 1 : 0;
+    var last = Math.min(d.offset + d.limit, d.total);
+    pager.appendChild(el("span", "faint", "Showing " + first + "–" + last + " of "
+      + d.total.toLocaleString()));
+    var nav = el("div", "pager__nav");
+    var back = el("button", null, "← Previous");
+    back.disabled = d.offset <= 0;
+    back.addEventListener("click", function () {
+      act.personOffset = Math.max(0, d.offset - d.limit);
+      loadPerson();
+    });
+    var fwd = el("button", null, "Next →");
+    fwd.disabled = last >= d.total;
+    fwd.addEventListener("click", function () {
+      act.personOffset = d.offset + d.limit;
+      loadPerson();
+    });
+    nav.appendChild(back);
+    nav.appendChild(fwd);
+    pager.appendChild(nav);
+  }
+
+  function clearPerson() {
+    act.user = null;
+    act.email = null;
+    act.offset = 0;
+    loadActivity();
+  }
+
+  $("actPersonClose").addEventListener("click", clearPerson);
 
   /* Who the log is narrowed to, in which period, and the ways out. */
   function renderLogFilter() {
@@ -2324,11 +2452,7 @@
     }
     var clear = el("button", null, "Show everyone");
     clear.type = "button";
-    clear.addEventListener("click", function () {
-      act.user = null;
-      act.offset = 0;
-      loadActivity();
-    });
+    clear.addEventListener("click", clearPerson);
     filter.appendChild(clear);
   }
 

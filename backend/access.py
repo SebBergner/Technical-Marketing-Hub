@@ -385,9 +385,15 @@ def record_sign_in(*, oid: str, email: str | None, username: str | None,
                    name: str | None, external: bool) -> None:
     """Remember who has signed in, so the Admin page can offer them as members.
 
-    Best effort: a failure here must never stop a sign-in."""
+    PTC people only: partners are not recorded at all (meeting 2026-10-07,
+    partners fully anonymous) -- a partner is still added to a group by
+    typing their address. Best effort: a failure here must never stop a
+    sign-in."""
     try:
         from backend.repositories.json_repo import _atomic_write
+        if _Known(_norm_email(email) or None, _norm_email(username) or None,
+                  bool(external)).is_partner:
+            return
         with _lock:
             users = known_users()
             by_oid = {u.get("oid"): u for u in users}
@@ -410,6 +416,19 @@ def known_users() -> list[dict]:
         return users if isinstance(users, list) else []
     except (OSError, ValueError):
         return []
+
+
+def forget_partners() -> int:
+    """Drop partners recorded before they were left out (2026-10-09); see
+    activity.scrub_partners(). Returns how many were dropped."""
+    from backend.repositories.json_repo import _atomic_write
+    with _lock:
+        users = known_users()
+        keep = [u for u in users
+                if not _Known(u.get("email"), u.get("username"), bool(u.get("external"))).is_partner]
+        if len(keep) != len(users):
+            _atomic_write(_owned(USERS_FILE), keep)
+        return len(users) - len(keep)
 
 
 @dataclass

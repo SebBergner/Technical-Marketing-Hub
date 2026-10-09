@@ -2146,28 +2146,38 @@
   function renderActivity(d) {
     var label = periodLabel();
     $("actTitle").textContent = "Sign-ins · " + label;
-    $("actPeopleTitle").textContent = "People · " + label;
+    $("actPeopleTitle").textContent = "PTC people · " + label;
     $("actLogTitle").textContent = "Sign-in log · " + label;
 
     var tiles = $("actTiles");
     tiles.innerHTML = "";
-    tile(tiles, d.counts.active, "Active now", "a request in the last " + d.active_minutes + " min");
-    tile(tiles, d.counts.today_people, "Signed in today", "people");
-    tile(tiles, d.counts.window_people, "People", d.counts.guests + " guest"
-      + (d.counts.guests === 1 ? "" : "s"));
-    tile(tiles, d.counts.window_sign_ins, "Sign-ins", null);
+    /* PTC people are named; external users (partners) are anonymous -- only
+     * counted, never listed (meeting 2026-10-07; backend/activity.py). */
+    tile(tiles, d.counts.active, "PTC people active now",
+      d.external_active ? "+ external users active" : "in the last " + d.active_minutes + " min");
+    tile(tiles, d.counts.today_people, "PTC people signed in today",
+      d.counts.today_external_sign_ins
+        ? "+ " + d.counts.today_external_sign_ins + " external sign-ins" : null);
+    tile(tiles, d.counts.window_people, "PTC people", null);
+    tile(tiles, d.counts.window_sign_ins, "Sign-ins", d.counts.window_external_sign_ins
+      ? d.counts.window_external_sign_ins + " by external users" : null);
 
     // Active now -- always the last few minutes, whatever the period.
     $("actActiveNote").textContent = "a request in the last " + d.active_minutes
       + " minutes, whatever the period";
     var host = $("actActive");
     host.innerHTML = "";
+    host.appendChild(el("div", "act-ext faint", d.external_active
+      ? "External users: active (latest request " + ago(d.external_last_active)
+        + "). Partners are anonymous, so they are not listed."
+      : "External users: none in the last " + d.active_minutes + " minutes."
+        + " Partners are anonymous, so they are never listed."));
     if (!d.active.length) {
-      host.appendChild(el("div", "faint", "Nobody right now."));
+      host.appendChild(el("div", "faint", "No PTC people right now."));
     } else {
       var t = el("table");
       var hr = t.createTHead().insertRow();
-      ["Name", "Email", "Account", "Groups", "Last request"].forEach(function (h) {
+      ["Name", "Email", "Groups", "Last request"].forEach(function (h) {
         hr.appendChild(el("th", null, h));
       });
       var tb = t.createTBody();
@@ -2177,7 +2187,6 @@
         name.appendChild(el("span", "act-dot"));
         name.appendChild(document.createTextNode(a.name || "—"));
         tr.insertCell().textContent = a.user || "—";
-        tr.insertCell().textContent = account(a.external);
         tr.insertCell().textContent = actGroups(a.groups) || "—";
         var when = tr.insertCell();
         when.className = "num faint";
@@ -2210,8 +2219,10 @@
         var when = tr.insertCell();
         when.className = "num faint";
         when.textContent = new Date(e.at).toLocaleString();
-        tr.insertCell().textContent = e.name || "—";
-        tr.insertCell().textContent = e.user || "—";
+        var who = tr.insertCell();
+        who.textContent = e.external ? "External user" : (e.name || "—");
+        if (e.external) who.className = "faint";
+        tr.insertCell().textContent = e.external ? "—" : (e.user || "—");
         tr.insertCell().textContent = account(e.external);
       });
       host.appendChild(lt);
@@ -2242,6 +2253,7 @@
     $("actNote").textContent = (d.recorded_since
       ? "Sign-ins recorded since " + new Date(d.recorded_since).toLocaleString() + ". "
       : "No sign-ins recorded yet. ")
+      + "External users (partners) are recorded anonymously: when, never who. "
       + "What people view or download is counted on the Overview, not per person.";
   }
 
@@ -2265,8 +2277,8 @@
     }
     var pt = el("table");
     var phr = pt.createTHead().insertRow();
-    ["Name", "Email", "Account", "Groups", "Sign-ins", "Last sign-in", "Last active"]
-      .forEach(function (h, i) { phr.appendChild(el("th", i === 4 ? "r" : null, h)); });
+    ["Name", "Email", "Groups", "Sign-ins", "Last sign-in", "Last active"]
+      .forEach(function (h, i) { phr.appendChild(el("th", i === 3 ? "r" : null, h)); });
     var ptb = pt.createTBody();
     rows.forEach(function (p) {
       var tr = ptb.insertRow();
@@ -2274,7 +2286,6 @@
       tr.title = "Show this person's sign-ins in the log";
       tr.insertCell().textContent = p.name || "—";
       tr.insertCell().textContent = p.user || "—";
-      tr.insertCell().textContent = account(p.external);
       tr.insertCell().textContent = actGroups(p.groups) || "—";
       var n = tr.insertCell();
       n.className = "r num";

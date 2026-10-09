@@ -1,3 +1,4 @@
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -37,6 +38,13 @@ async def lifespan(app: FastAPI):
     from backend.deps import build_repo
 
     log_security_warnings()
+    # Partners are anonymous in the activity records (2026-10-09); this drops
+    # identity written before that, and does nothing once the files are clean.
+    from backend import activity
+    try:
+        activity.scrub_partners()
+    except Exception:                                      # noqa: BLE001
+        logging.getLogger(__name__).exception("could not scrub partner identity")
     from backend.repositories.base import AssetQuery
     from backend.seed import load_seed
 

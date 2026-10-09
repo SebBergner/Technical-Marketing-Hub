@@ -651,7 +651,11 @@ partner put in a group with Access internal content does get those files.
 **Admin → Sign-ins** (2026-10-07) shows who is active now (a request in the
 last 15 minutes -- the server keeps no session, so "online" can only mean
 "recently active"), people and sign-ins per period, and the sign-in log.
-What people view or download is still recorded anonymously; per-person usage
+**Partners are anonymous** (meeting 2026-10-07; since 2026-10-09): a
+partner's sign-in is logged only as "external user at T", partners have no
+per-person activity and are not kept in `users.json`; identity written
+before that is removed at app start (`activity.scrub_partners()`). PTC
+people are named. What people view or download is still recorded anonymously; per-person usage
 waits for management's decision (see `backend/activity.py` for where it
 would go).
 

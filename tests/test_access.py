@@ -124,8 +124,8 @@ def test_known_users_are_shown_with_their_groups(monkeypatch):
     access.record_sign_in(oid="2", email=None, username="p@partner.it", name="P", external=True)
     access.record_sign_in(oid="1", email=ME, username=ME, name="Liwei Chen", external=False)
     users = {u["oid"]: u for u in access.users_view()}
-    assert len(users) == 2 and users["1"]["name"] == "Liwei Chen"
-    assert users["1"]["groups"] == [ADMINS, EMPLOYEES] and users["2"]["groups"] == [PARTNERS]
+    assert len(users) == 1 and users["1"]["name"] == "Liwei Chen", "partners are not recorded"
+    assert users["1"]["groups"] == [ADMINS, EMPLOYEES]
 
 
 # ─────────────────────────────────────────────── the endpoints

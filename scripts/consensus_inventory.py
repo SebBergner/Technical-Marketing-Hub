@@ -92,6 +92,10 @@ def mmss(seconds) -> str:
     return f"{seconds // 60}:{seconds % 60:02d}"
 
 
+#: Columns whose values are links, made clickable.
+LINK_COLUMNS = {"Open in Consensus", "SharePoint link"}
+
+
 def sheet(wb, title: str, headers: list[str], rows: list[list], widths: dict | None = None,
           status_col: int | None = None, decision_col: int | None = None):
     ws = wb.create_sheet(title)
@@ -106,6 +110,12 @@ def sheet(wb, title: str, headers: list[str], rows: list[list], widths: dict | N
     ws.auto_filter.ref = ws.dimensions
     for i, h in enumerate(headers, start=1):
         ws.column_dimensions[get_column_letter(i)].width = (widths or {}).get(h, 16)
+        if h in LINK_COLUMNS:
+            for row in ws.iter_rows(min_row=2, min_col=i, max_col=i):
+                for cell in row:
+                    if isinstance(cell.value, str) and cell.value.startswith("http"):
+                        cell.hyperlink = cell.value
+                        cell.style = "Hyperlink"
     if status_col:
         for row in ws.iter_rows(min_row=2, min_col=status_col, max_col=status_col):
             for cell in row:
@@ -149,6 +159,10 @@ def write(out_path: str, result: dict, v1_all: list[dict], sp_age: dict,
         ["How to read it", ""],
         ["One row per Consensus video (by video uuid): a video can be a demo of its own and a "
          "chapter of several playlists; the Videos sheet lists both.", ""],
+        ["To find one in Consensus: 'Where in Consensus' says which demo or playlist it is "
+         "in, and 'Open in Consensus' opens that page. A video with no demo of its own is a "
+         "chapter: open the playlist and pick the chapter. The video uuid is internal to "
+         "Consensus and cannot be searched for there.", ""],
         ["A match needs the name AND the length to agree. Length alone is not evidence: a "
          "video typically has ~7 unrelated SharePoint videos within 2 seconds.", ""],
         ["File size is not available from Consensus, so it cannot be compared. It is shown "
@@ -169,20 +183,45 @@ def write(out_path: str, result: dict, v1_all: list[dict], sp_age: dict,
         if row[0].value in FILLS:
             row[0].fill = PatternFill("solid", fgColor=FILLS[row[0].value])
 
-    headers = ["Status", "Review decision", "Consensus title", "Consensus demo UUID",
+    headers = ["Status", "Review decision", "Consensus title", "Where in Consensus",
+               "Open in Consensus", "Consensus demo UUID",
                "Video UUID", "Length", "Language", "Public", "Playlists using it",
                "Consensus folder", "Created",
                "SharePoint file", "Library", "SharePoint demo", "SP length", "Length diff (s)",
                "Size (MB)", "Resolution", "Name score", "Copies of this file",
                "Next candidate", "SharePoint item id", "SharePoint link", "Notes"]
     v1 = {d.get("uuid"): d for d in v1_all}
+
+    def link(uuid: str) -> str:
+        """The demo's or playlist's Consensus page. The video uuid itself is
+        Consensus-internal: nothing in its interface finds it."""
+        return (v1.get(uuid) or {}).get("previewLink") or             f"https://play.goconsensus.com/{uuid}?preview=sales"
+
+    def private(public: bool) -> str:
+        return "" if public else " (not public)"
+
+    def where(v) -> tuple[str, str]:
+        """How a person finds this video in Consensus, and the page to open."""
+        if v.demos:
+            d = v.demos[0]
+            text = f'Demo "{d["title"]}"{private(d["public"])}'
+            if v.playlists:
+                text += f"; also a chapter of {len(v.playlists)} playlist(s)"
+            return text, link(d["uuid"])
+        p = v.playlists[0]
+        text = f'Chapter "{p["chapter"]}" of playlist "{p["title"]}"{private(p["public"])}'
+        if len(v.playlists) > 1:
+            text += f" and {len(v.playlists) - 1} more"
+        return text, link(p["uuid"])
+
     rows = []
     for v, m in videos:
         demo = v.demos[0] if v.demos else {}
         folder = ((v1.get(demo.get("uuid")) or {}).get("folderInfo") or {}).get("name") or ""
         b = m.best or {}
         rows.append([
-            m.status, "", v.title, ", ".join(d["uuid"] for d in v.demos), v.video_uuid,
+            m.status, "", v.title, *where(v),
+            ", ".join(d["uuid"] for d in v.demos), v.video_uuid,
             mmss(v.duration), v.language or "", "yes" if v.public else "no",
             "; ".join(f'{p["title"]} › {p["chapter"]}' for p in v.playlists), folder,
             (demo.get("created_at") or "")[:10],
@@ -194,6 +233,7 @@ def write(out_path: str, result: dict, v1_all: list[dict], sp_age: dict,
             f'{m.runner_up["file"]} ({m.runner_up_score})' if m.runner_up else "",
             b.get("item_id"), b.get("web_url"), ""])
     widths = {"Status": 30, "Review decision": 18, "Consensus title": 45,
+              "Where in Consensus": 55, "Open in Consensus": 30,
               "Consensus demo UUID": 38, "Video UUID": 38, "Playlists using it": 45,
               "Consensus folder": 32, "SharePoint file": 48,
               "SharePoint demo": 38, "Copies of this file": 40, "Next candidate": 45,
@@ -207,20 +247,21 @@ def write(out_path: str, result: dict, v1_all: list[dict], sp_age: dict,
         chapters = p["chapters"]
         in_sp = sum(1 for c in chapters if c.get("status") == ci.IN_SP)
         to_move = sum(1 for c in chapters if c.get("status") == ci.MIGRATE)
-        p_rows.append([p["title"], p["uuid"], p["type"], "yes" if p["public"] else "no",
+        p_rows.append([p["title"], link(p["uuid"]), p["uuid"], p["type"],
+                       "yes" if p["public"] else "no",
                        len(chapters), in_sp, len(chapters) - in_sp - to_move, to_move])
         for n, c in enumerate(chapters, start=1):
             m = status_of.get(c["video_uuid"])
-            c_rows.append([p["title"], n, c["chapter"], c["video_uuid"],
+            c_rows.append([p["title"], link(p["uuid"]), n, c["chapter"], c["video_uuid"],
                            title_of.get(c["video_uuid"]), c.get("status"),
                            (m.best or {}).get("file") if m else None])
-    sheet(wb, "Playlists", ["Playlist", "Playlist UUID", "Type", "Public", "Chapters",
-                            "In SharePoint", "To check", "To migrate"],
-          p_rows, {"Playlist": 55, "Playlist UUID": 38})
-    sheet(wb, "Playlist chapters", ["Playlist", "#", "Chapter", "Video UUID", "Video",
-                                    "Status", "SharePoint file"],
-          c_rows, {"Playlist": 45, "Chapter": 45, "Video UUID": 38, "Video": 45,
-                   "Status": 30, "SharePoint file": 48}, status_col=6)
+    sheet(wb, "Playlists", ["Playlist", "Open in Consensus", "Playlist UUID", "Type", "Public",
+                            "Chapters", "In SharePoint", "To check", "To migrate"],
+          p_rows, {"Playlist": 55, "Open in Consensus": 30, "Playlist UUID": 38})
+    sheet(wb, "Playlist chapters", ["Playlist", "Open in Consensus", "#", "Chapter",
+                                    "Video UUID", "Video", "Status", "SharePoint file"],
+          c_rows, {"Playlist": 45, "Open in Consensus": 30, "Chapter": 45, "Video UUID": 38,
+                   "Video": 45, "Status": 30, "SharePoint file": 48}, status_col=7)
 
     shared = [[k, len(t), "; ".join(t)] for k, t in result["shared_files"].items()]
     sheet(wb, "Shared SharePoint files", ["SharePoint item id", "Consensus videos",

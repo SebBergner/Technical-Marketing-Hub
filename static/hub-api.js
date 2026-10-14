@@ -5154,6 +5154,22 @@
     foot.insertBefore(link, foot.firstChild);
     foot.appendChild(row);
 
+    // Hub activity (2026-10-14), above Share feedback, for people who may
+    // see it -- PTC employees by default.
+    hubPermissions.then(function (granted) {
+      if (granted.indexOf("view_reports") < 0 || foot.querySelector(".hub-foot__activity")) return;
+      var activity = document.createElement("a");
+      activity.className = "hub-foot__feedback hub-foot__activity";
+      activity.href = "/reports";
+      activity.innerHTML =
+        '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">'
+        + '<path d="M2.5 13.5V8.5M6.2 13.5V4.5M9.8 13.5V7M13.5 13.5V2.5"'
+        + ' fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
+        + "<span>Hub activity</span>";
+      activity.title = "How PTC uses the Hub: most used content, most active people, teams";
+      foot.insertBefore(activity, link);
+    });
+
     // Fire-and-forget: an unreachable version endpoint leaves the label empty
     // rather than an apology, and nothing else on the page depends on it.
     fetch("/api/version")

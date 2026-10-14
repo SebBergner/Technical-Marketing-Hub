@@ -12,8 +12,8 @@ from backend.version import app_version
 from backend.db import SessionLocal, create_all
 from backend import oidc
 from backend.routers import (
-    admin, assets, auth, consensus, curation, debug, graph, migration, requests,
-    segments, taxonomy, vms,
+    admin, assets, auth, consensus, curation, debug, graph, migration, reports,
+    requests, segments, taxonomy, vms,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -93,6 +93,7 @@ app = FastAPI(
 app.include_router(auth.router)
 app.include_router(assets.router)
 app.include_router(taxonomy.router)
+app.include_router(reports.router)
 app.include_router(segments.router)
 app.include_router(requests.router)
 app.include_router(consensus.router)
@@ -137,6 +138,15 @@ async def admin_page():
     Served to anyone — the page itself decides what to show, and every figure
     on it comes from /api/admin/overview, which does not."""
     return FileResponse(os.path.join(BASE_DIR, "static", "admin.html"))
+
+
+@app.get("/reports", include_in_schema=False)
+async def reports_page():
+    """Hub activity, for every PTC employee (2026-10-14). Its own page like
+    /admin; its figures come from /api/reports/activity, which checks
+    "View Hub activity"."""
+    return FileResponse(os.path.join(BASE_DIR, "static", "reports.html"),
+                        headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/migration", include_in_schema=False)

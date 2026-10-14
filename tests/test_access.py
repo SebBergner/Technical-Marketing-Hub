@@ -31,7 +31,7 @@ def no_named_admins_or_curators(monkeypatch):
 def test_staff_partners_and_nobody_by_default():
     staff = person("someone@ptc.com").permissions
     assert {Perm(p) for p in staff} == {Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD,
-                                        Perm.INTERNAL, Perm.CREATE_DEMO}
+                                        Perm.INTERNAL, Perm.CREATE_DEMO, Perm.VIEW_REPORTS}
     partner = person("p@partner.it").permissions
     assert {Perm(p) for p in partner} == {Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD}
     assert ANONYMOUS.permissions == frozenset()
@@ -224,4 +224,18 @@ def test_with_neither_preview_nor_download_the_file_ids_are_withheld(client, tmp
     access.update_group(EMPLOYEES, "a", permissions=["view_hub"])
     body = client.get("/api/assets/bobcat", headers=staff).json()
     assert body["files_locked"] is True and body["resources"][0]["item_id"] is None
+
+
+def test_a_new_default_reaches_groups_saved_before_it_but_not_a_removed_one(tmp_path, monkeypatch):
+    """2026-10-14: "View Hub activity" is a PTC-employees default; a file saved
+    earlier (no `catalogue`) gains it, and once removed it stays removed."""
+    monkeypatch.setattr(access, "_owned", lambda name: str(tmp_path / name))
+    (tmp_path / "access.json").write_text(json.dumps({"groups": [
+        {"id": EMPLOYEES, "permissions": ["view_hub", "preview", "download"]}]}),
+        encoding="utf-8")
+    access._cache.clear()
+    assert "view_reports" in person("someone@ptc.com").permissions
+    access.update_group(EMPLOYEES, "a", permissions=["view_hub"])
+    access._cache.clear()
+    assert person("someone@ptc.com").permissions == frozenset({"view_hub"})
 

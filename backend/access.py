@@ -71,6 +71,7 @@ class Perm(str, Enum):
     MANAGE_ACCESS = "manage_content_access"
     REVIEW_CONTENT = "review_content"
     VIEW_ARCHIVED = "view_archived"
+    VIEW_REPORTS = "view_reports"
     RUN_SYNC = "run_sync"
     RUN_MIGRATION = "run_migration"
     VIEW_ADMIN = "view_admin"
@@ -93,6 +94,9 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
     (Perm.REVIEW_CONTENT, "Review content",
      "Mark demos Still current (the interface shown matches today's release), "
      "archive or restore them, and work through the content-review list."),
+    (Perm.VIEW_REPORTS, "View Hub activity",
+     "See the Hub activity page: the most used content, the most active PTC "
+     "people and team totals. Never partners' names."),
     (Perm.VIEW_ARCHIVED, "See archived content",
      "Open archived demos, and show them in lists with 'Show archived'."),
     (Perm.MANAGE_ACCESS, "Manage content access",
@@ -111,7 +115,7 @@ ADMINS, EMPLOYEES, PARTNERS = "administrators", "ptc-employees", "partners"
 _ADMIN_ONLY = frozenset({Perm.VIEW_ADMIN.value, Perm.MANAGE_USERS.value})
 
 _EMPLOYEE_DEFAULT = [Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD, Perm.INTERNAL,
-                     Perm.CREATE_DEMO]
+                     Perm.CREATE_DEMO, Perm.VIEW_REPORTS]
 _PARTNER_DEFAULT = [Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD]
 
 BUILTIN = {
@@ -160,13 +164,26 @@ def _defaults() -> dict:
                        for gid, spec in BUILTIN.items()]}
 
 
+#: The permissions that existed before access.json recorded its catalogue
+#: (2026-10-14); a file without one was saved knowing exactly these.
+_CATALOGUE_BEFORE_TRACKING = ALL - {"view_reports"}
+
+
 def _normalise(state: dict) -> dict:
-    """Built-ins always present and in front, Administrators always complete."""
+    """Built-ins always present and in front, Administrators always complete.
+
+    A built-in group saved before a permission existed gains it if it is one
+    of that group's defaults (2026-10-14, "View Hub activity" for PTC
+    employees): `catalogue` records which permissions existed when the file
+    was saved, so a default someone removed on purpose stays removed."""
     groups = [g for g in state.get("groups") or [] if isinstance(g, dict) and g.get("id")]
     by_id = {g["id"]: g for g in groups}
+    known = set(state.get("catalogue") or _CATALOGUE_BEFORE_TRACKING)
     out = []
     for gid, spec in BUILTIN.items():
         g = by_id.pop(gid, None) or dict(id=gid, members=[], permissions=spec["permissions"])
+        g["permissions"] = list(g.get("permissions") or []) + [
+            p for p in spec["permissions"] if p not in known]
         g.update(builtin=True, auto=spec["auto"], name=spec["name"],
                  description=spec["description"])
         if gid == ADMINS:
@@ -182,7 +199,7 @@ def _normalise(state: dict) -> dict:
         g["permissions"] = _clean_perms(g.get("permissions"))
         g["members"] = sorted({_norm_email(m) for m in g.get("members") or [] if _norm_email(m)})
         g.setdefault("description", "")
-    return {**state, "groups": out}
+    return {**state, "groups": out, "catalogue": sorted(ALL)}
 
 
 def load_state() -> dict:

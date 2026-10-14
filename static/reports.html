@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hub activity · Technical Marketing Hub</title>
+<!--
+  Hub activity for every PTC employee (Serge, 2026-10-13: "healthy
+  competition"). Its own page, like /admin, so Elio's index.html stays
+  untouched. What is shown was decided by Liwei on 2026-10-14: the most
+  active people and team totals -- no bottom of the list -- and nothing about
+  partners but a count of what was left out of the ranking.
+-->
+<style>
+  :root{
+    --bg:#f6f7f4; --surface:#fff; --surface-2:#eef1ea; --border:#dde2d6;
+    --ink:#1b2318; --muted:#5d6a56; --faint:#8a9682;
+    --green:#00890B; --green-soft:#e3efe0; --gold:#b8860b;
+    --radius:10px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12160f; --surface:#191f15; --surface-2:#212a1c; --border:#2e3a27;
+      --ink:#e9ede2; --muted:#aebaa5; --faint:#7b8a73;
+      --green:#5fbe7c; --green-soft:#1d3323; --gold:#e0b15c;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.55 -apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px 16px 80px}
+  header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;
+    flex-wrap:wrap;margin-bottom:18px}
+  h1{font-size:20px;margin:0}
+  h2{font-size:13px;margin:0 0 10px;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--faint);font-weight:700}
+  a{color:var(--green)}
+  .muted{color:var(--muted)} .faint{color:var(--faint)}
+  .num{font-variant-numeric:tabular-nums}
+  .ranges{display:flex;gap:4px;flex-wrap:wrap}
+  .ranges button{font:inherit;font-size:12.5px;cursor:pointer;padding:4px 11px;border-radius:99px;
+    border:1px solid var(--border);background:var(--surface);color:var(--ink)}
+  .ranges button[aria-pressed="true"]{background:var(--green);border-color:var(--green);
+    color:#fff;font-weight:600}
+  .tiles{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    margin-bottom:18px}
+  .tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:12px 14px}
+  .tile__n{font-size:22px;font-weight:700}
+  .tile__l{font-size:12.5px;color:var(--muted)}
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:16px 18px;margin-bottom:14px;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--faint);padding:0 8px 6px;font-weight:700}
+  td{padding:7px 8px;border-top:1px solid var(--border)}
+  td.r,th.r{text-align:right}
+  .rank{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;
+    border-radius:50%;background:var(--surface-2);font-weight:700;font-size:12px}
+  .rank--1{background:var(--gold);color:#fff}
+  .note{font-size:12.5px;margin-top:10px}
+  [hidden]{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="faint" style="font-size:12px"><a href="/">← Technical Marketing Hub</a></div>
+      <h1>Hub activity</h1>
+      <div class="muted" style="font-size:13px">How PTC uses the Hub: views, previews,
+        downloads and searches.</div>
+    </div>
+    <div class="ranges" id="ranges"></div>
+  </header>
+
+  <div id="noAccess" class="card" hidden>
+    <h2>No access</h2>
+    <p class="muted" style="margin:0">Your account is not in a group that may view Hub activity.</p>
+  </div>
+
+  <div id="content" hidden>
+    <div class="tiles" id="tiles"></div>
+    <div class="grid">
+      <div class="card"><h2 id="peopleTitle">Most active people</h2><div id="people"></div></div>
+      <div class="card"><h2>Teams</h2><div id="teams"></div></div>
+    </div>
+    <div class="card"><h2>Most used content</h2><div id="topContent"></div></div>
+    <p class="faint note" id="footnote"></p>
+  </div>
+</div>
+<script src="/static/reports.js"></script>
+</body>
+</html>

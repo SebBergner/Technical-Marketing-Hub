@@ -400,3 +400,76 @@ def report(*, since: str | None = None, until: str | None = None,
                 "items": log_rows[offset:offset + limit]},
         "recorded_since": events[0]["at"] if events else None,
     }
+
+
+# ─────────────────────────────────────────── Hub activity for everyone (2026-10-14)
+def leaderboard(events: list[dict], *, since: str | None = None, until: str | None = None,
+                top: int = 10, titles: dict[str, str] | None = None,
+                teams: list[dict] | None = None) -> dict:
+    """The Hub activity page: the most active PTC people, team totals, the
+    most used content -- for every PTC employee to see (Serge, 2026-10-13).
+
+    Deliberately NOT here (Liwei, 2026-10-14): a bottom of the list -- no
+    "laggards" -- and anything about partners beyond one anonymous count of
+    what was left out of the ranking. `teams` are the Hub's own groups
+    ({name, members}); the Hub has no org chart.
+    """
+    window = [e for e in _within(events, since, until) if e.get("event") in USAGE_KINDS]
+    people: dict[str, dict] = {}
+    content: dict[str, dict] = {}
+    external = 0
+    for e in window:
+        if e.get("external"):
+            external += 1
+            continue
+        email = e.get("user")
+        if email:
+            p = people.setdefault(email, {k: 0 for k in USAGE_KINDS})
+            p[e["event"]] += 1
+        aid = e.get("asset_id")
+        if aid and e["event"] in ("view", "preview", "download"):
+            c = content.setdefault(aid, {"views": 0, "downloads": 0, "people": set()})
+            c["downloads" if e["event"] == "download" else "views"] += 1
+            if email:
+                c["people"].add(email)
+
+    names = {}
+    for u in access.known_users():
+        for key in (u.get("email"), u.get("username")):
+            if key:
+                names[key] = u.get("name")
+
+    def total(counts: dict) -> int:
+        return sum(counts.get(k, 0) for k in USAGE_KINDS)
+
+    ranked = sorted(people.items(), key=lambda kv: (total(kv[1]), kv[1]["download"]),
+                    reverse=True)
+    top_people = [{"rank": i + 1, "name": names.get(email) or email.split("@")[0],
+                   "user": email, "total": total(c), **c}
+                  for i, (email, c) in enumerate(ranked[:top])]
+
+    team_rows = []
+    for t in teams or []:
+        members = set(t.get("members") or [])
+        mine = {e: c for e, c in people.items() if e in members}
+        team_rows.append({"team": t["name"], "members": len(members), "active": len(mine),
+                          **{k: sum(c[k] for c in mine.values()) for k in USAGE_KINDS},
+                          "total": sum(total(c) for c in mine.values())})
+    team_rows.sort(key=lambda r: r["total"], reverse=True)
+
+    titles = titles or {}
+    top_content = sorted(content.items(), key=lambda kv: (kv[1]["views"] + kv[1]["downloads"],
+                                                          len(kv[1]["people"])), reverse=True)
+    return {
+        "people": top_people,
+        "teams": team_rows,
+        "content": [{"asset_id": aid, "title": titles.get(aid) or aid, "views": c["views"],
+                     "downloads": c["downloads"], "people": len(c["people"])}
+                    for aid, c in top_content[:top]],
+        "totals": {"active_people": len(people),
+                   **{k: sum(c[k] for c in people.values()) for k in USAGE_KINDS},
+                   "anonymous": sum(1 for e in window if not e.get("external")
+                                    and not e.get("user"))},
+        "external_not_ranked": external,
+        "top": top,
+    }

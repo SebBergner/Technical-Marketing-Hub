@@ -936,11 +936,10 @@ def get_person_activity(email: str, since: str | None = None, until: str | None 
     events = _events(repo, None, None)
     mine = (email or "").strip().lower()
     ids = {e.get("asset_id") for e in events if e.get("asset_id") and e.get("user") == mine}
-    titles = {}
-    for asset_id in ids:
-        asset = repo.get(asset_id)
-        if asset is not None:
-            titles[asset_id] = asset.title
+    # One listing rather than a get() per demo, which rebuilds the catalogue
+    # view every time (2026-10-14).
+    titles = {a.id: a.title for a in repo.list(AssetQuery(
+        limit=10 ** 6, include_older_vms=True, include_archived=True)).items if a.id in ids}
     return activity.person_usage(events, email, titles, since=since, until=until,
                                  offset=offset, limit=limit)
 

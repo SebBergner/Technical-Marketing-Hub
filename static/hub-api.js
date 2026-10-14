@@ -58,16 +58,6 @@
   var MAX_PAGES = 20;           // 4,000 assets; the catalogue is ~950
   var FUNNEL_UNKNOWN = "";
 
-  /* Sections the landing page shows that we have no honest data for. Editor's
-   * Picks needs curation nobody has done; Continue needs per-user history we
-   * do not collect. Leaving them filled with sample cards would put invented
-   * content beside real content with nothing to tell them apart, which is
-   * worse than a shorter page. Set to [] to show them again. */
-  //: Elio's landing sections, all replaced by the Home built in buildHome()
-  //: (Liwei, 2026-10-01). Hidden by class, not removed: index.html is his.
-  var HIDE_UNTIL_REAL = ["editorsPicksSection", "continueSection",
-                         "browseByProductSection", "latestUploadsSection",
-                         "mostViewedSection"];
 
   /* ---------------------------------------------------------------- mapping */
 
@@ -961,10 +951,6 @@
   }
 
   function buildHome(assets, facets) {
-    HIDE_UNTIL_REAL.forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) el.classList.add("hub-hidden");
-    });
     var thread = document.getElementById("mainThread");
     if (!thread || document.getElementById("hubHome")) return;
     if (!document.getElementById("hubHomeCss")) {
@@ -975,8 +961,7 @@
     }
     var home = document.createElement("div");
     home.id = "hubHome";
-    var before = document.getElementById("continueSection");
-    thread.insertBefore(home, before && before.parentNode === thread ? before : null);
+    thread.appendChild(home);
 
     // What's in the Hub
     var counts = {};
@@ -1210,8 +1195,7 @@
                   "hubFilterSegment", "hubFilterStage", "hubFilterLanguage",
                   "hubFilterCf", "hubFilterVideoType", "hubFilterPublished",
                   "hubFilterArchived"];
-  var LANDING = ["hubHome", "continueSection", "latestUploadsSection", "mostViewedSection",
-                 "browseByProductSection", "editorsPicksSection"];
+  var LANDING = ["hubHome"];
   //: One request's ceiling, enforced server-side (`le=200` in assets.py) --
   //: not a UI choice, so raising it here would just get clamped back. A
   //: filter or a search that matches more than this needs a second request,
@@ -2639,7 +2623,7 @@
      * proposed in the review: three steps instead of one, and every board
      * belongs to whoever made it.
      */
-    ["vpShareBtn", "vpDsrBtn"].forEach(function (btnId) {
+    ["vpShareBtn"].forEach(function (btnId) {
       var b = document.getElementById(btnId);
       if (b) b.style.display = "none";
     });

@@ -104,3 +104,12 @@ def test_creators_are_ranked_by_how_much_their_demos_were_used_in_the_window():
     assert out["unattributed_uses"] == 1, "the Demo Video one has no creator"
     assert "Aulenbach, Jason" not in {c["creator"] for c in out["creators"]}, \
         "unused in the window: not ranked at all"
+
+
+def test_the_hub_page_is_revalidated_and_carries_no_inline_handlers(client):
+    """2026-10-14: index.html is markup only; behaviour lives in
+    static/js/hub-ui.js, and the page must not be served stale after a deploy."""
+    r = client.get("/")
+    assert r.headers["cache-control"] == "no-cache"
+    assert "onclick=" not in r.text and "onchange=" not in r.text
+    assert '<script src="/static/js/hub-ui.js" defer></script>' in r.text

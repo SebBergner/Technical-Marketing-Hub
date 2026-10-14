@@ -304,8 +304,8 @@ function computeKindOfDemo() {
       '<div class="derived-output__value">For: ' + groups[level].join(', ') + '</div>' +
       '<div class="field-hint" style="margin-top:4px;">' + VIDEO_LEVEL_HINT[level] + '</div>' +
       '<div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">' +
-        '<button class="btn-ghost" style="flex:none; padding:6px 12px;" onclick="openStyleExampleModal(\'' + level + '\')"><svg class="orion-ico--sm orion-ico"><use href="#i-play"/></svg>See an example of this style</button>' +
-        '<button class="btn-ghost" style="flex:none; padding:6px 12px;" onclick="checkExistingAsset(this, \'' + level + '\')"><svg class="orion-ico--sm orion-ico"><use href="#i-search"/></svg>Check Demo Database for Similar Content</button>' +
+        '<button class="btn-ghost" style="flex:none; padding:6px 12px;" data-action="style-example" data-level="' + level + '"><svg class="orion-ico--sm orion-ico"><use href="#i-play"/></svg>See an example of this style</button>' +
+        '<button class="btn-ghost" style="flex:none; padding:6px 12px;" data-action="check-existing" data-level="' + level + '"><svg class="orion-ico--sm orion-ico"><use href="#i-search"/></svg>Check Demo Database for Similar Content</button>' +
       '</div>' +
       '<div id="existingCheck-' + level + '" style="display:none; margin-top:10px;"></div>' +
       '</div>';
@@ -358,9 +358,9 @@ function checkExistingAsset(btn, level) {
             '<div class="orion-subtle" style="margin:2px 0 6px; font-size:12px;">' + match.subtitle + '</div>' +
             '<div style="font-size:12px; color:var(--orion-text-2);">' + match.meta + ' · ' + match.stats + '<br>' + match.updated + ' · owner ' + match.owner + '</div>' +
             '<div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">' +
-              '<button class="btn-ghost" style="flex:none; padding:6px 12px;" onclick="recordAssetDecision(\'' + level + '\', \'use-as-is\')">Use as-is</button>' +
-              '<button class="btn-ghost" style="flex:none; padding:6px 12px;" onclick="recordAssetDecision(\'' + level + '\', \'refresh\')">Needs a quick refresh</button>' +
-              '<button class="btn-primary-sm" style="flex:none; padding:6px 12px;" onclick="recordAssetDecision(\'' + level + '\', \'new\')">Create new anyway</button>' +
+              '<button class="btn-ghost" style="flex:none; padding:6px 12px;" data-action="asset-decision" data-level="' + level + '" data-decision="use-as-is">Use as-is</button>' +
+              '<button class="btn-ghost" style="flex:none; padding:6px 12px;" data-action="asset-decision" data-level="' + level + '" data-decision="refresh">Needs a quick refresh</button>' +
+              '<button class="btn-primary-sm" style="flex:none; padding:6px 12px;" data-action="asset-decision" data-level="' + level + '" data-decision="new">Create new anyway</button>' +
             '</div>' +
           '</div>' +
         '</div>';
@@ -435,7 +435,7 @@ function videoAssetFromData(data) {
     : escAttr(product || 'Cross-Portfolio') + (funnel ? ' \u00b7 ' + escAttr(funnel) : '');
 
   var actionsHtml = data.share
-    ? '<button class="btn-primary-sm" data-share-title="' + escAttr(data.share.title) + '" data-share-meta="' + escAttr(data.share.meta) + '" data-share-uuid="' + escAttr(data.share.uuid) + '" onclick="openShareModal(this.dataset.shareTitle, this.dataset.shareMeta, this.dataset.shareUuid)"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share</button>'
+    ? '<button class="btn-primary-sm" data-share-title="' + escAttr(data.share.title) + '" data-share-meta="' + escAttr(data.share.meta) + '" data-share-uuid="' + escAttr(data.share.uuid) + '" data-action="share"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share</button>'
     : '<span class="orion-badge orion-badge--open" title="Silent cut \u2014 no narration">No audio track</span>';
 
   card.innerHTML =
@@ -482,3 +482,56 @@ document.getElementById('hubSearchInput').addEventListener('input', hubApplyFilt
   document.getElementById(id).addEventListener('change', hubApplyFilters);
 });
 hubApplyFilters();
+
+/* ── One listener for every control on the page (2026-10-14) ──────────────
+ * The markup names what a control does (data-action="..."); this table says
+ * how. Functions are looked up on window at click time, so static/hub-api.js
+ * can still wrap one (openRequestView, submitAssetRequest...) and be called.
+ * Replaces the inline onclick attributes the concept mock-up carried. */
+var HUB_ACTIONS = {
+  "pill-select": function (el) { pillSelect(el); },
+  "pill-toggle-kind": function (el) { pillToggle(el); computeKindOfDemo(); },
+  "pill-toggle-scope": function (el) { pillToggle(el); computeProductScope(); },
+  "pill-customer": function (el) { pillSelect(el); onCustomerChange(el); },
+  "pill-asset-type": function (el) { pillSelect(el); onAssetTypeChange(el); },
+  "pill-starting-materials": function (el) { pillSelect(el); onStartingMaterialsChange(el); },
+  "open-request": function () { window.openRequestView(); },
+  "close-request": function () { window.closeRequestView(); },
+  "submit-request": function (el, e) { window.submitAssetRequest(e); },
+  "reset-request": function () { window.resetRequestForm(); },
+  "reset-filters": function () { window.hubResetFilters(); },
+  "close-detail": function () { window.closeVideoPreview(); },
+  "share": function (el) {
+    window.openShareModal(el.dataset.shareTitle, el.dataset.shareMeta, el.dataset.shareUuid);
+  },
+  "close-share": function () { window.closeShareModal(); },
+  "generate-share-link": function () { window.generateShareLink(); },
+  "copy-share-link": function () { window.copyShareLink(); },
+  "style-example": function (el) { window.openStyleExampleModal(el.dataset.level); },
+  "close-style-example": function () { window.closeStyleExampleModal(); },
+  "check-existing": function (el) { window.checkExistingAsset(el, el.dataset.level); },
+  "asset-decision": function (el) {
+    window.recordAssetDecision(el.dataset.level, el.dataset.decision);
+  }
+};
+
+document.addEventListener("click", function (e) {
+  // A backdrop closes its modal only when the click lands on the backdrop
+  // itself, not on the dialog inside it.
+  var backdrop = e.target.closest("[data-backdrop]");
+  if (backdrop && e.target === backdrop) {
+    HUB_ACTIONS[backdrop.dataset.backdrop](backdrop, e);
+    return;
+  }
+  var el = e.target.closest("[data-action]");
+  if (!el) return;
+  var action = HUB_ACTIONS[el.dataset.action];
+  if (action) action(el, e);
+});
+
+document.addEventListener("change", function (e) {
+  if (e.target.dataset && e.target.dataset.change === "attachments") {
+    window.handleAttachmentFiles(e.target);
+  }
+});
+

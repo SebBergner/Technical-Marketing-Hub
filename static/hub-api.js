@@ -2051,8 +2051,9 @@
     closeFilePreview(false);
     closeAssetDetail();
     closeAdvancedSearch();
+    closeActivity();
     // The hash has to follow, or a refresh reopens the page we just left.
-    if (/^#\/(asset|search)\//.test(location.hash || "")) {
+    if (/^#\/(asset|search|activity)/.test(location.hash || "")) {
       history.pushState(null, "", location.pathname + location.search);
     }
   }
@@ -2111,11 +2112,10 @@
       navTargets[name] = target;
       item.style.cursor = "pointer";
 
-      // Home's inline onclick is Elio's, and it half-restores the catalogue
-      // from underneath a details page. exitOverlays() below does the whole
-      // job, his half included. Request New Asset keeps its own onclick --
-      // that one opens a view we have no replacement for.
-      if (name === "Home") item.removeAttribute("onclick");
+      // Home's own action (close-request in static/js/hub-ui.js) only
+      // half-restores the catalogue from underneath a details page;
+      // exitOverlays() below does the whole job, that half included.
+      if (name === "Home") item.removeAttribute("data-action");
 
       item.addEventListener("click", function () {
         // Every nav click leaves the details page. Seb asked for a sidebar
@@ -4038,6 +4038,19 @@
    * thing: read the hash and show whatever it names. */
   function routeFromHash() {
     var hash = location.hash || "";
+    if (hash === "#/request") {
+      closeFilePreview(false);
+      closeAssetDetail();
+      if (typeof window.openRequestView === "function") window.openRequestView();
+      return;
+    }
+    // Any other address: the request form is not where we are (2026-10-14,
+    // so Back from it, or a link elsewhere, leaves it like any other view).
+    var requestPage = document.getElementById("requestViewPage");
+    if (requestPage && requestPage.classList.contains("active")
+        && typeof window.closeRequestView === "function") {
+      window.closeRequestView();
+    }
     if (hash === "#/activity") {
       closeFilePreview(false);
       closeAssetDetail();
@@ -4791,20 +4804,6 @@
         + '<use href="#i-trend"/></svg> Hub activity</span>';
       item.addEventListener("click", function () { location.hash = "#/activity"; });
       after.insertAdjacentElement("afterend", item);
-      // Any other way out through the sidebar -- Home, a product, a type --
-      // leaves Hub activity. Elio's items only show the catalogue and never
-      // touch the address, so #/activity used to stay open underneath it
-      // (Liwei, 2026-10-14: half the page stuck below Home). Capture phase,
-      // so the view is gone before the item's own handler shows its page.
-      var side = home.closest(".orion-side") || home.parentNode;
-      side.addEventListener("click", function (e) {
-        var target = e.target.closest(".orion-navitem");
-        if (!target || target === item) return;
-        if (location.hash === "#/activity") {
-          history.pushState(null, "", location.pathname + location.search);
-        }
-        closeActivity();
-      }, true);
       // Opened straight from a link: the view came up before this entry did.
       if (location.hash === "#/activity") markActivityNav(true);
     });
@@ -5246,15 +5245,26 @@
     if (typeof openRequest === "function" && !openRequest.hubWrapped) {
       window.openRequestView = function () {
         closeAdvancedSearch();
+        closeActivity();
         closeFilePreview(false);
-        // Opened from a details page or Advanced Search, the address still
-        // named that page, and a refresh went back there (2026-10-01).
-        if (/^#\/(search|asset)\//.test(location.hash || "")) {
-          history.pushState(null, "", location.pathname + location.search);
+        // Opened from a details page, Advanced Search or Hub activity, the
+        // address still named that page, and a refresh went back there.
+        if (location.hash !== "#/request") {
+          history.pushState(null, "", location.pathname + location.search + "#/request");
         }
         return openRequest.apply(this, arguments);
       };
       window.openRequestView.hubWrapped = true;
+    }
+    var closeRequest = window.closeRequestView;
+    if (typeof closeRequest === "function" && !closeRequest.hubWrapped) {
+      window.closeRequestView = function () {
+        if (location.hash === "#/request") {
+          history.pushState(null, "", location.pathname + location.search);
+        }
+        return closeRequest.apply(this, arguments);
+      };
+      window.closeRequestView.hubWrapped = true;
     }
   }
 
@@ -5340,7 +5350,7 @@
       return;
     }
 
-    var button = document.querySelector('[onclick*="submitAssetRequest"]');
+    var button = document.querySelector('[data-action="submit-request"]');
     var restore = button ? button.innerHTML : null;
     if (button) { button.disabled = true; button.textContent = "Submitting\u2026"; }
 
@@ -5401,9 +5411,9 @@
     }
   }
 
-  /* Elio binds the submit through an inline onclick, so replacing the global
-   * is enough here -- unlike the filter controls, which use addEventListener
-   * and had to be cloned to drop their handlers. */
+  /* The page's actions call window.submitAssetRequest and
+   * window.handleAttachmentFiles when used (static/js/hub-ui.js), so replacing
+   * the globals is enough here. */
   function wireRequestForm() {
     window.submitAssetRequest = submitRequest;
     window.handleAttachmentFiles = takeAttachments;
@@ -5522,7 +5532,7 @@
 
     var button = document.getElementById("generateBtn");
     if (button) {
-      button.onclick = null;               // drop Elio's generateShareLink()
+      button.removeAttribute("data-action");  // not the mock-up's generateShareLink()
       button.addEventListener("click", submitShare);
     }
   }

@@ -218,4 +218,7 @@ async def index():
     It began as Elio's concept mock-up; since 2026-10-14 it is ours (Liwei:
     "only a concept reference"), and the mock content has been removed.
     """
-    return FileResponse(os.path.join(BASE_DIR, "index.html"))
+    # no-cache: revalidate every time, so a deploy never leaves a browser on
+    # an old page that names scripts or styles which have since changed.
+    return FileResponse(os.path.join(BASE_DIR, "index.html"),
+                        headers={"Cache-Control": "no-cache"})

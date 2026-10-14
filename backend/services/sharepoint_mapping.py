@@ -287,6 +287,29 @@ def build_resource(filename: str, subfolder: str | None = None,
     return row
 
 
+def content_date(asset: dict) -> date | None:
+    """When a kit's content was last made, from its files (2026-10-14).
+
+    A kit folder's own dates are no use: 545 of 745 Demo Catalog folders
+    read 2024-03-25, 2024-05-21 or 2024-05-22 -- the days the library was
+    moved -- while the files inside kept their own dates, back to 2018
+    (measured 2026-10-14). So: the main video's last modification, which is
+    what a viewer sees; with no main video, the newest file in the kit.
+    None when no file carries a date. Call after derive_video_facts, which
+    picks the main video. OriginalPublishDate, where a folder states one,
+    still wins (the caller checks it first).
+    """
+    resources = asset.get("resources") or []
+    main = asset.get("main_video")
+    if main:
+        for r in resources:
+            if r.get("name") == main and r.get("modified_at"):
+                return as_date(r["modified_at"])
+    dates = [as_date(r["modified_at"]) for r in resources if r.get("modified_at")]
+    dates = [d for d in dates if d]
+    return max(dates) if dates else None
+
+
 def derive_video_facts(asset: dict) -> None:
     """Fill resource counts, main_video, customer_facing and audio in place.
 

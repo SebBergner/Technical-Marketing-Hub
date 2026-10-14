@@ -506,9 +506,36 @@ def test_original_publish_date_is_preferred_over_last_modified():
     assert str(asset.uploaded_at) == "2019-05-14"
 
 
-def test_without_a_publish_date_the_folder_date_is_kept():
+def test_without_a_publish_date_or_files_the_folder_date_is_kept():
     asset = build_assets([folder("Kit v.1")])[0][0]
     assert str(asset.uploaded_at) == "2025-07-21"
+
+
+def dated_file(name, path, modified):
+    return {**file_item(name, path), "lastModifiedDateTime": f"{modified}T09:00:00Z"}
+
+
+def test_without_a_publish_date_a_kit_is_as_old_as_its_main_video():
+    """2026-10-14: 545 of 745 kit folders carry the day the library was
+    moved (2024), while their files kept their own dates."""
+    asset = build_assets([folder("Kit v.1"),
+                          dated_file("Kit Demo Video.mp4", "/Kit v.1", "2019-03-02"),
+                          dated_file("Kit Script.docx", "/Kit v.1", "2023-06-01")])[0][0]
+    assert asset.main_video == "Kit Demo Video.mp4"
+    assert str(asset.uploaded_at) == "2019-03-02", "the video, not the newer script"
+
+
+def test_a_kit_without_video_takes_its_newest_file():
+    asset = build_assets([folder("Kit v.1"),
+                          dated_file("Script.docx", "/Kit v.1", "2018-01-05"),
+                          dated_file("Slides.pptx", "/Kit v.1", "2020-11-30")])[0][0]
+    assert str(asset.uploaded_at) == "2020-11-30"
+
+
+def test_a_stated_publish_date_still_wins_over_the_files():
+    asset = build_assets([folder("Kit v.1", OriginalPublishDate="2024-09-01T00:00:00Z"),
+                          dated_file("Kit Demo Video.mp4", "/Kit v.1", "2019-03-02")])[0][0]
+    assert str(asset.uploaded_at) == "2024-09-01"
 
 
 def test_deleted_items_are_ignored():

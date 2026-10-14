@@ -195,6 +195,9 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
     #: Yes/No columns as the folder states them, applied after the filename
     #: inference in derive_video_facts so that an explicit value wins.
     stated: dict[str, tuple[bool | None, bool | None]] = {}
+    #: Folders that state an OriginalPublishDate; every other kit takes its
+    #: date from its files once they are attached (content_date, 2026-10-14).
+    dated: set[str] = set()
     taken: set[str] = set()
 
     # Pass 1 — top-level folders carrying a Demo Type become assets.
@@ -225,10 +228,11 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
                 consensus_uuid=m.clean_text(_field(fields, "consensus_uuid")),
                 brightcove_id=m.clean_text(_field(fields, "brightcove_id")),
                 thumbnail_url=m.parse_url(_field(fields, "thumbnail_url")),
-                # The content's own date when the folder states one; the
-                # folder's last edit otherwise, as before. Without this every
-                # migrated Gallery video would read as uploaded on the day of
-                # the migration and flood Latest Uploads (HLR-A8).
+                # The content's own date when the folder states one. Otherwise
+                # the folder's last edit, but only until the files are in:
+                # see content_date below. Without this every migrated Gallery
+                # video would read as uploaded on the day of the migration
+                # and flood Latest Uploads (HLR-A8).
                 uploaded_at=(m.as_date(_field(fields, "original_publish_date"))
                              or m.as_date(item.get("lastModifiedDateTime"))),
                 web_url=item.get("webUrl"),
@@ -236,6 +240,8 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
             )
             stated[name] = (m.as_bool(_field(fields, "customer_facing")),
                             m.as_bool(_field(fields, "has_audio")))
+            if m.as_date(_field(fields, "original_publish_date")):
+                dated.add(name)
         elif m.clean_text(_field(fields, "content_type")) == "CAD Model":
             # A standalone CAD dataset, not a demo -- no Demo Type, no
             # Segment, no managed-metadata Product column on this content
@@ -277,6 +283,9 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
     for name, asset in assets.items():
         m.derive_video_facts(asset)
         m.apply_stated_flags(asset, *stated.get(name, (None, None)))
+        if name not in dated:
+            # A folder's own dates are the library move, not the content.
+            asset["uploaded_at"] = m.content_date(asset) or asset.get("uploaded_at")
 
     result.assets = len(assets)
     return [Asset.model_validate(a) for a in assets.values()], result

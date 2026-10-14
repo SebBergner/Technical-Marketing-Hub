@@ -1,8 +1,8 @@
 /* The Migration page.
  *
- * Kept apart from hub-api.js and admin.js on purpose, like admin.js is kept
- * apart from hub-api.js: this page owns its own markup and shares nothing
- * that could break another page.
+ * Kept apart from the Hub page's script and admin.js on purpose, as admin.js
+ * is: this page owns its own markup and shares nothing that could break
+ * another page.
  *
  * A manager's view: how much has moved, when, how far the plan has got, and
  * what the content is. Everything on screen comes from one call per source --

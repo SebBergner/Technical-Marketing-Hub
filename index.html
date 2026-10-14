@@ -8,7 +8,7 @@
      the rule — which is precisely the flash of Elio's placeholder data Liwei
      kept seeing. A rule has to precede what it hides.
 
-     What is hidden is what hub-api.js rewrites from the live catalogue: the
+     What is hidden is what static/js/hub/ rewrites from the live catalogue: the
      centre rails, and the sidebar navigation with its hardcoded product list,
      logos and counts. Both are revealed together once real content is in
      place, and never otherwise — a blank screen is an honest failure, whereas
@@ -217,7 +217,7 @@
             <option value="ServiceMax">ServiceMax</option>
             <option value="Codebeamer">Codebeamer</option>
             <!-- fillSelect() keeps this label rather than the raw facet value
-                 "IPE" -- see UMBRELLA_DISPLAY in hub-api.js. Elio/Seb rename,
+                 "IPE" -- see UMBRELLA_DISPLAY in static/js/hub/nav.js. Elio/Seb rename,
                  2026-09-08; the backend still calls it IPE. -->
             <option value="IPE">PTC Ignite</option>
           </select>
@@ -281,7 +281,7 @@
 
     <div class="orion-thread" id="mainThread">
 
-      <!-- Segment landing page: rendered by hub-api.js when a segment is on -->
+      <!-- Segment landing page: rendered by static/js/hub/nav.js when a segment is on -->
       <div class="section hub-seg" id="hubSegmentPage" style="display:none;"></div>
 
       <!-- All Assets (filtered results) -->
@@ -643,4 +643,4 @@
 
 <div id="hubApiStatus" class="hub-api-status"></div>
 <script src="/static/js/hub-ui.js" defer></script>
-<script src="/static/hub-api.js" defer></script>
+<script type="module" src="/static/js/hub/main.js"></script>

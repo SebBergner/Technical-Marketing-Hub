@@ -388,7 +388,7 @@ Language 筛选、LDK 时长隐藏这些都已经上线，不再是待办。
    填进 `AUTH_CURATOR_GROUPS`，不然登录了也没人有 curator 权限，`/api/graph/sync`
    照样会被拒绝
 2. 做完①之后：
-   - 把 `static/hub-api.js` 里的 `SHARE_BUTTON_HIDDEN` 改成 `false`
+   - 把 `static/js/hub/cards.js` 里的 `SHARE_BUTTON_HIDDEN` 改成 `false`
    - 就能配一个有 curator 权限的账号/服务主体，加定时同步（Azure Timer 调
      `/api/graph/sync` 和 `/api/consensus/sync`）
 3. **在 workflow 里加测试步骤** —— 一行，能挡住坏代码上线（部署了 11 次都是

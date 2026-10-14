@@ -124,7 +124,7 @@ def test_only_the_listed_paths_are_open(oidc, fake, client):
     assert client.get("/api/version").status_code == 200
     assert client.get("/login").status_code == 302
     # A sample of what must not be: the page, its script, the docs, admin.
-    for path in ("/", "/static/hub-api.js", "/docs", "/openapi.json", "/admin",
+    for path in ("/", "/static/js/hub/main.js", "/docs", "/openapi.json", "/admin",
                  "/api/admin/session"):
         assert client.get(path).status_code in (302, 401), path
 
@@ -133,7 +133,7 @@ def test_a_browser_fetching_on_its_own_is_not_sent_to_sign_in(oidc, fake, client
     """Found in the first end-to-end run: the favicon was redirected to
     /login, started a second flow, and replaced the one in progress -- so the
     real return from Microsoft would have failed its state check."""
-    for path, mode in (("/favicon.ico", "no-cors"), ("/static/hub-api.js", "no-cors"),
+    for path, mode in (("/favicon.ico", "no-cors"), ("/static/js/hub/main.js", "no-cors"),
                        ("/", "cors"), ("/favicon.ico", None)):
         headers = {"Sec-Fetch-Mode": mode} if mode else {}
         assert client.get(path, headers=headers).status_code == 401, (path, mode)

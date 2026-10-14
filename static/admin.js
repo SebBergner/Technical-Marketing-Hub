@@ -1,7 +1,6 @@
 /* The Admin page.
  *
- * Kept apart from hub-api.js on purpose: that file's whole job is taking over
- * Elio's mock-up without disturbing it, and none of that applies here. This
+ * Kept apart from the Hub page's script (static/js/hub/) on purpose: this
  * page owns its own markup, so it can be plain and direct.
  *
  * Every number on screen comes from one call to /api/admin/overview. The page

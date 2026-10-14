@@ -376,7 +376,7 @@ secret is issued as a bcrypt hash and the token exchange rejects it, and even
 fixed, OAuth is V2 and V2 is read-only.
 
 This is also why the share button is hidden in the UI today
-(`SHARE_BUTTON_HIDDEN = true` in `static/hub-api.js`). **Flip it to `false`
+(`SHARE_BUTTON_HIDDEN = true` in `static/js/hub/cards.js`). **Flip it to `false`
 once this step is verified.**
 
 ### Step 2 — Create durable storage and point `DATA_DIR` at it
@@ -525,7 +525,7 @@ These were written as same-day follow-ups on 2026-09-03 and are **still not
 done** as of 2026-09-08 — carried forward rather than re-dated, so a future
 reader does not mistake "still open" for "just noticed":
 
-- **`SHARE_BUTTON_HIDDEN` is still `true`** in `static/hub-api.js`. Flipping
+- **`SHARE_BUTTON_HIDDEN` is still `true`** in `static/js/hub/cards.js`. Flipping
   it needs the curator/Easy-Auth gap (§1, point 3) closed first — enabling it
   before then would mean every DemoBoard is attributed to whatever fallback
   account `CONSENSUS_USER_EMAIL` names, not the person who clicked Share.

@@ -213,7 +213,7 @@ async def version():
 
 @app.get("/")
 async def index():
-    """The Hub's page, fed from the live API by static/hub-api.js.
+    """The Hub's page, fed from the live API by static/js/hub/ (main.js).
 
     It began as Elio's concept mock-up; since 2026-10-14 it is ours (Liwei:
     "only a concept reference"), and the mock content has been removed.

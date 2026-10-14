@@ -173,7 +173,7 @@ a:hover { text-decoration: underline; }
 .orion-side__brand .lockup { display: flex; align-items: center; gap: 8px; }
 .orion-side__body { flex: 1; overflow-y: auto; padding: 0 12px 12px; }
 .orion-side__foot { border-top: 1px solid var(--orion-border); padding: 8px 12px; }
-/* Sidebar foot additions, built by hub-api.js (buildSidebarFoot). Requested
+/* Sidebar foot additions, built by static/js/hub/nav.js (buildSidebarFoot). Requested
    by Seb 2026-09-22 for the team trial: somewhere to send feedback, and the
    build it is feedback about. */
 .hub-foot__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -688,7 +688,7 @@ video.hub-inline-player__media { object-fit: contain; }
   .vp-files__note { margin-top:10px; font-size:12px; color:var(--orion-text-3);
     line-height:1.5; }
 
-  /* A virtual machine's page, read from EXT-TDD (hub-api.js, renderVmCards).
+  /* A virtual machine's page, read from EXT-TDD (static/js/hub/vm.js, renderVmCards).
      Pages there follow no template, so everything here has to survive a page
      of two lines and a page of twelve sections equally. */
   .hub-vm-card .btn-ghost, .hub-vm-card .btn-primary-sm { flex:none; padding:8px 16px; }
@@ -1045,10 +1045,10 @@ video.hub-inline-player__media { object-fit: contain; }
   /* "Load more" under the results grid. A brand-new class Elio's file has no
      opinion on, so no ordering trap here the way the colour tokens had --
      nothing in the document sets .hub-load-more before this, and the button
-     is only ever created by hub-api.js, after this stylesheet has already
+     is only ever created by static/js/hub/filters.js, after this stylesheet has already
      been parsed. */
   /* The language tag a card gets when it isn't English -- see
-     addLanguageTag() in hub-api.js for why English itself is skipped, and
+     addLanguageTag() in static/js/hub/cards.js for why English itself is skipped, and
      why it lives on the thumbnail (2026-09-08: it used to sit in
      .asset-card__meta, a no-wrap flex row, and got silently clipped off the
      card whenever the platform badge and product/funnel text already filled

@@ -1,6 +1,6 @@
 /* The page's own behaviour: the request form, the share and style-example
- * modals, the card template hub-api.js fills, and the sidebar's view switches.
- * Split out of index.html 2026-10-14; loaded before static/hub-api.js. */
+ * modals, the card pool static/js/hub/ fills, and the sidebar's view switches.
+ * Split out of index.html 2026-10-14; loaded before static/js/hub/main.js. */
 function openShareModal(title, meta, uuid) {
   document.getElementById('shareAssetTitle').textContent = title;
   document.getElementById('shareAssetMeta').textContent = meta;
@@ -387,7 +387,7 @@ function computeProductScope() {
 function onStartingMaterialsChange(el) {
   document.getElementById('attachmentsSection').style.display = el.dataset.value === 'have' ? '' : 'none';
 }
-/* Replaced at runtime by hub-api.js, which keeps the File objects and uploads
+/* Replaced at runtime by static/js/hub/request.js, which keeps the File objects and uploads
    them. This version used to render a chip and then clear the input,
    discarding every file; it now refuses rather than pretending, for the case
    where that script fails to load. */
@@ -397,7 +397,7 @@ function handleAttachmentFiles(input) {
   list.innerHTML = '<span class="attach-warn">The Hub could not be reached, so '
     + 'files cannot be attached. Reload the page and try again.</span>';
 }
-/* Replaced at runtime by hub-api.js, which actually posts the answers. This
+/* Replaced at runtime by static/js/hub/request.js, which actually posts the answers. This
    remains as the fallback for the case where that script fails to load: it is
    better to say the Hub is unavailable than to show a success screen for a
    request that went nowhere, which is what this function used to do. */
@@ -411,13 +411,13 @@ function submitAssetRequest(e) {
   }
 }
 
-// Filled with real cards by static/hub-api.js, which owns searching,
+// Filled with real cards by static/js/hub/, which owns searching,
 // filtering and Reset (window.hubApplyFilters / window.hubResetFilters).
 var HUB_ASSET_POOL = null;
 
 /* ── One listener for every control on the page (2026-10-14) ──────────────
  * The markup names what a control does (data-action="..."); this table says
- * how. Functions are looked up on window at click time, so static/hub-api.js
+ * how. Functions are looked up on window at click time, so static/js/hub/
  * can still wrap one (openRequestView, submitAssetRequest...) and be called.
  * Replaces the inline onclick attributes the concept mock-up carried. */
 var HUB_ACTIONS = {

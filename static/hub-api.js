@@ -172,47 +172,6 @@
    * an old pre-rebrand Creo name, and repeating it on nearly every tile is
    * noise (Liwei, 2026-09-10).
    */
-  var TAGS_CSS =
-    // One row, always there, so every card's title and text line up whether
-    // it carries three tags or none (one line tall; a long customer name
-    // ellipses rather than wrapping).
-    ".hub-card-pills{display:flex;gap:6px;margin:2px 0 6px;min-height:22px;overflow:hidden}" +
-    // One style for every tag, from theme tokens only, so it reads on both
-    // the light and the dark ground (the "indigo" tokens are PTC green, and
-    // the soft ones have no dark counterpart -- see index.html).
-    ".hub-pill{display:inline-flex;align-items:center;padding:1px 9px;border-radius:999px;" +
-    "font-size:11.5px;font-weight:500;line-height:18px;white-space:nowrap;min-width:0;" +
-    "overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;" +
-    "background:var(--orion-surface-2);color:var(--orion-text-2);border:1px solid var(--orion-border-md)}" +
-    // Internal (2026-10-07): amber on both grounds, so it reads as a caution
-    // rather than one more tag.
-    ".hub-pill--internal{color:#b5641a;background:rgba(214,140,40,.13);" +
-    "border-color:rgba(214,140,40,.5);font-weight:600}" +
-    ".hub-access-btn{margin-left:2px;padding:1px 9px;border-radius:999px;font:inherit;" +
-    "font-size:11.5px;line-height:18px;cursor:pointer;background:none;" +
-    "color:var(--orion-text-2);border:1px dashed var(--orion-border-md)}" +
-    ".hub-access-btn:hover{color:var(--orion-text);border-style:solid}" +
-    ".hub-card-line{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}" +
-    ".hub-facts{margin-top:14px}" +
-    ".hub-facts__table{width:100%;border-collapse:collapse;font-size:13px}" +
-    ".hub-facts__table th{width:170px;text-align:left;font-weight:500;color:var(--orion-text-2);" +
-    "padding:8px 12px 8px 0;vertical-align:top;border-top:1px solid var(--orion-border)}" +
-    ".hub-facts__table td{padding:8px 0;color:var(--orion-text);border-top:1px solid var(--orion-border)}" +
-    ".hub-facts__table tr:first-child th,.hub-facts__table tr:first-child td{border-top:none}" +
-    ".hub-facts__table td .orion-badge{margin:0 6px 4px 0}" +
-    ".hub-facts__long{margin-top:14px;padding-top:12px;border-top:1px solid var(--orion-border)}" +
-    ".hub-facts__long-label{font-size:13px;font-weight:500;color:var(--orion-text-2);margin-bottom:6px}" +
-    ".hub-facts__long-text{font-size:13.5px;line-height:1.6;color:var(--orion-text);white-space:pre-line}" +
-    ".hub-total{margin-left:10px;font-size:13px;font-weight:500;color:var(--orion-text-3);" +
-    "vertical-align:middle;white-space:nowrap}";
-
-  function ensureTagsCss() {
-    if (document.getElementById("hubTagsCss")) return;
-    var style = document.createElement("style");
-    style.id = "hubTagsCss";
-    style.textContent = TAGS_CSS;
-    (document.head || document.body).appendChild(style);
-  }
 
   /* The Video Type, only for a video (Liwei, 2026-10-01). `content_depth` is
    * also set on many LDKs and VDKs, and "Video type: Technical Teaser" on a
@@ -244,7 +203,6 @@
   }
 
   function renderCardTags(card, a) {
-    ensureTagsCss();
     var meta = card.querySelector(".asset-card__meta");
     if (!meta) return;
 
@@ -703,35 +661,10 @@
    * The left nav's product shortcuts are unchanged: they are the main
    * products on purpose.
    */
-  var COMBO_CSS =
-    ".hub-combo__btn{flex:1;border:none;background:transparent;font:inherit;font-size:13px;" +
-    "color:var(--orion-text-2);text-align:left;cursor:pointer;padding:2px 30px 2px 6px;" +
-    "white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}" +
-    ".hub-combo__btn:focus-visible{outline:2px solid var(--orion-link);outline-offset:2px;border-radius:4px}" +
-    ".hub-combo__pop{position:absolute;top:calc(100% + 4px);left:0;z-index:60;min-width:260px;" +
-    "background:var(--orion-surface);border:1px solid var(--orion-border-md);" +
-    "border-radius:var(--orion-radius-sm);box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px;cursor:default}" +
-    ".hub-combo__search{width:100%;box-sizing:border-box;font:inherit;font-size:13px;padding:7px 9px;" +
-    "border:1px solid var(--orion-border-md);border-radius:6px;background:var(--orion-surface-2);" +
-    "color:var(--orion-text);outline:none}" +
-    ".hub-combo__search:focus{border-color:var(--orion-link)}" +
-    ".hub-combo__list{list-style:none;margin:6px 0 0;padding:0;max-height:280px;overflow-y:auto}" +
-    ".hub-combo__opt{padding:6px 9px;border-radius:4px;cursor:pointer;color:var(--orion-text);" +
-    "font-size:13px;white-space:nowrap}" +
-    ".hub-combo__opt.is-active{background:var(--orion-surface-3)}" +
-    ".hub-combo__opt[aria-selected=true]{font-weight:600}" +
-    ".hub-combo__none{padding:8px 9px;color:var(--orion-text-3);font-size:13px}";
-
   function enhanceSearchableSelect(id, placeholder, noneText) {
     var sel = document.getElementById(id);
     if (!sel || sel.dataset.hubCombo) return;
     sel.dataset.hubCombo = "1";
-    if (!document.getElementById("hubComboCss")) {
-      var style = document.createElement("style");
-      style.id = "hubComboCss";
-      style.textContent = COMBO_CSS;
-      document.head ? document.head.appendChild(style) : document.body.appendChild(style);
-    }
     var pill = sel.parentNode;
     var btn = document.createElement("button");
     btn.type = "button";
@@ -878,38 +811,6 @@
                          vdk: ["VDK", "VDKs"], cad_model: ["CAD dataset", "CAD datasets"],
                          vm: ["virtual machine", "virtual machines"] };
 
-  var HOME_CSS =
-    "#hubHome .section{margin-bottom:28px}" +
-    ".hub-home-types{display:flex;flex-wrap:wrap;gap:8px}" +
-    ".hub-home-type{display:inline-flex;align-items:baseline;gap:6px;padding:8px 14px;font:inherit;" +
-    "font-size:13px;color:var(--orion-text-2);background:var(--orion-surface);" +
-    "border:1px solid var(--orion-border-md);border-radius:999px;cursor:pointer}" +
-    ".hub-home-type b{font-size:15px;font-weight:700;color:var(--orion-text);font-variant-numeric:tabular-nums}" +
-    ".hub-home-type:hover{border-color:var(--orion-indigo);color:var(--orion-text)}" +
-    ".hub-home-products{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}" +
-    ".hub-home-product{display:flex;align-items:center;gap:12px;padding:14px 16px;text-align:left;font:inherit;" +
-    "background:var(--orion-surface);border:1px solid var(--orion-border-md);border-radius:var(--orion-radius);cursor:pointer}" +
-    ".hub-home-product:hover{border-color:var(--orion-indigo)}" +
-    ".hub-home-product .nav-mark{width:26px;height:26px;flex:none}" +
-    ".hub-home-product__name{font-size:14px;font-weight:650;color:var(--orion-text)}" +
-    ".hub-home-product__meta{font-size:12px;color:var(--orion-text-3);font-variant-numeric:tabular-nums}" +
-    ".hub-home-recent{display:flex;flex-direction:column;background:var(--orion-surface);" +
-    "border:1px solid var(--orion-border);border-radius:var(--orion-radius)}" +
-    ".hub-home-recent__row{display:flex;align-items:center;gap:14px;padding:10px 14px;text-decoration:none;" +
-    "color:inherit;border-top:1px solid var(--orion-border)}" +
-    ".hub-home-recent__row:first-child{border-top:none}" +
-    ".hub-home-recent__row:hover{background:var(--orion-surface-2)}" +
-    ".hub-home-recent__thumb{position:relative;flex:none;width:96px;height:54px;border-radius:6px;overflow:hidden;" +
-    "background:#000 center/cover no-repeat}" +
-    ".hub-home-recent__text{flex:1;min-width:0}" +
-    ".hub-home-recent__title{font-size:13.5px;font-weight:600;color:var(--orion-text);overflow:hidden;" +
-    "text-overflow:ellipsis;white-space:nowrap}" +
-    ".hub-home-recent__meta{font-size:12px;color:var(--orion-text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
-    ".hub-home-recent__when{flex:none;font-size:12px;color:var(--orion-text-3);white-space:nowrap}" +
-    ".hub-home-more{border:none;background:none;font:inherit;font-size:13px;font-weight:700;" +
-    "color:var(--orion-indigo);cursor:pointer;padding:0}" +
-    ".hub-home-more:hover{text-decoration:underline}";
-
   function homeSection(id, icon, title, sub) {
     var section = document.createElement("div");
     section.className = "section";
@@ -953,12 +854,6 @@
   function buildHome(assets, facets) {
     var thread = document.getElementById("mainThread");
     if (!thread || document.getElementById("hubHome")) return;
-    if (!document.getElementById("hubHomeCss")) {
-      var style = document.createElement("style");
-      style.id = "hubHomeCss";
-      style.textContent = HOME_CSS;
-      (document.head || document.body).appendChild(style);
-    }
     var home = document.createElement("div");
     home.id = "hubHome";
     thread.appendChild(home);
@@ -1796,51 +1691,9 @@
     ["hubFilterArchived", "Archived"]
   ];
 
-  var FILTER_BAR_CSS =
-    "#mainTopbar #hubResetBtn{display:none!important}" +
-    // .hero-search is display:flex, which beats the hidden attribute.
-    ".hub-more-panel[hidden]{display:none}" +
-    // Each dropdown as wide as what it shows, not as its longest option
-    // ("Virtual Machine (7)" made Asset Type 230px while reading "All"),
-    // so the search box keeps the room.
-    "#mainTopbar .filter-pill select{field-sizing:content}" +
-    "#mainTopbar .hero-search__field{min-width:360px}" +
-    // Built to the filter pills' own measurements (Seb, 2026-10-01: it
-    // "looks strange" beside them): same 46px height, the value colour for
-    // its text, the arrow at the same inset.
-    ".hub-more-btn{position:relative;display:inline-flex;align-items:center;gap:8px;" +
-    "padding:10px 32px 10px 13px;font:inherit;font-size:13px;line-height:24px;" +
-    "color:var(--orion-text);background:var(--orion-surface);border:1px solid var(--orion-border-md);" +
-    "border-radius:var(--orion-radius-sm);cursor:pointer;white-space:nowrap}" +
-    ".hub-more-btn:hover,.hub-more-btn[aria-expanded=true]{border-color:var(--orion-indigo)}" +
-    ".hub-more-btn svg{position:absolute;right:11px;width:14px;height:14px;color:var(--orion-text-3);" +
-    "pointer-events:none;transition:transform .15s}" +
-    ".hub-more-btn[aria-expanded=true] svg{transform:rotate(180deg)}" +
-    ".hub-more-btn__n{min-width:18px;padding:0 5px;border-radius:999px;background:var(--orion-indigo);color:#fff;" +
-    "font-size:11px;font-weight:700;line-height:18px;text-align:center}" +
-    ".hub-more-panel{margin-top:10px}" +
-    ".hub-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px}" +
-    ".hub-chips:empty{display:none}" +
-    ".hub-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 4px 3px 10px;font:inherit;font-size:12.5px;" +
-    "color:var(--orion-text);background:var(--orion-indigo-soft);border:1px solid var(--orion-indigo);" +
-    "border-radius:999px;cursor:pointer}" +
-    ".hub-chip b{font-weight:500;color:var(--orion-text-2)}" +
-    ".hub-chip__x{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;" +
-    "border-radius:50%;font-size:14px;line-height:1;color:var(--orion-text-2)}" +
-    ".hub-chip:hover .hub-chip__x{background:var(--orion-indigo);color:#fff}" +
-    ".hub-chips__clear{border:none;background:none;font:inherit;font-size:12.5px;font-weight:700;" +
-    "color:var(--orion-indigo);cursor:pointer;padding:3px 6px}" +
-    ".hub-chips__clear:hover{text-decoration:underline}";
-
   function wireFilterBar() {
     var bar = document.querySelector("#mainTopbar .hero-search");
     if (!bar || document.getElementById("hubMoreFilters")) return;
-    if (!document.getElementById("hubFilterBarCss")) {
-      var style = document.createElement("style");
-      style.id = "hubFilterBarCss";
-      style.textContent = FILTER_BAR_CSS;
-      (document.head || document.body).appendChild(style);
-    }
 
     var panel = document.createElement("div");
     panel.className = "hero-search hub-more-panel";
@@ -2548,7 +2401,6 @@
      * badge -- Serge, via Liwei 2026-09-29. */
     var meta = document.getElementById("vpMeta");
     if (meta) {
-      ensureTagsCss();
       meta.innerHTML = "";
       var typeLabel = (TYPE_CHIP[asset.type] || [])[1];
       if (typeLabel) meta.appendChild(pill(typeLabel, "customer"));
@@ -3600,43 +3452,11 @@
    * Built once by moving Elio's own elements -- his .vp-player and his
    * Value Roadmap card -- into wrappers, so index.html is untouched and the
    * page is reused for every asset as before. */
-  var DETAIL_CSS =
-    ".hub-vp-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,380px);gap:20px;" +
-    "align-items:start;margin-bottom:22px}" +
-    ".hub-vp-top .vp-player{margin-bottom:0;max-height:none}" +
-    // The side column is exactly as tall as the preview: the card fills it
-    // and scrolls inside rather than stretching the row.
-    ".hub-vp-side{position:relative;align-self:stretch;min-height:240px}" +
-    ".hub-vp-side .hub-facts{position:absolute;inset:0;margin:0;overflow-y:auto;padding:18px 20px}" +
-    ".hub-vp-side .hub-facts__table th{width:118px}" +
-    ".hub-sections{margin-top:6px}" +
-    ".hub-sections__tabs{display:flex;gap:6px;border-bottom:1px solid var(--orion-border);margin-bottom:14px}" +
-    ".hub-sections__tab{display:inline-flex;align-items:center;gap:7px;border:none;background:none;font:inherit;" +
-    "font-size:14px;font-weight:650;color:var(--orion-text-3);padding:10px 14px;margin-bottom:-1px;" +
-    "border-bottom:2px solid transparent;cursor:pointer}" +
-    ".hub-sections__tab svg{width:16px;height:16px}" +
-    ".hub-sections__tab:hover:not(:disabled){color:var(--orion-text)}" +
-    ".hub-sections__tab--active{color:var(--orion-text);border-bottom-color:var(--orion-indigo)}" +
-    ".hub-sections__tab--active svg{color:var(--orion-indigo)}" +
-    ".hub-sections__tab:disabled{opacity:.45;cursor:default}" +
-    // The tab names the section, so the card's own title would repeat it;
-    // what else sits in the head (the file summary, Re-index) stays.
-    ".hub-sections .vp-card__head-title{display:none}" +
-    ".hub-sections .vp-card__head{justify-content:flex-end}" +
-    "@media (max-width:1180px){.hub-vp-top{grid-template-columns:1fr}" +
-    ".hub-vp-side{min-height:0}.hub-vp-side .hub-facts{position:static}}";
-
   var SECTIONS = [{ key: "files", label: "Files", icon: "i-file-text", pane: "vpPaneFiles" },
                   { key: "roadmap", label: "Value Roadmap", icon: "i-target", pane: "vpPaneRoadmap" }];
 
   function ensureDetailLayout(page) {
     if (document.getElementById("vpSections")) return;
-    if (!document.getElementById("hubDetailCss")) {
-      var style = document.createElement("style");
-      style.id = "hubDetailCss";
-      style.textContent = DETAIL_CSS;
-      (document.head || document.body).appendChild(style);
-    }
 
     var player = page.querySelector(".vp-player");
     if (player) {
@@ -3724,7 +3544,6 @@
   }
 
   function renderFactsTable(page, asset) {
-    ensureTagsCss();
     var card = document.getElementById("vpFacts");
     if (!card) {
       card = document.createElement("div");
@@ -4132,106 +3951,6 @@
   var ACT_RANGES = [["30", "30 days"], ["90", "90 days"], ["365", "12 months"]];
   var actState = { range: "30", seq: 0 };
 
-  var ACTIVITY_CSS =
-    "#hubActivityPage .vp-head{display:flex;justify-content:space-between;align-items:flex-end;" +
-    "gap:16px;flex-wrap:wrap}" +
-    ".hub-act__ranges{display:inline-flex;padding:3px;gap:2px;border-radius:var(--orion-radius-pill);" +
-    "background:var(--orion-surface-2);border:1px solid var(--orion-border)}" +
-    ".hub-act__ranges button{font:inherit;font-size:12.5px;font-weight:500;border:none;cursor:pointer;" +
-    "padding:5px 13px;border-radius:var(--orion-radius-pill);background:none;color:var(--orion-text-2)}" +
-    ".hub-act__ranges button[aria-pressed=true]{background:var(--orion-surface);color:var(--orion-text);" +
-    "font-weight:600;box-shadow:var(--orion-shadow)}" +
-    ".hub-act{display:grid;gap:16px;margin-top:18px;transition:opacity .15s}" +
-    ".hub-act--loading{opacity:.55}" +
-    ".hub-act__card{background:var(--orion-surface);border:1px solid var(--orion-border);" +
-    "border-radius:var(--orion-radius);box-shadow:var(--orion-shadow);padding:18px 20px;min-width:0}" +
-    ".hub-act__card h3{margin:0 0 2px;font-size:14px;font-weight:600;color:var(--orion-text)}" +
-    ".hub-act__sub{font-size:12.5px;color:var(--orion-text-3);margin-bottom:14px}" +
-    ".hub-act__top{display:grid;gap:16px;grid-template-columns:minmax(260px,1.25fr) repeat(3,minmax(150px,1fr))}" +
-    "@media (max-width:1100px){.hub-act__top{grid-template-columns:repeat(2,minmax(0,1fr))}}" +
-    "@media (max-width:620px){.hub-act__top{grid-template-columns:1fr}}" +
-    // The hero: one number, big, in the Hub's own green wash.
-    ".hub-act__hero{background:linear-gradient(135deg,var(--orion-indigo-soft),var(--orion-surface) 70%);" +
-    "border-color:color-mix(in srgb,var(--orion-indigo) 30%,var(--orion-border))}" +
-    ".hub-act__hero-n{font-size:52px;line-height:1.05;font-weight:700;letter-spacing:-.02em;" +
-    "color:var(--orion-text);margin:6px 0 4px}" +
-    ".hub-act__label{font-size:12.5px;font-weight:500;color:var(--orion-text-2)}" +
-    ".hub-act__n{font-size:28px;line-height:1.15;font-weight:700;color:var(--orion-text);margin:4px 0}" +
-    ".hub-act__delta{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:600}" +
-    ".hub-act__delta--up{color:var(--orion-green-ink)}.hub-act__delta--down{color:var(--orion-danger-ink)}" +
-    ".hub-act__delta--flat{color:var(--orion-text-3)}" +
-    ".hub-act__delta span{font-weight:400;color:var(--orion-text-3)}" +
-    ".hub-act__spark{display:block;margin-top:10px;width:100%;height:30px}" +
-    ".hub-act__mid{display:grid;gap:16px;grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr)}" +
-    "@media (max-width:1100px){.hub-act__mid{grid-template-columns:1fr}}" +
-    // The daily chart.
-    ".hub-act__chart{position:relative}" +
-    ".hub-act__chart svg{display:block;width:100%;height:240px;overflow:visible}" +
-    ".hub-act__chart .grid line{stroke:var(--orion-border);stroke-width:1}" +
-    ".hub-act__chart text{font-size:11px;fill:var(--orion-text-3);font-family:var(--orion-font)}" +
-    ".hub-act__tip{position:absolute;pointer-events:none;background:var(--orion-surface);" +
-    "border:1px solid var(--orion-border-md);border-radius:var(--orion-radius-sm);" +
-    "box-shadow:0 4px 14px rgba(16,24,40,.14);padding:8px 10px;font-size:12px;min-width:150px;" +
-    "color:var(--orion-text-2);transform:translate(-50%,-110%);white-space:nowrap}" +
-    ".hub-act__tip b{display:block;font-size:15px;color:var(--orion-text)}" +
-    ".hub-act__tip .k{display:inline-block;width:10px;height:2px;background:var(--orion-indigo);" +
-    "vertical-align:middle;margin-right:5px}" +
-    ".hub-act details{margin-top:10px;font-size:12.5px;color:var(--orion-text-2)}" +
-    ".hub-act details summary{cursor:pointer;color:var(--orion-text-3)}" +
-    ".hub-act table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}" +
-    ".hub-act th{text-align:left;font-weight:600;color:var(--orion-text-3);padding:4px 6px}" +
-    ".hub-act td{padding:4px 6px;border-top:1px solid var(--orion-border);color:var(--orion-text-2)}" +
-    ".hub-act .r{text-align:right;font-variant-numeric:tabular-nums}" +
-    // Leaderboard.
-    ".hub-act__lb{list-style:none;margin:0;padding:0;display:grid;gap:4px}" +
-    ".hub-act__lb li{display:grid;grid-template-columns:30px 36px minmax(0,1fr) minmax(90px,38%);" +
-    "align-items:center;gap:10px;padding:7px 6px;border-radius:var(--orion-radius-sm)}" +
-    ".hub-act__lb li:hover{background:var(--orion-surface-2)}" +
-    ".hub-act__rank{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;" +
-    "justify-content:center;font-size:12px;font-weight:700;color:var(--orion-text-2);" +
-    "background:var(--orion-surface-3)}" +
-    ".hub-act__rank--1{background:linear-gradient(135deg,#f7d774,#d4a017);color:#5a4200}" +
-    ".hub-act__rank--2{background:linear-gradient(135deg,#eceff3,#b8c0cc);color:#3b4350}" +
-    ".hub-act__rank--3{background:linear-gradient(135deg,#f1c6a0,#c47f45);color:#4a2a10}" +
-    ".hub-act__avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;" +
-    "justify-content:center;font-size:12.5px;font-weight:700;color:var(--orion-indigo);" +
-    "background:var(--orion-indigo-soft);border:1px solid color-mix(in srgb,var(--orion-indigo) 25%,transparent)}" +
-    ".hub-act__who{min-width:0}.hub-act__who b{display:block;font-size:13.5px;font-weight:600;" +
-    "color:var(--orion-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
-    ".hub-act__who span{font-size:12px;color:var(--orion-text-3)}" +
-    ".hub-act__bar{display:flex;align-items:center;gap:8px}" +
-    ".hub-act__track{flex:1;height:8px;border-radius:0 4px 4px 0;background:var(--orion-surface-3);overflow:hidden}" +
-    ".hub-act__fill{height:100%;border-radius:0 4px 4px 0;background:var(--orion-indigo)}" +
-    ".hub-act__val{font-size:13px;font-weight:600;color:var(--orion-text);min-width:28px;text-align:right;" +
-    "font-variant-numeric:tabular-nums}" +
-    // Teams.
-    ".hub-act__team{padding:10px 0;border-top:1px solid var(--orion-border)}" +
-    ".hub-act__team:first-of-type{border-top:none;padding-top:2px}" +
-    ".hub-act__team-head{display:flex;justify-content:space-between;gap:8px;font-size:13.5px}" +
-    ".hub-act__team-head b{font-weight:600;color:var(--orion-text)}" +
-    ".hub-act__team-head span{color:var(--orion-text-3);font-size:12.5px}" +
-    ".hub-act__meter{height:6px;border-radius:999px;margin-top:7px;" +
-    "background:color-mix(in srgb,var(--orion-indigo) 14%,var(--orion-surface))}" +
-    ".hub-act__meter i{display:block;height:100%;border-radius:999px;background:var(--orion-indigo)}" +
-    ".hub-act__team-foot{font-size:12px;color:var(--orion-text-3);margin-top:5px}" +
-    // Most used content.
-    ".hub-act__content{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}" +
-    ".hub-act__item{display:block;text-decoration:none;color:inherit;border:1px solid var(--orion-border);" +
-    "border-radius:var(--orion-radius);overflow:hidden;background:var(--orion-surface);" +
-    "transition:transform .12s,box-shadow .12s}" +
-    ".hub-act__item:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(16,24,40,.12)}" +
-    ".hub-act__thumb{position:relative;height:108px;background:var(--orion-surface-3);" +
-    "background-size:cover;background-position:center}" +
-    ".hub-act__num{position:absolute;top:8px;left:8px;min-width:24px;height:24px;padding:0 6px;" +
-    "border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:12px;" +
-    "font-weight:700;color:#fff;background:rgba(31,35,41,.82)}" +
-    ".hub-act__item-body{padding:10px 12px}" +
-    ".hub-act__item-title{font-size:13px;font-weight:600;color:var(--orion-text);line-height:1.35;" +
-    "display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:35px}" +
-    ".hub-act__item-meta{font-size:12px;color:var(--orion-text-3);margin-top:6px}" +
-    ".hub-act__empty{font-size:13px;color:var(--orion-text-3);padding:8px 0}" +
-    ".hub-act__foot{font-size:12px;color:var(--orion-text-3);line-height:1.6;margin:4px 2px 24px}";
-
   function actEl(tag, cls, text) {
     var n = document.createElement(tag);
     if (cls) n.className = cls;
@@ -4261,12 +3980,6 @@
   function buildActivityPage() {
     var page = document.getElementById("hubActivityPage");
     if (page) return page;
-    if (!document.getElementById("hubActivityCss")) {
-      var style = document.createElement("style");
-      style.id = "hubActivityCss";
-      style.textContent = ACTIVITY_CSS;
-      (document.head || document.body).appendChild(style);
-    }
     page = document.createElement("div");
     page.className = "video-preview-page";
     page.id = "hubActivityPage";
@@ -4835,96 +4548,6 @@
 
   function advancedHash(q) { return "#/search/" + encodeURIComponent(q || ""); }
 
-  var ADV_CSS =
-    // Inside the search field, at its right end, set off by a divider
-    // (Liwei, 2026-10-01): part of the search, the way Gmail and Drive put
-    // their search options in the box, rather than a fifth control beside
-    // the filters it is not one of.
-    ".hub-adv-open{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;margin:-4px -6px -4px 4px;" +
-    "padding:4px 6px 4px 12px;border:none;border-left:1px solid var(--orion-border-md);border-radius:0;" +
-    "background:none;color:var(--orion-indigo);font:inherit;font-size:12.5px;font-weight:600;" +
-    "cursor:pointer;white-space:nowrap}" +
-    ".hub-adv-open:hover{text-decoration:underline}" +
-    ".hub-adv-open:focus-visible{outline:2px solid var(--orion-indigo);outline-offset:2px}" +
-    // PTC green, not blue (Liwei, 2026-09-30). index.html colours these with
-    // var(--orion-accent, #5b6cff), and --orion-accent is defined nowhere, so
-    // the blue fallback always showed. The ids raise specificity: this sheet
-    // sits in <head>, before index.html's own rules in <body>.
-    "#hubSuggest .hub-suggest__btn:hover{border-color:var(--orion-indigo)}" +
-    "#hubSuggest .hub-suggest__btn--page{border-color:var(--orion-indigo);color:var(--orion-indigo)}" +
-    "#hubSuggest .hub-suggest__btn--page:hover{background:var(--orion-indigo-soft)}" +
-    "body .hub-seg__fam:hover{border-color:var(--orion-indigo)}" +
-    ".hub-adv__bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0 8px}" +
-    ".hub-adv__bar .hero-search__field{flex:1 1 320px}" +
-    ".hub-adv__summary{font-size:12.5px;color:var(--orion-text-3);margin:4px 0 14px;min-height:18px}" +
-    ".hub-adv__list{display:flex;flex-direction:column;gap:12px}" +
-    ".hub-adv__hit{display:flex;gap:18px;padding:16px 18px;background:var(--orion-surface-2);" +
-    "border:1px solid var(--orion-border);border-radius:var(--orion-radius)}" +
-    ".hub-adv__thumb{position:relative;flex:0 0 160px;height:90px;border-radius:6px;overflow:hidden;" +
-    "background:#000 center/cover no-repeat;display:block}" +
-    ".hub-adv__main{flex:1;min-width:0}" +
-    ".hub-adv__head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}" +
-    "#productScopeResult.hub-derived--pending{border-color:var(--orion-border-md);background:var(--orion-surface-2)}" +
-    "#productScopeResult.hub-derived--pending .derived-output__label{color:var(--orion-text-3)}" +
-    "#productScopeResult.hub-derived--pending .derived-output__value{color:var(--orion-text-2);font-weight:500}" +
-    ".hub-page-link{align-self:center;font-size:12.5px;color:var(--orion-text-3);text-decoration:none;" +
-    "white-space:nowrap;padding:0 4px}" +
-    ".hub-page-link:hover{color:var(--orion-link);text-decoration:underline}" +
-    ".hub-adv__count{margin-left:auto;font-size:12px;color:var(--orion-text-3);white-space:nowrap;" +
-    "font-variant-numeric:tabular-nums}" +
-    // The sidebar's logo and name go Home (wireBrandHome).
-    ".orion-side__brand .lockup.hub-brand-home{cursor:pointer}" +
-    ".orion-side__brand .lockup.hub-brand-home:hover{color:var(--orion-indigo)}" +
-    ".hub-adv__title{font-size:15px;font-weight:650;color:var(--orion-text);text-decoration:none}" +
-    ".hub-adv__title:hover{color:var(--orion-link);text-decoration:underline}" +
-    ".hub-adv__desc{margin:6px 0 8px;font-size:12.5px;line-height:1.6;color:var(--orion-text-2);" +
-    "display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}" +
-    ".hub-adv__tags{display:flex;flex-wrap:wrap;gap:6px}" +
-    ".hub-adv__files{margin-top:12px;padding-top:10px;border-top:1px dashed var(--orion-border-md)}" +
-    ".hub-adv__files-head{font-size:12px;font-weight:600;color:var(--orion-text-2);margin-bottom:4px}" +
-    ".hub-adv__more{display:flex;justify-content:center;margin:18px 0}" +
-    ".hub-hl{background:#fde68a;color:#1f2937;border-radius:2px;padding:0 1px}" +
-    ".hub-pill.hub-pill--hit{border-color:#d9a400}" +
-    // Details page: the Videos / Documents tabs over the file list.
-    ".hub-files-tabs{display:flex;gap:4px;margin:4px 0 6px;border-bottom:1px solid var(--orion-border)}" +
-    ".hub-files-tab{border:none;background:none;font:inherit;font-size:13px;font-weight:600;" +
-    "color:var(--orion-text-3);padding:8px 12px;margin-bottom:-1px;border-bottom:2px solid transparent;cursor:pointer}" +
-    ".hub-files-tab:hover:not(:disabled){color:var(--orion-text)}" +
-    ".hub-files-tab--active{color:var(--orion-text);border-bottom-color:var(--orion-indigo)}" +
-    ".hub-files-tab:disabled{opacity:.45;cursor:default}" +
-    // Share, right of Download: same shape, neutral, so Download stays the
-    // primary action of the row.
-    ".vp-file__share{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;padding:4px 10px;" +
-    "font:inherit;font-size:11.5px;font-weight:700;color:var(--orion-text-2);background:var(--orion-surface);" +
-    "border:1px solid var(--orion-border-md);border-radius:var(--orion-radius-pill);cursor:pointer;white-space:nowrap}" +
-    ".vp-file__share:hover{color:var(--orion-text);border-color:var(--orion-text-3)}" +
-    ".vp-file__share svg{width:12px;height:12px}" +
-    ".hub-file-preview__actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex:none}" +
-    ".hub-file-preview__actions + .hub-preview__close{margin-left:4px}" +
-    ".hub-preview__bar .hub-preview__title{min-width:0}" +
-    ".hub-preview__bar .hub-file-preview__download{margin:0;width:auto;padding:5px 12px;font-size:12px}" +
-    ".hub-preview__bar .hub-file-preview__share{margin:0;width:auto;padding:5px 12px;font-size:12px}" +
-    ".hub-file-preview__share{margin-top:8px;width:100%;display:flex;align-items:center;justify-content:center;" +
-    "gap:6px;padding:8px 12px;font:inherit;font-size:12.5px;font-weight:700;color:var(--orion-text-2);" +
-    "background:var(--orion-surface);border:1px solid var(--orion-border-md);border-radius:var(--orion-radius-sm);cursor:pointer}" +
-    ".hub-file-preview__share:hover{color:var(--orion-text);border-color:var(--orion-text-3)}" +
-    ".hub-file-preview__share svg{width:13px;height:13px}" +
-    ".hub-file-preview__stand-in{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;" +
-    "justify-content:center;gap:12px;padding:32px;text-align:center;background:var(--orion-surface-2);color:var(--orion-text-2)}" +
-    ".hub-file-preview__stand-in>svg{width:44px;height:44px;color:var(--orion-text-3)}" +
-    ".hub-file-preview__stand-in-name{font-size:15px;font-weight:600;color:var(--orion-text);overflow-wrap:anywhere}" +
-    ".hub-file-preview__stand-in-note{font-size:12.5px;max-width:420px;line-height:1.5}" +
-    ".hub-file-preview__stand-in .btn-primary-sm{flex:none;text-decoration:none}" +
-    "@media (max-width:640px){.hub-adv__hit{flex-direction:column}.hub-adv__thumb{flex-basis:auto;height:140px}" +
-    ".vp-file{flex-wrap:wrap}.vp-file__facts{margin-left:0;flex-basis:100%;order:3}}";
-
-  function ensureAdvCss() {
-    if (document.getElementById("hubAdvCss")) return;
-    var style = document.createElement("style");
-    style.id = "hubAdvCss";
-    style.textContent = ADV_CSS;
-    (document.head || document.body).appendChild(style);
-  }
 
   /* The query's words, split the way the server splits them
    * (relevance.terms: letters and digits, underscore a separator). */
@@ -4960,8 +4583,6 @@
   function buildAdvancedPage() {
     var page = document.getElementById("hubAdvancedPage");
     if (page) return page;
-    ensureAdvCss();
-    ensureTagsCss();
     page = document.createElement("div");
     page.className = "video-preview-page";
     page.id = "hubAdvancedPage";
@@ -5223,7 +4844,6 @@
   }
 
   function wireAdvancedSearch() {
-    ensureAdvCss();
     wireBrandHome();
     // Entry 1: beside the main search box.
     var field = document.querySelector("#mainTopbar .hero-search__field");
@@ -6280,7 +5900,6 @@
   function showTotal(count) {
     var title = document.querySelector("#mainTopbar .orion-title");
     if (!title) return;
-    ensureTagsCss();
     var el = document.getElementById("hubTotal");
     if (!el) {
       el = document.createElement("span");
@@ -6400,47 +6019,6 @@
     check: '<circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.4 2.4 4.6-4.9"/>'
   };
 
-  var AGE_CSS =
-    ".hub-age{display:inline-flex;align-items:center;gap:4px;padding:2px 8px 2px 6px;" +
-    "border-radius:999px;font-size:11px;font-weight:600;line-height:16px;white-space:nowrap;" +
-    "border:1px solid transparent}" +
-    ".hub-age svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;" +
-    "stroke-linecap:round;stroke-linejoin:round}" +
-    ".hub-age--new{color:#1d7a35;background:#e6f4e9;border-color:#b9dfc2}" +
-    ".hub-age--aging{color:#8a5a00;background:#fbefd2;border-color:#efd391}" +
-    ".hub-age--older{color:#4b5260;background:#fff;border-color:#d3d7de}" +
-    ".hub-age--current{color:#1f5fa8;background:#e7f0fb;border-color:#b6cff0}" +
-    ".hub-age--archived{color:#fff;background:#5b6270;border-color:#5b6270}" +
-    "@media (prefers-color-scheme: dark){" +
-    ".hub-age--new{color:#7fd497;background:rgba(46,160,67,.16);border-color:rgba(46,160,67,.4)}" +
-    ".hub-age--aging{color:#f0c060;background:rgba(214,160,40,.16);border-color:rgba(214,160,40,.4)}" +
-    ".hub-age--older{color:#c2c8d2;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18)}" +
-    ".hub-age--current{color:#8cbcf5;background:rgba(56,132,230,.16);border-color:rgba(56,132,230,.4)}}" +
-    // On a card: the thumbnail's free top-left corner, over the picture --
-    // solid and white-on-colour there, because the soft pills vanished on
-    // light thumbnails (Liwei, 2026-10-14). Same idea as the duration chip.
-    ".asset-card__thumb .hub-age{position:absolute;top:8px;left:8px;z-index:1;color:#fff;" +
-    "border-color:rgba(255,255,255,.35);box-shadow:0 1px 3px rgba(0,0,0,.35);" +
-    "text-shadow:0 1px 1px rgba(0,0,0,.2)}" +
-    ".asset-card__thumb .hub-age--new{background:#1d8a3c}" +
-    ".asset-card__thumb .hub-age--aging{background:#b7791f}" +
-    ".asset-card__thumb .hub-age--older{background:rgba(31,35,41,.86)}" +
-    ".asset-card__thumb .hub-age--current{background:#1f63b8}" +
-    ".asset-card__thumb .hub-age--archived{background:#4b5260}" +
-    // Elio's ranked cards keep the type chip top-left; go below it.
-    ".asset-card__thumb:has(.rank-chip) .hub-age{top:36px}" +
-    ".hub-review-btn{margin-left:2px;padding:1px 9px;border-radius:999px;font:inherit;" +
-    "font-size:11.5px;line-height:18px;cursor:pointer;background:none;" +
-    "color:var(--orion-text-2);border:1px dashed var(--orion-border-md)}" +
-    ".hub-review-btn:hover{color:var(--orion-text);border-style:solid}";
-
-  function ensureAgeCss() {
-    if (document.getElementById("hubAgeCss")) return;
-    var style = document.createElement("style");
-    style.id = "hubAgeCss";
-    style.textContent = AGE_CSS;
-    (document.head || document.documentElement).appendChild(style);
-  }
 
   function publishedYear(a) {
     var m = /^(\d{4})/.exec(a.uploaded_at || "");
@@ -6480,7 +6058,6 @@
     } else {
       return null;
     }
-    ensureAgeCss();
     var el = document.createElement("span");
     el.className = "hub-age hub-age--" + kind;
     el.title = title;
@@ -6506,7 +6083,6 @@
     if (!asset.uploaded_at && !asset.still_current_until) return;
     hubPermissions.then(function (granted) {
       if (granted.indexOf("review_content") < 0 || detailAsset !== asset) return;
-      ensureAgeCss();
       var on = !!asset.still_current_until;
       var btn = document.createElement("button");
       btn.type = "button";
@@ -6624,11 +6200,6 @@
    * request form is opened from one nav item. Nothing is hidden until the
    * answer arrives, and nothing at all if it never does.
    */
-  var PERMISSION_CSS =
-    ".hub-no-download a[href$='/download']{display:none !important}" +
-    ".hub-no-preview a[href$='/preview']{display:none !important}" +
-    ".hub-no-create_demo #navRequestAsset{display:none !important}";
-
   /* What this person may do, once known; [] if it never arrives. */
   var hubPermissions = Promise.resolve([]);
 
@@ -6638,10 +6209,6 @@
       .then(function (d) {
         var granted = d && d.user && d.user.permissions;
         if (!granted) return [];
-        var style = document.createElement("style");
-        style.id = "hubPermissionCss";
-        style.textContent = PERMISSION_CSS;
-        (document.head || document.documentElement).appendChild(style);
         ["download", "preview", "create_demo"].forEach(function (p) {
           document.documentElement.classList.toggle("hub-no-" + p, granted.indexOf(p) < 0);
         });

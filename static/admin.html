@@ -232,6 +232,15 @@
   .act-person:hover td{background:var(--surface-2)}
   .act-person--on td{background:var(--green-soft)}
   .act-note{font-size:12px;margin-top:10px}
+  /* content review */
+  .rv-card{margin-bottom:14px}
+  .rv-note{margin:-4px 0 10px;font-size:12.5px}
+  .rv-table{max-height:420px;overflow:auto}
+  .rv-table th{position:sticky;top:0;background:var(--surface);z-index:1}
+  .rv-tag{margin-left:6px;font-size:10px;padding:1px 6px}
+  .rv-actions{white-space:nowrap;text-align:right}
+  .rv-actions button{margin-left:4px}
+  .rv-reason{padding:3px 8px;font-size:12px;width:150px}
   .act-ext{font-size:12.5px;margin-bottom:8px}
   .act-dot{display:inline-block;width:8px;height:8px;border-radius:50%;
     background:var(--green);margin-right:6px;vertical-align:middle}
@@ -360,6 +369,7 @@
   <nav class="tabs" id="adminTabs" role="tablist">
     <button type="button" class="tab tab--on" role="tab" data-tab="overview" aria-selected="true">Overview</button>
     <button type="button" class="tab" role="tab" data-tab="content" aria-selected="false">Content dashboard</button>
+    <button type="button" class="tab" role="tab" data-tab="review" aria-selected="false">Content review</button>
     <button type="button" class="tab" role="tab" data-tab="internal" aria-selected="false">Content access</button>
     <button type="button" class="tab" role="tab" data-tab="access" aria-selected="false">Users &amp; groups</button>
     <button type="button" class="tab" role="tab" data-tab="activity" aria-selected="false">Sign-ins</button>
@@ -440,6 +450,18 @@
         what the catalogue does not yet say.</p>
       <div class="tiles" id="contentTotals"></div>
       <div class="grid grid--2" id="contentCharts" style="margin-top:12px"></div>
+    </section>
+  </div>
+
+  <!-- What to look at again: dust, idle, Still current running out, archived (2026-10-14). -->
+  <div id="tabReview" role="tabpanel" hidden>
+    <section>
+      <div class="section-head"><h2>Content review</h2></div>
+      <p class="muted" style="margin:-6px 0 6px">Demos worth another look. Still current
+        confirms the interface shown matches today's release; Archive takes a demo out of the
+        Hub's lists. Both are kept in the Hub only &mdash; SharePoint is never changed.</p>
+      <p class="faint" id="rvIntro" style="margin:0 0 14px;font-size:12.5px"></p>
+      <div id="rvBody"></div>
     </section>
   </div>
 

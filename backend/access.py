@@ -70,6 +70,7 @@ class Perm(str, Enum):
     MANAGE_HOME = "manage_home"
     MANAGE_ACCESS = "manage_content_access"
     REVIEW_CONTENT = "review_content"
+    VIEW_ARCHIVED = "view_archived"
     RUN_SYNC = "run_sync"
     RUN_MIGRATION = "run_migration"
     VIEW_ADMIN = "view_admin"
@@ -91,7 +92,9 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
      "Choose Featured demos, hide demos and switch the Hub's display options."),
     (Perm.REVIEW_CONTENT, "Review content",
      "Mark demos Still current (the interface shown matches today's release), "
-     "and work through the content-review list."),
+     "archive or restore them, and work through the content-review list."),
+    (Perm.VIEW_ARCHIVED, "See archived content",
+     "Open archived demos, and show them in lists with 'Show archived'."),
     (Perm.MANAGE_ACCESS, "Manage content access",
      "Mark demos Internal or Open, on the Admin page and on a demo's page."),
     (Perm.RUN_SYNC, "Run sync", "Sync SharePoint and Consensus, and set the daily sync."),

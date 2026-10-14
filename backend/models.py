@@ -400,6 +400,11 @@ class AssetBase(BaseModel):
     #: age badge while it lasts.
     still_current_until: date | None = None
     still_current_by: str | None = None
+    #: Retired in the Hub (2026-10-14): out of every list and search, still in
+    #: SharePoint and Consensus. Different from Internal, which limits who
+    #: opens the files of a demo everyone can still find.
+    archived: bool = False
+    archived_at: str | None = None
 
     # cross-references — the four ID spaces the Portal exists to correlate
     source_item_id: str | None = None         # SharePoint list item

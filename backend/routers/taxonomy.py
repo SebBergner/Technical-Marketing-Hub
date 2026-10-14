@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 
-from backend.deps import get_repo
+from backend.access import Perm
+from backend.deps import CurrentUser, get_current_user, get_repo
 from backend.models import ContentDepth, Facets, video_type_filter
 from backend.repositories.base import AssetQuery, AssetRepository
 
@@ -68,9 +69,11 @@ def get_facets(
     source: list[str] = Query(default=[]),
     tag: list[str] = Query(default=[]),
     published: list[str] = Query(default=[]),
+    archived: bool = False,
     customer_facing: bool | None = None,
     include_older_vms: bool = False,
     repo: AssetRepository = Depends(get_repo),
+    user: CurrentUser = Depends(get_current_user),
 ):
     """Every filter value with a real count behind it.
 
@@ -89,9 +92,11 @@ def get_facets(
         content_depths=video_type_filter(depth), sources=source, tags=tag,
         published=published,
         customer_facing=customer_facing, include_older_vms=include_older_vms,
+        include_archived=archived and user.can(Perm.VIEW_ARCHIVED),
     )
     any_filter = any([q, type, product, family, umbrella, stage, segment,
-                      language, depth, source, tag, published, include_older_vms])         or customer_facing is not None
+                      language, depth, source, tag, published, include_older_vms,
+                      archived])         or customer_facing is not None
     return repo.facets(query if any_filter else None)
 
 

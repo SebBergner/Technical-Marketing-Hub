@@ -53,6 +53,9 @@ class AssetQuery:
     #: Older versions of a VM are left out of listings unless asked for --
     #: see backend/services/listing.py.
     include_older_vms: bool = False
+    #: Archived demos (Hub-only retirement, 2026-10-14) are left out of every
+    #: list, search and count unless asked for -- by someone allowed to see them.
+    include_archived: bool = False
     sort: SortKey = "relevance"
     limit: int = 50
     offset: int = 0
@@ -82,6 +85,14 @@ class AssetRepository(ABC):
         raise NotImplementedError
 
     def unhide(self, asset_id: str) -> list[dict]:
+        raise NotImplementedError
+
+    def archived(self) -> list[dict]:
+        """Archived demos (2026-10-14); file-backed only."""
+        raise NotImplementedError
+
+    def set_archived(self, asset_id: str, on: bool, actor: str,
+                     reason: str | None = None) -> dict:
         raise NotImplementedError
 
     def content_reviews(self) -> dict[str, dict]:

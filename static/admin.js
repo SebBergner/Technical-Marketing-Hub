@@ -1334,8 +1334,8 @@
   /* Overview | Content dashboard | Users & groups. The tab is in the
    * address (#content, #access), so a refresh or a shared link opens the
    * same one. */
-  var PANELS = { overview: "tabOverview", content: "tabContent", internal: "tabInternal",
-                 access: "tabAccess", activity: "tabActivity" };
+  var PANELS = { overview: "tabOverview", content: "tabContent", review: "tabReview",
+                 internal: "tabInternal", access: "tabAccess", activity: "tabActivity" };
 
   function tabFromHash() {
     var name = location.hash.replace("#", "");
@@ -1353,6 +1353,7 @@
     if (name === "content" && !contentLoaded) loadContent();
     if (name === "access") loadAccess();
     if (name === "internal") loadContentAccess();
+    if (name === "review") loadReview();
     if (name === "activity") { renderActRanges(); loadActivity(); }
   }
 
@@ -1859,6 +1860,201 @@
       what.title = fullChange(e);
     });
     host.appendChild(t);
+  }
+
+  /* ── Content review (2026-10-14) ──────────────────────────────────────
+   * What to look at again: collecting dust (Serge: 7+ years, not confirmed
+   * Still current), little used (Elio: a year old; Seb: and not used
+   * lately), Still current running out, and what is archived. Every action
+   * is Hub-only: Still current lasts a year, Archive takes a demo out of the
+   * Hub's lists, Restore puts it back. SharePoint is never changed. */
+  function canReviewContent() {
+    return (session.permissions || []).indexOf("review_content") >= 0;
+  }
+
+  function loadReview() {
+    return fetch("/api/admin/content-review")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d) renderReview(d); });
+  }
+
+  function reviewAction(url, body, status) {
+    status.textContent = "Saving…";
+    status.className = "promo-status faint";
+    return fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(function (r) {
+      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
+        throw new Error(b.detail || ("HTTP " + r.status));
+      });
+      return loadReview();
+    }).catch(function (err) {
+      status.textContent = "Not saved: " + err.message;
+      status.className = "promo-status err";
+    });
+  }
+
+  function demoLink(id, title) {
+    var a = el("a", null, title || id);
+    a.href = "/#/asset/" + encodeURIComponent(id);
+    a.target = "_blank";
+    a.rel = "noopener";
+    return a;
+  }
+
+  function reviewTable(rows, status, opts) {
+    if (!rows.length) return el("div", "faint", opts.empty);
+    var wrap = el("div", "rv-table");
+    var t = el("table");
+    var hr = t.createTHead().insertRow();
+    var heads = ["Demo", "Type", "Published", "Last used", "Views 12 mo",
+                 "Downloads 12 mo", "People 12 mo"];
+    if (opts.until) heads.push("Still current until");
+    if (canReviewContent()) heads.push("");
+    heads.forEach(function (h, i) {
+      hr.appendChild(el("th", i >= 4 && i <= 6 ? "r" : null, h));
+    });
+    var tb = t.createTBody();
+    rows.forEach(function (r) {
+      var tr = tb.insertRow();
+      var name = tr.insertCell();
+      name.appendChild(demoLink(r.asset_id, r.title));
+      if (r.internal) name.appendChild(el("span", "pill pill--off rv-tag", "Internal"));
+      tr.insertCell().textContent = TYPE_WORD[r.type] || r.type;
+      var pub = tr.insertCell();
+      pub.className = "num";
+      pub.textContent = r.uploaded_at || "—";
+      var used = tr.insertCell();
+      used.className = "num" + (r.last_used ? "" : " faint");
+      used.textContent = r.last_used || "never";
+      [r.views_12m, r.downloads_12m, r.people_12m].forEach(function (n) {
+        var c = tr.insertCell();
+        c.className = "r num" + (n ? "" : " faint");
+        c.textContent = n;
+      });
+      if (opts.until) {
+        var u = tr.insertCell();
+        u.className = "num";
+        u.textContent = r.still_current_until || "—";
+      }
+      if (canReviewContent()) {
+        var act = tr.insertCell();
+        act.className = "rv-actions";
+        var keep = el("button", "btn-small", opts.until ? "Confirm again" : "Still current");
+        keep.type = "button";
+        keep.title = "The interface shown still matches today's release (lasts a year)";
+        keep.addEventListener("click", function () {
+          reviewAction("/api/assets/" + encodeURIComponent(r.asset_id) + "/still-current",
+            { still_current: true }, status);
+        });
+        act.appendChild(keep);
+        var arch = el("button", "btn-small", "Archive");
+        arch.type = "button";
+        arch.title = "Take it out of the Hub's lists. SharePoint is not changed.";
+        arch.addEventListener("click", function () {
+          // Asked in place, with an optional reason (window.prompt is
+          // suppressed in some browsers, as window.confirm was).
+          act.innerHTML = "";
+          var reason = el("input", "rv-reason");
+          reason.placeholder = "Why (optional)";
+          reason.maxLength = 300;
+          var yes = el("button", "btn-small btn-danger--solid", "Archive");
+          yes.type = "button";
+          yes.addEventListener("click", function () {
+            reviewAction("/api/assets/" + encodeURIComponent(r.asset_id) + "/archive",
+              { archived: true, reason: reason.value }, status);
+          });
+          var no = el("button", "btn-small", "Cancel");
+          no.type = "button";
+          no.addEventListener("click", loadReview);
+          act.appendChild(reason);
+          act.appendChild(yes);
+          act.appendChild(no);
+          reason.focus();
+        });
+        act.appendChild(arch);
+      }
+    });
+    wrap.appendChild(t);
+    return wrap;
+  }
+
+  function reviewSection(host, title, count, note, body) {
+    var c = el("div", "card rv-card");
+    var head = el("div", "card-head");
+    head.appendChild(el("h2", null, title));
+    head.appendChild(el("span", "faint num", String(count)));
+    c.appendChild(head);
+    if (note) c.appendChild(el("p", "muted rv-note", note));
+    c.appendChild(body);
+    host.appendChild(c);
+  }
+
+  function renderReview(d) {
+    var host = $("rvBody");
+    host.innerHTML = "";
+    var status = el("div", "promo-status faint");
+    var since = d.usage_since ? new Date(d.usage_since).toLocaleDateString() : null;
+    var recorded = since ? Math.round((Date.now() - new Date(d.usage_since)) / 86400000) : 0;
+    $("rvIntro").textContent = "Usage recorded since " + (since || "—")
+      + (recorded < d.idle_days
+        ? " (" + recorded + " days): until that reaches " + d.idle_days + " days, "
+          + "“little used” means unused since recording began."
+        : ".")
+      + " Still current lasts " + d.still_current_months + " months.";
+
+    reviewSection(host, "Collecting dust", d.dust.length,
+      d.dust_years + " years old or more, and not confirmed Still current. "
+      + "Re-record, retire (Archive) or confirm.",
+      reviewTable(d.dust, status, { empty: "Nothing collecting dust." }));
+    reviewSection(host, "Little used", d.idle.length,
+      "Published over " + d.min_age_days + " days ago, not confirmed Still current, "
+      + "and nobody opened, previewed or downloaded it in the last " + d.idle_days + " days.",
+      reviewTable(d.idle, status, { empty: "Nothing idle." }));
+    reviewSection(host, "Still current running out", d.expiring.length,
+      "Confirmations ending in the next 30 days, or ended in the last 30. "
+      + "Confirm again, or let the age badge come back.",
+      reviewTable(d.expiring, status, { until: true, empty: "None running out." }));
+
+    var arch = el("div");
+    if (!d.archived.length) {
+      arch.appendChild(el("div", "faint", "Nothing archived."));
+    } else {
+      d.archived.forEach(function (a) {
+        var r = el("div", "promo-row");
+        r.appendChild(el("span", "promo-row__n", ""));
+        var info = el("div");
+        info.appendChild(demoLink(a.asset_id, a.title));
+        info.appendChild(el("div", "promo-row__meta",
+          [TYPE_WORD[a.type] || a.type,
+           "archived " + new Date(a.at).toLocaleDateString()
+             + (a.by ? " by " + a.by.replace(/^(user|dev):/, "") : ""),
+           a.reason ? "“" + a.reason + "”" : ""].filter(Boolean).join(" · ")));
+        r.appendChild(info);
+        var acts = el("div", "promo-row__actions");
+        if (canReviewContent()) {
+          var restore = el("button", null, "Restore");
+          restore.type = "button";
+          restore.addEventListener("click", function () {
+            reviewAction("/api/assets/" + encodeURIComponent(a.asset_id) + "/archive",
+              { archived: false }, status);
+          });
+          acts.appendChild(restore);
+        }
+        r.appendChild(acts);
+        arch.appendChild(r);
+      });
+    }
+    reviewSection(host, "Archived", d.archived.length,
+      "Out of every list and search in the Hub; still in SharePoint and Consensus. "
+      + "People with “See archived content” can still open them.", arch);
+    host.appendChild(status);
+    if (!canReviewContent()) {
+      host.appendChild(el("p", "faint", "Viewing only: acting on these needs the "
+        + "Review content permission."));
+    }
   }
 
   /* ── Content access: Open / Internal (2026-10-07) ─────────────────────

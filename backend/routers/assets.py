@@ -47,6 +47,8 @@ def list_assets(
     published: list[str] = Query(
         default=[], description="age band (new | recent | aging | older) or a year "
                                 "such as 2023; any one matches"),
+    archived: bool = Query(default=False, description="also list archived demos "
+                           "(only for 'See archived content'; ignored otherwise)"),
     customer_facing: bool | None = None,
     has_narrated_audio: bool | None = None,
     has_consensus_uuid: bool | None = None,
@@ -63,8 +65,10 @@ def list_assets(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     repo: AssetRepository = Depends(get_repo),
+    user: CurrentUser = Depends(get_current_user),
 ):
     return repo.list(AssetQuery(
+        include_archived=archived and user.can(Perm.VIEW_ARCHIVED),
         text=q, types=type, products=product, funnel_stages=stage, segments=segment,
         industries=industry, value_drivers=driver, languages=language, content_depths=video_type_filter(depth),
         sources=source, product_families=family,
@@ -79,11 +83,11 @@ def list_assets(
 def promoted_summaries(repo: AssetRepository) -> list[AssetSummary]:
     """The promoted assets, in their order, through `get()` -- the same
     funnel as a details page, so a divested or removed asset simply drops
-    out instead of showing as a broken card."""
+    out instead of showing as a broken card. An archived one too."""
     out = []
     for asset_id in repo.promoted()["asset_ids"]:
         asset = repo.get(asset_id)
-        if asset is not None:
+        if asset is not None and not asset.archived:
             out.append(AssetSummary.model_validate(
                 asset.model_dump(include=set(AssetSummary.model_fields))))
     return out
@@ -150,6 +154,8 @@ def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo),
         if repo.is_hidden(asset_id):
             raise HTTPException(status_code=404, detail="This demo is hidden from the Hub.")
         raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
+    if asset.archived and not user.can(Perm.VIEW_ARCHIVED):
+        raise HTTPException(status_code=404, detail="This demo is archived.")
     if _locked_for(user, asset):
         asset = asset.model_copy(update={"resources": _without_file_ids(asset.resources),
                                          "files_locked": True})
@@ -407,5 +413,25 @@ def set_still_current(asset_id: str, body: StillCurrentIn,
     except NotImplementedError:
         raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
     log.info("still current of %s set to %s by %s", asset_id, body.still_current, actor)
+    return result
+
+
+class ArchiveIn(BaseModel):
+    archived: bool
+    reason: str | None = None
+
+
+@router.put("/{asset_id}/archive")
+def set_archived(asset_id: str, body: ArchiveIn, repo: AssetRepository = Depends(get_repo),
+                 actor: str = Depends(require_perm(Perm.REVIEW_CONTENT))):
+    """Archive a demo in the Hub, or restore it (2026-10-14). Hub-only:
+    nothing is deleted or moved in SharePoint or Consensus."""
+    try:
+        result = repo.set_archived(asset_id, body.archived, actor, body.reason)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+    log.info("archived=%s for %s by %s", body.archived, asset_id, actor)
     return result
 

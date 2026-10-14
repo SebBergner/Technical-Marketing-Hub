@@ -381,6 +381,12 @@ class JsonAssetRepository(AssetRepository):
         # Internal (2026-10-07): a folder SharePoint closes to partners, or a
         # demo marked so on the Hub (owned/content_access.json). Either way,
         # only "Access internal content" opens its files.
+        # Archived (2026-10-14): marked here, filtered in _rows, so that
+        # whoever may see archived content can still reach it by id.
+        archive = self._load("archived") or {}
+        if archive:
+            rows = [{**r, "archived": True, "archived_at": archive[r["id"]].get("at")}
+                    if r["id"] in archive else r for r in rows]
         # Still current (2026-10-14): a reviewer's confirmation, while it lasts.
         reviews = self._load("content_review") or {}
         if reviews:
@@ -418,6 +424,8 @@ class JsonAssetRepository(AssetRepository):
         def keep(record: dict) -> bool:
             # Reachable by id, never met while browsing -- listing.py says why.
             if not listing.is_listed(record, query.include_older_vms):
+                return False
+            if record.get("archived") and not query.include_archived:
                 return False
             # Membership comes from the scorer, so a record can never be
             # excluded by one rule and ranked by another.
@@ -592,6 +600,32 @@ class JsonAssetRepository(AssetRepository):
         asset = self.get(asset_id)
         return {"asset_id": asset_id, "internal": asset.internal,
                 "internal_source": asset.internal_source}
+
+    # ─────────────────────────────────────────── Archived
+    def archived(self) -> list[dict]:
+        """Archived demos, most recent first, with who archived them and why."""
+        state = self._load("archived") or {}
+        items = [{"asset_id": k, **v} for k, v in state.items()]
+        return sorted(items, key=lambda i: i.get("at") or "", reverse=True)
+
+    def set_archived(self, asset_id: str, on: bool, actor: str,
+                     reason: str | None = None) -> dict:
+        """Archive a demo in the Hub, or restore it. SharePoint and Consensus
+        are never touched: this only decides what the Hub lists."""
+        asset = self.get(asset_id)
+        if asset is None:
+            raise KeyError(asset_id)
+        with self._lock:
+            state = self._load("archived") or {}
+            if on:
+                state[asset_id] = {"title": asset.title,
+                                   "type": getattr(asset.type, "value", asset.type),
+                                   "by": actor, "at": utcnow().isoformat(timespec="seconds"),
+                                   "reason": (reason or "").strip()[:300] or None}
+            else:
+                state.pop(asset_id, None)
+            self._save("archived", state)
+        return {"asset_id": asset_id, "archived": on}
 
     # ─────────────────────────────────────────── Still current
     def content_reviews(self) -> dict[str, dict]:
@@ -1330,6 +1364,8 @@ class JsonAssetRepository(AssetRepository):
             age_band=content_age.band(_as_date(record.get("uploaded_at"))),
             still_current_until=record.get("still_current_until"),
             still_current_by=record.get("still_current_by"),
+            archived=bool(record.get("archived")),
+            archived_at=record.get("archived_at"),
             products=record.get("products") or [],
             product_families=taxonomy.families_of(record.get("products")),
             umbrella_families=taxonomy.umbrellas_of(record.get("products")),

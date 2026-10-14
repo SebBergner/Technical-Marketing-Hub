@@ -1208,7 +1208,8 @@
 
   var CONTROLS = ["hubSearchInput", "hubFilterType", "hubFilterProduct",
                   "hubFilterSegment", "hubFilterStage", "hubFilterLanguage",
-                  "hubFilterCf", "hubFilterVideoType", "hubFilterPublished"];
+                  "hubFilterCf", "hubFilterVideoType", "hubFilterPublished",
+                  "hubFilterArchived"];
   var LANDING = ["hubHome", "continueSection", "latestUploadsSection", "mostViewedSection",
                  "browseByProductSection", "editorsPicksSection"];
   //: One request's ceiling, enforced server-side (`le=200` in assets.py) --
@@ -1263,6 +1264,7 @@
     if (val("hubFilterStage")) params.append("stage", val("hubFilterStage"));
     if (val("hubFilterLanguage")) params.append("language", val("hubFilterLanguage"));
     if (val("hubFilterPublished")) params.append("published", val("hubFilterPublished"));
+    if (val("hubFilterArchived")) params.set("archived", "true");
     // Elio's "Video Type", which is `content_depth` under its own name.
     if (val("hubFilterVideoType")) params.append("depth", val("hubFilterVideoType"));
     var cf = val("hubFilterCf");
@@ -1467,10 +1469,37 @@
     if (select) select.value = effectiveSort() || "relevance";
   }
 
+  /* "Archived: Show" under More filters, only for people who may see
+   * archived content (2026-10-14); the server ignores the ask otherwise. */
+  function ensureArchivedFilter() {
+    if (document.getElementById("hubFilterArchived")) return;
+    var panel = document.getElementById("hubMoreFilters");
+    if (!panel) return;
+    var pill = document.createElement("label");
+    pill.className = "filter-pill";
+    pill.appendChild(document.createTextNode("Archived: "));
+    var select = document.createElement("select");
+    select.id = "hubFilterArchived";
+    [["", "Hide"], ["true", "Show"]].forEach(function (o) {
+      var option = document.createElement("option");
+      option.value = o[0];
+      option.textContent = o[1];
+      select.appendChild(option);
+    });
+    select.addEventListener("change", applyFilters);
+    pill.appendChild(select);
+    pill.insertAdjacentHTML("beforeend",
+      '<svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>');
+    panel.appendChild(pill);
+  }
+
   async function applyFilters() {
     updateVideoTypeFilterVisibility();
     updateVmVersionFilter();
     ensurePublishedFilter();
+    hubPermissions.then(function (granted) {
+      if (granted.indexOf("view_archived") >= 0) ensureArchivedFilter();
+    });
     reflectSort();
     var params = currentQuery();
     var active = params.toString().length > 0 || !!sortOverride;
@@ -1779,7 +1808,8 @@
     ["hubFilterType", "Type"], ["hubFilterVideoType", "Video type"],
     ["hubFilterProduct", "Product"], ["hubFilterSegment", "Segment"],
     ["hubFilterStage", "Stage"], ["hubFilterLanguage", "Language"],
-    ["hubFilterCf", "Customer-facing"], ["hubFilterPublished", "Published"]
+    ["hubFilterCf", "Customer-facing"], ["hubFilterPublished", "Published"],
+    ["hubFilterArchived", "Archived"]
   ];
 
   var FILTER_BAR_CSS =
@@ -5649,6 +5679,7 @@
          + '<path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
     glass: '<path d="M6 2h12M6 22h12M7 2v3a5 5 0 0 0 10 0V2M7 22v-3a5 5 0 0 1 10 0v3"/>',
     clock: '<path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/>',
+    box: '<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11h14V8M10 12h4"/>',
     check: '<circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.4 2.4 4.6-4.9"/>'
   };
 
@@ -5662,6 +5693,7 @@
     ".hub-age--aging{color:#8a5a00;background:#fbefd2;border-color:#efd391}" +
     ".hub-age--older{color:#4b5260;background:#fff;border-color:#d3d7de}" +
     ".hub-age--current{color:#1f5fa8;background:#e7f0fb;border-color:#b6cff0}" +
+    ".hub-age--archived{color:#fff;background:#5b6270;border-color:#5b6270}" +
     "@media (prefers-color-scheme: dark){" +
     ".hub-age--new{color:#7fd497;background:rgba(46,160,67,.16);border-color:rgba(46,160,67,.4)}" +
     ".hub-age--aging{color:#f0c060;background:rgba(214,160,40,.16);border-color:rgba(214,160,40,.4)}" +
@@ -5700,7 +5732,12 @@
   function ageBadge(a) {
     var kind, text, icon, title;
     var year = publishedYear(a);
-    if (a.still_current_until) {
+    if (a.archived) {
+      kind = "archived"; icon = "box"; text = "Archived";
+      title = "Archived in the Hub" + (a.archived_at ? " on " + friendlyDate(
+        String(a.archived_at).slice(0, 10)) : "") + ": out of every list and search."
+        + " Still in SharePoint.";
+    } else if (a.still_current_until) {
       kind = "current"; icon = "check"; text = "Still current";
       title = "A reviewer confirmed the interface shown still matches today's release"
         + " (until " + friendlyDate(a.still_current_until) + ")."
@@ -5772,6 +5809,33 @@
         });
       });
       meta.appendChild(btn);
+
+      var arch = document.createElement("button");
+      arch.type = "button";
+      arch.className = "hub-review-btn";
+      arch.textContent = asset.archived ? "Restore" : "Archive";
+      arch.title = asset.archived
+        ? "Put it back in the Hub's lists and search"
+        : "Take it out of the Hub's lists and search. SharePoint is not changed.";
+      arch.addEventListener("click", function () {
+        arch.disabled = true;
+        fetch("/api/assets/" + encodeURIComponent(asset.id) + "/archive", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ archived: !asset.archived }),
+        }).then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        }).then(function (d) {
+          asset.archived = d.archived;
+          asset.archived_at = d.archived ? new Date().toISOString() : null;
+          renderAgeMark(meta, asset);
+        }).catch(function (err) {
+          arch.disabled = false;
+          report("Could not change the archive: " + err.message, true);
+        });
+      });
+      meta.appendChild(arch);
     });
   }
 

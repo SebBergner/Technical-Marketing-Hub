@@ -648,6 +648,18 @@ SharePoint) or when it is marked on the Hub (`owned/content_access.json`,
 needs **Manage content access**). This replaces the partner-only rule: a
 partner put in a group with Access internal content does get those files.
 
+**Content age and review** (2026-10-14, Serge's asks): cards and demo pages
+show age badges (services/content_age.py: New < 1 year, the year at 2–4,
+"Older UI" at 4+); a reviewer (**Review content**) can mark a demo **Still
+current** for `STILL_CURRENT_MONTHS` (12) or **Archive** it -- Hub-only, out
+of every list and search, still in SharePoint; **See archived content** opens
+archived demos and shows them with "Archived: Show". Admin → Content review
+lists collecting dust (7+ years), little used (1+ year old, unused 180 days),
+Still current running out, and the archive. Data: `owned/content_review.json`,
+`owned/archived.json`. Demo Catalog dates now come from the kit's files
+(main video, else newest file) unless OriginalPublishDate is set; the first
+sync after deploying rebuilds the mirror once (`sync.MAPPING_VERSION`).
+
 **Admin → Sign-ins** (2026-10-07) shows who is active now (a request in the
 last 15 minutes -- the server keeps no session, so "online" can only mean
 "recently active"), people and sign-ins per period, and the sign-in log.

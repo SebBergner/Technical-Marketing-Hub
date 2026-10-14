@@ -387,3 +387,25 @@ def set_access(asset_id: str, body: AccessIn, repo: AssetRepository = Depends(ge
     log.info("access of %s set to %s by %s", asset_id, body.level, actor)
     return result
 
+
+class StillCurrentIn(BaseModel):
+    still_current: bool
+
+
+@router.put("/{asset_id}/still-current")
+def set_still_current(asset_id: str, body: StillCurrentIn,
+                      repo: AssetRepository = Depends(get_repo),
+                      actor: str = Depends(require_perm(Perm.REVIEW_CONTENT))):
+    """Confirm the interface a demo shows still matches today's release, or
+    withdraw that (Serge, 2026-10-13). Lasts STILL_CURRENT_MONTHS, then the
+    age badge returns. Hub-owned (owned/content_review.json)."""
+    try:
+        result = repo.set_still_current(asset_id, body.still_current, actor,
+                                        settings.still_current_months)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+    log.info("still current of %s set to %s by %s", asset_id, body.still_current, actor)
+    return result
+

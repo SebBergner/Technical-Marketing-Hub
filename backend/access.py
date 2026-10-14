@@ -69,6 +69,7 @@ class Perm(str, Enum):
     EDIT_METADATA = "edit_metadata"
     MANAGE_HOME = "manage_home"
     MANAGE_ACCESS = "manage_content_access"
+    REVIEW_CONTENT = "review_content"
     RUN_SYNC = "run_sync"
     RUN_MIGRATION = "run_migration"
     VIEW_ADMIN = "view_admin"
@@ -88,6 +89,9 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
      "Review metadata proposals and write them back to SharePoint."),
     (Perm.MANAGE_HOME, "Manage the Home page",
      "Choose Featured demos, hide demos and switch the Hub's display options."),
+    (Perm.REVIEW_CONTENT, "Review content",
+     "Mark demos Still current (the interface shown matches today's release), "
+     "and work through the content-review list."),
     (Perm.MANAGE_ACCESS, "Manage content access",
      "Mark demos Internal or Open, on the Admin page and on a demo's page."),
     (Perm.RUN_SYNC, "Run sync", "Sync SharePoint and Consensus, and set the daily sync."),

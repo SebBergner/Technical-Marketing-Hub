@@ -566,6 +566,7 @@
     clampDescription(card, a);
     paintCover(card, a);
     addLanguageTag(card, a);
+    addAgeBadge(card, a);
     renderCardTags(card, a);
 
     /* The name opens a details page inside the Hub, not the platform.
@@ -2540,6 +2541,7 @@
       if (videoTypeOf(asset)) meta.appendChild(pill(videoTypeOf(asset), "vtype"));
       if (asset.segment) meta.appendChild(pill(asset.segment, "segment"));
       renderAccessMark(meta, asset);
+      renderAgeMark(meta, asset);
     }
 
     /* Facts, and only the ones we hold. An empty stats row beats a row of
@@ -5624,6 +5626,153 @@
      * only (report(..., true)). */
     showTotal(assets.length);
     console.info("[hub-api] loaded", assets.length, "assets", bySource);
+  }
+
+  /* ── Age badges (Serge, 2026-10-13) ───────────────────────────────────
+   *
+   * "Software interfaces change fast. The badge tells you how old a
+   * recording is, not whether the content is still valid." His spec:
+   *
+   *   under 1 year   New                 green, sparkle
+   *   1 to 2 years   (no badge)          so the badges keep their meaning
+   *   2 to 4 years   2023                amber, hourglass, the year
+   *   4+ years       Older UI · 2019     grey, history icon
+   *   any age        Still current       blue, set by a reviewer, replaces
+   *                                      the age badge while it lasts
+   *
+   * The band comes from the server (`age_band`, services/content_age.py),
+   * so the Published filter and the badge can never disagree. Collecting
+   * dust (7+ years) is a review-view word only, never shown here.
+   */
+  var AGE_ICONS = {
+    spark: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>'
+         + '<path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+    glass: '<path d="M6 2h12M6 22h12M7 2v3a5 5 0 0 0 10 0V2M7 22v-3a5 5 0 0 1 10 0v3"/>',
+    clock: '<path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/>',
+    check: '<circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.4 2.4 4.6-4.9"/>'
+  };
+
+  var AGE_CSS =
+    ".hub-age{display:inline-flex;align-items:center;gap:4px;padding:2px 8px 2px 6px;" +
+    "border-radius:999px;font-size:11px;font-weight:600;line-height:16px;white-space:nowrap;" +
+    "border:1px solid transparent}" +
+    ".hub-age svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;" +
+    "stroke-linecap:round;stroke-linejoin:round}" +
+    ".hub-age--new{color:#1d7a35;background:#e6f4e9;border-color:#b9dfc2}" +
+    ".hub-age--aging{color:#8a5a00;background:#fbefd2;border-color:#efd391}" +
+    ".hub-age--older{color:#4b5260;background:#fff;border-color:#d3d7de}" +
+    ".hub-age--current{color:#1f5fa8;background:#e7f0fb;border-color:#b6cff0}" +
+    "@media (prefers-color-scheme: dark){" +
+    ".hub-age--new{color:#7fd497;background:rgba(46,160,67,.16);border-color:rgba(46,160,67,.4)}" +
+    ".hub-age--aging{color:#f0c060;background:rgba(214,160,40,.16);border-color:rgba(214,160,40,.4)}" +
+    ".hub-age--older{color:#c2c8d2;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18)}" +
+    ".hub-age--current{color:#8cbcf5;background:rgba(56,132,230,.16);border-color:rgba(56,132,230,.4)}}" +
+    // On a card: the thumbnail's free top-left corner, over the picture.
+    ".asset-card__thumb .hub-age{position:absolute;top:8px;left:8px;z-index:1;" +
+    "box-shadow:0 1px 2px rgba(0,0,0,.12)}" +
+    // Elio's ranked cards keep the type chip top-left; go below it.
+    ".asset-card__thumb:has(.rank-chip) .hub-age{top:36px}" +
+    ".hub-review-btn{margin-left:2px;padding:1px 9px;border-radius:999px;font:inherit;" +
+    "font-size:11.5px;line-height:18px;cursor:pointer;background:none;" +
+    "color:var(--orion-text-2);border:1px dashed var(--orion-border-md)}" +
+    ".hub-review-btn:hover{color:var(--orion-text);border-style:solid}";
+
+  function ensureAgeCss() {
+    if (document.getElementById("hubAgeCss")) return;
+    var style = document.createElement("style");
+    style.id = "hubAgeCss";
+    style.textContent = AGE_CSS;
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  function publishedYear(a) {
+    var m = /^(\d{4})/.exec(a.uploaded_at || "");
+    return m ? m[1] : "";
+  }
+
+  function friendlyDate(iso) {
+    var d = new Date(iso + "T00:00:00");
+    return isNaN(d) ? iso : d.toLocaleDateString(undefined,
+      { year: "numeric", month: "short", day: "numeric" });
+  }
+
+  /* The badge for one demo, or null (1-2 years old, or no date). */
+  function ageBadge(a) {
+    var kind, text, icon, title;
+    var year = publishedYear(a);
+    if (a.still_current_until) {
+      kind = "current"; icon = "check"; text = "Still current";
+      title = "A reviewer confirmed the interface shown still matches today's release"
+        + " (until " + friendlyDate(a.still_current_until) + ")."
+        + (year ? " Published " + year + "." : "");
+    } else if (a.age_band === "new") {
+      kind = "new"; icon = "spark"; text = "New";
+      title = "Recent recording: shows the current software interface.";
+    } else if (a.age_band === "aging") {
+      kind = "aging"; icon = "glass"; text = year;
+      title = "Published " + year + ". The interface may have changed since.";
+    } else if (a.age_band === "older") {
+      kind = "older"; icon = "clock"; text = "Older UI · " + year;
+      title = "Published " + year + ". The software interface has likely changed;"
+        + " the capabilities shown may still apply.";
+    } else {
+      return null;
+    }
+    ensureAgeCss();
+    var el = document.createElement("span");
+    el.className = "hub-age hub-age--" + kind;
+    el.title = title;
+    el.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + AGE_ICONS[icon] + "</svg>";
+    el.appendChild(document.createTextNode(text));
+    return el;
+  }
+
+  function addAgeBadge(card, a) {
+    var thumb = card.querySelector(".asset-card__thumb");
+    var badge = thumb && ageBadge(a);
+    if (badge) thumb.appendChild(badge);
+  }
+
+  /* On a demo's page: the same badge in the tag row, and for people with
+   * "Review content" a switch to confirm or withdraw Still current. */
+  function renderAgeMark(meta, asset) {
+    meta.querySelectorAll(".hub-age, .hub-review-btn").forEach(function (n) { n.remove(); });
+    var badge = ageBadge(asset);
+    // With the tags, ahead of any buttons, however often it is redrawn.
+    if (badge) meta.insertBefore(badge, meta.querySelector(
+      ".hub-pill--internal, .hub-access-btn, .hub-review-btn"));
+    if (!asset.uploaded_at && !asset.still_current_until) return;
+    hubPermissions.then(function (granted) {
+      if (granted.indexOf("review_content") < 0 || detailAsset !== asset) return;
+      ensureAgeCss();
+      var on = !!asset.still_current_until;
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "hub-review-btn";
+      btn.textContent = on ? "Withdraw Still current" : "Mark Still current";
+      btn.title = on
+        ? "The interface shown no longer matches today's release: show its age again"
+        : "The interface shown still matches today's release (lasts a year)";
+      btn.addEventListener("click", function () {
+        btn.disabled = true;
+        fetch("/api/assets/" + encodeURIComponent(asset.id) + "/still-current", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ still_current: !on }),
+        }).then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        }).then(function (d) {
+          asset.still_current_until = d.still_current_until;
+          asset.still_current_by = d.still_current_by;
+          renderAgeMark(meta, asset);
+        }).catch(function (err) {
+          btn.disabled = false;
+          report("Could not change Still current: " + err.message, true);
+        });
+      });
+      meta.appendChild(btn);
+    });
   }
 
   /* ── Open / Internal on a demo's page (2026-10-07) ─────────────────────

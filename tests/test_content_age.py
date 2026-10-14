@@ -75,3 +75,44 @@ def test_the_facet_lists_every_band_then_the_years(client):
         "counted over everything but the Published filter itself"
     years = [f["value"] for f in facets[4:]]
     assert years == sorted(years, reverse=True)
+
+
+# ─────────────────────────────────────────────── Still current
+def test_every_demo_carries_its_band(client):
+    bands = {a["id"]: a["age_band"] for a in client.get("/api/assets?limit=10").json()["items"]}
+    assert bands == {"fresh": "new", "two": "recent", "three": "aging", "old": "older",
+                     "nodate": None}
+
+
+@pytest.fixture
+def reviewer(monkeypatch):
+    from backend.auth import AuthMode
+    monkeypatch.setattr(settings, "auth_mode", AuthMode.EASYAUTH.value)
+    monkeypatch.setattr(settings, "admin_username", "")
+    monkeypatch.setattr(settings, "admin_password", "")
+    monkeypatch.setattr(settings, "hub_admin_emails", "boss@ptc.com")
+    from tests.test_auth import easyauth_headers
+    return easyauth_headers("boss@ptc.com"), easyauth_headers("someone@ptc.com")
+
+
+def test_review_content_marks_still_current_for_a_while(client, reviewer, tmp_path):
+    boss, staff = reviewer
+    url = "/api/assets/old/still-current"
+    assert client.put(url, json={"still_current": True}, headers=staff).status_code == 403
+    r = client.put(url, json={"still_current": True}, headers=boss)
+    assert r.status_code == 200 and r.json()["still_current_by"] == "user:boss@ptc.com"
+    until = date.fromisoformat(r.json()["still_current_until"])
+    assert 360 <= (until - date.today()).days <= 370, "twelve months by default"
+    old = client.get("/api/assets/old", headers=staff).json()
+    assert old["age_band"] == "older" and old["still_current_until"], "band kept, mark on top"
+    assert (tmp_path / "owned" / "content_review.json").exists()
+    client.put(url, json={"still_current": False}, headers=boss)
+    assert client.get("/api/assets/old", headers=staff).json()["still_current_until"] is None
+
+
+def test_an_expired_confirmation_counts_for_nothing(client, tmp_path):
+    (tmp_path / "owned").mkdir(exist_ok=True)
+    (tmp_path / "owned" / "content_review.json").write_text(json.dumps(
+        {"old": {"by": "x", "until": (date.today() - timedelta(days=1)).isoformat()}}),
+        encoding="utf-8")
+    assert client.get("/api/assets/old").json()["still_current_until"] is None

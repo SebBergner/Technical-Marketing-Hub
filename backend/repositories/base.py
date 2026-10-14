@@ -84,6 +84,14 @@ class AssetRepository(ABC):
     def unhide(self, asset_id: str) -> list[dict]:
         raise NotImplementedError
 
+    def content_reviews(self) -> dict[str, dict]:
+        """Still current confirmations (2026-10-14); file-backed only."""
+        raise NotImplementedError
+
+    def set_still_current(self, asset_id: str, on: bool, actor: str,
+                          months: int = 12) -> dict:
+        raise NotImplementedError
+
     def content_access(self) -> list[dict]:
         """Demos marked Internal in the Hub (2026-10-07); file-backed only."""
         raise NotImplementedError

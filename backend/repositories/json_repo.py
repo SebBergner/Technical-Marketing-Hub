@@ -381,6 +381,14 @@ class JsonAssetRepository(AssetRepository):
         # Internal (2026-10-07): a folder SharePoint closes to partners, or a
         # demo marked so on the Hub (owned/content_access.json). Either way,
         # only "Access internal content" opens its files.
+        # Still current (2026-10-14): a reviewer's confirmation, while it lasts.
+        reviews = self._load("content_review") or {}
+        if reviews:
+            today = utcnow().date().isoformat()
+            live = {k: v for k, v in reviews.items() if (v.get("until") or "") >= today}
+            rows = [{**r, "still_current_until": live[r["id"]]["until"],
+                     "still_current_by": live[r["id"]].get("by")}
+                    if r["id"] in live else r for r in rows]
         marked = self._load("content_access") or {}
         if closed or marked:
             rows = [{**r, "internal": True,
@@ -584,6 +592,32 @@ class JsonAssetRepository(AssetRepository):
         asset = self.get(asset_id)
         return {"asset_id": asset_id, "internal": asset.internal,
                 "internal_source": asset.internal_source}
+
+    # ─────────────────────────────────────────── Still current
+    def content_reviews(self) -> dict[str, dict]:
+        """{asset id: {by, at, until}}, expired ones included (owned/)."""
+        return self._load("content_review") or {}
+
+    def set_still_current(self, asset_id: str, on: bool, actor: str,
+                          months: int = 12) -> dict:
+        """Confirm a demo is Still current for `months`, or withdraw it."""
+        if self.get(asset_id) is None:
+            raise KeyError(asset_id)
+        with self._lock:
+            state = self._load("content_review") or {}
+            if on:
+                today = utcnow().date()
+                until = date(today.year + (today.month - 1 + months) // 12,
+                             (today.month - 1 + months) % 12 + 1, min(today.day, 28))
+                state[asset_id] = {"by": actor, "at": utcnow().isoformat(timespec="seconds"),
+                                   "until": until.isoformat()}
+            else:
+                state.pop(asset_id, None)
+            self._save("content_review", state)
+        asset = self.get(asset_id)
+        return {"asset_id": asset_id, "age_band": asset.age_band,
+                "still_current_until": asset.still_current_until,
+                "still_current_by": asset.still_current_by}
 
     # ─────────────────────────────────────────── Hub display settings
     def hub_settings(self) -> dict:
@@ -1293,6 +1327,9 @@ class JsonAssetRepository(AssetRepository):
             partner_restricted=bool(record.get("partner_restricted")),
             internal=bool(record.get("internal")),
             internal_source=record.get("internal_source"),
+            age_band=content_age.band(_as_date(record.get("uploaded_at"))),
+            still_current_until=record.get("still_current_until"),
+            still_current_by=record.get("still_current_by"),
             products=record.get("products") or [],
             product_families=taxonomy.families_of(record.get("products")),
             umbrella_families=taxonomy.umbrellas_of(record.get("products")),

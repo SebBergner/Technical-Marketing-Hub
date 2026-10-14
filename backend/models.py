@@ -392,6 +392,14 @@ class AssetBase(BaseModel):
     #: partners there) or "hub" (marked on the Hub).
     internal: bool = False
     internal_source: str | None = None
+    #: How old, in the bands people see (services/content_age.py): new,
+    #: recent, aging, older -- None without a date.
+    age_band: str | None = None
+    #: A reviewer confirmed the interface shown still matches today's release
+    #: (Serge's "Still current", 2026-10-13). Until this date; replaces the
+    #: age badge while it lasts.
+    still_current_until: date | None = None
+    still_current_by: str | None = None
 
     # cross-references — the four ID spaces the Portal exists to correlate
     source_item_id: str | None = None         # SharePoint list item

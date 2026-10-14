@@ -177,6 +177,10 @@ class Settings(BaseSettings):
     #: download from a demo folder only where this group holds Read there
     #: (backend/integrations/graph/partner_access.py, 2026-10-06).
     partner_group_name: str = "GPX TDD Scalable Demo Catalog Visitors"
+    #: How long a "Still current" confirmation lasts before the demo shows its
+    #: age badge again and needs another look (Liwei, 2026-10-14: it expires;
+    #: software interfaces change every release).
+    still_current_months: int = 12
     #: Signed-in users whose email is in one of these domains are PTC people;
     #: anyone else (guest accounts) counts as a partner. Comma-separated.
     internal_email_domains: str = "ptc.com"

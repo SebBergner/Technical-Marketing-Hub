@@ -4477,9 +4477,20 @@
       + periodWord()));
     contentCard.appendChild(topContent(d.content));
 
+    var creatorCard = actEl("div", "hub-act__card");
+    creatorCard.appendChild(actEl("h3", null, "Whose demos were used most"));
+    creatorCard.appendChild(actEl("div", "hub-act__sub", "Creators ranked by how much their "
+      + "demos were opened and downloaded, last " + periodWord() + ". Only demos used in "
+      + "this period count."));
+    creatorCard.appendChild(creatorBoard(d.creators || []));
+
     var bottom = actEl("div", "hub-act__mid");
     bottom.appendChild(contentCard);
-    bottom.appendChild(teamCard);
+    var side = actEl("div");
+    side.style.cssText = "display:grid;gap:16px;align-content:start";
+    side.appendChild(creatorCard);
+    side.appendChild(teamCard);
+    bottom.appendChild(side);
     host.appendChild(bottom);
 
     host.appendChild(actEl("div", "hub-act__foot",
@@ -4488,7 +4499,10 @@
         + " actions by partner accounts in this period are counted anonymously and not ranked." : "")
       + (t.anonymous ? " " + t.anonymous.toLocaleString()
         + " earlier actions were recorded without a name and are not ranked either." : "")
-      + " Teams are the groups set up by the Hub's administrators."));
+      + " Teams are the groups set up by the Hub's administrators."
+      + " A demo's creator is whoever created its main video in SharePoint"
+      + (d.unattributed_uses ? "; " + d.unattributed_uses.toLocaleString()
+        + " uses were of demos with no recorded creator (migrated videos, Consensus)." : ".")));
   }
 
   /* One series (actions per day): a 2px line over a 10% wash, hairline
@@ -4677,6 +4691,41 @@
       track.appendChild(fill);
       bar.appendChild(track);
       bar.appendChild(actEl("span", "hub-act__val", compact(p.total)));
+      li.appendChild(bar);
+      ol.appendChild(li);
+    });
+    return ol;
+  }
+
+  /* SharePoint writes "Last, First"; people read "First Last". */
+  function personName(raw) {
+    var m = /^\s*([^,]+),\s*(.+)$/.exec(raw || "");
+    return m ? m[2] + " " + m[1] : (raw || "");
+  }
+
+  function creatorBoard(list) {
+    if (!list.length) return actEl("div", "hub-act__empty",
+      "No demo with a known creator was used in this period.");
+    var max = list[0].total || 1;
+    var ol = actEl("ol", "hub-act__lb");
+    list.forEach(function (c) {
+      var li = actEl("li");
+      li.appendChild(actEl("span", "hub-act__rank" + (c.rank <= 3 ? " hub-act__rank--" + c.rank : ""), c.rank));
+      var name = personName(c.creator);
+      li.appendChild(actEl("span", "hub-act__avatar", initials(name)));
+      var who = actEl("div", "hub-act__who");
+      who.appendChild(actEl("b", null, name));
+      who.appendChild(actEl("span", null, plural(c.demos, "demo") + " used · "
+        + plural(c.views, "view") + " · " + plural(c.downloads, "download")
+        + (c.people ? " · " + c.people + (c.people === 1 ? " person" : " people") : "")));
+      li.appendChild(who);
+      var bar = actEl("div", "hub-act__bar");
+      var track = actEl("div", "hub-act__track");
+      var fill = actEl("div", "hub-act__fill");
+      fill.style.width = Math.max(3, c.total / max * 100) + "%";
+      track.appendChild(fill);
+      bar.appendChild(track);
+      bar.appendChild(actEl("span", "hub-act__val", compact(c.total)));
       li.appendChild(bar);
       ol.appendChild(li);
     });

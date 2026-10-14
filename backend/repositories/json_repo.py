@@ -63,6 +63,8 @@ _MIRROR_FIELDS = (
     "internal_title",
     "resources", "resource_counts", "resource_count", "video_count", "main_video",
     "external_views",
+    # Who made it (sharepoint_mapping.content_creator, 2026-10-14).
+    "creator",
     # VM pages only. Public by construction: credentials are sealed out of it
     # before it is built (backend/integrations/graph/vm_pages.py) and live in
     # PRIVATE_DIR instead.
@@ -1365,6 +1367,7 @@ class JsonAssetRepository(AssetRepository):
             still_current_until=record.get("still_current_until"),
             still_current_by=record.get("still_current_by"),
             archived=bool(record.get("archived")),
+            creator=record.get("creator"),
             archived_at=record.get("archived_at"),
             products=record.get("products") or [],
             product_families=taxonomy.families_of(record.get("products")),

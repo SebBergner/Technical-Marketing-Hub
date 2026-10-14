@@ -405,6 +405,10 @@ class AssetBase(BaseModel):
     #: opens the files of a demo everyone can still find.
     archived: bool = False
     archived_at: str | None = None
+    #: Who made it: the SharePoint file creator of its main video, or of most
+    #: of its files (sharepoint_mapping.content_creator, 2026-10-14). As
+    #: SharePoint writes it, "Last, First".
+    creator: str | None = None
 
     # cross-references — the four ID spaces the Portal exists to correlate
     source_item_id: str | None = None         # SharePoint list item

@@ -34,7 +34,8 @@ def hub_activity(since: str | None = None, until: str | None = None,
     # administrators) say nothing about a team.
     teams = [g for g in access.load_state()["groups"] if not g["builtin"]]
     out = activity.leaderboard(events, since=since, until=until, top=top,
-                               titles=titles, teams=teams)
+                               titles=titles, teams=teams,
+                               creators={k: a.creator for k, a in listed.items() if a.creator})
     # Only content the Hub still lists, so a link never leads to a 404; with
     # its picture and type for the page's cards.
     out["content"] = [{**c, "thumbnail_url": listed[c["asset_id"]].thumbnail_url,

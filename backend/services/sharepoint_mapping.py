@@ -310,6 +310,35 @@ def content_date(asset: dict) -> date | None:
     return max(dates) if dates else None
 
 
+#: Accounts that create files without being anyone's author: the migration's
+#: app identity, mostly (every Demo Video file, measured 2026-10-14).
+_NOT_A_PERSON = {"sharepoint app", "system account", "sharepoint system"}
+
+
+def content_creator(asset: dict) -> str | None:
+    """Who made a kit (Liwei, 2026-10-14: "the SharePoint file creator is the
+    demo's owner and creator"). The main video's creator; with no main video,
+    whoever created most of the kit's files. None when only system accounts
+    did -- the folder's OwnedBy column names a team, not a person.
+    """
+    resources = asset.get("resources") or []
+
+    def person(r: dict) -> str | None:
+        name = (r.get("created_by") or "").strip()
+        return name if name and name.lower() not in _NOT_A_PERSON else None
+
+    main = asset.get("main_video")
+    if main:
+        for r in resources:
+            if r.get("name") == main and person(r):
+                return person(r)
+    counts: dict[str, int] = {}
+    for r in resources:
+        if person(r):
+            counts[person(r)] = counts.get(person(r), 0) + 1
+    return max(counts, key=lambda k: (counts[k], k)) if counts else None
+
+
 def derive_video_facts(asset: dict) -> None:
     """Fill resource counts, main_video, customer_facing and audio in place.
 

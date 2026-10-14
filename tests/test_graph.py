@@ -707,3 +707,25 @@ def test_a_mirror_built_by_an_older_mapping_is_rebuilt_once(tmp_path, monkeypatc
     graph_router.run_sync(object(), repo, "test")
     assert seen == [None, "next-token"], "full once, then delta again"
     assert repo.sync_state("sharepoint")["mapping_version"] == MAPPING_VERSION
+
+
+def test_a_kits_creator_is_who_created_its_main_video():
+    """Liwei, 2026-10-14: the SharePoint file creator is the demo's owner."""
+    def made(name, by):
+        return {**file_item(name, "/Kit v.1"), "createdBy": {"user": {"displayName": by}}}
+    asset = build_assets([folder("Kit v.1"), made("Kit Demo Video.mp4", "Hughes, Paul"),
+                          made("Script.docx", "Wall, Eric"), made("Slides.pptx", "Wall, Eric")])[0][0]
+    assert asset.creator == "Hughes, Paul"
+    migrated = build_assets([folder("Kit v.1"), made("Kit.mp4", "SharePoint App")])[0][0]
+    assert migrated.creator is None, "the migration's app account is nobody's creator"
+
+
+def test_the_creator_survives_into_the_mirror(tmp_path):
+    from backend.repositories.json_repo import JsonAssetRepository
+    repo = JsonAssetRepository(str(tmp_path))
+    made = {**file_item("Kit Demo Video.mp4", "/Kit v.1"),
+            "createdBy": {"user": {"displayName": "Hughes, Paul"}}}
+    assets, _ = build_assets([folder("Kit v.1"), made])
+    repo.replace_source_rows(assets, source_system="sharepoint")
+    assert repo.get(assets[0].id).creator == "Hughes, Paul"
+

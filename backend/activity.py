@@ -405,7 +405,8 @@ def report(*, since: str | None = None, until: str | None = None,
 # ─────────────────────────────────────────── Hub activity for everyone (2026-10-14)
 def leaderboard(events: list[dict], *, since: str | None = None, until: str | None = None,
                 top: int = 10, titles: dict[str, str] | None = None,
-                teams: list[dict] | None = None) -> dict:
+                teams: list[dict] | None = None,
+                creators: dict[str, str] | None = None) -> dict:
     """The Hub activity page: the most active PTC people, team totals, the
     most used content -- for every PTC employee to see (Serge, 2026-10-13).
 
@@ -465,6 +466,26 @@ def leaderboard(events: list[dict], *, since: str | None = None, until: str | No
                           "total": sum(total(c) for c in mine.values())})
     team_rows.sort(key=lambda r: r["total"], reverse=True)
 
+    # Whose demos were used (Liwei, 2026-10-14): only demos used in this
+    # window count, so years of old, unused content never weigh in. The
+    # creator is the SharePoint file creator (sharepoint_mapping.content_creator).
+    by_creator: dict[str, dict] = {}
+    unattributed = 0
+    for aid, c in content.items():
+        who = (creators or {}).get(aid)
+        if not who:
+            unattributed += c["views"] + c["downloads"]
+            continue
+        k = by_creator.setdefault(who, {"demos": set(), "views": 0, "downloads": 0,
+                                        "people": set()})
+        k["demos"].add(aid)
+        k["views"] += c["views"]
+        k["downloads"] += c["downloads"]
+        k["people"] |= c["people"]
+    creator_rows = sorted(by_creator.items(),
+                          key=lambda kv: (kv[1]["views"] + kv[1]["downloads"], len(kv[1]["people"])),
+                          reverse=True)
+
     titles = titles or {}
     top_content = sorted(content.items(), key=lambda kv: (kv[1]["views"] + kv[1]["downloads"],
                                                           len(kv[1]["people"])), reverse=True)
@@ -478,6 +499,11 @@ def leaderboard(events: list[dict], *, since: str | None = None, until: str | No
                    **{k: sum(c[k] for c in people.values()) for k in USAGE_KINDS},
                    "anonymous": sum(1 for e in window if not e.get("external")
                                     and not e.get("user"))},
+        "creators": [{"rank": i + 1, "creator": who, "demos": len(k["demos"]),
+                      "views": k["views"], "downloads": k["downloads"],
+                      "people": len(k["people"]), "total": k["views"] + k["downloads"]}
+                     for i, (who, k) in enumerate(creator_rows[:top])],
+        "unattributed_uses": unattributed,
         "external_not_ranked": external,
         "top": top,
         "series": _daily(days, since, until),

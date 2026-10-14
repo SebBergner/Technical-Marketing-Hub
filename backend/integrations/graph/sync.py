@@ -286,6 +286,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
         if name not in dated:
             # A folder's own dates are the library move, not the content.
             asset["uploaded_at"] = m.content_date(asset) or asset.get("uploaded_at")
+        asset["creator"] = m.content_creator(asset)
 
     result.assets = len(assets)
     return [Asset.model_validate(a) for a in assets.values()], result
@@ -295,7 +296,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
 #: deployment rebuilds its mirror once on the next sync rather than waiting
 #: for something in SharePoint to change (delta reports "unchanged" and the
 #: old rows would stay). 2: kit dates from their files (2026-10-14).
-MAPPING_VERSION = 2
+MAPPING_VERSION = 3          # 3: the demo's creator from its files (2026-10-14)
 
 
 def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,

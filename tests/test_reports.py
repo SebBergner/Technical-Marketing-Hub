@@ -90,3 +90,17 @@ def test_the_daily_series_and_the_previous_period_come_with_it(client):
                       headers=easyauth_headers("someone@ptc.com")).json()
     assert len(body["series"]) in (30, 31) and body["previous"] is not None
     assert body["content"][0]["type"] == "vdk"
+
+
+def test_creators_are_ranked_by_how_much_their_demos_were_used_in_the_window():
+    events = [ev("view", "a@ptc.com", asset="kit1"), ev("download", "b@ptc.com", asset="kit1"),
+              ev("view", "a@ptc.com", asset="kit2"), ev("view", "a@ptc.com", asset="video"),
+              ev("view", "a@ptc.com", asset="old", days=400)]
+    out = activity.leaderboard(events, since=(NOW - timedelta(days=30)).isoformat(),
+                               creators={"kit1": "Hughes, Paul", "kit2": "Wall, Eric",
+                                         "old": "Aulenbach, Jason"})
+    assert [(c["creator"], c["demos"], c["views"], c["downloads"], c["people"])
+            for c in out["creators"]] == [("Hughes, Paul", 1, 1, 1, 2), ("Wall, Eric", 1, 1, 0, 1)]
+    assert out["unattributed_uses"] == 1, "the Demo Video one has no creator"
+    assert "Aulenbach, Jason" not in {c["creator"] for c in out["creators"]}, \
+        "unused in the window: not ranked at all"

@@ -16,9 +16,9 @@
  * in the existing filter code changes, and if this file fails or the API is
  * down the page falls back to the static cards on its own.
  *
- * The cards themselves are built by Elio's `videoAssetFromData()`, not by a
- * copy of it here — his markup and CSS stay the single source of truth, and a
- * redesign on his side carries over without anyone editing this file.
+ * The cards are built here too (cardShell(), 2026-10-14); the concept
+ * mock-up's videoAssetFromData() knew only Consensus videos, and every
+ * card it made had to be patched afterwards.
  */
 (function () {
   "use strict";
@@ -91,35 +91,6 @@
     if (a.uploaded_at) bits.push((a.type === "video" ? "Published " : "Updated ")
                                  + uploadedLabel(a.uploaded_at));
     return bits.join(" · ");
-  }
-
-  /* Our asset -> the shape videoAssetFromData() expects. */
-  function toCardData(a) {
-    var product = (a.products && a.products[0]) || "";
-    return {
-      title: a.title || "",
-      desc: a.description || statsLine(a),
-      thumb: a.thumbnail_url || "",
-      // Not for an LDK. Seb, in review: he'd assume a 13:15 badge means the
-      // demo takes 13:15, but that number is the recording's own length --
-      // a live demo can run well past it. Elio: hide it; time only matters
-      // for a customer-facing (i.e. actually-watched) video.
-      duration: a.type === "ldk" ? "" : durationLabel(a.duration_seconds),
-      product: product,
-      segment: a.segment || "",
-      industry: a.industry || "",
-      funnel: a.funnel_stage || FUNNEL_UNKNOWN,
-      // The UI's yes/no; anything not explicitly customer-facing is "no".
-      cf: a.customer_facing ? "yes" : "no",
-      // Only offer Share when a share is actually possible. Without a Consensus
-      // uuid the button would be a dead end, and the UI already has a sensible
-      // fallback badge for that case.
-      share: a.consensus_uuid ? {
-        title: a.title,
-        meta: [a.segment, a.funnel_stage].filter(Boolean).join(" · "),
-        uuid: a.consensus_uuid
-      } : null
-    };
   }
 
   /* A language tag on the tile, so a French-only recording is not discovered
@@ -225,9 +196,8 @@
     }
   }
 
-  /* Elio's own static cards already establish the convention: a kit is a box,
-   * a VDK a monitor, a recording a video camera. videoAssetFromData() hardcodes
-   * the video one because it was written for Consensus content. */
+  /* Elio's static cards established the convention: a kit is a box, a VDK
+   * a monitor, a recording a video camera. */
   var TYPE_CHIP = {
     video: ["i-video", "Video"],
     ldk:   ["i-box", "LDK"],
@@ -236,43 +206,98 @@
     cad_model: ["i-layers", "CAD Dataset"]
   };
 
-  function retypeCard(card, a) {
-    var chip = card.querySelector(".type-chip");
-    var spec = TYPE_CHIP[a.type] || TYPE_CHIP.video;
-    if (chip) {
-      chip.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#'
-                     + spec[0] + '"/></svg>' + spec[1];
+  /* A card's markup, right the first time (2026-10-14). Until then it came
+   * from the concept mock-up's videoAssetFromData(), which made every card a
+   * Consensus video -- Video chip, an inert play button, a Share button or a
+   * "No audio track" badge -- and buildCard() then corrected each of those.
+   * The rest (platform buttons, cover, tags, badges) is filled in by
+   * buildCard() below. */
+  function cardShell(a) {
+    var card = document.createElement("div");
+    card.className = "asset-card";
+    card.dataset.type = a.type || "video";      // the type filter reads this
+    card.dataset.source = a.source || "";
+    card.dataset.assetId = a.id || "";
+
+    var thumb = document.createElement("div");
+    thumb.className = "asset-card__thumb";
+    if (a.thumbnail_url) {
+      thumb.style.background = "url(" + JSON.stringify(a.thumbnail_url) + ") center / cover";
     }
 
-    /* The play button was on every card and did nothing on most of them.
-     * A Consensus record IS a recording, so it plays -- in the Consensus
-     * player, which is where the video actually lives. A SharePoint demo kit
-     * is a folder of files with no single thing to play, so the control is
-     * removed rather than left there inert.
-     *
-     * Card-level inline playback was tried here 2026-09-10 and withdrawn the
-     * same day: Seb's "play it in that thumbnail frame" ask was about the
-     * DETAIL PAGE's own hero player (.vp-player, top-left of the page), not
-     * the grid tile. See openAssetDetail() below for where this actually
-     * landed, and embedInlinePlayer() for the shared overlay mechanism both
-     * would have used. */
-    var play = card.querySelector(".play-btn");
-    if (!play) return;
-    var url = previewUrl(a);
-    if (!url) { play.remove(); return; }   // nothing to play: no control
+    var spec = TYPE_CHIP[a.type] || TYPE_CHIP.video;
+    var chip = document.createElement("span");
+    chip.className = "type-chip";
+    chip.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#' + spec[0] + '"/></svg>';
+    chip.appendChild(document.createTextNode(spec[1]));
+    thumb.appendChild(chip);
 
-    var button = document.createElement("button");
-    button.className = "play-btn";
-    button.type = "button";
-    button.title = "Play preview";
-    button.innerHTML = play.innerHTML;
-    button.style.cursor = "pointer";
-    button.addEventListener("click", function (e) {
+    /* A Consensus record IS a recording, so it plays -- in the Consensus
+     * player, where the video lives. A SharePoint kit is a folder of files
+     * with nothing single to play, so it gets no control at all.
+     *
+     * Card-level inline playback was tried 2026-09-10 and withdrawn the same
+     * day: Seb's "play it in that thumbnail frame" was about the DETAIL
+     * PAGE's hero player (.vp-player), not the grid tile. See
+     * openAssetDetail() for where that landed. */
+    if (previewUrl(a)) {
+      var play = document.createElement("button");
+      play.className = "play-btn";
+      play.type = "button";
+      play.title = "Play preview";
+      play.innerHTML = '<svg><use href="#i-play"/></svg>';
+      play.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        openPreview(a);
+      });
+      thumb.appendChild(play);
+    }
+
+    // Not for an LDK. Seb, in review: he'd assume a 13:15 badge means the
+    // demo takes 13:15, but that number is the recording's own length --
+    // a live demo can run well past it. Elio: hide it; time only matters
+    // for a customer-facing (i.e. actually-watched) video.
+    var duration = a.type === "ldk" ? "" : durationLabel(a.duration_seconds);
+    if (duration) {
+      var time = document.createElement("span");
+      time.className = "duration-chip";
+      time.textContent = duration;
+      thumb.appendChild(time);
+    }
+
+    /* The name opens a details page inside the Hub, not the platform.
+     * Seb: "we should create a details page for each of those... behind a
+     * unique link so you can share this link internally". Serge: "when you
+     * click on the name, it should take you to the details page." */
+    var title = document.createElement("div");
+    title.className = "asset-card__title";
+    var open = document.createElement("a");
+    open.href = "#/asset/" + encodeURIComponent(a.id);
+    open.className = "hub-detail-link";
+    open.textContent = a.title || "";
+    open.addEventListener("click", function (e) {
       e.preventDefault();
-      e.stopPropagation();
-      openPreview(a);
+      openAssetDetail(a.id);
     });
-    play.replaceWith(button);
+    title.appendChild(open);
+
+    var meta = document.createElement("div");
+    meta.className = "asset-card__meta";          // renderCardTags() fills it
+
+    var stats = document.createElement("div");
+    stats.className = "asset-card__stats";
+    stats.textContent = a.description || statsLine(a);
+
+    var actions = document.createElement("div");
+    actions.className = "asset-card__actions";    // platformActions() fills it
+
+    var body = document.createElement("div");
+    body.className = "asset-card__body";
+    [title, meta, stats, actions].forEach(function (n) { body.appendChild(n); });
+    card.appendChild(thumb);
+    card.appendChild(body);
+    return card;
   }
 
   /* Plays in a thumbnail-like frame itself, not a popup -- used by the
@@ -423,11 +448,10 @@
    * when a third and fourth platform appear beside it. Home platforms get the
    * verb, references get the logo.
    *
-   * Nothing at all is rendered for a platform the asset is NOT on.
-   * videoAssetFromData() shipped a "No audio track" badge in this slot, which
-   * was the mockup's only reason for being unshareable and the wrong reason
-   * here. Labelling every absence does not scale either -- with three
-   * platforms each card would carry a row of things it is not.
+   * Nothing at all is rendered for a platform the asset is NOT on (the
+   * mock-up put a "No audio track" badge here): labelling every absence does
+   * not scale -- with three platforms each card would carry a row of things
+   * it is not.
    */
   /* HIDDEN, not deleted.
    *
@@ -502,40 +526,13 @@
   }
 
   function buildCard(a) {
-    var card = window.videoAssetFromData(toCardData(a));
-    // videoAssetFromData hardcodes type=video, which is right for Consensus
-    // but wrong for the demo kits; the type filter reads this attribute.
-    card.dataset.type = a.type || "video";
-    card.dataset.source = a.source || "";
-    card.dataset.assetId = a.id || "";
-
-    retypeCard(card, a);
+    var card = cardShell(a);
     platformActions(card, a);
     clampDescription(card, a);
     paintCover(card, a);
     addLanguageTag(card, a);
     addAgeBadge(card, a);
     renderCardTags(card, a);
-
-    /* The name opens a details page inside the Hub, not the platform.
-     *
-     * Seb: "we should create a details page for each of those... behind a
-     * unique link so you can share this link internally". Serge: "when you
-     * click on the name, it should take you to the details page."
-     */
-    var title = card.querySelector(".asset-card__title");
-    if (title) {
-      var open = document.createElement("a");
-      open.href = "#/asset/" + encodeURIComponent(a.id);
-      open.className = "hub-detail-link";
-      open.textContent = title.textContent;
-      open.addEventListener("click", function (e) {
-        e.preventDefault();
-        openAssetDetail(a.id);
-      });
-      title.textContent = "";
-      title.appendChild(open);
-    }
     return card;
   }
 
@@ -2358,7 +2355,7 @@
 
     setText("vpTitle", asset.title);
     // Same call as the card's duration-chip, same reason to skip it for LDK
-    // -- see toCardData().
+    // -- see cardShell().
     setText("vpDuration", asset.type === "ldk" ? "" : durationLabel(asset.duration_seconds));
     // Hidden when empty: its dark background otherwise shows as a small bar
     // in the corner of every LDK and of any kit without a length (2026-10-01).
@@ -2587,7 +2584,7 @@
         // VDK's and LDK's, embed the _CF video there." This is the
         // "thumbnail" he meant -- confirmed 2026-09-10 after an initial
         // mix-up that tried this on the grid tiles instead (withdrawn, see
-        // retypeCard() above). No fetch needed here, unlike a grid card:
+        // cardShell() above). No fetch needed here, unlike a grid card:
         // openAssetDetail() already has the full Asset, resources[] and
         // main_video included, since this IS the detail response.
         var videos = (asset.resources || []).filter(function (r) { return r.kind === "video"; });
@@ -5339,7 +5336,7 @@
      * (added 2026-09-09) point straight at SharePoint's own SiteAssets, not
      * a pre-authenticated Graph URL like preview()/download_url() use -- they
      * only render for a viewer who is themselves signed into SharePoint in
-     * that browser. Elio's own card markup has already set this as a
+     * that browser. cardShell() has already set this as a
      * background-image with no fallback if it 404s, so an unauthenticated
      * viewer would otherwise see a blank tile instead of any cover at all.
      * Preloading costs nothing extra for the common case: the browser's own
@@ -5896,16 +5893,6 @@
   }
 
   async function load() {
-    if (typeof window.videoAssetFromData !== "function") {
-      // The hook is gone. Say so rather than silently leaving the static cards
-      // in place and letting everyone believe the data is live.
-      console.error("[hub-api] videoAssetFromData() not found — index.html has "
-                  + "changed shape. The page is showing hardcoded data.");
-      bootFailed("The page could not be wired to the catalogue. "
-               + "index.html has changed shape — see the console.");
-      return;
-    }
-
     var assets, facets;
     try {
       assets = await fetchAllAssets();

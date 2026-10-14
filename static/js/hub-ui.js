@@ -411,54 +411,6 @@ function submitAssetRequest(e) {
   }
 }
 
-function escAttr(s) { return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
-
-
-function videoAssetFromData(data) {
-  var product = data.product || '';
-  var segment = data.segment || '';
-  var funnel = data.funnel || '';
-  var cf = data.cf || '';
-
-  var card = document.createElement('div');
-  card.className = 'asset-card';
-  card.dataset.type = 'video';
-  card.dataset.product = product;
-  card.dataset.segment = segment;
-  card.dataset.stage = funnel;
-  card.dataset.cf = cf;
-
-  var logoMap = { Windchill: ['logo-windchill', '0 0 1299.67 299.6'], Creo: ['logo-creo', '0 0 1334.88 449.9'] };
-  var logo = logoMap[product];
-  var metaHtml = logo
-    ? '<span class="meta-logo-chip"><svg class="meta-logo" viewBox="' + logo[1] + '"><use href="#' + logo[0] + '"/></svg></span> ' + escAttr(funnel)
-    : escAttr(product || 'Cross-Portfolio') + (funnel ? ' \u00b7 ' + escAttr(funnel) : '');
-
-  var actionsHtml = data.share
-    ? '<button class="btn-primary-sm" data-share-title="' + escAttr(data.share.title) + '" data-share-meta="' + escAttr(data.share.meta) + '" data-share-uuid="' + escAttr(data.share.uuid) + '" data-action="share"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share</button>'
-    : '<span class="orion-badge orion-badge--open" title="Silent cut \u2014 no narration">No audio track</span>';
-
-  card.innerHTML =
-    '<div class="asset-card__thumb">' +
-      '<span class="type-chip"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg>Video</span>' +
-      '<div class="play-btn" style="cursor:default;"><svg><use href="#i-play"/></svg></div>' +
-      (data.duration ? '<span class="duration-chip">' + escAttr(data.duration) + '</span>' : '') +
-    '</div>' +
-    '<div class="asset-card__body">' +
-      '<div class="asset-card__title">' + data.title + '</div>' +
-      '<div class="asset-card__meta">' + metaHtml + '</div>' +
-      '<div class="asset-card__stats">' + (data.desc || '') + '</div>' +
-      '<div class="asset-card__actions">' + actionsHtml + '</div>' +
-    '</div>';
-
-  var thumbEl = card.querySelector('.asset-card__thumb');
-  thumbEl.style.backgroundImage = "url('" + data.thumb + "')";
-  thumbEl.style.backgroundSize = 'cover';
-  thumbEl.style.backgroundPosition = 'center';
-
-  return card;
-}
-
 // Filled with real cards by static/hub-api.js, which owns searching,
 // filtering and Reset (window.hubApplyFilters / window.hubResetFilters).
 var HUB_ASSET_POOL = null;

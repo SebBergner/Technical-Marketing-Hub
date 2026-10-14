@@ -245,6 +245,12 @@ def _within(events: list[dict], since: str | None, until: str | None) -> list[di
     return out
 
 
+def readable(email: str) -> str:
+    """A name for someone who never signed in here (or a sample person): the
+    address's own words, "sample.user.01" -> "Sample User 01"."""
+    return " ".join(w.capitalize() for w in email.split("@")[0].replace("_", ".").split("."))
+
+
 def attach_usage(rep: dict, events: list[dict], *, since: str | None = None,
                  until: str | None = None) -> dict:
     """Add each PTC person's views, previews, downloads and searches in the
@@ -274,7 +280,8 @@ def attach_usage(rep: dict, events: list[dict], *, since: str | None = None,
     for email in by_user:
         if email not in people:
             u = known.get(email) or {}
-            p = {"oid": u.get("oid"), "user": email, "name": u.get("name"), "sign_ins": 0,
+            p = {"oid": u.get("oid"), "user": email, "name": u.get("name") or readable(email),
+                 "sign_ins": 0,
                  "last_sign_in": None, "last_active": None, "groups": u.get("groups", [])}
             rep["people"].append(p)
             people[email] = p
@@ -453,7 +460,7 @@ def leaderboard(events: list[dict], *, since: str | None = None, until: str | No
 
     ranked = sorted(people.items(), key=lambda kv: (total(kv[1]), kv[1]["download"]),
                     reverse=True)
-    top_people = [{"rank": i + 1, "name": names.get(email) or email.split("@")[0],
+    top_people = [{"rank": i + 1, "name": names.get(email) or readable(email),
                    "user": email, "total": total(c), **c}
                   for i, (email, c) in enumerate(ranked[:top])]
 
@@ -506,6 +513,9 @@ def leaderboard(events: list[dict], *, since: str | None = None, until: str | No
         "unattributed_uses": unattributed,
         "external_not_ranked": external,
         "top": top,
+        # Any sample event in the window (services/sample_activity.py): the
+        # page says so, so a demonstration is never read as a measurement.
+        "synthetic": any(e.get("synthetic") for e in window),
         "series": _daily(days, since, until),
     }
 

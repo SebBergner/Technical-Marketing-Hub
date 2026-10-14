@@ -920,9 +920,33 @@ def get_activity(since: str | None = None, until: str | None = None,
     each PTC person's views, previews, downloads and searches in the window
     (backend/activity.py). Bounds come from the browser, as for /usage."""
     from backend import activity
+    from backend.services import sample_activity
     report = activity.report(since=since, until=until, today=today, q=q, user=user,
                              offset=offset, limit=limit)
+    report["sample_loaded"] = hasattr(repo, "owned_dir") and sample_activity.loaded(repo)
     return activity.attach_usage(report, _events(repo, None, None), since=since, until=until)
+
+
+@router.post("/sample-activity", dependencies=[VIEW_ADMIN])
+def load_sample_activity(repo: AssetRepository = Depends(get_repo),
+                         actor: str = Depends(MANAGE_USERS)):
+    """Write sample usage for demonstrating Hub activity (2026-10-14) --
+    flagged synthetic, in its own file, made-up people; see
+    services/sample_activity.py. Replaces an earlier sample."""
+    from backend.services import sample_activity
+    n = sample_activity.generate(repo)
+    log.info("sample activity loaded by %s: %d events", actor, n)
+    return {"loaded": True, "events": n}
+
+
+@router.delete("/sample-activity", dependencies=[VIEW_ADMIN])
+def remove_sample_activity(repo: AssetRepository = Depends(get_repo),
+                           actor: str = Depends(MANAGE_USERS)):
+    """Delete the sample; real usage is in another file and stays."""
+    from backend.services import sample_activity
+    removed = sample_activity.remove(repo)
+    log.info("sample activity removed by %s (%s)", actor, removed)
+    return {"loaded": False}
 
 
 @router.get("/activity/person", dependencies=[VIEW_ADMIN])

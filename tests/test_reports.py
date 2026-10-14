@@ -113,3 +113,29 @@ def test_the_hub_page_is_revalidated_and_carries_no_inline_handlers(client):
     assert r.headers["cache-control"] == "no-cache"
     assert "onclick=" not in r.text and "onchange=" not in r.text
     assert '<script src="/static/js/hub-ui.js" defer></script>' in r.text
+
+
+def test_sample_activity_is_flagged_kept_apart_and_removable(client, tmp_path):
+    """2026-10-14: for demonstrations. Synthetic, its own file, made-up people."""
+    real = (tmp_path / "owned" / "usage_events.jsonl").read_text(encoding="utf-8")
+    boss = easyauth_headers("boss@ptc.com")
+    import backend.config as cfg
+    cfg.settings.hub_admin_emails = "boss@ptc.com"
+    try:
+        assert client.post("/api/admin/sample-activity",
+                           headers=easyauth_headers("someone@ptc.com")).status_code == 403
+        r = client.post("/api/admin/sample-activity", headers=boss)
+        assert r.status_code == 200 and r.json()["events"] > 1000
+        demo = tmp_path / "owned" / "usage_events.demo.jsonl"
+        rows = [json.loads(line) for line in demo.read_text(encoding="utf-8").splitlines()]
+        assert all(e["synthetic"] for e in rows)
+        assert {e["user"].split("@")[1] for e in rows if e.get("user")} == {"sample.invalid"}
+        assert (tmp_path / "owned" / "usage_events.jsonl").read_text(encoding="utf-8") == real
+        body = client.get("/api/reports/activity", headers=boss).json()
+        assert body["synthetic"] is True
+        assert any(p["name"].startswith("Sample User") for p in body["people"])
+        assert client.delete("/api/admin/sample-activity", headers=boss).status_code == 200
+        assert not demo.exists()
+        assert client.get("/api/reports/activity", headers=boss).json()["synthetic"] is False
+    finally:
+        cfg.settings.hub_admin_emails = ""

@@ -4758,6 +4758,20 @@
         + '<use href="#i-trend"/></svg> Hub activity</span>';
       item.addEventListener("click", function () { location.hash = "#/activity"; });
       after.insertAdjacentElement("afterend", item);
+      // Any other way out through the sidebar -- Home, a product, a type --
+      // leaves Hub activity. Elio's items only show the catalogue and never
+      // touch the address, so #/activity used to stay open underneath it
+      // (Liwei, 2026-10-14: half the page stuck below Home). Capture phase,
+      // so the view is gone before the item's own handler shows its page.
+      var side = home.closest(".orion-side") || home.parentNode;
+      side.addEventListener("click", function (e) {
+        var target = e.target.closest(".orion-navitem");
+        if (!target || target === item) return;
+        if (location.hash === "#/activity") {
+          history.pushState(null, "", location.pathname + location.search);
+        }
+        closeActivity();
+      }, true);
       // Opened straight from a link: the view came up before this entry did.
       if (location.hash === "#/activity") markActivityNav(true);
     });

@@ -582,6 +582,8 @@ class Facets(BaseModel):
     #: folded into the others, because a tag can mean anything and pretending
     #: otherwise would put unrelated content behind a filter.
     tags: list[FacetValue] = Field(default_factory=list)
+    #: Age bands (new, recent, aging, older) then years, newest first.
+    published: list[FacetValue] = Field(default_factory=list)
     total: int = 0
 
 

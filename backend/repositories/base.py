@@ -18,7 +18,7 @@ from backend.models import (
 
 #: "relevance" degrades to "recent" when there is no search text, so it is one
 #: concept rather than two and can safely be the default.
-SortKey = Literal["relevance", "recent", "most_viewed", "title"]
+SortKey = Literal["relevance", "recent", "oldest", "most_viewed", "title"]
 
 
 @dataclass
@@ -42,6 +42,9 @@ class AssetQuery:
     #: takes you somewhere, that one narrows where you are.
     umbrella_families: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
+    #: How old (Serge, 2026-10-13): age bands -- new, recent, aging, older --
+    #: or years ("2023"); any one matches (services/content_age.py).
+    published: list[str] = field(default_factory=list)
     customer_facing: bool | None = None
     has_narrated_audio: bool | None = None
     has_consensus_uuid: bool | None = None

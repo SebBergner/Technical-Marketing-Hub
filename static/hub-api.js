@@ -1207,7 +1207,7 @@
 
   var CONTROLS = ["hubSearchInput", "hubFilterType", "hubFilterProduct",
                   "hubFilterSegment", "hubFilterStage", "hubFilterLanguage",
-                  "hubFilterCf", "hubFilterVideoType"];
+                  "hubFilterCf", "hubFilterVideoType", "hubFilterPublished"];
   var LANDING = ["hubHome", "continueSection", "latestUploadsSection", "mostViewedSection",
                  "browseByProductSection", "editorsPicksSection"];
   //: One request's ceiling, enforced server-side (`le=200` in assets.py) --
@@ -1261,6 +1261,7 @@
     if (val("hubFilterSegment")) params.append("segment", val("hubFilterSegment"));
     if (val("hubFilterStage")) params.append("stage", val("hubFilterStage"));
     if (val("hubFilterLanguage")) params.append("language", val("hubFilterLanguage"));
+    if (val("hubFilterPublished")) params.append("published", val("hubFilterPublished"));
     // Elio's "Video Type", which is `content_depth` under its own name.
     if (val("hubFilterVideoType")) params.append("depth", val("hubFilterVideoType"));
     var cf = val("hubFilterCf");
@@ -1356,9 +1357,120 @@
     if (!isVm) document.getElementById("hubFilterVmVersions").value = "";
   }
 
+  /* ── Published and Sort (Serge, 2026-10-13) ───────────────────────────
+   *
+   * "Search TMH by date" and "sort by date published, latest first". Both
+   * built here rather than in Elio's markup, like Versions above.
+   *
+   * Published narrows by age band -- the same bands as the age badges
+   * (backend/services/content_age.py) -- or by year, with counts like every
+   * other filter. Sort is a visible handle on the sort the page already
+   * keeps (`sortOverride`): Latest Uploads shows "Newest first", Home and
+   * Reset put it back, and choosing one on Home lists everything that way.
+   */
+  var PUBLISHED_BANDS = [["new", "Under 1 year"], ["recent", "1\u20132 years"],
+                         ["aging", "2\u20134 years"], ["older", "4 years or more"]];
+  var SORTS = [["relevance", "Best match"], ["recent", "Newest first"],
+               ["oldest", "Oldest first"], ["most_viewed", "Most viewed"],
+               ["title", "A\u2013Z"]];
+
+  function ensurePublishedFilter() {
+    var select = document.getElementById("hubFilterPublished");
+    if (select) return select;
+    // In the main bar after Segment, not under "More filters": finding the
+    // newest is what Serge asked for, so it is in plain sight.
+    var segment = document.getElementById("hubFilterSegment");
+    var anchor = segment && segment.closest("label");
+    if (!anchor) return null;
+    var pill = document.createElement("label");
+    pill.className = "filter-pill";
+    pill.id = "hubPublishedPill";
+    pill.appendChild(document.createTextNode("Published: "));
+    select = document.createElement("select");
+    select.id = "hubFilterPublished";
+    var any = document.createElement("option");
+    any.value = "";
+    any.textContent = "Any time";
+    select.appendChild(any);
+    select.addEventListener("change", applyFilters);
+    pill.appendChild(select);
+    pill.insertAdjacentHTML("beforeend",
+      '<svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>');
+    anchor.insertAdjacentElement("afterend", pill);
+    return select;
+  }
+
+  /* Bands first, always all four (at 0 too, so the control keeps its
+   * shape), then each year with content, newest first. */
+  function fillPublished(facet) {
+    var select = ensurePublishedFilter();
+    if (!select || !facet) return;
+    var counts = {};
+    facet.forEach(function (f) { counts[f.value] = f.count; });
+    var chosen = select.value;
+    while (select.options.length > 1) select.remove(1);
+    Array.prototype.slice.call(select.querySelectorAll("optgroup")).forEach(function (g) {
+      g.remove();
+    });
+    function group(label, entries) {
+      var g = document.createElement("optgroup");
+      g.label = label;
+      entries.forEach(function (e) {
+        var o = document.createElement("option");
+        o.value = e[0];
+        o.textContent = e[1] + " (" + (counts[e[0]] || 0) + ")";
+        g.appendChild(o);
+      });
+      select.appendChild(g);
+    }
+    group("Age", PUBLISHED_BANDS);
+    var years = facet.filter(function (f) { return /^\d{4}$/.test(f.value); })
+      .map(function (f) { return [f.value, f.value]; });
+    if (years.length) group("Year", years);
+    select.value = chosen;
+    if (select.value !== chosen) select.value = "";
+  }
+
+  function ensureSortControl() {
+    var select = document.getElementById("hubSort");
+    if (select) return select;
+    var head = document.querySelector("#allAssetsSection .section-head");
+    if (!head) return null;
+    var pill = document.createElement("label");
+    pill.className = "filter-pill hub-sort";
+    pill.style.marginLeft = "auto";
+    pill.appendChild(document.createTextNode("Sort: "));
+    select = document.createElement("select");
+    select.id = "hubSort";
+    SORTS.forEach(function (o) {
+      var option = document.createElement("option");
+      option.value = o[0];
+      option.textContent = o[1];
+      select.appendChild(option);
+    });
+    select.addEventListener("change", function () {
+      sortOverride = select.value;
+      applyFilters();
+    });
+    pill.appendChild(select);
+    pill.insertAdjacentHTML("beforeend",
+      '<svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>');
+    head.appendChild(pill);
+    return select;
+  }
+
+  /* Show the sort actually in force -- including the A-Z a segment page
+   * uses -- rather than whatever was last picked. */
+  function reflectSort() {
+    var select = ensureSortControl();
+    if (select) select.value = effectiveSort() || "relevance";
+  }
+
   async function applyFilters() {
     updateVideoTypeFilterVisibility();
     updateVmVersionFilter();
+    ensurePublishedFilter();
+    reflectSort();
     var params = currentQuery();
     var active = params.toString().length > 0 || !!sortOverride;
 
@@ -1399,6 +1511,7 @@
         rescoreSelect("hubFilterStage", baselineFacets.funnel_stages);
         rescoreSelect("hubFilterVideoType", baselineFacets.content_depths);
         rescoreSelect("hubFilterLanguage", baselineFacets.languages);
+        fillPublished(baselineFacets.published);
         fillSidebarCounts(baselineFacets);
       }
       loadMoreState = null;
@@ -1466,6 +1579,7 @@
     rescoreSelect("hubFilterStage", facets.funnel_stages);
     rescoreSelect("hubFilterVideoType", facets.content_depths);
     rescoreSelect("hubFilterLanguage", facets.languages);
+    fillPublished(facets.published);
     // The sidebar shows the same three dimensions, so it takes the same
     // numbers. Leaving it on whole-catalogue counts would reintroduce, one
     // panel over, exactly the contradiction this is meant to remove.
@@ -1630,6 +1744,18 @@
       freshReset.addEventListener("click", clearAll);
     }
     window.hubApplyFilters = applyFilters;   // for anything else that calls it
+    // index.html's Reset clears the controls in its own markup; Published
+    // and Sort are built here, so they are cleared here (2026-10-14).
+    var elioReset = window.hubResetFilters;
+    if (typeof elioReset === "function" && !elioReset.hubWrapped) {
+      window.hubResetFilters = function () {
+        var published = document.getElementById("hubFilterPublished");
+        if (published) published.value = "";
+        sortOverride = null;
+        return elioReset.apply(this, arguments);
+      };
+      window.hubResetFilters.hubWrapped = true;
+    }
   }
 
   /* ── the filter bar (Liwei, 2026-10-01) ──────────────────────────────
@@ -1652,7 +1778,7 @@
     ["hubFilterType", "Type"], ["hubFilterVideoType", "Video type"],
     ["hubFilterProduct", "Product"], ["hubFilterSegment", "Segment"],
     ["hubFilterStage", "Stage"], ["hubFilterLanguage", "Language"],
-    ["hubFilterCf", "Customer-facing"]
+    ["hubFilterCf", "Customer-facing"], ["hubFilterPublished", "Published"]
   ];
 
   var FILTER_BAR_CSS =
@@ -5465,6 +5591,7 @@
     fillSelect("hubFilterStage", facets.funnel_stages);
     fillSelect("hubFilterVideoType", facets.content_depths);
     fillSelect("hubFilterLanguage", facets.languages);
+    fillPublished(facets.published);
     fillSelect("hubFilterType", facets.types);
     fillSidebarCounts(facets);
     takeOverControls();

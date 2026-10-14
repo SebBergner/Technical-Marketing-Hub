@@ -67,6 +67,7 @@ def get_facets(
     depth: list[str] = Query(default=[]),
     source: list[str] = Query(default=[]),
     tag: list[str] = Query(default=[]),
+    published: list[str] = Query(default=[]),
     customer_facing: bool | None = None,
     include_older_vms: bool = False,
     repo: AssetRepository = Depends(get_repo),
@@ -86,10 +87,11 @@ def get_facets(
         umbrella_families=umbrella,
         funnel_stages=stage, segments=segment, languages=language,
         content_depths=video_type_filter(depth), sources=source, tags=tag,
+        published=published,
         customer_facing=customer_facing, include_older_vms=include_older_vms,
     )
     any_filter = any([q, type, product, family, umbrella, stage, segment,
-                      language, depth, source, tag, include_older_vms])         or customer_facing is not None
+                      language, depth, source, tag, published, include_older_vms])         or customer_facing is not None
     return repo.facets(query if any_filter else None)
 
 

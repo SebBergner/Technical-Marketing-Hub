@@ -45,7 +45,7 @@ from backend.models import (
     Page, ProposalState, ProposalSummary, ValueRoadmap, video_type,
 )
 from backend.repositories.base import AssetQuery, AssetRepository
-from backend.services import listing, relevance, taxonomy
+from backend.services import content_age, listing, relevance, taxonomy
 from backend.tables import utcnow
 
 log = logging.getLogger(__name__)
@@ -443,6 +443,10 @@ class JsonAssetRepository(AssetRepository):
                     & set(query.umbrella_families)):
                 return False
 
+            if query.published and not content_age.matches(
+                    _as_date(record.get("uploaded_at")), query.published):
+                return False
+
             if query.customer_facing is not None \
                     and bool(record.get("customer_facing", True)) != query.customer_facing:
                 return False
@@ -473,6 +477,9 @@ class JsonAssetRepository(AssetRepository):
 
         if query.sort == "most_viewed":
             rows.sort(key=lambda r: (stats.get(r["id"], {}) or {}).get("views", 0), reverse=True)
+        elif query.sort == "oldest":
+            # Undated last: "oldest" must not open on content with no date.
+            rows.sort(key=lambda r: (recency(r) == date.min, recency(r)))
         elif query.sort == "title":
             rows.sort(key=lambda r: r.get("title", "").lower())
         elif query.sort == "relevance" and query.text:
@@ -762,8 +769,20 @@ class JsonAssetRepository(AssetRepository):
                        for t in FILTER_TYPES]
         type_facets += [FacetValue(value=v, count=n) for v, n in sorted(type_counts.items())]
 
+        # Published: the four age bands in order (at zero too, so the control
+        # never changes shape), then every year that has content, newest first.
+        dated = [_as_date(r.get("uploaded_at")) for r in rows_for("published")]
+        dated = [d for d in dated if d]
+        band_counts = Counter(content_age.band(d) for d in dated)
+        year_counts = Counter(str(d.year) for d in dated)
+        published = [FacetValue(value=b, count=band_counts.get(b, 0))
+                     for b, _ in content_age.BANDS]
+        published += [FacetValue(value=y, count=n)
+                      for y, n in sorted(year_counts.items(), reverse=True)]
+
         return Facets(
             types=type_facets,
+            published=published,
             products=multi("products", "products"),
             funnel_stages=scalar("funnel_stage", "funnel_stages"),
             segments=scalar("segment", "segments"),

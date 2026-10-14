@@ -44,6 +44,9 @@ def list_assets(
         description="umbrella product family — the eight the navigation browses "
                     "by, decided by the team rather than derived. An asset can "
                     "be in none of them and still be searchable."),
+    published: list[str] = Query(
+        default=[], description="age band (new | recent | aging | older) or a year "
+                                "such as 2023; any one matches"),
     customer_facing: bool | None = None,
     has_narrated_audio: bool | None = None,
     has_consensus_uuid: bool | None = None,
@@ -53,7 +56,7 @@ def list_assets(
         default=False,
         description="also list VMs a newer version of the same VM supersedes"),
     sort: str = Query(
-        default="relevance", pattern="^(relevance|recent|most_viewed|title)$",
+        default="relevance", pattern="^(relevance|recent|oldest|most_viewed|title)$",
         description="relevance ranks title matches above description matches and "
                     "opening matches above buried ones; with no search text it "
                     "is identical to recent"),
@@ -65,7 +68,7 @@ def list_assets(
         text=q, types=type, products=product, funnel_stages=stage, segments=segment,
         industries=industry, value_drivers=driver, languages=language, content_depths=video_type_filter(depth),
         sources=source, product_families=family,
-        umbrella_families=umbrella, tags=tag,
+        umbrella_families=umbrella, tags=tag, published=published,
         customer_facing=customer_facing, has_narrated_audio=has_narrated_audio,
         has_consensus_uuid=has_consensus_uuid, rail=rail, editor_picks_only=editor_picks,
         include_older_vms=include_older_vms,

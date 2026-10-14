@@ -1632,39 +1632,20 @@
     return function () { clearTimeout(t); t = setTimeout(fn, ms); };
   }
 
-  /* Elio binds his handler with addEventListener, which captures the function
-   * reference -- reassigning the global would leave his version still wired up
-   * and fighting this one. Cloning each control drops its listeners outright,
-   * which is the only reliable way to take them over. */
+  /* The filter controls are ours outright (2026-10-14), so they are simply
+   * wired here; before that each one was cloned to shed the concept mock-up's
+   * own listeners. Reset -- the Reset button and the chips' Clear all --
+   * is clearAll(), which clears every control, Published and the sort
+   * included. */
   function takeOverControls() {
     var debounced = debounce(applyFilters, 200);
     CONTROLS.forEach(function (id) {
       var el = document.getElementById(id);
       if (!el) return;
-      var fresh = el.cloneNode(true);
-      el.replaceWith(fresh);
-      fresh.addEventListener(fresh.tagName === "INPUT" ? "input" : "change",
-                             debounced);
+      el.addEventListener(el.tagName === "INPUT" ? "input" : "change", debounced);
     });
-    var reset = document.getElementById("hubResetBtn");
-    if (reset) {
-      var freshReset = reset.cloneNode(true);
-      reset.replaceWith(freshReset);
-      freshReset.addEventListener("click", clearAll);
-    }
     window.hubApplyFilters = applyFilters;   // for anything else that calls it
-    // index.html's Reset clears the controls in its own markup; Published
-    // and Sort are built here, so they are cleared here (2026-10-14).
-    var elioReset = window.hubResetFilters;
-    if (typeof elioReset === "function" && !elioReset.hubWrapped) {
-      window.hubResetFilters = function () {
-        var published = document.getElementById("hubFilterPublished");
-        if (published) published.value = "";
-        sortOverride = null;
-        return elioReset.apply(this, arguments);
-      };
-      window.hubResetFilters.hubWrapped = true;
-    }
+    window.hubResetFilters = clearAll;       // data-action="reset-filters"
   }
 
   /* ── the filter bar (Liwei, 2026-10-01) ──────────────────────────────
@@ -1911,21 +1892,10 @@
     }
   }
 
-  /* Elio's "Latest Uploads" nav item, renamed to match Home (2026-10-01):
-   * newest first by date, where a kit's date is its last edit, is
-   * "recently published or updated" -- not uploads. Renamed before
-   * wireNav(), which finds items by the text on screen. */
+  /* The sidebar's newest-first item (2026-10-01): a kit's date is its last
+   * edit, so this is "recently published or updated" -- not uploads.
+   * wireNav() finds items by the text on screen. */
   var RECENT_NAV_LABEL = "Recently published";
-
-  function renameRecentNav() {
-    document.querySelectorAll(".orion-side .orion-navitem .label").forEach(function (label) {
-      label.childNodes.forEach(function (n) {
-        if (n.nodeType === Node.TEXT_NODE && n.textContent.trim() === "Latest Uploads") {
-          n.textContent = " " + RECENT_NAV_LABEL;
-        }
-      });
-    });
-  }
 
   function wireNav(facets) {
     var families = {}, stages = {}, umbrellas = {};
@@ -1951,7 +1921,7 @@
 
       var target = null;
       if (canonical === "Home") target = { control: null };
-      else if (canonical === "Latest Uploads" || canonical === RECENT_NAV_LABEL)
+      else if (canonical === RECENT_NAV_LABEL)
         target = { control: null, sort: "recent" };
       else if (NAV_TYPE[canonical]) target = { control: "hubFilterType", value: NAV_TYPE[canonical] };
       // A product family is a destination, not a filter toggle: it clears
@@ -5981,7 +5951,6 @@
     wireDetailPage();
     fillProductPills(facets);
     await buildFamilyNav(facets);
-    renameRecentNav();
     wireNav(facets);
     markUnavailable(facets);
     markNavActive();

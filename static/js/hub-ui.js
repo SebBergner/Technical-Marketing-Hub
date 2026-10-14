@@ -459,29 +459,9 @@ function videoAssetFromData(data) {
   return card;
 }
 
-// Filled with real cards by static/hub-api.js, which also owns filtering;
-// the mock-up's own filter over sample cards was removed 2026-10-14.
+// Filled with real cards by static/hub-api.js, which owns searching,
+// filtering and Reset (window.hubApplyFilters / window.hubResetFilters).
 var HUB_ASSET_POOL = null;
-function hubApplyFilters() {}
-
-function hubResetFilters() {
-  document.getElementById('hubSearchInput').value = '';
-  // hubApplyFilters() is window.hubApplyFilters by the time this runs --
-  // hub-api.js points it at its own applyFilters() at boot -- so this
-  // function's own job is only clearing every control's value, and a new
-  // control needs adding here or Reset silently leaves it set.
-  ['hubFilterType', 'hubFilterProduct', 'hubFilterSegment', 'hubFilterStage',
-   'hubFilterLanguage', 'hubFilterCf'].forEach(function(id) {
-    document.getElementById(id).value = '';
-  });
-  hubApplyFilters();
-}
-
-document.getElementById('hubSearchInput').addEventListener('input', hubApplyFilters);
-['hubFilterType','hubFilterProduct','hubFilterSegment','hubFilterStage','hubFilterCf'].forEach(function(id) {
-  document.getElementById(id).addEventListener('change', hubApplyFilters);
-});
-hubApplyFilters();
 
 /* ── One listener for every control on the page (2026-10-14) ──────────────
  * The markup names what a control does (data-action="..."); this table says

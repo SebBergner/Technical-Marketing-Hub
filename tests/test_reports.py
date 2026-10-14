@@ -78,6 +78,15 @@ def test_every_ptc_employee_may_see_it_partners_may_not(client):
                       headers=easyauth_headers("someone@ptc.com")).status_code == 403
 
 
-def test_the_page_is_served(client):
-    r = client.get("/reports")
-    assert r.status_code == 200 and "Hub activity" in r.text
+def test_the_old_address_leads_to_the_view_inside_the_hub(client):
+    r = client.get("/reports", follow_redirects=False)
+    assert r.status_code == 302 and r.headers["location"] == "/#/activity"
+
+
+def test_the_daily_series_and_the_previous_period_come_with_it(client):
+    from datetime import datetime, timedelta, timezone
+    since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    body = client.get("/api/reports/activity", params={"since": since},
+                      headers=easyauth_headers("someone@ptc.com")).json()
+    assert len(body["series"]) in (30, 31) and body["previous"] is not None
+    assert body["content"][0]["type"] == "vdk"

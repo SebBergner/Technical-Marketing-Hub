@@ -417,7 +417,15 @@ def leaderboard(events: list[dict], *, since: str | None = None, until: str | No
     window = [e for e in _within(events, since, until) if e.get("event") in USAGE_KINDS]
     people: dict[str, dict] = {}
     content: dict[str, dict] = {}
+    days: dict[str, dict] = {}
     external = 0
+    for e in window:
+        # The daily line counts everyone's actions, partners' included --
+        # anonymous totals, as on the Overview; only the ranking is PTC-only.
+        d = days.setdefault((e.get("at") or "")[:10], {k: 0 for k in USAGE_KINDS})
+        d[e["event"]] += 1
+        if e.get("user"):
+            d.setdefault("people", set()).add(e["user"])
     for e in window:
         if e.get("external"):
             external += 1
@@ -472,4 +480,24 @@ def leaderboard(events: list[dict], *, since: str | None = None, until: str | No
                                     and not e.get("user"))},
         "external_not_ranked": external,
         "top": top,
+        "series": _daily(days, since, until),
     }
+
+
+def _daily(days: dict[str, dict], since: str | None, until: str | None) -> list[dict]:
+    """One entry per day in the window, zeros included, so a quiet day shows
+    as a dip rather than vanishing from the line."""
+    from datetime import date as _date
+    lo = _parse(since).date() if _parse(since) else (
+        _date.fromisoformat(min(days)) if days else None)
+    hi = (_parse(until).date() - timedelta(days=1)) if _parse(until) else _now().date()
+    if lo is None:
+        return []
+    out, day = [], lo
+    while day <= hi:
+        key = day.isoformat()
+        d = days.get(key) or {}
+        out.append({"date": key, **{k: d.get(k, 0) for k in USAGE_KINDS},
+                    "people": len(d.get("people") or ())})
+        day += timedelta(days=1)
+    return out

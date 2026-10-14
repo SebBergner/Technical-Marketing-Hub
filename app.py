@@ -3,7 +3,7 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -142,11 +142,9 @@ async def admin_page():
 
 @app.get("/reports", include_in_schema=False)
 async def reports_page():
-    """Hub activity, for every PTC employee (2026-10-14). Its own page like
-    /admin; its figures come from /api/reports/activity, which checks
-    "View Hub activity"."""
-    return FileResponse(os.path.join(BASE_DIR, "static", "reports.html"),
-                        headers={"Cache-Control": "no-cache"})
+    """Hub activity now lives inside the Hub (#/activity, 2026-10-14: in the
+    main page's design, not the Admin page's); this keeps old links working."""
+    return RedirectResponse("/#/activity", status_code=302)
 
 
 @app.get("/migration", include_in_schema=False)

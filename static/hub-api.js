@@ -4054,6 +4054,13 @@
    * thing: read the hash and show whatever it names. */
   function routeFromHash() {
     var hash = location.hash || "";
+    if (hash === "#/activity") {
+      closeFilePreview(false);
+      closeAssetDetail();
+      openActivity();
+      return;
+    }
+    closeActivity();
     var search = /^#\/search\/(.*)$/.exec(hash);
     if (search) {
       closeFilePreview(false);
@@ -4112,6 +4119,657 @@
       closeAssetDetail();
     });
     routeFromHash();          // honour a link opened cold
+  }
+
+  /* ── Hub activity (#/activity), 2026-10-14 ────────────────────────────
+   *
+   * How PTC uses the Hub, for every PTC employee -- Serge's "healthy
+   * competition", and a showcase for the team. Inside the Hub, in its own
+   * design (Liwei: "follow the Hub main page, not the Admin page"), like
+   * Advanced Search. Data: /api/reports/activity.
+   *
+   * What it never shows (Liwei, 2026-10-14): a bottom of the list, and
+   * anything about partners beyond one anonymous count. Every figure in a
+   * chart is also in a table or a label, so nothing hides behind a hover.
+   */
+  var ACT_RANGES = [["30", "30 days"], ["90", "90 days"], ["365", "12 months"]];
+  var actState = { range: "30", seq: 0 };
+
+  var ACTIVITY_CSS =
+    "#hubActivityPage .vp-head{display:flex;justify-content:space-between;align-items:flex-end;" +
+    "gap:16px;flex-wrap:wrap}" +
+    ".hub-act__ranges{display:inline-flex;padding:3px;gap:2px;border-radius:var(--orion-radius-pill);" +
+    "background:var(--orion-surface-2);border:1px solid var(--orion-border)}" +
+    ".hub-act__ranges button{font:inherit;font-size:12.5px;font-weight:500;border:none;cursor:pointer;" +
+    "padding:5px 13px;border-radius:var(--orion-radius-pill);background:none;color:var(--orion-text-2)}" +
+    ".hub-act__ranges button[aria-pressed=true]{background:var(--orion-surface);color:var(--orion-text);" +
+    "font-weight:600;box-shadow:var(--orion-shadow)}" +
+    ".hub-act{display:grid;gap:16px;margin-top:18px;transition:opacity .15s}" +
+    ".hub-act--loading{opacity:.55}" +
+    ".hub-act__card{background:var(--orion-surface);border:1px solid var(--orion-border);" +
+    "border-radius:var(--orion-radius);box-shadow:var(--orion-shadow);padding:18px 20px;min-width:0}" +
+    ".hub-act__card h3{margin:0 0 2px;font-size:14px;font-weight:600;color:var(--orion-text)}" +
+    ".hub-act__sub{font-size:12.5px;color:var(--orion-text-3);margin-bottom:14px}" +
+    ".hub-act__top{display:grid;gap:16px;grid-template-columns:minmax(260px,1.25fr) repeat(3,minmax(150px,1fr))}" +
+    "@media (max-width:1100px){.hub-act__top{grid-template-columns:repeat(2,minmax(0,1fr))}}" +
+    "@media (max-width:620px){.hub-act__top{grid-template-columns:1fr}}" +
+    // The hero: one number, big, in the Hub's own green wash.
+    ".hub-act__hero{background:linear-gradient(135deg,var(--orion-indigo-soft),var(--orion-surface) 70%);" +
+    "border-color:color-mix(in srgb,var(--orion-indigo) 30%,var(--orion-border))}" +
+    ".hub-act__hero-n{font-size:52px;line-height:1.05;font-weight:700;letter-spacing:-.02em;" +
+    "color:var(--orion-text);margin:6px 0 4px}" +
+    ".hub-act__label{font-size:12.5px;font-weight:500;color:var(--orion-text-2)}" +
+    ".hub-act__n{font-size:28px;line-height:1.15;font-weight:700;color:var(--orion-text);margin:4px 0}" +
+    ".hub-act__delta{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:600}" +
+    ".hub-act__delta--up{color:var(--orion-green-ink)}.hub-act__delta--down{color:var(--orion-danger-ink)}" +
+    ".hub-act__delta--flat{color:var(--orion-text-3)}" +
+    ".hub-act__delta span{font-weight:400;color:var(--orion-text-3)}" +
+    ".hub-act__spark{display:block;margin-top:10px;width:100%;height:30px}" +
+    ".hub-act__mid{display:grid;gap:16px;grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr)}" +
+    "@media (max-width:1100px){.hub-act__mid{grid-template-columns:1fr}}" +
+    // The daily chart.
+    ".hub-act__chart{position:relative}" +
+    ".hub-act__chart svg{display:block;width:100%;height:240px;overflow:visible}" +
+    ".hub-act__chart .grid line{stroke:var(--orion-border);stroke-width:1}" +
+    ".hub-act__chart text{font-size:11px;fill:var(--orion-text-3);font-family:var(--orion-font)}" +
+    ".hub-act__tip{position:absolute;pointer-events:none;background:var(--orion-surface);" +
+    "border:1px solid var(--orion-border-md);border-radius:var(--orion-radius-sm);" +
+    "box-shadow:0 4px 14px rgba(16,24,40,.14);padding:8px 10px;font-size:12px;min-width:150px;" +
+    "color:var(--orion-text-2);transform:translate(-50%,-110%);white-space:nowrap}" +
+    ".hub-act__tip b{display:block;font-size:15px;color:var(--orion-text)}" +
+    ".hub-act__tip .k{display:inline-block;width:10px;height:2px;background:var(--orion-indigo);" +
+    "vertical-align:middle;margin-right:5px}" +
+    ".hub-act details{margin-top:10px;font-size:12.5px;color:var(--orion-text-2)}" +
+    ".hub-act details summary{cursor:pointer;color:var(--orion-text-3)}" +
+    ".hub-act table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}" +
+    ".hub-act th{text-align:left;font-weight:600;color:var(--orion-text-3);padding:4px 6px}" +
+    ".hub-act td{padding:4px 6px;border-top:1px solid var(--orion-border);color:var(--orion-text-2)}" +
+    ".hub-act .r{text-align:right;font-variant-numeric:tabular-nums}" +
+    // Leaderboard.
+    ".hub-act__lb{list-style:none;margin:0;padding:0;display:grid;gap:4px}" +
+    ".hub-act__lb li{display:grid;grid-template-columns:30px 36px minmax(0,1fr) minmax(90px,38%);" +
+    "align-items:center;gap:10px;padding:7px 6px;border-radius:var(--orion-radius-sm)}" +
+    ".hub-act__lb li:hover{background:var(--orion-surface-2)}" +
+    ".hub-act__rank{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;" +
+    "justify-content:center;font-size:12px;font-weight:700;color:var(--orion-text-2);" +
+    "background:var(--orion-surface-3)}" +
+    ".hub-act__rank--1{background:linear-gradient(135deg,#f7d774,#d4a017);color:#5a4200}" +
+    ".hub-act__rank--2{background:linear-gradient(135deg,#eceff3,#b8c0cc);color:#3b4350}" +
+    ".hub-act__rank--3{background:linear-gradient(135deg,#f1c6a0,#c47f45);color:#4a2a10}" +
+    ".hub-act__avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;" +
+    "justify-content:center;font-size:12.5px;font-weight:700;color:var(--orion-indigo);" +
+    "background:var(--orion-indigo-soft);border:1px solid color-mix(in srgb,var(--orion-indigo) 25%,transparent)}" +
+    ".hub-act__who{min-width:0}.hub-act__who b{display:block;font-size:13.5px;font-weight:600;" +
+    "color:var(--orion-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+    ".hub-act__who span{font-size:12px;color:var(--orion-text-3)}" +
+    ".hub-act__bar{display:flex;align-items:center;gap:8px}" +
+    ".hub-act__track{flex:1;height:8px;border-radius:0 4px 4px 0;background:var(--orion-surface-3);overflow:hidden}" +
+    ".hub-act__fill{height:100%;border-radius:0 4px 4px 0;background:var(--orion-indigo)}" +
+    ".hub-act__val{font-size:13px;font-weight:600;color:var(--orion-text);min-width:28px;text-align:right;" +
+    "font-variant-numeric:tabular-nums}" +
+    // Teams.
+    ".hub-act__team{padding:10px 0;border-top:1px solid var(--orion-border)}" +
+    ".hub-act__team:first-of-type{border-top:none;padding-top:2px}" +
+    ".hub-act__team-head{display:flex;justify-content:space-between;gap:8px;font-size:13.5px}" +
+    ".hub-act__team-head b{font-weight:600;color:var(--orion-text)}" +
+    ".hub-act__team-head span{color:var(--orion-text-3);font-size:12.5px}" +
+    ".hub-act__meter{height:6px;border-radius:999px;margin-top:7px;" +
+    "background:color-mix(in srgb,var(--orion-indigo) 14%,var(--orion-surface))}" +
+    ".hub-act__meter i{display:block;height:100%;border-radius:999px;background:var(--orion-indigo)}" +
+    ".hub-act__team-foot{font-size:12px;color:var(--orion-text-3);margin-top:5px}" +
+    // Most used content.
+    ".hub-act__content{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}" +
+    ".hub-act__item{display:block;text-decoration:none;color:inherit;border:1px solid var(--orion-border);" +
+    "border-radius:var(--orion-radius);overflow:hidden;background:var(--orion-surface);" +
+    "transition:transform .12s,box-shadow .12s}" +
+    ".hub-act__item:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(16,24,40,.12)}" +
+    ".hub-act__thumb{position:relative;height:108px;background:var(--orion-surface-3);" +
+    "background-size:cover;background-position:center}" +
+    ".hub-act__num{position:absolute;top:8px;left:8px;min-width:24px;height:24px;padding:0 6px;" +
+    "border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:12px;" +
+    "font-weight:700;color:#fff;background:rgba(31,35,41,.82)}" +
+    ".hub-act__item-body{padding:10px 12px}" +
+    ".hub-act__item-title{font-size:13px;font-weight:600;color:var(--orion-text);line-height:1.35;" +
+    "display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:35px}" +
+    ".hub-act__item-meta{font-size:12px;color:var(--orion-text-3);margin-top:6px}" +
+    ".hub-act__empty{font-size:13px;color:var(--orion-text-3);padding:8px 0}" +
+    ".hub-act__foot{font-size:12px;color:var(--orion-text-3);line-height:1.6;margin:4px 2px 24px}";
+
+  function actEl(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined && text !== null) n.textContent = String(text);
+    return n;
+  }
+
+  function plural(n, word) {
+    return n.toLocaleString() + " " + word + (n === 1 ? "" : "s");
+  }
+
+  function breakdown(views, downloads, searches) {
+    return [plural(views, "view"), plural(downloads, "download"), plural(searches, "search")]
+      .join(" · ").replace(/searchs/g, "searches");
+  }
+
+  function compact(n) {
+    n = Number(n || 0);
+    return n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "K" : n.toLocaleString();
+  }
+
+  function initials(name) {
+    var parts = String(name || "?").replace(/[^A-Za-zÀ-ɏ\s.-]/g, " ").trim().split(/[\s.-]+/);
+    return ((parts[0] || "?")[0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+  }
+
+  function buildActivityPage() {
+    var page = document.getElementById("hubActivityPage");
+    if (page) return page;
+    if (!document.getElementById("hubActivityCss")) {
+      var style = document.createElement("style");
+      style.id = "hubActivityCss";
+      style.textContent = ACTIVITY_CSS;
+      (document.head || document.body).appendChild(style);
+    }
+    page = document.createElement("div");
+    page.className = "video-preview-page";
+    page.id = "hubActivityPage";
+    page.innerHTML =
+        '<button class="vp-back" type="button"><svg class="orion-ico orion-ico--sm">'
+      +   '<use href="#i-chevron-left"/></svg>Back to Technical Marketing Hub</button>'
+      + '<div class="vp-head"><div>'
+      +   '<div class="vp-title">Hub activity</div>'
+      +   '<div class="orion-subtle">How PTC uses the Technical Marketing Hub: '
+      +   'what is opened, downloaded and searched for, and by how many people.</div>'
+      + '</div><div class="hub-act__ranges" role="group" aria-label="Period" id="hubActRanges"></div></div>'
+      + '<div class="hub-act" id="hubAct"></div>';
+    var anchor = document.getElementById("videoPreviewPage");
+    if (anchor) anchor.parentNode.insertBefore(page, anchor);
+    else document.body.appendChild(page);
+    page.querySelector(".vp-back").addEventListener("click", function () {
+      history.pushState(null, "", location.pathname + location.search);
+      closeActivity();
+    });
+    var ranges = page.querySelector("#hubActRanges");
+    ACT_RANGES.forEach(function (r) {
+      var b = actEl("button", null, r[1]);
+      b.type = "button";
+      b.dataset.range = r[0];
+      b.addEventListener("click", function () {
+        actState.range = r[0];
+        loadActivity();
+      });
+      ranges.appendChild(b);
+    });
+    return page;
+  }
+
+  function openActivity() {
+    var page = buildActivityPage();
+    closeAdvancedSearch();
+    document.getElementById("requestViewPage").classList.remove("active");
+    var topbar = document.getElementById("mainTopbar");
+    var thread = document.getElementById("mainThread");
+    if (topbar) topbar.style.display = "none";
+    if (thread) thread.style.display = "none";
+    page.classList.add("active");
+    markActivityNav(true);
+    loadActivity();
+  }
+
+  function closeActivity() {
+    var page = document.getElementById("hubActivityPage");
+    if (!page || !page.classList.contains("active")) return;
+    page.classList.remove("active");
+    markActivityNav(false);
+    var detail = document.getElementById("videoPreviewPage");
+    var adv = document.getElementById("hubAdvancedPage");
+    if ((detail && detail.classList.contains("active"))
+        || (adv && adv.classList.contains("active"))) return;
+    var topbar = document.getElementById("mainTopbar");
+    var thread = document.getElementById("mainThread");
+    if (topbar) topbar.style.display = "";
+    if (thread) thread.style.display = "";
+  }
+
+  function loadActivity() {
+    var page = buildActivityPage();
+    page.querySelectorAll("#hubActRanges button").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.range === actState.range));
+    });
+    var host = document.getElementById("hubAct");
+    host.classList.add("hub-act--loading");       // keep the frame while refetching
+    var seq = ++actState.seq;
+    var since = new Date(Date.now() - Number(actState.range) * 86400000).toISOString();
+    fetch("/api/reports/activity?since=" + encodeURIComponent(since))
+      .then(function (r) {
+        if (r.status === 401 || r.status === 403) return { forbidden: true };
+        return r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status));
+      })
+      .then(function (d) {
+        if (seq !== actState.seq) return;
+        host.classList.remove("hub-act--loading");
+        if (d.forbidden) {
+          host.innerHTML = "";
+          host.appendChild(actEl("div", "hub-act__card hub-act__empty",
+            "Your account is not in a group that may view Hub activity."));
+          return;
+        }
+        renderActivityPage(d);
+      })
+      .catch(function (err) {
+        host.classList.remove("hub-act--loading");
+        report("Could not load Hub activity: " + err.message, true);
+      });
+  }
+
+  function periodWord() {
+    return actState.range === "365" ? "12 months" : actState.range + " days";
+  }
+
+  function delta(now, before) {
+    var el = actEl("div", "hub-act__delta");
+    if (before === null || before === undefined) return el;
+    var arrow, text, kind;
+    if (!before) {
+      if (!now) return el;
+      kind = "up"; arrow = "↑"; text = "new";
+    } else {
+      var pct = Math.round((now - before) / before * 100);
+      kind = pct > 0 ? "up" : pct < 0 ? "down" : "flat";
+      arrow = pct > 0 ? "↑" : pct < 0 ? "↓" : "→";
+      text = (pct > 0 ? "+" : "") + pct + "%";
+    }
+    el.className += " hub-act__delta--" + kind;
+    el.appendChild(document.createTextNode(arrow + " " + text + " "));
+    el.appendChild(actEl("span", null, "vs previous " + periodWord()));
+    return el;
+  }
+
+  /* A 12-point-ish trend in the de-emphasis grey, the latest point in green. */
+  function sparkline(values) {
+    var w = 160, h = 30, n = values.length;
+    var svg = '<svg class="hub-act__spark" viewBox="0 0 ' + w + " " + h
+      + '" preserveAspectRatio="none" aria-hidden="true">';
+    if (n < 2) return svg + "</svg>";
+    var max = Math.max.apply(null, values) || 1;
+    var pts = values.map(function (v, i) {
+      return [(i / (n - 1)) * (w - 4) + 2, h - 3 - (v / max) * (h - 7)];
+    });
+    var d = pts.map(function (p, i) { return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join("");
+    var last = pts[n - 1];
+    return svg + '<path d="' + d + '" fill="none" stroke="var(--orion-text-3)" stroke-width="1.5"'
+      + ' stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>'
+      + '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1)
+      + '" r="3" fill="var(--orion-indigo)" stroke="var(--orion-surface)" stroke-width="1.5"/></svg>';
+  }
+
+  /* Weekly buckets for the sparklines (daily is too spiky at 12 months). */
+  function buckets(series, pick) {
+    var size = series.length > 120 ? 30 : series.length > 40 ? 7 : 3;
+    var out = [];
+    for (var i = 0; i < series.length; i += size) {
+      out.push(series.slice(i, i + size).reduce(function (s, d) { return s + pick(d); }, 0));
+    }
+    return out;
+  }
+
+  function statCard(label, value, before, values) {
+    var c = actEl("div", "hub-act__card");
+    c.appendChild(actEl("div", "hub-act__label", label));
+    c.appendChild(actEl("div", "hub-act__n", compact(value)));
+    c.appendChild(delta(value, before));
+    c.insertAdjacentHTML("beforeend", sparkline(values));
+    return c;
+  }
+
+  function renderActivityPage(d) {
+    var host = document.getElementById("hubAct");
+    host.innerHTML = "";
+    var t = d.totals, prev = d.previous || {};
+    var views = t.view + t.preview;
+    var series = d.series || [];
+
+    // ── the headline row
+    var top = actEl("div", "hub-act__top");
+    var hero = actEl("div", "hub-act__card hub-act__hero");
+    hero.appendChild(actEl("div", "hub-act__label", "PTC people who used the Hub"));
+    hero.appendChild(actEl("div", "hub-act__hero-n", compact(t.active_people)));
+    hero.appendChild(delta(t.active_people, d.previous ? prev.active_people : null));
+    hero.appendChild(actEl("div", "hub-act__sub", "in the last " + periodWord()));
+    top.appendChild(hero);
+    top.appendChild(statCard("Views and previews", views,
+      d.previous ? (prev.view || 0) + (prev.preview || 0) : null,
+      buckets(series, function (x) { return x.view + x.preview; })));
+    top.appendChild(statCard("Downloads", t.download, d.previous ? prev.download : null,
+      buckets(series, function (x) { return x.download; })));
+    top.appendChild(statCard("Searches", t.search, d.previous ? prev.search : null,
+      buckets(series, function (x) { return x.search; })));
+    host.appendChild(top);
+
+    // ── daily activity and the leaderboard
+    var mid = actEl("div", "hub-act__mid");
+    var chartCard = actEl("div", "hub-act__card");
+    chartCard.appendChild(actEl("h3", null, "Daily activity"));
+    chartCard.appendChild(actEl("div", "hub-act__sub",
+      "Views, previews, downloads and searches per day, everyone included"));
+    chartCard.appendChild(dailyChart(series));
+    chartCard.appendChild(dailyTable(series));
+    mid.appendChild(chartCard);
+
+    var lbCard = actEl("div", "hub-act__card");
+    lbCard.appendChild(actEl("h3", null, "Most active people"));
+    lbCard.appendChild(actEl("div", "hub-act__sub", "Top " + d.top + " PTC people, last "
+      + periodWord()));
+    lbCard.appendChild(leaderboard(d.people));
+    mid.appendChild(lbCard);
+    host.appendChild(mid);
+
+    // ── teams and content
+    var teamCard = actEl("div", "hub-act__card");
+    teamCard.appendChild(actEl("h3", null, "Teams"));
+    teamCard.appendChild(actEl("div", "hub-act__sub",
+      "How many of each team used the Hub, and what they did"));
+    teamCard.appendChild(teams(d.teams));
+
+    var contentCard = actEl("div", "hub-act__card");
+    contentCard.appendChild(actEl("h3", null, "Most used content"));
+    contentCard.appendChild(actEl("div", "hub-act__sub", "Opened and downloaded most, last "
+      + periodWord()));
+    contentCard.appendChild(topContent(d.content));
+
+    var bottom = actEl("div", "hub-act__mid");
+    bottom.appendChild(contentCard);
+    bottom.appendChild(teamCard);
+    host.appendChild(bottom);
+
+    host.appendChild(actEl("div", "hub-act__foot",
+      "Only PTC people are ranked, and only the top " + d.top + " are shown."
+      + (d.external_not_ranked ? " " + d.external_not_ranked.toLocaleString()
+        + " actions by partner accounts in this period are counted anonymously and not ranked." : "")
+      + (t.anonymous ? " " + t.anonymous.toLocaleString()
+        + " earlier actions were recorded without a name and are not ranked either." : "")
+      + " Teams are the groups set up by the Hub's administrators."));
+  }
+
+  /* One series (actions per day): a 2px line over a 10% wash, hairline
+   * grid, a crosshair that snaps to the day, and a readout per day. */
+  function dailyChart(series) {
+    var wrap = actEl("div", "hub-act__chart");
+    if (!series.length) {
+      wrap.appendChild(actEl("div", "hub-act__empty", "No activity in this period yet."));
+      return wrap;
+    }
+    // Drawn at the card's real width (not a scaled viewBox, which shrank the
+    // axis text to nothing on a narrow screen), once it is on the page, and
+    // again when the window is resized.
+    requestAnimationFrame(function () { drawDaily(wrap, series); });
+    if (!window.hubActResize) {
+      window.hubActResize = debounce(function () {
+        var w = document.querySelector("#hubActivityPage.active .hub-act__chart");
+        if (w && w.hubSeries) drawDaily(w, w.hubSeries);
+      }, 150);
+      window.addEventListener("resize", window.hubActResize);
+    }
+    wrap.hubSeries = series;
+    return wrap;
+  }
+
+  function drawDaily(wrap, series) {
+    wrap.innerHTML = "";
+    var W = Math.max(280, wrap.clientWidth || 600), H = 240, L = 40, R = 12, T = 12, B = 26;
+    var total = function (x) { return x.view + x.preview + x.download + x.search; };
+    var vals = series.map(total);
+    var max = Math.max.apply(null, vals);
+    var step = max <= 5 ? 1 : Math.pow(10, Math.floor(Math.log10(max)));
+    if (max / step > 5) step *= 2;
+    var top = Math.max(step, Math.ceil(max / step) * step);
+    var n = series.length;
+    var x = function (i) { return L + (n === 1 ? (W - L - R) / 2 : i / (n - 1) * (W - L - R)); };
+    var y = function (v) { return T + (1 - v / top) * (H - T - B); };
+    var ns = "http://www.w3.org/2000/svg";
+    var svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Actions per day; figures in the table below");
+    var g = '<g class="grid">';
+    for (var v = 0; v <= top; v += step) {
+      g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v)
+        + '" vector-effect="non-scaling-stroke"/>'
+        + '<text x="' + (L - 8) + '" y="' + (y(v) + 4) + '" text-anchor="end">'
+        + v.toLocaleString() + "</text>";
+    }
+    g += "</g>";
+    var line = vals.map(function (v, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1); }).join("");
+    var area = line + "L" + x(n - 1).toFixed(1) + " " + y(0) + "L" + x(0).toFixed(1) + " " + y(0) + "Z";
+    var fmt = function (iso, long) {
+      return new Date(iso + "T00:00:00").toLocaleDateString(undefined,
+        long ? { weekday: "short", month: "short", day: "numeric" } : { month: "short", day: "numeric" });
+    };
+    var ticks = [0, Math.floor((n - 1) / 2), n - 1].filter(function (i, k, a) { return a.indexOf(i) === k; });
+    var labels = ticks.map(function (i) {
+      return '<text x="' + x(i) + '" y="' + (H - 6) + '" text-anchor="'
+        + (i === 0 ? "start" : i === n - 1 ? "end" : "middle") + '">' + fmt(series[i].date) + "</text>";
+    }).join("");
+    var peak = vals.indexOf(max);
+    svg.innerHTML = g
+      + '<path d="' + area + '" fill="var(--orion-indigo)" fill-opacity=".1"/>'
+      + '<path d="' + line + '" fill="none" stroke="var(--orion-indigo)" stroke-width="2"'
+      + ' stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>'
+      + labels
+      + '<line class="xh" y1="' + T + '" y2="' + (H - B) + '" stroke="var(--orion-border-md)"'
+      + ' stroke-width="1" vector-effect="non-scaling-stroke" visibility="hidden"/>';
+    wrap.appendChild(svg);
+
+    // Dots in HTML so they stay round however the SVG stretches.
+    function dot(i, cls) {
+      var d = actEl("span", cls);
+      d.style.cssText = "position:absolute;width:9px;height:9px;border-radius:50%;"
+        + "background:var(--orion-indigo);border:2px solid var(--orion-surface);"
+        + "transform:translate(-50%,-50%);pointer-events:none;left:" + (x(i) / W * 100) + "%;"
+        + "top:" + (y(vals[i]) / H * 240) + "px";
+      return d;
+    }
+    if (max > 0) {
+      wrap.appendChild(dot(peak, "peak"));
+      var peakLabel = actEl("span", null, "Peak " + max.toLocaleString());
+      peakLabel.style.cssText = "position:absolute;font-size:11px;font-weight:600;"
+        + "color:var(--orion-text-2);transform:translate(-50%,-150%);pointer-events:none;"
+        + "left:" + (x(peak) / W * 100) + "%;top:" + (y(max) / H * 240) + "px";
+      wrap.appendChild(peakLabel);
+    }
+    var hover = dot(0, "hover");
+    hover.style.display = "none";
+    wrap.appendChild(hover);
+    var tip = actEl("div", "hub-act__tip");
+    tip.style.display = "none";
+    wrap.appendChild(tip);
+    var xh = svg.querySelector(".xh");
+
+    function show(i) {
+      var s = series[i];
+      var px = x(i) / W * 100;
+      xh.setAttribute("x1", x(i));
+      xh.setAttribute("x2", x(i));
+      xh.setAttribute("visibility", "visible");
+      hover.style.display = "";
+      hover.style.left = px + "%";
+      hover.style.top = (y(vals[i]) / H * 240) + "px";
+      tip.innerHTML = "";
+      tip.appendChild(actEl("div", null, fmt(s.date, true)));
+      var b = actEl("b");
+      b.appendChild(actEl("span", "k"));
+      b.appendChild(document.createTextNode(vals[i].toLocaleString() + " actions"));
+      tip.appendChild(b);
+      tip.appendChild(actEl("div", null, breakdown(s.view + s.preview, s.download, s.search)));
+      tip.appendChild(actEl("div", null, s.people + " PTC " + (s.people === 1 ? "person" : "people")));
+      tip.style.display = "";
+      tip.style.left = Math.min(Math.max(px, 12), 88) + "%";
+      var py = y(vals[i]) / H * 240;
+      tip.style.top = py + "px";
+      // Near the top it would cover the card's title: show it below instead.
+      tip.style.transform = py < 90 ? "translate(-50%, 14px)" : "";
+    }
+    function hide() {
+      xh.setAttribute("visibility", "hidden");
+      hover.style.display = "none";
+      tip.style.display = "none";
+    }
+    svg.addEventListener("pointermove", function (e) {
+      var box = svg.getBoundingClientRect();
+      var fx = (e.clientX - box.left) / box.width * W;
+      var i = Math.round((fx - L) / (W - L - R) * (n - 1));
+      show(Math.max(0, Math.min(n - 1, i)));
+    });
+    svg.addEventListener("pointerleave", hide);
+    svg.setAttribute("tabindex", "0");
+    var focusAt = n - 1;
+    svg.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowLeft") focusAt = Math.max(0, focusAt - 1);
+      else if (e.key === "ArrowRight") focusAt = Math.min(n - 1, focusAt + 1);
+      else return;
+      e.preventDefault();
+      show(focusAt);
+    });
+    svg.addEventListener("focus", function () { show(focusAt); });
+    svg.addEventListener("blur", hide);
+  }
+
+  function dailyTable(series) {
+    var det = actEl("details");
+    det.appendChild(actEl("summary", null, "Show the figures as a table"));
+    var tbl = actEl("table");
+    var hr = tbl.createTHead().insertRow();
+    ["Day", "Views", "Downloads", "Searches", "PTC people"].forEach(function (h, i) {
+      hr.appendChild(actEl("th", i ? "r" : null, h));
+    });
+    var tb = tbl.createTBody();
+    series.slice().reverse().forEach(function (s) {
+      var tr = tb.insertRow();
+      tr.insertCell().textContent = s.date;
+      [s.view + s.preview, s.download, s.search, s.people].forEach(function (v) {
+        var c = tr.insertCell();
+        c.className = "r";
+        c.textContent = v;
+      });
+    });
+    det.appendChild(tbl);
+    return det;
+  }
+
+  function leaderboard(people) {
+    if (!people.length) return actEl("div", "hub-act__empty", "Nobody yet in this period.");
+    var max = people[0].total || 1;
+    var ol = actEl("ol", "hub-act__lb");
+    people.forEach(function (p) {
+      var li = actEl("li");
+      li.appendChild(actEl("span", "hub-act__rank" + (p.rank <= 3 ? " hub-act__rank--" + p.rank : ""), p.rank));
+      li.appendChild(actEl("span", "hub-act__avatar", initials(p.name)));
+      var who = actEl("div", "hub-act__who");
+      var name = actEl("b", null, p.name);
+      name.title = p.user;
+      who.appendChild(name);
+      who.appendChild(actEl("span", null, breakdown(p.view + p.preview, p.download, p.search)));
+      li.appendChild(who);
+      var bar = actEl("div", "hub-act__bar");
+      var track = actEl("div", "hub-act__track");
+      var fill = actEl("div", "hub-act__fill");
+      fill.style.width = Math.max(3, p.total / max * 100) + "%";
+      track.appendChild(fill);
+      bar.appendChild(track);
+      bar.appendChild(actEl("span", "hub-act__val", compact(p.total)));
+      li.appendChild(bar);
+      ol.appendChild(li);
+    });
+    return ol;
+  }
+
+  function teams(list) {
+    var box = actEl("div");
+    if (!list.length) {
+      box.appendChild(actEl("div", "hub-act__empty",
+        "No teams yet. Teams are the groups the Hub's administrators set up."));
+      return box;
+    }
+    list.forEach(function (t) {
+      var row = actEl("div", "hub-act__team");
+      var head = actEl("div", "hub-act__team-head");
+      head.appendChild(actEl("b", null, t.team));
+      head.appendChild(actEl("span", null, t.active + " of " + t.members + " active"));
+      row.appendChild(head);
+      var meter = actEl("div", "hub-act__meter");
+      var fill = actEl("i");
+      fill.style.width = (t.members ? t.active / t.members * 100 : 0) + "%";
+      meter.appendChild(fill);
+      meter.setAttribute("role", "img");
+      meter.setAttribute("aria-label", t.active + " of " + t.members + " members active");
+      row.appendChild(meter);
+      row.appendChild(actEl("div", "hub-act__team-foot",
+        breakdown(t.view + t.preview, t.download, t.search)));
+      box.appendChild(row);
+    });
+    return box;
+  }
+
+  function topContent(items) {
+    if (!items.length) return actEl("div", "hub-act__empty", "Nothing opened yet in this period.");
+    var grid = actEl("div", "hub-act__content");
+    items.forEach(function (c, i) {
+      var a = actEl("a", "hub-act__item");
+      a.href = "#/asset/" + encodeURIComponent(c.asset_id);
+      var thumb = actEl("div", "hub-act__thumb");
+      var safe = c.thumbnail_url && /^https?:/i.test(c.thumbnail_url) ? c.thumbnail_url : null;
+      if (safe) thumb.style.backgroundImage = 'url("' + safe.replace(/"/g, "%22") + '")';
+      // The cards' own rule: a picture only if it loads (SharePoint-hosted
+      // ones need a SharePoint sign-in), else the generated cover.
+      try {
+        paintCoverInto(thumb, { id: c.asset_id, title: c.title, type: c.type,
+                               products: c.products || [], thumbnail_url: safe });
+      } catch (e) { /* the grey ground is fine */ }
+      thumb.appendChild(actEl("span", "hub-act__num", i + 1));
+      a.appendChild(thumb);
+      var body = actEl("div", "hub-act__item-body");
+      body.appendChild(actEl("div", "hub-act__item-title", c.title));
+      body.appendChild(actEl("div", "hub-act__item-meta", plural(c.views, "view") + " · "
+        + plural(c.downloads, "download")
+        + (c.people ? " · " + c.people + (c.people === 1 ? " person" : " people") : "")));
+      a.appendChild(body);
+      grid.appendChild(a);
+    });
+    return grid;
+  }
+
+  /* The way in: "Hub activity" in the sidebar's Discover list, for people
+   * who may see it. */
+  function addActivityNav() {
+    hubPermissions.then(function (granted) {
+      if (granted.indexOf("view_reports") < 0 || document.getElementById("navActivity")) return;
+      var home = document.getElementById("navHome");
+      if (!home) return;
+      var items = Array.prototype.slice.call(home.parentNode.querySelectorAll(".orion-navitem"));
+      var after = home;
+      for (var i = items.indexOf(home) + 1; i < items.length; i++) {
+        if (items[i].previousElementSibling !== after) break;
+        after = items[i];
+      }
+      var item = document.createElement("div");
+      item.className = "orion-navitem";
+      item.id = "navActivity";
+      item.innerHTML = '<span class="label"><svg class="orion-ico orion-ico--sm">'
+        + '<use href="#i-trend"/></svg> Hub activity</span>';
+      item.addEventListener("click", function () { location.hash = "#/activity"; });
+      after.insertAdjacentElement("afterend", item);
+      // Opened straight from a link: the view came up before this entry did.
+      if (location.hash === "#/activity") markActivityNav(true);
+    });
+  }
+
+  function markActivityNav(on) {
+    var item = document.getElementById("navActivity");
+    if (!item) return;
+    item.classList.toggle("orion-navitem--active", on);
+    if (on) document.querySelectorAll(".orion-navitem--active").forEach(function (n) {
+      if (n !== item) n.classList.remove("orion-navitem--active");
+    });
   }
 
   /* ---------------------------------------------------- advanced search
@@ -5154,21 +5812,7 @@
     foot.insertBefore(link, foot.firstChild);
     foot.appendChild(row);
 
-    // Hub activity (2026-10-14), above Share feedback, for people who may
-    // see it -- PTC employees by default.
-    hubPermissions.then(function (granted) {
-      if (granted.indexOf("view_reports") < 0 || foot.querySelector(".hub-foot__activity")) return;
-      var activity = document.createElement("a");
-      activity.className = "hub-foot__feedback hub-foot__activity";
-      activity.href = "/reports";
-      activity.innerHTML =
-        '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">'
-        + '<path d="M2.5 13.5V8.5M6.2 13.5V4.5M9.8 13.5V7M13.5 13.5V2.5"'
-        + ' fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
-        + "<span>Hub activity</span>";
-      activity.title = "How PTC uses the Hub: most used content, most active people, teams";
-      foot.insertBefore(activity, link);
-    });
+    addActivityNav();
 
     // Fire-and-forget: an unreachable version endpoint leaves the label empty
     // rather than an apology, and nothing else on the page depends on it.
@@ -5715,9 +6359,17 @@
     ".hub-age--aging{color:#f0c060;background:rgba(214,160,40,.16);border-color:rgba(214,160,40,.4)}" +
     ".hub-age--older{color:#c2c8d2;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18)}" +
     ".hub-age--current{color:#8cbcf5;background:rgba(56,132,230,.16);border-color:rgba(56,132,230,.4)}}" +
-    // On a card: the thumbnail's free top-left corner, over the picture.
-    ".asset-card__thumb .hub-age{position:absolute;top:8px;left:8px;z-index:1;" +
-    "box-shadow:0 1px 2px rgba(0,0,0,.12)}" +
+    // On a card: the thumbnail's free top-left corner, over the picture --
+    // solid and white-on-colour there, because the soft pills vanished on
+    // light thumbnails (Liwei, 2026-10-14). Same idea as the duration chip.
+    ".asset-card__thumb .hub-age{position:absolute;top:8px;left:8px;z-index:1;color:#fff;" +
+    "border-color:rgba(255,255,255,.35);box-shadow:0 1px 3px rgba(0,0,0,.35);" +
+    "text-shadow:0 1px 1px rgba(0,0,0,.2)}" +
+    ".asset-card__thumb .hub-age--new{background:#1d8a3c}" +
+    ".asset-card__thumb .hub-age--aging{background:#b7791f}" +
+    ".asset-card__thumb .hub-age--older{background:rgba(31,35,41,.86)}" +
+    ".asset-card__thumb .hub-age--current{background:#1f63b8}" +
+    ".asset-card__thumb .hub-age--archived{background:#4b5260}" +
     // Elio's ranked cards keep the type chip top-left; go below it.
     ".asset-card__thumb:has(.rank-chip) .hub-age{top:36px}" +
     ".hub-review-btn{margin-left:2px;padding:1px 9px;border-radius:999px;font:inherit;" +

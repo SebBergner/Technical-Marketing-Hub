@@ -1,0 +1,1067 @@
+/* The Hub's stylesheet (split out of index.html, 2026-10-14).
+ * 1. The Orion design system, from the concept mock-up.
+ * 2. The Hub's own additions (formerly a style block at the end of index.html). */
+
+/* ============================================================
+   ORION UI STYLE — PTC enterprise agentic design system (inlined)
+   ============================================================ */
+:root {
+  --orion-green:        #5fa836;
+  --orion-green-strong: #4f9a2c;
+  --orion-green-soft:   #e6f4df;
+  --orion-green-ink:    #2f6b1f;
+  --orion-indigo:       #4f5bd5;
+  --orion-indigo-strong:#4149bf;
+  --orion-indigo-soft:  #eceeFB;
+  --orion-link:         #2563eb;
+  --orion-frame:        #1a1d21;
+  --orion-app-bg:       #2b2f33;
+  --orion-surface:      #ffffff;
+  --orion-surface-2:    #f5f6f8;
+  --orion-surface-3:    #eceef1;
+  --orion-border:       #e3e5e8;
+  --orion-border-md:    #c9ccd1;
+  --orion-border-ink:   #1f2329;
+  --orion-text:         #1f2329;
+  --orion-text-2:       #5b626b;
+  --orion-text-3:       #9aa0a8;
+  --orion-warn-bg:      #f6e2c6;
+  --orion-warn-border:  #e8c89a;
+  --orion-warn-ink:     #8a5414;
+  --orion-warn-body:    #6b4a22;
+  --orion-danger-bg:    #fbe3e3;
+  --orion-danger-ink:   #c0392b;
+  --orion-open-bg:      #fdebcf;
+  --orion-open-ink:     #9a6a16;
+  --orion-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --orion-mono: "SF Mono", "Roboto Mono", Menlo, Consolas, "Courier New", monospace;
+  --orion-radius:    8px;
+  --orion-radius-sm: 6px;
+  --orion-radius-pill: 999px;
+  --orion-shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.04);
+}
+  /* ==================================================================
+     Seb's review, 2026-09-03. This block sits directly after Elio's own
+     :root closes, and it must stay there -- not at the top of the file,
+     not at the bottom.
+
+     Not the bottom: that was the first attempt, and Liwei caught it -- the
+     breadcrumb and every green control painted blue for a visible beat on
+     every load, then flipped, because this file has no </head> and the
+     browser had already painted them by the time it reached a rule 2.5 MB
+     down.
+
+     Not the top either: --orion-indigo is a custom property, so two :root
+     rules setting it resolve by source order, THE LATER ONE WINS, same as
+     any other property at equal specificity. Moving this block above
+     Elio's own :root (line 6) put his #4f5bd5 after ours in the cascade,
+     so his blue won outright -- not a flash, the color was wrong site-wide.
+     Proved in the browser before it shipped: --orion-indigo computed as
+     #4f5bd5 with the block hoisted to the top.
+
+     Right here is both: after his declaration, so this one wins, and only
+     ~2.5 KB into the file, well before any markup that reads it paints. */
+
+  /* PTC brand green in place of Elio's indigo, with the palette Seb attached.
+     The token names stay `--orion-indigo` -- they are threaded through
+     eighteen of his rules, and renaming them would turn a colour change into
+     a merge conflict on every future revision of his file.
+
+     Two greens rather than one, and which goes where was measured rather than
+     judged. Elio's file has a real dark theme, and no single green clears AA
+     on both of its grounds:
+
+                       on #ffffff      on #1c1f23
+       #40AA1D           3.01:1  x       5.51:1  ok
+       #00890B           4.58:1  ok      2.94:1  x
+
+     The brand palette happens to contain exactly the pair needed, so the
+     accent follows the theme: the secondary green on the light ground, the
+     primary green Seb pointed at on the dark one. Anything that fills a shape
+     behind WHITE text is pinned to #00890B in both themes -- white on the
+     primary green is 3.01:1, which is fine for a border and not for a 12.5px
+     button label. */
+  :root {
+    --orion-indigo:        #00890B;   /* PTC secondary green */
+    --orion-indigo-strong: #00650A;   /* hover / pressed */
+    --orion-indigo-soft:   #eaf5e5;
+    --orion-link:          #00890B;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --orion-indigo:      #40AA1D;   /* PTC primary green, PMS 2421C */
+      --orion-indigo-soft: #16301a;
+      --orion-link:        #40AA1D;
+    }
+  }
+  :root[data-theme="dark"] {
+    --orion-indigo:        #40AA1D;
+    --orion-indigo-soft:   #16301a;
+    --orion-link:          #40AA1D;
+  }
+  /* --orion-link is set with the tokens above. It was #2563eb, the most
+     saturated blue on Seb's screenshot -- the "Technical Demo Development"
+     breadcrumb -- so leaving it would have answered his note halfway. */
+
+  /* Pinned rather than tokenised: these three fill a shape and put white text
+     on it, so they need the green that carries white in BOTH themes. */
+  .play-btn, .btn-primary-sm, .vp-player__play { background: #00890B; }
+  .play-btn:hover, .btn-primary-sm:hover, .vp-player__play:hover {
+    background: #00650A;
+  }
+
+  /* Re-index is gone from the details page. Seb: it is an administrator's
+     action and a global one -- re-indexing from a single asset invites 807
+     people to trigger 807 partial runs, and the button implied a per-asset
+     scope the sync does not have. It belongs in the Admin area, which is not
+     built yet, so the honest state is no button rather than a disabled one. */
+  .vp-reindex { display: none !important; }
+
+  /* Back to the catalogue, made prominent. Seb's review left the details page
+     as the one view with no obvious exit: the link was 13px of secondary grey
+     with no affordance, in a layout where everything else that navigates is a
+     button. Now it reads as one. */
+  .vp-back { font-size: 13px; font-weight: 600; color: var(--orion-text);
+    border: 1px solid var(--orion-border-md); border-radius: 999px;
+    padding: 7px 15px 7px 11px; background: var(--orion-surface);
+    transition: background .12s, border-color .12s, color .12s; }
+  .vp-back:hover { color: var(--orion-indigo-strong); background: var(--orion-indigo-soft);
+    border-color: var(--orion-indigo); }
+  .vp-back svg { width: 16px; height: 16px; }
+
+  /* The placeholder cover on the details page, which Seb asked for.
+     Nothing new is invented: it is the same cover the cards already paint for
+     the 455 assets with no thumbnail, at the size this panel wants. The player
+     used to be hidden outright when there was neither a still nor anything to
+     play, so the page began abruptly at the title. */
+  .vp-player.hub-cover { background-color: var(--orion-frame); }
+  .vp-player .hub-cover__mark svg { width: 92px; height: 92px; opacity: .5; }
+  .vp-player .hub-cover__mark--text { font-size: 30px; letter-spacing: -.2px; }
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--orion-font);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--orion-text);
+  background: var(--orion-app-bg);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--orion-link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.orion-spark { display: inline-block; width: 18px; height: 18px; color: var(--orion-indigo); vertical-align: -4px; flex: none; }
+.orion-spark--sm { width: 16px; height: 16px; vertical-align: -3px; }
+
+.orion-app {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  height: calc(100vh - 24px);
+  margin: 12px;
+  background: var(--orion-surface);
+  border: 3px solid var(--orion-frame);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.orion-workarea { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.orion-workbody { flex: 1; display: flex; min-height: 0; }
+
+.orion-side { display: flex; flex-direction: column; background: var(--orion-surface-2); border-right: 1px solid var(--orion-border); min-height: 0; }
+.orion-side__brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 16px 16px 12px; font-weight: 600; font-size: 15px; }
+.orion-side__brand .lockup { display: flex; align-items: center; gap: 8px; }
+.orion-side__body { flex: 1; overflow-y: auto; padding: 0 12px 12px; }
+.orion-side__foot { border-top: 1px solid var(--orion-border); padding: 8px 12px; }
+/* Sidebar foot additions, built by hub-api.js (buildSidebarFoot). Requested
+   by Seb 2026-09-22 for the team trial: somewhere to send feedback, and the
+   build it is feedback about. */
+.hub-foot__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.hub-foot__version { font-size: 11px; color: var(--orion-text-muted, #6b7280); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hub-foot__feedback { display: flex; align-items: center; gap: 8px; padding: 7px 8px; margin-bottom: 6px; border-radius: 6px; color: inherit; text-decoration: none; font-size: 13px; }
+.hub-foot__feedback:hover { background: var(--orion-surface-3, rgba(0,0,0,.05)); }
+.hub-foot__feedback svg { width: 15px; height: 15px; flex: none; }
+/* Seb, 2026-09-25: the signed-in name sits above the PTC mark and reads at a
+   glance -- the theme's full-strength text colour, so white on the dark
+   sidebar and near-black on the light one (white there would vanish). */
+.hub-foot__who { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 2px 8px 8px; margin-bottom: 6px; border-bottom: 1px solid var(--orion-border); }
+.hub-foot__who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--orion-text); }
+.hub-foot__who a { font-size: 11.5px; color: var(--orion-text-muted, #6b7280); white-space: nowrap; }
+.hub-foot__who a:hover { color: var(--orion-link); }
+
+.orion-group { font-size: 12px; color: var(--orion-text-3); margin: 16px 4px 6px; text-transform: uppercase; letter-spacing: .04em; }
+.orion-group:first-child { margin-top: 4px; }
+.orion-navitem { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; margin-bottom: 2px; border-radius: var(--orion-radius-sm); color: var(--orion-text); cursor: pointer; font-size: 13.5px; }
+.orion-navitem .label { display: flex; align-items: center; gap: 9px; }
+.orion-navitem:hover { background: var(--orion-surface-3); }
+.orion-navitem--active { background: var(--orion-surface); box-shadow: inset 0 0 0 1px var(--orion-border); font-weight: 600; }
+.orion-navitem .count { color: var(--orion-text-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.orion-divider { height: 1px; background: var(--orion-border); margin: 10px 0; }
+
+.orion-main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--orion-surface); }
+.orion-topbar { padding: 20px 32px 18px; border-bottom: 1px solid var(--orion-border); }
+.orion-breadcrumb { font-size: 13px; color: var(--orion-text-2); margin-bottom: 4px; }
+.orion-breadcrumb a { color: var(--orion-link); }
+.orion-title { font-size: 24px; font-weight: 600; margin: 0 0 4px; }
+.orion-subtle { color: var(--orion-text-2); font-size: 13.5px; }
+
+.orion-thread { flex: 1; overflow-y: auto; padding: 26px 32px 40px; }
+
+.orion-ico { width: 18px; height: 18px; flex: none; vertical-align: -4px; }
+.orion-ico--sm{ width: 15px; height: 15px; vertical-align: -3px; }
+.orion-ico--lg{ width: 22px; height: 22px; vertical-align: -5px; }
+.ico-green { color: var(--orion-green); }
+.ico-amber { color: var(--orion-warn-ink); }
+.ico-indigo { color: var(--orion-indigo); }
+.ico-muted { color: var(--orion-text-3); }
+
+.orion-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: var(--orion-radius-pill); font-size: 11.5px; font-weight: 600; line-height: 1.4; }
+.orion-badge--ok     { background: var(--orion-green-soft); color: var(--orion-green-ink); }
+.orion-badge--risk   { background: var(--orion-danger-bg); color: var(--orion-danger-ink); }
+.orion-badge--open   { background: var(--orion-open-bg);   color: var(--orion-open-ink); }
+/* A badge that does something when clicked — the tag chips on a details page.
+   At rest it is identical to the badges beside it, deliberately: Liwei asked
+   for one chip style across the row. The affordance appears on hover and on
+   keyboard focus instead, which is where it is needed and where it cannot
+   fragment the resting look. */
+.orion-badge--action { cursor: pointer; }
+.orion-badge--action:hover { background: var(--orion-surface-3); color: var(--orion-text); }
+.orion-badge--action:focus-visible { outline: 2px solid var(--orion-indigo); outline-offset: 1px; }
+
+.orion-logo { display: flex; align-items: center; padding: 8px 4px; }
+.orion-logo svg { height: 22px; width: auto; }
+
+/* ============================================================
+   HERO SEARCH
+   ============================================================ */
+.hero-search { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.hero-search__field { min-width: 220px; }
+.hero-search__field {
+  flex: 1; display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm);
+  padding: 11px 14px; background: var(--orion-surface);
+}
+.hero-search__field input { flex: 1; border: none; outline: none; font: inherit; font-size: 14px; background: transparent; }
+.hero-search__field input::placeholder { color: var(--orion-text-3); }
+.filter-pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 10px 13px;
+  border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm);
+  background: var(--orion-surface); font-size: 13px; color: var(--orion-text-2); cursor: pointer; white-space: nowrap;
+}
+.filter-pill select {
+  border: none; background: transparent; font: inherit; font-size: 13px; color: var(--orion-text-2);
+  appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 2px;
+}
+.filter-pill select:focus { outline: none; }.hub-noresults { display: none; padding: 30px 10px; text-align: center; color: var(--orion-text-3); font-size: 13.5px; }
+.hub-noresults.show { display: block; }
+.hub-reset-cta { font-size: 13px; font-weight: 700; color: var(--orion-indigo); cursor: pointer; background: none; border: none; padding: 6px 2px; white-space: nowrap; }
+.hub-reset-cta:hover { text-decoration: underline; }
+
+/* ============================================================
+   SECTION HEADERS
+   ============================================================ */
+.section { margin-bottom: 34px; }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+.section-head__title { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 600; }
+.section-head__sub { color: var(--orion-text-3); font-weight: 400; font-size: 12.5px; margin-left: 2px; }
+.section-head__link { font-size: 13px; color: var(--orion-link); display: flex; align-items: center; gap: 3px; }
+
+/* ============================================================
+   ASSET CARDS
+   ============================================================ */
+.asset-row { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 6px; margin: 0 -2px; }
+.asset-grid { display: flex; flex-wrap: wrap; gap: 16px; }
+.asset-grid .asset-card { width: 260px; }
+.asset-row::-webkit-scrollbar { height: 6px; }
+.asset-row::-webkit-scrollbar-thumb { background: var(--orion-border-md); border-radius: 3px; }
+
+.asset-card {
+  flex: 0 0 254px; border: 1px solid var(--orion-border); border-radius: var(--orion-radius);
+  overflow: hidden; background: var(--orion-surface); box-shadow: var(--orion-shadow);
+  display: flex; flex-direction: column;
+}
+.asset-card__thumb {
+  position: relative; height: 130px; background: var(--orion-surface-3);
+  display: flex; align-items: center; justify-content: center;
+  border-bottom: 1px solid var(--orion-border);
+}
+.asset-card__thumb .watermark { width: 46px; height: 46px; color: var(--orion-border-md); }
+.type-chip {
+  position: absolute; top: 8px; left: 8px; display: flex; align-items: center; gap: 4px;
+  background: rgba(255,255,255,.94); border: 1px solid var(--orion-border-md);
+  border-radius: var(--orion-radius-pill); padding: 3px 9px 3px 7px; font-size: 11px; font-weight: 600; color: var(--orion-text-2);
+}
+.new-dot { position: absolute; top: 9px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--orion-green); box-shadow: 0 0 0 2px #fff; }
+.duration-chip {
+  position: absolute; bottom: 8px; right: 8px; background: rgba(31,35,41,.82); color: #fff;
+  font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; font-variant-numeric: tabular-nums;
+}
+.rank-chip {
+  position: absolute; bottom: 8px; left: 8px; background: rgba(31,35,41,.82); color: #fff;
+  font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px;
+}
+.play-btn {
+  width: 42px; height: 42px; border-radius: 50%; background: var(--orion-indigo); border: none;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff;
+  box-shadow: 0 2px 6px rgba(79,91,213,.4);
+  /* Found 2026-09-10: .hub-cover__mark is `position:absolute`, and a
+     positioned element always paints above a non-positioned one regardless
+     of DOM order -- so on a card with no thumbnail_url (paintCoverInto()
+     always runs) AND a play button (a SharePoint asset cross-referenced to
+     Consensus, still with no thumbnail of its own), the cover mark sat on
+     top and silently ate every click. Needed real user clicks to catch --
+     element.click() from a console does not go through hit-testing the same
+     way and never showed the bug. */
+  position: relative; z-index: 1;
+}
+.play-btn svg { width: 17px; height: 17px; margin-left: 2px; }
+.play-btn:hover { background: var(--orion-indigo-strong); }
+
+/* The inline player Seb asked for, 2026-09-10 -- the detail page's own hero
+   player (.vp-player), confirmed after an initial mix-up that tried this on
+   grid tiles instead. Layered on top of the existing content (both
+   .vp-player and .asset-card__thumb are already position:relative) rather
+   than replacing it, so closing it needs nothing reconstructed: the
+   original cover or thumbnail image was never removed, only covered. */
+.hub-inline-player { position: absolute; inset: 0; z-index: 2; background: #000;
+  display: flex; align-items: center; justify-content: center; }
+.hub-inline-player__media { width: 100%; height: 100%; border: none; background: #000; }
+video.hub-inline-player__media { object-fit: contain; }
+.hub-inline-player__close {
+  position: absolute; top: 6px; right: 6px; z-index: 3; width: 22px; height: 22px;
+  border-radius: 50%; border: none; background: rgba(0,0,0,.6); color: #fff;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.hub-inline-player__close:hover { background: rgba(0,0,0,.85); }
+.hub-inline-player__close svg { width: 12px; height: 12px; }
+
+.asset-card__body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.asset-card__title { font-size: 13.5px; font-weight: 600; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.asset-card__meta { font-size: 12px; color: var(--orion-text-2); display: flex; align-items: center; gap: 6px; }
+.meta-logo-chip { display: inline-flex; align-items: center; background: #fff; padding: 2px 5px; border-radius: 4px; line-height: 0; flex: none; box-shadow: 0 0 0 1px var(--orion-border); }
+.nav-mark { height: 15px; width: auto; flex: none; }
+.meta-logo { height: 11px; width: auto; display: block; }
+.asset-card__stats { font-size: 11.5px; color: var(--orion-text-3); display: flex; align-items: center; gap: 5px; }
+.asset-card__uuid { font-size: 10.5px; color: var(--orion-text-3); display: flex; align-items: center; gap: 4px; }
+.asset-card__uuid .orion-mono { font-size: 10px; background: var(--orion-surface-2); padding: 1px 6px; border-radius: 4px; color: var(--orion-text-2); }
+.orion-mono { font-family: var(--orion-mono); }
+.asset-card__actions { margin-top: auto; padding-top: 8px; display: flex; gap: 8px; }
+
+.btn-ghost, .btn-primary-sm {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 7px 8px; border-radius: var(--orion-radius-sm); font-size: 12.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--orion-border-md);
+}
+.btn-ghost { background: var(--orion-surface); color: var(--orion-text); }
+.btn-ghost:hover { background: var(--orion-surface-2); }
+.btn-primary-sm { background: var(--orion-indigo); color: #fff; border-color: var(--orion-indigo); }
+.btn-primary-sm:hover { background: var(--orion-indigo-strong); }
+.asset-card__actions--3 .btn-ghost, .asset-card__actions--3 .btn-primary-sm { padding: 7px 3px; font-size: 11.5px; gap: 3px; }
+
+/* ============================================================
+   COMPACT LIST (Continue where you left off)
+   ============================================================ */
+.compact-list { border: 1px solid var(--orion-border); border-radius: var(--orion-radius); overflow: hidden; }
+.compact-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--orion-border); }
+.compact-row:last-child { border-bottom: none; }
+.compact-row__thumb { width: 42px; height: 30px; border-radius: 4px; background: var(--orion-surface-3); display: flex; align-items: center; justify-content: center; flex: none; color: var(--orion-text-3); }
+.compact-row__thumb svg { width: 15px; height: 15px; }
+.compact-row__title { font-size: 13px; font-weight: 500; }
+.compact-row__meta { font-size: 12px; color: var(--orion-text-3); display: flex; align-items: center; gap: 6px; }
+.compact-row__progress { flex: none; width: 70px; height: 4px; background: var(--orion-surface-3); border-radius: 2px; overflow: hidden; margin-left: auto; }
+.compact-row__progress span { display: block; height: 100%; background: var(--orion-indigo); }
+
+/* ============================================================
+   PRODUCT TILES
+   ============================================================ */
+.product-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.product-tile {
+  display: flex; align-items: center; gap: 13px; padding: 16px; border: 1px solid var(--orion-border);
+  border-radius: var(--orion-radius); cursor: pointer; background: var(--orion-surface);
+}
+.product-tile:hover { background: var(--orion-surface-2); border-color: var(--orion-border-md); }
+.product-tile__mark {
+  width: 40px; height: 40px; border-radius: var(--orion-radius-sm); background: var(--orion-surface-2);
+  display: flex; align-items: center; justify-content: center; flex: none; color: var(--orion-text);
+}
+.product-tile__name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+.product-tile__count { font-size: 12px; color: var(--orion-text-3); }
+.product-logo-chip {
+  display: inline-flex; align-items: center; justify-content: center; background: #fff;
+  padding: 8px 12px; border-radius: var(--orion-radius-sm); flex: none; height: 40px;
+  box-shadow: 0 0 0 1px var(--orion-border);
+}
+.product-logo { height: 20px; width: auto; display: block; }
+
+/* ============================================================
+   FEATURED / EVANGELIZE
+   ============================================================ */
+.featured-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.featured-card {
+  display: flex; gap: 16px; padding: 18px; border: 1px solid var(--orion-border-ink);
+  border-radius: var(--orion-radius); background: var(--orion-surface);
+}
+.featured-card__thumb {
+  flex: none; width: 96px; height: 96px; border-radius: var(--orion-radius-sm); background: var(--orion-surface-2);
+  display: flex; align-items: center; justify-content: center; color: var(--orion-border-md);
+}
+.featured-card__eyebrow { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--orion-green-ink); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.featured-card__title { font-size: 14.5px; font-weight: 600; margin-bottom: 5px; }
+.featured-card__body { font-size: 12.5px; color: var(--orion-text-2); margin-bottom: 10px; }
+.featured-card__foot { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--orion-text-3); }
+
+/* ============================================================
+   STAGE / TYPE PILLS
+   ============================================================ */
+.stage-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.stage-pill {
+  padding: 7px 14px; border-radius: var(--orion-radius-pill); border: 1px solid var(--orion-border-md);
+  font-size: 12.5px; font-weight: 500; cursor: pointer; color: var(--orion-text-2); background: var(--orion-surface);
+}
+/* A selected pill inverts, and inverting means BOTH halves flip. The original
+   painted the background with --orion-text -- a foreground token -- and left
+   the label a literal #fff. That reads correctly in light mode by luck, since
+   --orion-text is near-black there; in dark mode it is near-white, so the
+   label vanished into its own background. Pairing it with --orion-surface
+   keeps the contrast in both themes with no theme-specific rule. */
+.stage-pill--active { background: var(--orion-text); color: var(--orion-surface);
+  border-color: var(--orion-text); font-weight: 600; }
+
+/* ============================================================
+   REQUEST ASSET FORM
+   ============================================================ */
+.form-section { border: 1px solid var(--orion-border); border-radius: var(--orion-radius); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-row select, .form-row textarea {
+  padding: 8px 10px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm);
+  font: inherit; font-size: 13px; width: 100%; background: var(--orion-surface); color: var(--orion-text);
+}
+.form-row textarea { resize: vertical; min-height: 64px; }
+.field-hint { font-size: 12px; color: var(--orion-text-3); }
+.upload-drop {
+  border: 1px dashed var(--orion-border-md); border-radius: var(--orion-radius-sm); padding: 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; cursor: pointer; color: var(--orion-text-2);
+}
+.upload-drop:hover { background: var(--orion-surface-2); border-color: var(--orion-text-3); }
+.upload-drop input[type="file"] { display: none; }
+.upload-drop__title { font-size: 13px; font-weight: 600; color: var(--orion-text); }
+.upload-drop__sub { font-size: 12px; color: var(--orion-text-3); }
+.attachment-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.attachment-list:empty { display: none; }
+/* --orion-indigo-soft is a light-mode tint with no dark counterpart, and the
+   value inside uses --orion-text, which follows the theme. In dark mode that
+   put near-white text on a near-white panel: the derived scope was invisible.
+   A translucent wash of the indigo keeps the accent in both themes, because
+   it takes its lightness from whatever is behind it. */
+.derived-output { border: 1px solid var(--orion-indigo);
+  background: color-mix(in srgb, var(--orion-indigo) 12%, transparent);
+  border-radius: var(--orion-radius-sm); padding: 10px 14px; }
+/* indigo-strong is dark enough to disappear against the dark app background,
+   so the label lightens with the theme rather than staying put. */
+.derived-output__label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--orion-indigo-strong); margin-bottom: 3px; }
+:root:not([data-theme="light"]) .derived-output__label,
+:root[data-theme="dark"] .derived-output__label { color: #a5adff; }
+.derived-output__value { font-size: 14px; font-weight: 600; color: var(--orion-text); }
+
+/* ============================================================
+   DEMOBOARD SHARE MODAL
+   ============================================================ */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(20,22,25,.55);
+  display: none; align-items: center; justify-content: center; z-index: 50; padding: 24px;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  width: 460px; max-width: 100%; max-height: 88vh; overflow-y: auto;
+  background: var(--orion-surface); border-radius: var(--orion-radius);
+  box-shadow: 0 20px 50px rgba(0,0,0,.35); border: 1px solid var(--orion-border);
+}
+.modal.modal--wide { width: 760px; }
+.modal__head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--orion-border); }
+.modal__head-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; }
+.modal__close { background: none; border: none; cursor: pointer; color: var(--orion-text-3); padding: 4px; display: flex; }
+.modal__close:hover { color: var(--orion-text); }
+.modal__body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+
+.modal__asset { display: flex; gap: 12px; align-items: center; }
+.modal__asset-thumb { width: 58px; height: 42px; border-radius: 6px; background: var(--orion-surface-2); display: flex; align-items: center; justify-content: center; color: var(--orion-text-3); flex: none; }
+.modal__asset-title { font-size: 13.5px; font-weight: 600; }
+.modal__asset-meta { font-size: 12px; color: var(--orion-text-2); margin-top: 2px; }
+
+.modal__note { display: flex; gap: 8px; align-items: flex-start; background: var(--orion-surface-2); border-radius: var(--orion-radius-sm); padding: 10px 12px; font-size: 12.5px; color: var(--orion-text-2); }
+.modal__note svg { flex: none; margin-top: 1px; }
+
+.form-row { display: flex; flex-direction: column; gap: 5px; }
+.form-row label { font-size: 12px; font-weight: 600; color: var(--orion-text-2); }
+/* No background or colour was set, so date and file inputs fell through to the
+   browser default -- white box, black text -- in dark mode. */
+.form-row input { padding: 8px 10px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); font: inherit; font-size: 13px; width: 100%;
+  background: var(--orion-surface); color: var(--orion-text); }
+.form-row input::placeholder { color: var(--orion-text-3); }
+/* The native calendar and file glyphs are dark-on-dark otherwise. */
+:root:not([data-theme="light"]) .form-row input,
+:root[data-theme="dark"] .form-row input { color-scheme: dark; }
+.chip-input { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); padding: 7px 8px; }
+.chip-input .chip { display: flex; align-items: center; gap: 5px; background: var(--orion-surface-2); border-radius: var(--orion-radius-pill); padding: 3px 9px; font-size: 12px; }
+.chip-input input { border: none; outline: none; flex: 1; min-width: 120px; font: inherit; font-size: 13px; padding: 3px 4px; }
+
+.share-result { background: var(--orion-green-soft); border-radius: var(--orion-radius-sm); padding: 12px 14px; }
+.share-result__label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--orion-green-ink); margin-bottom: 8px; }
+.share-result__link { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--orion-surface); border-radius: 6px; padding: 8px 10px; }
+.share-result__link span { font-family: var(--orion-mono); font-size: 12.5px; color: var(--orion-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-result__link button { flex: none; border: 1px solid var(--orion-border-md); background: var(--orion-surface); border-radius: 6px; padding: 5px 11px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.share-result__link button:hover { background: var(--orion-surface-2); }
+.share-result__meta { font-size: 11.5px; color: var(--orion-green-ink); margin-top: 8px; }
+
+.modal__foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--orion-border); }
+.modal__foot .btn-ghost, .modal__foot .btn-primary-sm { flex: none; padding: 8px 16px; }
+
+.dsr-room-list { display: flex; flex-direction: column; gap: 6px; }
+.dsr-room-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); cursor: pointer; }
+.dsr-room-row:hover { background: var(--orion-surface-2); }
+.dsr-room-row--selected { border-color: var(--orion-indigo); background: var(--orion-indigo-soft); }
+.dsr-room-row__radio { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--orion-border-md); flex: none; position: relative; }
+.dsr-room-row--selected .dsr-room-row__radio { border-color: var(--orion-indigo); }
+.dsr-room-row--selected .dsr-room-row__radio::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; background: var(--orion-indigo); }
+.dsr-room-row__name { font-size: 13px; font-weight: 600; }
+.dsr-room-row__meta { font-size: 11.5px; color: var(--orion-text-3); }
+.dsr-room-row--new { border-style: dashed; }
+.dsr-room-row--new .dsr-room-row__name { color: var(--orion-text-2); font-weight: 500; }
+
+/* dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --orion-surface: #1c1f23; --orion-surface-2: #24272c; --orion-surface-3: #2c3036;
+    --orion-border: #34383e; --orion-border-md: #454a52; --orion-border-ink: #c9ccd1;
+    --orion-text: #eceef1; --orion-text-2: #a7adb6; --orion-text-3: #767c85;
+    --orion-app-bg: #101214;
+  }
+}
+:root[data-theme="dark"] {
+  --orion-surface: #1c1f23; --orion-surface-2: #24272c; --orion-surface-3: #2c3036;
+  --orion-border: #34383e; --orion-border-md: #454a52; --orion-border-ink: #c9ccd1;
+  --orion-text: #eceef1; --orion-text-2: #a7adb6; --orion-text-3: #767c85;
+  --orion-app-bg: #101214;
+}
+:root[data-theme="light"] {
+  --orion-surface: #ffffff; --orion-surface-2: #f5f6f8; --orion-surface-3: #eceef1;
+  --orion-border: #e3e5e8; --orion-border-md: #c9ccd1; --orion-border-ink: #1f2329;
+  --orion-text: #1f2329; --orion-text-2: #5b626b; --orion-text-3: #9aa0a8;
+  --orion-app-bg: #2b2f33;
+}
+
+/* ============================================================
+   VIDEO PREVIEW PAGE
+   ============================================================ */
+.video-preview-page { display: none; flex: 1; overflow-y: auto; padding: 26px 32px 48px; }
+.video-preview-page.active { display: block; }
+.vp-back { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--orion-text-2); cursor: pointer; margin-bottom: 18px; background: none; border: none; padding: 0; font: inherit; }
+.vp-back:hover { color: var(--orion-link); }
+.vp-back svg { width: 15px; height: 15px; }
+
+.vp-player {
+  background: var(--orion-frame); border-radius: var(--orion-radius); aspect-ratio: 16/9; max-height: 440px;
+  display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 22px;
+}
+.vp-player__play {
+  width: 66px; height: 66px; border-radius: 50%; background: var(--orion-indigo); border: none;
+  display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  /* Same fix as .play-btn above, and the actual bug behind "detail page
+     click doesn't play": .hub-cover__mark is position:absolute and was
+     painting on top of this button (a positioned element always beats a
+     static one, regardless of DOM order), silently swallowing every real
+     click on every SharePoint LDK/VDK -- exactly the case this button
+     newly needed to work for. */
+  position: relative; z-index: 1;
+}
+.vp-player__play svg { width: 27px; height: 27px; margin-left: 3px; }
+.vp-player__duration {
+  position: absolute; bottom: 14px; right: 16px; background: rgba(0,0,0,.55); color: #fff;
+  font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 4px; font-variant-numeric: tabular-nums;
+}
+
+.vp-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 24px; }
+.vp-title { font-size: 21px; font-weight: 700; margin: 0 0 8px; line-height: 1.3; }
+/* Wraps since 2026-09-15: this row gained content depth and up to three
+   product families, so on a narrow window it is no longer a single line. */
+.vp-meta-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  row-gap: 6px; font-size: 13px; color: var(--orion-text-2); margin-bottom: 6px; }
+.vp-stats-row { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--orion-text-3); }
+.vp-actions { display: flex; gap: 8px; flex: none; }
+.vp-actions .btn-ghost, .vp-actions .btn-primary-sm { flex: none; padding: 8px 16px; }
+
+.vp-card { background: var(--orion-surface-2); border-radius: var(--orion-radius); padding: 22px 24px; }
+.vp-card__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.vp-card__head-title { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; }
+.vp-card__head-title svg { color: var(--orion-indigo); width: 19px; height: 19px; }
+.vp-reindex { display: flex; align-items: center; gap: 6px; background: var(--orion-indigo); color: #fff; border: none; padding: 7px 14px; border-radius: var(--orion-radius-sm); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.vp-reindex:hover { background: var(--orion-indigo-strong); }
+.vp-desc { font-size: 13.5px; color: var(--orion-text); line-height: 1.55; margin-bottom: 20px; }
+
+.vp-label { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--orion-text-3); margin-bottom: 10px; }
+.vp-value-drivers { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+.value-driver-chip { background: var(--orion-indigo-soft); color: var(--orion-indigo-strong); font-size: 12.5px; font-weight: 600; padding: 5px 13px; border-radius: var(--orion-radius-pill); }
+
+.capability-card { background: var(--orion-surface); border: 1px solid var(--orion-border); border-radius: var(--orion-radius); padding: 16px 18px; margin-bottom: 12px; }
+.capability-card:last-child { margin-bottom: 0; }
+.capability-card__head { margin-bottom: 10px; display: flex; align-items: baseline; gap: 0; }
+.phase-tag { display: inline-flex; align-items: center; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--orion-indigo); border: 1.5px solid var(--orion-indigo); border-radius: 5px; padding: 2px 8px; margin-right: 10px; flex: none; }
+.capability-card__title { font-size: 14.5px; font-weight: 600; }
+.capability-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; }
+.capability-chip { background: var(--orion-surface-3); color: var(--orion-text-2); font-size: 12px; padding: 4px 10px; border-radius: 6px; }
+.capability-narration { font-size: 12.5px; color: var(--orion-text-2); font-style: italic; line-height: 1.5; }
+
+/* ── 2. The Hub's own additions ─────────────────────────────────── */
+  .hub-api-status { position:fixed; bottom:10px; right:12px; z-index:9999;
+    font:11px/1.4 ui-monospace,Consolas,monospace; color:#6b727a;
+    background:rgba(255,255,255,.94); border:1px solid #dcdfe3;
+    border-radius:4px; padding:3px 8px; pointer-events:none; }
+  .hub-api-status:empty { display:none; }
+  .hub-api-status--error { color:#c0392b; border-color:#c0392b; }
+  /* !important because hubApplyFilters() rewrites style.display on these
+     sections whenever no filter is active. */
+  .hub-hidden { display:none !important; }
+
+  /* --- fixes reported from use --------------------------------------- */
+
+  /* The search input set background:transparent but never a colour, so it
+     fell back to the browser default black. Invisible on the dark theme,
+     where everything around it is light-on-dark. */
+  .hero-search__field input { color: var(--orion-text); }
+
+  /* The chevron is a sibling of the <select>, so clicking it hit the label
+     and nothing opened -- only the select's own narrow box worked. Widening
+     the select to run underneath the arrow, and making the arrow ignore
+     pointer events, means the whole pill opens the menu.
+     The padding is the second half of the report: the text sat hard against
+     the border on both sides. */
+  .filter-pill { position: relative; padding-right: 0 !important; }
+  /* The select has to reach the pill's right edge, or the arrow sits beyond it
+     in the padding and clicks there land on the label instead. The pill gives
+     up its right padding and the select takes it over, so the arrow ends up
+     inside the select's own box. */
+  .filter-pill select {
+    flex: 1; padding: 2px 30px 2px 6px !important; text-overflow: ellipsis;
+  }
+  .filter-pill > svg { position: absolute; right: 11px; pointer-events: none; }
+  /* The dropdown list itself renders with the OS palette unless told the
+     surface it sits on, which on the dark theme gives black-on-black. */
+  .filter-pill select, .filter-pill option {
+    background: var(--orion-surface); color: var(--orion-text);
+  }
+  /* One colour per platform. A kit you run and a recording you send are
+     different things; a card that does not say which makes you guess. */
+  .hub-source { margin-right:6px; font-size:10px; }
+  .hub-source--sharepoint { color:#1a5fa8; border-color:#1a5fa8; background:#e8f0f9; }
+  .hub-source--consensus  { color:#c25a10; border-color:#c25a10; background:#fbeee3; }
+
+  /* One compact button per platform the asset is actually on. Nothing is
+     rendered for platforms it is not on -- with three sources, labelling every
+     absence would give each card a row of things it is not. */
+  /* A feature with no data yet, shown as a shape rather than hidden: the
+     panel is where Serge expects it, and says why it is empty. */
+  .vr-placeholder { display:flex; gap:12px; align-items:flex-start;
+    padding:14px 16px; border:1px dashed var(--orion-border-md);
+    border-radius:var(--orion-radius-sm); color:var(--orion-text-3);
+    font-size:12.5px; line-height:1.55; }
+  .vr-placeholder strong { color:var(--orion-text-2); display:block;
+    margin-bottom:2px; }
+  .vr-placeholder svg { flex:0 0 auto; margin-top:1px; }
+
+  /* What is in the folder. An asset IS a folder, so this is most of what
+     someone wants before opening it. */
+  .vp-files__summary { margin-left:auto; font-size:12px; color:var(--orion-text-3);
+    font-variant-numeric:tabular-nums; }
+  .vp-files__list { display:flex; flex-direction:column; }
+  .vp-file { display:flex; align-items:center; gap:9px; padding:7px 0;
+    border-bottom:1px solid var(--orion-border); font-size:12.5px; }
+  .vp-file:last-child { border-bottom:none; }
+  .vp-file__name { color:var(--orion-text); overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+  /* Only a real <a> gets these -- the plain-text fallback for a resource with
+     no item_id is a <span>, and text-decoration/cursor on it would promise a
+     click that does nothing. */
+  a.vp-file__name { text-decoration:none; cursor:pointer; }
+  a.vp-file__name:hover { text-decoration:underline; color:var(--orion-link); }
+  .vp-file__facts { margin-left:auto; flex:0 0 auto; color:var(--orion-text-3);
+    font-variant-numeric:tabular-nums; }
+  .vp-files__note { margin-top:10px; font-size:12px; color:var(--orion-text-3);
+    line-height:1.5; }
+
+  /* A virtual machine's page, read from EXT-TDD (hub-api.js, renderVmCards).
+     Pages there follow no template, so everything here has to survive a page
+     of two lines and a page of twelve sections equally. */
+  .hub-vm-card .btn-ghost, .hub-vm-card .btn-primary-sm { flex:none; padding:8px 16px; }
+  .hub-vm-actions { display:flex; flex-wrap:wrap; gap:8px; }
+  .hub-vm-actions a { text-decoration:none; }
+  .hub-vm-facts { margin-top:10px; font-size:12px; color:var(--orion-text-3); }
+  .hub-vm-sub { margin:14px 0 6px; }
+  .hub-vm-sub:first-of-type { margin-top:4px; }
+  .hub-vm-list { display:flex; flex-direction:column; gap:2px; }
+  .hub-vm-link { display:inline-flex; align-items:center; gap:8px; padding:4px 0;
+    color:var(--orion-text); text-decoration:none; font-size:13px; }
+  .hub-vm-link:hover span:last-child { text-decoration:underline; color:var(--orion-link); }
+  .hub-vm-card .hub-vm-slice { display:inline-flex; margin:2px 8px 6px 0; }
+  .hub-vm-card .hub-vm-toggle { padding:5px 12px; }
+  .hub-vm-used { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .hub-vm-via { font-size:12px; color:var(--orion-text-3); }
+  .hub-vm-toc { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+  .hub-vm-toc .orion-badge { border:none; font:inherit; font-size:12px; }
+  .hub-vm-section { border-top:1px solid var(--orion-border); scroll-margin-top:80px; }
+  .hub-vm-section > summary { cursor:pointer; padding:9px 0; font-weight:600;
+    font-size:13.5px; color:var(--orion-text); }
+  .hub-vm-section > summary:hover { color:var(--orion-link); }
+  .hub-vm-section__body { padding:0 0 12px 16px; font-size:13px; line-height:1.55;
+    color:var(--orion-text-2); overflow-wrap:anywhere; }
+  .hub-vm-p { margin:0 0 8px; }
+  .hub-vm-ul { margin:0 0 8px; padding-left:18px; }
+  .hub-vm-ul li { margin-bottom:3px; }
+  .hub-vm-inline-link { color:var(--orion-link); text-decoration:none; }
+  .hub-vm-inline-link:hover { text-decoration:underline; }
+  .hub-vm-table-wrap { overflow-x:auto; margin:0 0 10px; }
+  .hub-vm-table { border-collapse:collapse; font-size:12.5px; min-width:50%; }
+  .hub-vm-table th, .hub-vm-table td { border:1px solid var(--orion-border);
+    padding:5px 9px; text-align:left; vertical-align:top; }
+  .hub-vm-table th { background:var(--orion-surface-2); color:var(--orion-text);
+    font-weight:600; }
+  .hub-vm-sealed { margin:0 0 8px; padding:7px 10px; border:1px dashed var(--orion-border-md);
+    border-radius:var(--orion-radius-sm); color:var(--orion-text-3); font-size:12.5px; }
+  .hub-vm-revealed { margin:0 0 8px; padding:8px 10px 2px; border-radius:var(--orion-radius-sm);
+    background:var(--orion-warn-bg); color:var(--orion-text); }
+  .hub-vm-notice { margin-bottom:12px; padding:8px 12px; border-radius:var(--orion-radius-sm);
+    background:var(--orion-surface-2); font-size:12.5px; color:var(--orion-text-2); }
+  .hub-vm-notice a { color:var(--orion-link); }
+  .hub-vm-notice--open { background:var(--orion-warn-bg); color:var(--orion-warn-ink); }
+  .hub-vm-notice--older { margin:12px 0 0; background:var(--orion-warn-bg); color:var(--orion-warn-ink); }
+  .hub-vm-notice--older .hub-vm-link { padding:0; font-size:12.5px; }
+  .hub-vm-dl { margin-left:auto; }
+  /* Liwei, 2026-09-08: the icon-only grey button "太过不明显" -- easy to miss
+     next to a filename. PTC green text and border at rest, so it reads as an
+     action rather than another muted fact in the row; solid green on hover,
+     the same #00890B every other filled button in this app pins to in both
+     themes (--orion-indigo itself is #40AA1D in dark mode, which carries
+     white text at only 3.01:1 -- fine for the idle text/border here, not
+     enough for a solid fill, so the fill is pinned rather than themed).
+     Renamed from .vp-file__preview, 2026-09-10: Seb asked for the file name
+     itself to be the preview link and this button to become Download,
+     moved to the far right of the row -- same look, new job. */
+  .vp-file__download { flex:0 0 auto; display:inline-flex; align-items:center;
+    gap:5px; padding:4px 10px; font-size:11.5px; font-weight:700;
+    color:var(--orion-indigo); background:var(--orion-indigo-soft);
+    border:1px solid var(--orion-indigo); border-radius:var(--orion-radius-pill);
+    cursor:pointer; white-space:nowrap; text-decoration:none; }
+  .vp-file__download:hover { background:#00890B; border-color:#00890B; color:#fff; }
+  .vp-file__download svg { width:12px; height:12px; }
+
+
+  .hub-boot { display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 14px; padding: 80px 20px; text-align: center;
+    color: var(--orion-text-3); font-size: 13px; }
+  body.hub-ready .hub-boot { display: none; }
+  .hub-boot__spinner { width: 26px; height: 26px; border-radius: 50%;
+    border: 2px solid var(--orion-border-md); border-top-color: var(--orion-indigo);
+    animation: hub-spin .8s linear infinite; }
+  @keyframes hub-spin { to { transform: rotate(360deg); } }
+  .hub-boot--failed .hub-boot__spinner { display: none; }
+  .hub-boot--failed { color: #c2410c; }
+
+  /* The preview plays here, in a frame with no address bar. A browser popup
+     cannot hide the URL any more; an iframe never had one. */
+  .hub-preview { position:fixed; inset:0; z-index:1000; display:none;
+    align-items:center; justify-content:center; padding:24px;
+    background:rgba(10,12,15,.72); }
+  .hub-preview.open { display:flex; }
+  .hub-preview__box { width:min(1180px,96vw); height:min(760px,92vh);
+    display:flex; flex-direction:column; border-radius:10px; overflow:hidden;
+    background:var(--orion-surface); box-shadow:0 24px 64px rgba(0,0,0,.45); }
+  .hub-preview__bar { display:flex; align-items:center; gap:12px;
+    padding:10px 14px; border-bottom:1px solid var(--orion-border);
+    background:var(--orion-surface-2); }
+  .hub-preview__title { font-size:13.5px; font-weight:600;
+    color:var(--orion-text); overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap; }
+  .hub-preview__close { margin-left:auto; border:none; background:transparent;
+    font-size:22px; line-height:1; color:var(--orion-text-3); cursor:pointer;
+    padding:0 4px; }
+  .hub-preview__close:hover { color:var(--orion-text); }
+  /* Frame + metadata panel, side by side. Seb, 2026-09-10: "put the
+     metadata from the bottom on the right ... vertical" -- this row is what
+     replaced the earlier stacked (video-on-top, table-below) layout.
+     min-height:0 is load-bearing: without it, a flex child set to flex:1
+     inside a flex *column* parent (.hub-preview__box) sizes to its content
+     instead of shrinking to the space actually available, and the panel's
+     own scroll never gets a chance to kick in. */
+  .hub-file-preview__main { flex:1; min-height:0; display:flex;
+    flex-direction:row; overflow:hidden; }
+  .hub-preview__frame { flex:1; min-width:0; height:100%; border:none;
+    background:#fff; }
+
+  /* The metadata panel the file-preview modal adds beside the frame that the
+     Consensus one doesn't need. Fixed width, full height, its own scroll --
+     a long description or a ten-row Properties table scrolls in place
+     rather than crushing the video, the same goal the old capped-height
+     strip had, just oriented the other way now that the panel is vertical. */
+  .hub-file-preview__body { flex:0 0 260px; overflow-y:auto;
+    display:flex; flex-direction:column;
+    padding:14px; border-top:none; border-left:1px solid var(--orion-border); }
+  .hub-file-preview__desc { font-size:12.5px; color:var(--orion-text-2);
+    line-height:1.5; margin-bottom:12px; }
+  /* AMP's Properties box, as an actual label/value table rather than the one
+     bullet-separated line this used to be. A single column, not the grid
+     this used to be: at 260px there is only ever room for one, and the
+     side-panel shape is itself what Seb asked to match -- see above. */
+  .hub-file-preview__table { display:flex; flex-direction:column; gap:10px; }
+  .hub-file-preview__row { display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .hub-file-preview__label { font-size:10.5px; font-weight:700; letter-spacing:.03em;
+    text-transform:uppercase; color:var(--orion-text-3); }
+  .hub-file-preview__value { font-size:12.5px; color:var(--orion-text);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    font-variant-numeric:tabular-nums; }
+  /* Liwei, 2026-09-10: a download control at the bottom of the side panel,
+     so deciding "this is the file I want" while watching the preview does
+     not mean closing the popup to go find one. Same visual language as
+     .vp-file__download (indigo pill, pinned #00890B fill on hover for the
+     same contrast reason documented there), full width since it anchors
+     the bottom of a fixed-width column rather than sitting in a row.
+     margin-top:auto, not a fixed gap -- Liwei's follow-up same day: with
+     .hub-file-preview__body now a flex column, this pins the button to the
+     panel's own bottom edge regardless of how short the description/table
+     above it are, instead of the button just trailing whatever height that
+     content happens to be. */
+  .hub-file-preview__download { margin-top:auto; width:100%;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    padding:8px 12px; font-size:12.5px; font-weight:700;
+    color:var(--orion-indigo); background:var(--orion-indigo-soft);
+    border:1px solid var(--orion-indigo); border-radius:var(--orion-radius-sm);
+    cursor:pointer; text-decoration:none; }
+  .hub-file-preview__download:hover { background:#00890B; border-color:#00890B; color:#fff; }
+  .hub-file-preview__download svg { width:13px; height:13px; }
+  .hub-file-preview__nav { display:flex; align-items:center;
+    justify-content:space-between; padding:8px 14px;
+    border-top:1px solid var(--orion-border); background:var(--orion-surface-2);
+    flex:0 0 auto; }
+  .hub-file-preview__navbtn { display:inline-flex; align-items:center; gap:5px;
+    padding:6px 12px; font-size:12.5px; font-weight:600; color:var(--orion-text);
+    background:var(--orion-surface); border:1px solid var(--orion-border-md);
+    border-radius:var(--orion-radius-sm); cursor:pointer; }
+  .hub-file-preview__navbtn:hover:not(:disabled) { background:var(--orion-surface-2); }
+  .hub-file-preview__navbtn:disabled { opacity:.4; cursor:default; }
+  .hub-file-preview__navbtn svg { width:13px; height:13px; }
+  #hubFilePreviewPosition { font-size:12px; color:var(--orion-text-3);
+    font-variant-numeric:tabular-nums; }
+
+  /* Said plainly where there is nothing to show, rather than left blank —
+     an empty panel reads as broken, "not indexed yet" reads as honest. */
+  .hub-empty { color: var(--orion-text-3); font-size: 12.5px; font-style: italic; }
+
+  /* A platform badge that goes somewhere says so, quietly: the card is dense
+     and an underline on every one of them would be louder than the titles. */
+  .hub-source--link { text-decoration: none; cursor: pointer; }
+  .hub-source--link:hover { filter: brightness(.92); text-decoration: underline; }
+  /* The name opens the details page and must read as the primary action. */
+  .hub-detail-link { color: inherit; text-decoration: none; }
+  .hub-detail-link:hover { text-decoration: underline; }
+
+  /* The platform that HOSTS the asset gets the verb; any other platform it
+     also lives on gets just its mark. A Consensus demo exists to be shared, so
+     it keeps the full share button -- in Consensus colours. A SharePoint kit
+     that merely has a Consensus recording gets a 36px logo: real, secondary,
+     and still legible once a third platform appears beside it. */
+  .hub-platform { display:inline-flex; align-items:center; justify-content:center;
+    gap:6px; padding:5px 9px; }
+  .asset-card__actions { justify-content:flex-start; gap:6px; }
+  .hub-platform__logo { height:16px; width:16px; flex:0 0 auto; }
+
+  /* Cross-reference: the mark alone, on a neutral surface. It must not be
+     tinted -- the Consensus mark is a full-colour gradient. */
+  .hub-platform--ref { flex:0 0 auto; width:auto;
+    background: var(--orion-surface-2); border:1px solid var(--orion-border-md);
+    color: var(--orion-text); }
+  .hub-platform--ref:hover { border-color:#FC6839; }
+
+  /* Home platform: outline only. A filled gradient bar was the loudest thing
+     on a grid of 200 cards and drowned the titles it was meant to sit under.
+     A third of the tile is enough for the verb and leaves two thirds free for
+     whatever comes next -- a second platform, Add to Velocity, Favourite. */
+  .hub-platform--home { flex:0 0 33%; max-width:33%; background:transparent;
+    font-weight:600; font-size:10.5px; padding:4px 2px; letter-spacing:-.1px;
+    white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis; display:block; text-align:center; }
+  .hub-platform--home.hub-platform--consensus {
+    border:1px solid #FC6839; color:#FC6839; }
+  .hub-platform--home.hub-platform--consensus:hover {
+    background:rgba(252,104,57,.10); }
+
+  /* Elio's stats slot holds one short line; ours holds a description that runs
+     to 1194 characters at worst, which stretched cards from 286px to 709px.
+     Three lines, with the whole text on hover. */
+  .asset-card__stats.hub-desc {
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;
+    overflow:hidden; align-items:flex-start; }
+  /* Titles wrap to two lines at most for the same reason. No reserved height:
+     the cards in a row already stretch to the tallest, so the grid squares
+     itself up and forcing a minimum would only add dead space. */
+  .asset-card__title { display:-webkit-box; -webkit-box-orient:vertical;
+    -webkit-line-clamp:2; overflow:hidden; }
+
+  /* The type chip sat top-left, straight over the part of a thumbnail that
+     carries its title -- Consensus poster frames put their wordmark there, so
+     "Video" was covering "PERSONALIZED DEMO". The top edge is where a picture
+     says what it is; the bottom-left corner is empty on every card we build.
+
+     Except Elio's ranked cards, which put #1..#5 there, so those keep the
+     original position rather than stacking two pills in one corner. */
+  .asset-card__thumb:not(:has(.rank-chip)) .type-chip {
+    top:auto; bottom:8px; }
+
+  /* A derived cover for the 455 SharePoint assets that have no picture and no
+     way to make one. An identifier, not a photograph -- see paintCover(). */
+  .hub-cover { position:relative; overflow:hidden;
+    background:
+      linear-gradient(140deg,
+        hsl(var(--cover-hue) 42% 46% / .30) 0%,
+        hsl(var(--cover-hue) 42% 46% / .10) 62%,
+        transparent 100%),
+      var(--orion-surface-3); }
+  .hub-cover__mark { position:absolute; inset:0; display:flex;
+    align-items:center; justify-content:center; user-select:none; }
+  .hub-cover__mark svg { width:42px; height:42px; opacity:.55; }
+  /* No mark in the sprite for this family -- its name, which is still
+     distinctive and still scannable. */
+  .hub-cover__mark--text { font-size:15px; font-weight:650; letter-spacing:.2px;
+    padding:0 14px; text-align:center;
+    color:hsl(var(--cover-hue) 34% 46% / .62); }
+  :root:not([data-theme="light"]) .hub-cover__mark--text,
+  :root[data-theme="dark"] .hub-cover__mark--text {
+    color:hsl(var(--cover-hue) 42% 74% / .42); }
+  :root:not([data-theme="light"]) .hub-cover__mark svg,
+  :root[data-theme="dark"] .hub-cover__mark svg { opacity:.42; }
+
+  /* ------------------------------------------------- segment landing page */
+  .hub-seg { padding:18px 20px; border:1px solid var(--orion-border);
+    border-radius:var(--orion-radius); background:var(--orion-surface-2); }
+  /* Collapsed: one line with a chevron, so a search is not pushed below the
+     fold by an introduction nobody is reading at that moment. */
+  .hub-seg__toggle { display:none; align-items:center; gap:8px; width:100%;
+    border:none; background:transparent; color:var(--orion-text); font:inherit;
+    font-size:14px; font-weight:600; cursor:pointer; padding:0; text-align:left; }
+  .hub-seg__toggle svg { transform:rotate(90deg); transition:transform .15s;
+    color:var(--orion-text-3); }
+  .hub-seg__toggle-count { margin-left:auto; font-size:12px; font-weight:400;
+    color:var(--orion-text-3); font-variant-numeric:tabular-nums; }
+  .hub-seg--collapsed { padding:11px 20px; }
+  .hub-seg--collapsed .hub-seg__toggle { display:flex; }
+  .hub-seg--collapsed .hub-seg__toggle svg { transform:rotate(0deg); }
+  .hub-seg--collapsed > *:not(.hub-seg__toggle) { display:none; }
+
+  .hub-seg__back { display:inline-flex; align-items:center; gap:4px; border:none;
+    background:transparent; color:var(--orion-text-3); font:inherit;
+    font-size:12px; cursor:pointer; padding:0 0 8px; }
+  .hub-seg__back:hover { color:var(--orion-text); }
+  /* The chevron points forward in the sprite; this is a way back. */
+  .hub-seg__back svg { transform:rotate(180deg); }
+  .hub-seg__head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  .hub-seg__title { margin:0; font-size:22px; font-weight:650;
+    color:var(--orion-text); }
+  .hub-seg__count { font-size:12.5px; color:var(--orion-text-3);
+    font-variant-numeric:tabular-nums; }
+  .hub-seg__blurb { margin:8px 0 14px; font-size:13.5px; line-height:1.55;
+    color:var(--orion-text-2); max-width:70ch; }
+  /* Missing editorial content must look missing. A plausible sentence nobody
+     stands behind is worse than a visible gap. */
+  .hub-seg__blurb--empty { color:var(--orion-text-3); font-style:italic; }
+  .hub-seg__foot { display:flex; align-items:center; justify-content:space-between;
+    gap:14px; flex-wrap:wrap; padding-top:12px;
+    border-top:1px solid var(--orion-border); }
+  .hub-seg__fams { display:flex; gap:6px; flex-wrap:wrap; }
+  .hub-seg__fam { border:1px solid var(--orion-border-md); background:transparent;
+    color:var(--orion-text-2); border-radius:999px; padding:3px 10px;
+    font:inherit; font-size:12px; cursor:pointer; }
+  .hub-seg__fam:hover { border-color:var(--orion-accent, #5b6cff);
+    color:var(--orion-text); }
+  .hub-seg__fam em { font-style:normal; color:var(--orion-text-3);
+    font-variant-numeric:tabular-nums; }
+  .hub-seg__contact { font-size:12.5px; color:var(--orion-text-2); }
+  .hub-seg__empty { color:var(--orion-text-3); font-style:italic; }
+  .hub-seg__stamp { display:block; font-size:11px; color:var(--orion-text-3); }
+  .hub-seg__latest { margin-top:16px; }
+  .hub-seg__latest h3 { margin:0 0 10px; font-size:13.5px; font-weight:600;
+    color:var(--orion-text-2); }
+  .hub-seg__latest .asset-row { overflow-x:auto; }
+
+  /* A nav entry with nothing behind it. Dimmed rather than removed, because
+     the category is real and may fill up -- and because silently deleting
+     Elio's entries would hide the gap instead of showing it. */
+  .hub-nav--dead { opacity:.38; }
+  .hub-nav--dead:hover { background:transparent; }
+
+  /* ------------------------------------------------------ suggestion strip */
+  .hub-suggest { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .hub-suggest__btn { display:inline-flex; align-items:center; gap:6px;
+    border:1px solid var(--orion-border-md); background:var(--orion-surface);
+    color:var(--orion-text); border-radius:999px; padding:6px 12px;
+    font:inherit; font-size:12.5px; font-weight:550; cursor:pointer; }
+  .hub-suggest__btn:hover { border-color:var(--orion-accent, #5b6cff); }
+  .hub-suggest__btn--page { border-color:var(--orion-accent, #5b6cff);
+    color:var(--orion-accent, #5b6cff); }
+
+  /* ------------------------------------------------------- share modal */
+  .hub-req { font-size:10.5px; font-weight:600; text-transform:uppercase;
+    letter-spacing:.4px; color:#c25a10; margin-left:6px; }
+  .hub-opt { font-size:10.5px; font-weight:500; text-transform:uppercase;
+    letter-spacing:.4px; color:var(--orion-text-3); margin-left:6px; }
+  .hub-hint { font-size:11.5px; color:var(--orion-text-3); margin-top:5px; }
+  .chip-input .chip { display:inline-flex; align-items:center; gap:6px;
+    background:var(--orion-surface-3); border:1px solid var(--orion-border-md);
+    border-radius:var(--orion-radius-pill); padding:3px 6px 3px 10px;
+    font-size:12px; color:var(--orion-text); }
+  .chip__x { border:none; background:transparent; color:var(--orion-text-3);
+    cursor:pointer; font-size:14px; line-height:1; padding:0 2px; }
+  .chip__x:hover { color:var(--orion-text); }
+  .chip-input input { flex:1; min-width:170px; border:none; outline:none;
+    background:transparent; font:inherit; font-size:13px; color:var(--orion-text); }
+  /* A real send emails real people, so the safe option is the default and the
+     switch that arms it has to be visible rather than buried. */
+  .hub-testrow { display:flex; gap:9px; align-items:flex-start; margin-top:14px;
+    font-size:12px; color:var(--orion-text-2); line-height:1.45; cursor:pointer; }
+  .hub-testrow input { margin-top:2px; flex:0 0 auto; }
+  .share-error { margin-top:14px; padding:10px 12px; border-radius:6px;
+    border:1px solid #c2410c66; background:#c2410c14; color:#c2410c;
+    font-size:12.5px; line-height:1.5; white-space:pre-wrap; }
+
+  /* --------------------------------------------------- request intake */
+  .req-error { margin: 0 0 4px; padding: 10px 12px; border-radius: 6px;
+    border: 1px solid #c2410c66; background: #c2410c14; color: #c2410c;
+    font-size: 12.5px; line-height: 1.5; }
+  .req-outcome { margin-top: 10px; font-size: 13px; color: var(--orion-text-2); }
+  /* Recorded but not yet in SharePoint is not a failure and must not look
+     like one -- but it is not the plain success either. */
+  .req-outcome--warn { color: #c2410c; }
+
+  .attach-warn { display: block; font-size: 12px; line-height: 1.5;
+    color: #c2410c; }
+  .attach-size { color: var(--orion-text-3); font-variant-numeric: tabular-nums; }
+
+  /* "Load more" under the results grid. A brand-new class Elio's file has no
+     opinion on, so no ordering trap here the way the colour tokens had --
+     nothing in the document sets .hub-load-more before this, and the button
+     is only ever created by hub-api.js, after this stylesheet has already
+     been parsed. */
+  /* The language tag a card gets when it isn't English -- see
+     addLanguageTag() in hub-api.js for why English itself is skipped, and
+     why it lives on the thumbnail (2026-09-08: it used to sit in
+     .asset-card__meta, a no-wrap flex row, and got silently clipped off the
+     card whenever the platform badge and product/funnel text already filled
+     the width). Same look as .type-chip, since it's the same kind of fact --
+     a small label ON the thumbnail -- just the opposite corner. */
+  .hub-lang-tag { position:absolute; top:8px; right:8px; z-index:1;
+    background:rgba(255,255,255,.94); border:1px solid var(--orion-border-md);
+    border-radius:var(--orion-radius-pill); padding:3px 9px; font-size:11px;
+    font-weight:600; color:var(--orion-text-2); }
+
+  .hub-load-more { display: flex; justify-content: center; padding: 20px 0 4px; }
+  .hub-load-more__btn { padding: 9px 24px; border-radius: var(--orion-radius-sm);
+    border: 1px solid var(--orion-border-md); background: var(--orion-surface);
+    color: var(--orion-text); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .hub-load-more__btn:hover { background: var(--orion-surface-2); }
+  .hub-load-more__btn:disabled { opacity: .6; cursor: default; }

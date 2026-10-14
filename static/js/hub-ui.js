@@ -1,3 +1,6 @@
+/* The page's own behaviour: the request form, the share and style-example
+ * modals, the card template hub-api.js fills, and the sidebar's view switches.
+ * Split out of index.html 2026-10-14; loaded before static/hub-api.js. */
 function openShareModal(title, meta, uuid) {
   document.getElementById('shareAssetTitle').textContent = title;
   document.getElementById('shareAssetMeta').textContent = meta;
@@ -22,44 +25,6 @@ function copyShareLink() {
   setTimeout(function(){ btn.textContent = original; }, 1500);
 }
 
-var dsrRooms = [
-  { name: 'Bobcat – Windchill AI Expansion FY26Q3', meta: '3 assets · updated yesterday' },
-  { name: 'Acme Robotics – PLM Modernization', meta: '7 assets · updated Jul 20' }
-];
-var dsrSelected = null;
-function openDsrModal(title, meta) {
-  document.getElementById('dsrAssetTitle').textContent = title;
-  document.getElementById('dsrAssetMeta').textContent = meta;
-  document.getElementById('dsrConfirm').style.display = 'none';
-  dsrSelected = null;
-  renderDsrRooms();
-  document.getElementById('dsrBackdrop').classList.add('open');
-}
-function closeDsrModal() {
-  document.getElementById('dsrBackdrop').classList.remove('open');
-}
-function renderDsrRooms() {
-  var list = document.getElementById('dsrRoomList');
-  list.innerHTML = '';
-  dsrRooms.forEach(function(r, i) {
-    var row = document.createElement('div');
-    row.className = 'dsr-room-row' + (dsrSelected === i ? ' dsr-room-row--selected' : '');
-    row.onclick = function() { dsrSelected = i; renderDsrRooms(); };
-    row.innerHTML = '<span class="dsr-room-row__radio"></span><div><div class="dsr-room-row__name">' + r.name + '</div><div class="dsr-room-row__meta">' + r.meta + '</div></div>';
-    list.appendChild(row);
-  });
-  var newRow = document.createElement('div');
-  newRow.className = 'dsr-room-row dsr-room-row--new' + (dsrSelected === 'new' ? ' dsr-room-row--selected' : '');
-  newRow.onclick = function() { dsrSelected = 'new'; renderDsrRooms(); };
-  newRow.innerHTML = '<span class="dsr-room-row__radio"></span><div><div class="dsr-room-row__name">+ Create a new Digital Sales Room</div></div>';
-  list.appendChild(newRow);
-}
-function addToDsr() {
-  if (dsrSelected === null) return;
-  var label = dsrSelected === 'new' ? 'a new Digital Sales Room' : dsrRooms[dsrSelected].name;
-  document.getElementById('dsrConfirmText').textContent = 'Added to ' + label;
-  document.getElementById('dsrConfirm').style.display = 'block';
-}
 
 var videoData = {
   'dup-parts': {
@@ -140,11 +105,8 @@ function openVideoPreview(id) {
     (v.uuid ? ' <span>·</span> Consensus UUID <span class="orion-mono">' + v.uuid + '</span>' : '');
   document.getElementById('vpDesc').textContent = v.desc;
   var vpShareBtn = document.getElementById('vpShareBtn');
-  var vpDsrBtn = document.getElementById('vpDsrBtn');
   vpShareBtn.style.display = v.uuid ? '' : 'none';
-  vpDsrBtn.style.display = v.uuid ? '' : 'none';
   vpShareBtn.onclick = function() { openShareModal(v.title, v.metaText, v.uuid); };
-  vpDsrBtn.onclick = function() { openDsrModal(v.title, v.metaText); };
 
   document.getElementById('vpValueDrivers').innerHTML = v.drivers.map(function(d) {
     return '<span class="value-driver-chip">' + d + '</span>';
@@ -177,6 +139,37 @@ function setActiveNav(id) {
   document.querySelectorAll('.orion-side .orion-navitem').forEach(function(n) { n.classList.remove('orion-navitem--active'); });
   document.getElementById(id).classList.add('orion-navitem--active');
 }
+var REQUEST_FORM_DEFAULTS = null;
+function snapshotRequestFormDefaults() {
+  if (REQUEST_FORM_DEFAULTS) return;
+  REQUEST_FORM_DEFAULTS = {
+    pillRows: Array.from(document.querySelectorAll('#requestFormCard .stage-row')).map(function(row) {
+      return Array.from(row.children).map(function(p) { return p.classList.contains('stage-pill--active'); });
+    })
+  };
+}
+function resetRequestForm() {
+  if (!REQUEST_FORM_DEFAULTS) return;
+  var rows = document.querySelectorAll('#requestFormCard .stage-row');
+  rows.forEach(function(row, ri) {
+    Array.from(row.children).forEach(function(p, pi) {
+      p.classList.toggle('stage-pill--active', !!REQUEST_FORM_DEFAULTS.pillRows[ri][pi]);
+    });
+  });
+  document.getElementById('reqBrief').value = '';
+  document.getElementById('reqTargetDate').value = '';
+  document.getElementById('reqCompellingEvent').value = '';
+  document.getElementById('reqName').value = '';
+  document.getElementById('reqEmail').value = '';
+  document.getElementById('reqNotes').value = '';
+  document.getElementById('attachmentList').innerHTML = '';
+
+  onAssetTypeChange(document.querySelector('#assetTypeRow .stage-pill--active'));
+  onCustomerChange(document.querySelector('#customerRow .stage-pill--active'));
+  onStartingMaterialsChange(document.querySelector('#startingMaterialsRow .stage-pill--active'));
+  computeProductScope();
+  computeKindOfDemo();
+}
 function openRequestView() {
   document.getElementById('videoPreviewPage').classList.remove('active');
   document.getElementById('mainTopbar').style.display = 'none';
@@ -184,6 +177,7 @@ function openRequestView() {
   document.getElementById('requestViewPage').classList.add('active');
   document.getElementById('requestViewPage').scrollTop = 0;
   setActiveNav('navRequestAsset');
+  snapshotRequestFormDefaults();
   computeKindOfDemo();
   computeProductScope();
 }
@@ -219,7 +213,6 @@ var CHANNEL_TO_LEVEL = {
   'Social (LinkedIn / YouTube)': 'Teaser',
   'Event / trade show': 'Teaser',
   'Web (PTC.com)': 'Overview',
-  'eStore': 'Overview',
   'Share with a prospect': 'Explainer',
   'Share with an existing customer': 'Explainer',
   'Push to PTC Velocity': 'Explainer',
@@ -312,7 +305,7 @@ function computeKindOfDemo() {
       '<div class="field-hint" style="margin-top:4px;">' + VIDEO_LEVEL_HINT[level] + '</div>' +
       '<div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">' +
         '<button class="btn-ghost" style="flex:none; padding:6px 12px;" onclick="openStyleExampleModal(\'' + level + '\')"><svg class="orion-ico--sm orion-ico"><use href="#i-play"/></svg>See an example of this style</button>' +
-        '<button class="btn-ghost" style="flex:none; padding:6px 12px;" onclick="checkExistingAsset(this, \'' + level + '\')"><svg class="orion-ico--sm orion-ico"><use href="#i-search"/></svg>Check Consensus for something similar</button>' +
+        '<button class="btn-ghost" style="flex:none; padding:6px 12px;" onclick="checkExistingAsset(this, \'' + level + '\')"><svg class="orion-ico--sm orion-ico"><use href="#i-search"/></svg>Check Demo Database for Similar Content</button>' +
       '</div>' +
       '<div id="existingCheck-' + level + '" style="display:none; margin-top:10px;"></div>' +
       '</div>';
@@ -347,7 +340,7 @@ var EXISTING_ASSET_MATCHES = {
 function checkExistingAsset(btn, level) {
   btn.disabled = true;
   btn.style.opacity = '.6';
-  btn.textContent = 'Checking Consensus…';
+  btn.textContent = 'Checking Demo Database…';
   var resultEl = document.getElementById('existingCheck-' + level);
   var products = Array.from(document.querySelectorAll('#productScopeRow .stage-pill--active')).map(function(p) { return p.dataset.value; });
   var key = (products[0] || 'Other') + '|' + level;
@@ -360,7 +353,7 @@ function checkExistingAsset(btn, level) {
         '<div class="modal__note" style="align-items:flex-start; background:var(--orion-warn-bg);">' +
           '<svg class="orion-ico orion-ico--sm" style="color:var(--orion-warn-ink); margin-top:2px;"><use href="#i-info"/></svg>' +
           '<div>' +
-            '<div style="font-weight:700; margin-bottom:4px; color:var(--orion-warn-ink);">Found something similar in Consensus</div>' +
+            '<div style="font-weight:700; margin-bottom:4px; color:var(--orion-warn-ink);">Found something similar in the Demo Database</div>' +
             '<div style="font-weight:600;">' + match.title + '</div>' +
             '<div class="orion-subtle" style="margin:2px 0 6px; font-size:12px;">' + match.subtitle + '</div>' +
             '<div style="font-size:12px; color:var(--orion-text-2);">' + match.meta + ' · ' + match.stats + '<br>' + match.updated + ' · owner ' + match.owner + '</div>' +
@@ -374,7 +367,7 @@ function checkExistingAsset(btn, level) {
     } else {
       resultEl.innerHTML =
         '<div class="modal__note"><svg class="orion-ico orion-ico--sm" style="color:var(--orion-green-ink);"><use href="#i-check"/></svg>' +
-        '<span>No similar asset found in Consensus for this product and style — clear to create something new.</span></div>';
+        '<span>No similar asset found in the Demo Database for this product and style — clear to create something new.</span></div>';
     }
   }, 700);
 }
@@ -394,157 +387,98 @@ function computeProductScope() {
 function onStartingMaterialsChange(el) {
   document.getElementById('attachmentsSection').style.display = el.dataset.value === 'have' ? '' : 'none';
 }
+/* Replaced at runtime by hub-api.js, which keeps the File objects and uploads
+   them. This version used to render a chip and then clear the input,
+   discarding every file; it now refuses rather than pretending, for the case
+   where that script fails to load. */
 function handleAttachmentFiles(input) {
   var list = document.getElementById('attachmentList');
-  Array.from(input.files).forEach(function(f) {
-    var chip = document.createElement('span');
-    chip.className = 'chip';
-    chip.innerHTML = '<svg class="orion-ico orion-ico--sm"><use href="#i-file-text"/></svg> ' + f.name;
-    list.appendChild(chip);
-  });
   input.value = '';
+  list.innerHTML = '<span class="attach-warn">The Hub could not be reached, so '
+    + 'files cannot be attached. Reload the page and try again.</span>';
 }
+/* Replaced at runtime by hub-api.js, which actually posts the answers. This
+   remains as the fallback for the case where that script fails to load: it is
+   better to say the Hub is unavailable than to show a success screen for a
+   request that went nowhere, which is what this function used to do. */
 function submitAssetRequest(e) {
   e.preventDefault();
-  document.getElementById('requestFormCard').style.display = 'none';
-  document.getElementById('requestSuccessCard').style.display = '';
-  document.getElementById('requestViewPage').scrollTop = 0;
+  var box = document.getElementById('reqError');
+  if (box) {
+    box.textContent = 'The Hub could not be reached, so this was not submitted. '
+                    + 'Please reload the page and try again.';
+    box.style.display = '';
+  }
 }
 
-/* ============================================================
-   DEMO VIDEO GALLERY (Discover > Demo Video Gallery)
-   ============================================================ */
-function openDemoGalleryView() {
-  document.getElementById('videoPreviewPage').classList.remove('active');
-  document.getElementById('requestViewPage').classList.remove('active');
-  document.getElementById('mainTopbar').style.display = 'none';
-  document.getElementById('mainThread').style.display = 'none';
-  document.getElementById('demoGalleryPage').classList.add('active');
-  document.getElementById('demoGalleryPage').scrollTop = 0;
-  setActiveNav('navDemoGallery');
-}
-function closeDemoGalleryView() {
-  document.getElementById('demoGalleryPage').classList.remove('active');
-  document.getElementById('mainTopbar').style.display = '';
-  document.getElementById('mainThread').style.display = '';
-  setActiveNav('navHome');
-}
+function escAttr(s) { return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
 
-function dvgShowPopover(cardEl) {
-  if (!cardEl) return;
-  var pop = document.getElementById('dvgCardPopover');
-  var title = cardEl.querySelector('.dvg-card__title').textContent;
-  var desc = cardEl.dataset.desc || '';
-  var segment = cardEl.dataset.segment || '';
-  var industry = cardEl.dataset.industry || '';
-  var product = cardEl.dataset.product || '';
-  var driver = cardEl.dataset.driver || '';
-  var funnel = cardEl.dataset.funnel || '';
-  var cf = cardEl.dataset.cf || '';
-  var reasonEl = cardEl.querySelector('.dvg-card__reason');
-  var reasonText = reasonEl ? reasonEl.textContent.trim() : '';
 
-  document.getElementById('dvgPopTitle').textContent = title;
-  document.getElementById('dvgPopDesc').textContent = desc;
-  document.getElementById('dvgPopTags').innerHTML =
-    '<span class="dvg-tag">' + segment + '</span>' +
-    '<span class="dvg-tag">' + industry + '</span>' +
-    '<span class="dvg-tag">' + product + '</span>' +
-    '<span class="dvg-tag dvg-tag--driver">' + driver + '</span>' +
-    '<span class="dvg-tag">' + funnel + '</span>';
+function videoAssetFromData(data) {
+  var product = data.product || '';
+  var segment = data.segment || '';
+  var funnel = data.funnel || '';
+  var cf = data.cf || '';
 
-  var cfLabel = cf === 'yes' ? 'Yes — cleared to share' : ('No' + (reasonText ? ' — ' + reasonText : ''));
-  document.getElementById('dvgPopMeta').innerHTML =
-    '<div class="dvg-popover__meta-row"><span>Customer-Facing</span><b>' + cfLabel + '</b></div>';
+  var card = document.createElement('div');
+  card.className = 'asset-card';
+  card.dataset.type = 'video';
+  card.dataset.product = product;
+  card.dataset.segment = segment;
+  card.dataset.stage = funnel;
+  card.dataset.cf = cf;
 
-  dvgPositionPopover(cardEl, pop);
-  pop.classList.add('open');
-}
-function dvgHidePopover() {
-  document.getElementById('dvgCardPopover').classList.remove('open');
-}
-function dvgPositionPopover(cardEl, pop) {
-  var rect = cardEl.getBoundingClientRect();
-  var popWidth = Math.min(300, window.innerWidth - 24);
-  pop.style.width = popWidth + 'px';
-  var left = rect.left + rect.width / 2 - popWidth / 2;
-  left = Math.max(12, Math.min(left, window.innerWidth - popWidth - 12));
-  var estHeight = 220;
-  var top;
-  if (rect.bottom + estHeight + 12 < window.innerHeight) { top = rect.bottom + 8; }
-  else if (rect.top - estHeight - 12 > 0) { top = rect.top - estHeight - 8; }
-  else { top = Math.max(12, rect.top); }
-  pop.style.left = left + 'px';
-  pop.style.top = top + 'px';
+  var logoMap = { Windchill: ['logo-windchill', '0 0 1299.67 299.6'], Creo: ['logo-creo', '0 0 1334.88 449.9'] };
+  var logo = logoMap[product];
+  var metaHtml = logo
+    ? '<span class="meta-logo-chip"><svg class="meta-logo" viewBox="' + logo[1] + '"><use href="#' + logo[0] + '"/></svg></span> ' + escAttr(funnel)
+    : escAttr(product || 'Cross-Portfolio') + (funnel ? ' \u00b7 ' + escAttr(funnel) : '');
+
+  var actionsHtml = data.share
+    ? '<button class="btn-primary-sm" data-share-title="' + escAttr(data.share.title) + '" data-share-meta="' + escAttr(data.share.meta) + '" data-share-uuid="' + escAttr(data.share.uuid) + '" onclick="openShareModal(this.dataset.shareTitle, this.dataset.shareMeta, this.dataset.shareUuid)"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share</button>'
+    : '<span class="orion-badge orion-badge--open" title="Silent cut \u2014 no narration">No audio track</span>';
+
+  card.innerHTML =
+    '<div class="asset-card__thumb">' +
+      '<span class="type-chip"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg>Video</span>' +
+      '<div class="play-btn" style="cursor:default;"><svg><use href="#i-play"/></svg></div>' +
+      (data.duration ? '<span class="duration-chip">' + escAttr(data.duration) + '</span>' : '') +
+    '</div>' +
+    '<div class="asset-card__body">' +
+      '<div class="asset-card__title">' + data.title + '</div>' +
+      '<div class="asset-card__meta">' + metaHtml + '</div>' +
+      '<div class="asset-card__stats">' + (data.desc || '') + '</div>' +
+      '<div class="asset-card__actions">' + actionsHtml + '</div>' +
+    '</div>';
+
+  var thumbEl = card.querySelector('.asset-card__thumb');
+  thumbEl.style.backgroundImage = "url('" + data.thumb + "')";
+  thumbEl.style.backgroundSize = 'cover';
+  thumbEl.style.backgroundPosition = 'center';
+
+  return card;
 }
 
-function dvgApplyFilters() {
-  var q = document.getElementById('dvgSearchInput').value.trim().toLowerCase();
-  var segment = document.getElementById('dvgFilterSegment').value;
-  var industry = document.getElementById('dvgFilterIndustry').value;
-  var product = document.getElementById('dvgFilterProduct').value;
-  var driver = document.getElementById('dvgFilterDriver').value;
-  var funnel = document.getElementById('dvgFilterFunnel').value;
-  var cf = document.getElementById('dvgFilterCf').value;
+// Filled with real cards by static/hub-api.js, which also owns filtering;
+// the mock-up's own filter over sample cards was removed 2026-10-14.
+var HUB_ASSET_POOL = null;
+function hubApplyFilters() {}
 
-  var anyActive = !!(q || segment || industry || product || driver || funnel || cf);
-  document.getElementById('dvgResetBtn').style.display = anyActive ? 'inline-flex' : 'none';
-
-  var cards = document.querySelectorAll('.dvg-card');
-  var visibleCount = 0;
-  cards.forEach(function(card) {
-    var title = (card.querySelector('.dvg-card__title').textContent || '').toLowerCase();
-    var desc = (card.dataset.desc || '').toLowerCase();
-    var matchesText = !q || title.indexOf(q) !== -1 || desc.indexOf(q) !== -1;
-    var matchesSegment = !segment || card.dataset.segment === segment;
-    var matchesIndustry = !industry || card.dataset.industry === industry;
-    var matchesProduct = !product || card.dataset.product === product;
-    var matchesDriver = !driver || card.dataset.driver === driver;
-    var matchesFunnel = !funnel || card.dataset.funnel === funnel;
-    var matchesCf = !cf || card.dataset.cf === cf;
-    var visible = matchesText && matchesSegment && matchesIndustry && matchesProduct && matchesDriver && matchesFunnel && matchesCf;
-    card.style.display = visible ? '' : 'none';
-    if (visible) visibleCount++;
+function hubResetFilters() {
+  document.getElementById('hubSearchInput').value = '';
+  // hubApplyFilters() is window.hubApplyFilters by the time this runs --
+  // hub-api.js points it at its own applyFilters() at boot -- so this
+  // function's own job is only clearing every control's value, and a new
+  // control needs adding here or Reset silently leaves it set.
+  ['hubFilterType', 'hubFilterProduct', 'hubFilterSegment', 'hubFilterStage',
+   'hubFilterLanguage', 'hubFilterCf'].forEach(function(id) {
+    document.getElementById(id).value = '';
   });
-
-  document.querySelectorAll('.dvg-rail').forEach(function(rail) {
-    var anyVisible = Array.prototype.some.call(rail.querySelectorAll('.dvg-card'), function(c) { return c.style.display !== 'none'; });
-    rail.style.display = anyVisible ? '' : 'none';
-  });
-
-  document.getElementById('dvgResultCount').textContent = visibleCount + ' of ' + cards.length + ' videos';
-}
-function dvgResetFilters() {
-  document.getElementById('dvgSearchInput').value = '';
-  document.getElementById('dvgFilterSegment').value = '';
-  document.getElementById('dvgFilterIndustry').value = '';
-  document.getElementById('dvgFilterProduct').value = '';
-  document.getElementById('dvgFilterDriver').value = '';
-  document.getElementById('dvgFilterFunnel').value = '';
-  document.getElementById('dvgFilterCf').value = '';
-  dvgApplyFilters();
+  hubApplyFilters();
 }
 
-document.getElementById('dvgSearchInput').addEventListener('input', dvgApplyFilters);
-['dvgFilterSegment','dvgFilterIndustry','dvgFilterProduct','dvgFilterDriver','dvgFilterFunnel','dvgFilterCf'].forEach(function(id) {
-  document.getElementById(id).addEventListener('change', dvgApplyFilters);
+document.getElementById('hubSearchInput').addEventListener('input', hubApplyFilters);
+['hubFilterType','hubFilterProduct','hubFilterSegment','hubFilterStage','hubFilterCf'].forEach(function(id) {
+  document.getElementById(id).addEventListener('change', hubApplyFilters);
 });
-document.getElementById('dvgResetBtn').addEventListener('click', dvgResetFilters);
-
-document.querySelectorAll('.js-dvg-share').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    openShareModal(btn.dataset.shareTitle, btn.dataset.shareMeta, btn.dataset.shareUuid);
-  });
-});
-
-document.querySelectorAll('.dvg-card__thumb').forEach(function(thumb) {
-  var card = thumb.closest('.dvg-card');
-  thumb.addEventListener('mouseenter', function() { dvgShowPopover(card); });
-  thumb.addEventListener('mouseleave', dvgHidePopover);
-  thumb.addEventListener('focus', function() { dvgShowPopover(card); });
-  thumb.addEventListener('blur', dvgHidePopover);
-});
-document.querySelectorAll('.dvg-rail__track').forEach(function(track) {
-  track.addEventListener('scroll', dvgHidePopover);
-});
-
+hubApplyFilters();

@@ -93,7 +93,12 @@ def run_sync(client: GraphClient, repo: AssetRepository, actor: str,
     """The sync itself, shared by the button and the daily schedule
     (backend/auto_sync.py), so the two can never drift apart. Records the
     attempt either way and re-raises a failure for the caller to report."""
-    token = None if full else _load_token(repo)
+    from backend.integrations.graph.sync import MAPPING_VERSION
+    state = repo.sync_state(SOURCE_SYSTEM) if hasattr(repo, "sync_state") else {}
+    # A mirror built by an older mapping is rebuilt in full once, whatever
+    # delta says (sync.MAPPING_VERSION).
+    stale = state.get("mapping_version") != MAPPING_VERSION
+    token = None if (full or stale) else _load_token(repo)
     try:
         result = sync_catalogue(client, repo, delta_token=token)
     except (GraphPermissionError, GraphError, ValueError) as exc:
@@ -101,6 +106,8 @@ def run_sync(client: GraphClient, repo: AssetRepository, actor: str,
         raise
 
     _save_token(repo, result.delta_token)
+    if hasattr(repo, "set_sync_field"):
+        repo.set_sync_field(SOURCE_SYSTEM, "mapping_version", MAPPING_VERSION)
     summary = result.as_dict()
     summary["vm_pages"] = _sync_vm_pages(client, repo)
     summary["demo_video"] = _sync_demo_video(client, repo)

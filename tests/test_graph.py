@@ -681,3 +681,29 @@ def test_a_delta_with_changes_re_enumerates_instead_of_replacing_with_the_page()
         f"the mirror was written from the delta page, not the full library: {repo.written}"
     assert "Untouched Kit" in repo.written, \
         "an asset that did not change must survive the sync"
+
+
+def test_a_mirror_built_by_an_older_mapping_is_rebuilt_once(tmp_path, monkeypatch):
+    """Delta says "unchanged" when nothing moved in SharePoint, which would
+    leave rows built the old way (kit dates, 2026-10-14) in place for good."""
+    import backend.routers.graph as graph_router
+    from backend.integrations.graph.sync import MAPPING_VERSION, SyncResult
+    from backend.repositories.json_repo import JsonAssetRepository
+
+    repo = JsonAssetRepository(str(tmp_path))
+    repo.set_sync_token("sharepoint", "token-from-before")
+    seen = []
+
+    def fake_sync(client, repo, delta_token=None):
+        seen.append(delta_token)
+        return SyncResult(delta_token="next-token")
+
+    monkeypatch.setattr(graph_router, "sync_catalogue", fake_sync)
+    for part in ("_sync_vm_pages", "_sync_demo_video", "_sync_demo_pages",
+                 "_sync_partner_access"):
+        monkeypatch.setattr(graph_router, part, lambda client, repo: {"ok": True})
+
+    graph_router.run_sync(object(), repo, "test")
+    graph_router.run_sync(object(), repo, "test")
+    assert seen == [None, "next-token"], "full once, then delta again"
+    assert repo.sync_state("sharepoint")["mapping_version"] == MAPPING_VERSION

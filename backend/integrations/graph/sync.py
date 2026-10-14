@@ -291,6 +291,13 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
     return [Asset.model_validate(a) for a in assets.values()], result
 
 
+#: Bump when the way SharePoint items become Hub rows changes, so that every
+#: deployment rebuilds its mirror once on the next sync rather than waiting
+#: for something in SharePoint to change (delta reports "unchanged" and the
+#: old rows would stay). 2: kit dates from their files (2026-10-14).
+MAPPING_VERSION = 2
+
+
 def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
                    drive_name: str | None = None,
                    delta_token: str | None = None) -> SyncResult:

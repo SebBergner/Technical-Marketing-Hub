@@ -1141,6 +1141,13 @@ class JsonAssetRepository(AssetRepository):
     def sync_state(self, source_system: str) -> dict:
         return self._load("sync_state").get(source_system) or {}
 
+    def set_sync_field(self, source_system: str, key: str, value) -> None:
+        """One more fact about a source's sync, e.g. which mapping built it."""
+        with self._lock:
+            state = self._load("sync_state")
+            state.setdefault(source_system, {})[key] = value
+            self._save("sync_state", state)
+
     # ---------------------------------------------------- metadata proposals
     @staticmethod
     def _key(asset_id: str, field: str) -> str:

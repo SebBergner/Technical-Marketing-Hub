@@ -750,14 +750,10 @@ function ensureDetailLayout(page) {
     top.className = "hub-vp-top";
     player.parentNode.insertBefore(top, player);
     top.appendChild(player);
-    var column = document.createElement("div");
-    column.className = "hub-vp-side";
-    top.appendChild(column);
-    // Manage (when shown) above Details, together the preview's height.
     var side = document.createElement("div");
-    side.className = "hub-vp-side__inner";
+    side.className = "hub-vp-side";
     side.id = "vpSide";
-    column.appendChild(side);
+    top.appendChild(side);
     // A Details card from before the layout existed moves across too.
     var facts = document.getElementById("vpFacts");
     if (facts) side.appendChild(facts);
@@ -1240,20 +1236,24 @@ function renderAccessMark(meta, asset) {
   meta.appendChild(tag);
 }
 
-/* ── Manage: access, review and archive, beside Details (2026-10-15) ────
+/* ── Manage: access, review and archive, a tab beside Details (2026-10-15)
  *
  * Liwei: Make Internal, Mark Still current and Archive sat among the tags
  * under the title, looking like tags, where a click meant for one could
- * change a demo. They live here now: one card above Details, a row per
- * thing that can change, its state on the left and its action on the
- * right. The tag row shows state only.
+ * change a demo. They live in a Manage tab of the Details card now (a card
+ * of their own above Details took too much of the column): a row per thing
+ * that can change, its state on the left and its action on the right. The
+ * tag row shows state only. The tab is there only for someone who may do
+ * something in it; for everyone else the card is Details, as before.
  *
  * Access goes through requests for most people (services/access_requests.py,
  * Elio 2026-10-07: a controlled, tracked process): "Request Internal" with a
  * reason; someone with Manage content access approves or rejects it, here or
  * on Admin -> Content access. They may also change it directly, with a reason.
  * Changing access and archiving ask for confirmation; everything is in the
- * Admin log. The card is there only for someone who may do something in it.
+ * Admin log. The tab last chosen is kept from demo to demo, so a reviewer
+ * working through a list stays on Manage; a waiting request puts a dot on it
+ * for whoever may decide.
  */
 function mk(tag, cls, text) {
   var n = document.createElement(tag);
@@ -1335,12 +1335,10 @@ function manageRow(label) {
   return { row: row, state: state, actions: actions };
 }
 
-/* One line per row: the column beside the preview is short, so the
-   explanation is the state's tooltip rather than a second line. */
 function setState(state, main, sub) {
   state.innerHTML = "";
   state.appendChild(mk("b", null, main));
-  state.title = sub || "";
+  if (sub) state.appendChild(mk("span", null, sub));
 }
 
 function refreshMarks(asset) {
@@ -1516,11 +1514,57 @@ function archiveRow(asset) {
   return r.row;
 }
 
+var sideTab = "details";   // the tab last chosen, kept from demo to demo
+
+/* Turns the Details card's title into a Details | Manage tab strip, with
+   everything under the title moved into the Details pane. Once per render
+   of the card (renderFactsTable rebuilds it for every demo). */
+function sideTabs(card) {
+  var strip = card.querySelector(".hub-sidetabs");
+  if (strip) return strip;
+  var head = card.querySelector(".vp-card__head");
+  if (!head) return null;
+  var details = mk("div", "hub-sidepane");
+  details.dataset.pane = "details";
+  while (head.nextSibling) details.appendChild(head.nextSibling);
+  var manage = mk("div", "hub-sidepane hub-manage");
+  manage.dataset.pane = "manage";
+  manage.id = "vpManage";
+  strip = mk("div", "hub-sidetabs");
+  strip.setAttribute("role", "tablist");
+  [["details", "Details", "i-hex"], ["manage", "Manage", "i-flag"]].forEach(function (t) {
+    var tab = mk("button", "hub-sidetabs__tab");
+    tab.type = "button";
+    tab.setAttribute("role", "tab");
+    tab.dataset.pane = t[0];
+    tab.innerHTML = '<svg class="orion-ico"><use href="#' + t[2] + '"/></svg>';
+    tab.appendChild(mk("span", null, t[1]));
+    tab.addEventListener("click", function () {
+      sideTab = t[0];
+      showSideTab(card);
+    });
+    strip.appendChild(tab);
+  });
+  head.replaceWith(strip);
+  card.appendChild(details);
+  card.appendChild(manage);
+  return strip;
+}
+
+function showSideTab(card) {
+  card.querySelectorAll(".hub-sidetabs__tab").forEach(function (t) {
+    var on = t.dataset.pane === sideTab;
+    t.classList.toggle("hub-sidetabs__tab--active", on);
+    t.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  card.querySelectorAll(".hub-sidepane").forEach(function (p) {
+    p.hidden = p.dataset.pane !== sideTab;
+  });
+}
+
 function renderManage(asset) {
-  var old = document.getElementById("vpManage");
-  if (old) old.remove();
-  var side = document.getElementById("vpSide");
-  if (!side) return;
+  var card = document.getElementById("vpFacts");
+  if (!card) return;
   hubPermissions.then(function (granted) {
     granted = granted || [];
     var may = { manage: granted.indexOf("manage_content_access") >= 0,
@@ -1532,18 +1576,19 @@ function renderManage(asset) {
           .then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
       : Promise.resolve(null);
     return requests.then(function (view) {
-      if (detailAsset !== asset) return;
-      var stale = document.getElementById("vpManage");
-      if (stale) stale.remove();
-      var card = mk("div", "vp-card hub-manage");
-      card.id = "vpManage";
-      card.appendChild(mk("div", "hub-manage__head", "Manage"));
-      if (may.manage || may.ask) card.appendChild(accessRow(asset, may, view));
+      if (detailAsset !== asset || !sideTabs(card)) return;
+      var pane = document.getElementById("vpManage");
+      pane.innerHTML = "";
+      if (may.manage || may.ask) pane.appendChild(accessRow(asset, may, view));
       if (may.review && (asset.uploaded_at || asset.still_current_until)) {
-        card.appendChild(stillCurrentRow(asset));
+        pane.appendChild(stillCurrentRow(asset));
       }
-      if (may.review) card.appendChild(archiveRow(asset));
-      side.insertBefore(card, side.firstChild);
+      if (may.review) pane.appendChild(archiveRow(asset));
+      var tab = card.querySelector('.hub-sidetabs__tab[data-pane="manage"]');
+      var waiting = !!(view && view.pending && may.manage);
+      tab.classList.toggle("hub-sidetabs__tab--flag", waiting);
+      tab.title = waiting ? "A request is waiting for a decision" : "";
+      showSideTab(card);
     });
   });
 }

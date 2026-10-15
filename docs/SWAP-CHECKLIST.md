@@ -15,7 +15,8 @@ or later). Reusable for later swaps; update the version numbers and the
 Everything built since 2026-10-06, all of it new on production:
 
 - Users & groups (Administrators / PTC employees / Partners + custom groups) and
-  16 permissions; partners never get View Admin, Manage users or access requests.
+  17 permissions; partners never get View Admin, Manage users, access requests
+  or Create new demo.
 - Open / Internal per demo, the SharePoint partner rule, and **requests** to make
   a demo Internal (PTC employees ask, Manage content access decides).
 - Content age: kit dates from files, Published filter and Sort, age badges,
@@ -26,6 +27,13 @@ Everything built since 2026-10-06, all of it new on production:
   completeness, Content review, Content access, Hub usage, Users & groups,
   Sign-ins + the append-only **Admin log**).
 - Demo pages: a Details | Manage tab for people who may change a demo.
+- **Create New Demo** (2026-10-15): people with "Create new demo" (only
+  Administrators by default) create a video in Demo Video or a kit in the Demo
+  Catalog, metadata first; it is listed once someone with Review content
+  publishes it. New folders only -- nothing existing is changed. Tested end to
+  end against the test library only; the first real kit on production is worth
+  watching in SharePoint (its Language / Owned By columns were never written by
+  a test).
 - The Hub page rebuilt (index.html 2.6 MB → 79 KB; scripts as ES modules).
 
 ## Facts that shape the swap
@@ -108,10 +116,12 @@ Everything built since 2026-10-06, all of it new on production:
 12. **Home page tab**: Featured demos and the two display options (production
     has its own; re-pick if wanted). **Content access → Hidden demos**: hide the
     four old page-only story pages if still wanted.
-13. **Do not load sample activity on production.** Hub activity starts empty
+13. **`UPLOAD_LIBRARY_OVERRIDES` must be empty** on both slots (it points
+    Create New Demo at a test library; only for trials).
+14. **Do not load sample activity on production.** Hub activity starts empty
     and fills with real use from today; per-person tracking on production
     starts at the swap.
-14. **Spot checks**: search and filters; a demo page (Files, Manage tab for an
+15. **Spot checks**: search and filters; a demo page (Files, Manage tab for an
     admin); Hub activity opens; Admin → Sign-ins → Admin log shows your sync
     and group changes; a partner test account (if you have one) cannot open
     `/admin`.

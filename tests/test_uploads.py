@@ -271,3 +271,12 @@ def test_several_videos_need_a_chosen_preview_which_is_ticked_in_sharepoint(clie
 def test_one_video_is_the_preview_without_asking(client, sp):
     record = start(client).json()
     assert record["preview"] == "Videos/Overview_CF.mp4"
+
+
+def test_a_product_no_longer_sold_is_refused_with_the_reason(client, sp):
+    """2026-10-15: a test kit with Kepware+ among its products was created and
+    published, and never appeared -- the Hub lists nothing touching a divested
+    product. The form no longer offers them; the server says why."""
+    r = start(client, values={**KIT, "products": ["Creo", "Kepware+", "KEPServerEX"]})
+    assert r.status_code == 422 and "Kepware+" in r.json()["detail"]
+    assert "no longer sold" in r.json()["detail"] and sp.created == []

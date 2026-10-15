@@ -129,6 +129,11 @@ def resolve(client: GraphClient, spec: ut.TargetSpec, *, fresh: bool = False) ->
         # the Hub's product list from Demo Video.
         choices["products"] = (options(spec.product_choice_column)
                                if spec.product_choice_column else [])             or _hub_products(client, site_id)
+    # Never a product PTC no longer sells: the Hub lists no demo touching one
+    # (taxonomy.DIVESTED_PRODUCTS), so offering it would create a demo nobody
+    # can find. The Demo Catalog's old folders still carry such terms.
+    from backend.services import taxonomy
+    choices["products"] = [p for p in choices["products"] if not taxonomy.is_excluded([p])]
     target = Target(spec=spec, site_id=site_id, drive_id=drive.drive_id, list_id=list_id,
                     demo_content_type_id=demo["id"], product_note_field=note,
                     choices=choices, terms=terms, skipped=skipped)

@@ -125,6 +125,13 @@ def start(body: UploadIn, repo: AssetRepository = Depends(get_repo),
     from backend.integrations.graph import upload_writer as uw
     from backend.integrations.graph.migration_writer import safe_folder_name
     client = _client()
+    from backend.services import taxonomy
+    divested = [p for p in (body.values.get("products") or [])
+                if isinstance(p, str) and taxonomy.is_excluded([p])]
+    if divested:
+        raise HTTPException(status_code=422, detail=", ".join(divested) + ": no longer sold by "
+                            "PTC. The Hub lists no demo of these products, so it cannot be "
+                            "created here.")
     try:
         spec = ut.target(body.target)
         kind = ut.kind_of(spec, body.kind)

@@ -92,6 +92,49 @@ DIMENSIONS = {
               lambda v: WHERE_LABEL.get(v, v), list(WHERE_LABEL), None),
 }
 
+#: Data completeness (2026-10-14; was "Catalogue health" on the Overview,
+#: which counted every type against every field and older VM versions too).
+#: Each field is measured only over the types it applies to -- a funnel
+#: stage exists only on videos, a CAD dataset has no segment -- so a gap is
+#: a real gap, and over the same demos as the charts. Drilling in lists the
+#: demos missing it, like any bar.
+#: key -> (label, is it set?, types it applies to (None: all), note)
+COMPLETENESS = {
+    "product": ("Product", lambda a: bool(a.umbrella_families), None,
+                "A product family the Hub recognises."),
+    "segment": ("Segment", lambda a: bool(a.segment),
+                ("video", "ldk", "vdk", "vm"), "Not asked of CAD datasets."),
+    "stage": ("Funnel stage", lambda a: bool(a.funnel_stage), ("video",),
+              "Videos only: kits have no such column."),
+    "depth": ("Content depth", lambda a: bool(a.content_depth), ("video", "ldk", "vdk"),
+              "Videos and demo kits."),
+    "description": ("Description", lambda a: bool(a.description), None, None),
+    "thumbnail": ("Thumbnail", lambda a: bool(a.thumbnail_url),
+                  ("video", "ldk", "vdk", "cad_model"),
+                  "Without one the Hub draws a product cover."),
+}
+
+
+def _completeness_dim(key: str):
+    """A completeness field in DIMENSIONS' shape, so drilling in is the same
+    call as for a bar: its values are "Set" or "Not set"."""
+    label, is_set, types, _ = COMPLETENESS[key]
+    return (label, lambda a, t: ["Set" if is_set(a) else NOT_SET], None, None,
+            (lambda a: _type_value(a) in types) if types else None)
+
+
+def completeness(assets: list[AssetSummary]) -> list[dict]:
+    out = []
+    for key, (label, is_set, types, note) in COMPLETENESS.items():
+        pool = [a for a in assets if not types or _type_value(a) in types]
+        missing = sum(1 for a in pool if not is_set(a))
+        out.append({"key": "missing:" + key, "title": label, "of": len(pool),
+                    "missing": missing, "note": note,
+                    "types": [TYPE_LABEL[t] for t in types] if types else None,
+                    "percent_missing": round(missing * 100 / len(pool), 1) if pool else 0})
+    return sorted(out, key=lambda r: -r["percent_missing"])
+
+
 NOTES = {
     "age": "Videos only, by publish date. A kit's date is its folder's last "
            "edit, so it would measure edits, not content.",
@@ -129,16 +172,20 @@ def summary(repo: AssetRepository, today: date | None = None) -> dict:
                          if v != NOT_SET else NOT_SET, "count": counts[v]}
                         for v in keys],
         })
-    return {"total": len(assets), "as_of": today.isoformat(), "dimensions": out}
+    return {"total": len(assets), "as_of": today.isoformat(), "dimensions": out,
+            "completeness": completeness(assets)}
 
 
 def assets_in(repo: AssetRepository, dim: str, value: str,
               today: date | None = None) -> list[dict]:
     """The assets behind one bar, newest first."""
-    if dim not in DIMENSIONS:
+    if dim.startswith("missing:") and dim[8:] in COMPLETENESS:
+        _, values_of, _, _, applies = _completeness_dim(dim[8:])
+    elif dim in DIMENSIONS:
+        _, values_of, _, _, applies = DIMENSIONS[dim]
+    else:
         raise KeyError(dim)
     today = today or date.today()
-    _, values_of, _, _, applies = DIMENSIONS[dim]
     hits = [a for a in listed(repo)
             if (applies is None or applies(a)) and value in values_of(a, today)]
     hits.sort(key=lambda a: a.uploaded_at or date.min, reverse=True)

@@ -105,13 +105,9 @@
   .switch input:focus-visible + .switch__track{outline:2px solid var(--green);outline-offset:2px}
   .switch input:disabled + .switch__track{opacity:.55}
 
-  /* coverage bars ------------------------------------------------------ */
+  /* bars ---------------------------------------------------------------- */
   .bar{height:6px;border-radius:99px;background:var(--surface-2);overflow:hidden}
   .bar>span{display:block;height:100%;background:var(--amber)}
-  .cov{display:grid;grid-template-columns:150px 1fr 96px;gap:12px;
-    align-items:center;padding:7px 0}
-  .cov a{text-decoration:none}
-  .cov a:hover{text-decoration:underline}
 
   table{width:100%;border-collapse:collapse;font-size:13.5px}
   th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;
@@ -146,6 +142,22 @@
   .dim-row--unset .dim-row__bar>span{background:var(--faint)}
   .dim-row__n{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
   .dim-note{font-size:12.5px;color:var(--faint);margin:8px 0 0}
+  .cmp-row{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr) 150px;gap:16px;
+    align-items:center;width:100%;padding:7px 6px;border:0;border-radius:6px;
+    background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
+  .cmp-row:hover{background:var(--surface-2)}
+  .cmp-row:focus-visible{outline:2px solid var(--green);outline-offset:1px}
+  .cmp-row:disabled{cursor:default;background:none}
+  .cmp-row__label b{font-weight:600;display:block}
+  .cmp-row__label span{font-size:12px;color:var(--faint)}
+  .cmp-row__n{text-align:right;font-variant-numeric:tabular-nums;font-size:13px}
+  .cmp-row__n span{color:var(--faint);display:block;font-size:12px}
+  .cmp-bar{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+  .cmp-bar>span{display:block;height:100%;border-radius:99px}
+  .cmp-bar--good>span{background:var(--green)}
+  .cmp-bar--fair>span{background:var(--amber)}
+  .cmp-bar--poor>span{background:var(--red)}
+  @media (max-width:640px){.cmp-row{grid-template-columns:1fr 90px}.cmp-bar{grid-column:1/-1;order:3}}
   .dim-more{margin-top:6px;padding:4px 10px;font-size:12.5px}
 
   /* promoted on Home ----------------------------------------------------- */
@@ -372,10 +384,11 @@
 
   <nav class="tabs" id="adminTabs" role="tablist">
     <button type="button" class="tab tab--on" role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button type="button" class="tab" role="tab" data-tab="home" aria-selected="false">Home page</button>
     <button type="button" class="tab" role="tab" data-tab="content" aria-selected="false">Content dashboard</button>
     <button type="button" class="tab" role="tab" data-tab="review" aria-selected="false">Content review</button>
-    <button type="button" class="tab" role="tab" data-tab="usage" aria-selected="false">Hub usage</button>
     <button type="button" class="tab" role="tab" data-tab="internal" aria-selected="false">Content access</button>
+    <button type="button" class="tab" role="tab" data-tab="usage" aria-selected="false">Hub usage</button>
     <button type="button" class="tab" role="tab" data-tab="access" aria-selected="false">Users &amp; groups</button>
     <button type="button" class="tab" role="tab" data-tab="activity" aria-selected="false">Sign-ins</button>
   </nav>
@@ -388,24 +401,20 @@
   </section>
 
   <section>
-    <div class="section-head"><h2>Home page</h2></div>
-    <div class="card" id="hubDisplay" style="margin-bottom:12px"></div>
-    <div class="card" id="promoted"></div>
-  </section>
-
-  <section>
     <div class="section-head"><h2>Queues</h2></div>
     <div class="grid grid--2" id="queues"></div>
   </section>
 
-  <section>
-    <div class="section-head">
-      <h2>Catalogue health</h2>
-      <span class="faint" id="catTotal"></span>
-    </div>
-    <div class="card" id="coverage"></div>
-  </section>
+  </div>
 
+  <!-- What the Hub's Home page shows: Featured demos and display options
+       (its own tab since 2026-10-14; it was on Overview). -->
+  <div id="tabHome" role="tabpanel" hidden>
+    <section>
+      <div class="section-head"><h2>Home page</h2></div>
+      <div class="card" id="promoted" style="margin-bottom:12px"></div>
+      <div class="card" id="hubDisplay"></div>
+    </section>
   </div>
 
   <!-- HLR-F1: what the Hub holds, at a glance; every bar drills in. -->
@@ -419,6 +428,7 @@
         Click a bar to see the demos behind it. "Not set" is part of the picture: it is
         what the catalogue does not yet say.</p>
       <div class="tiles" id="contentTotals"></div>
+      <div class="card" id="contentCompleteness" style="margin-top:12px"></div>
       <div class="grid grid--2" id="contentCharts" style="margin-top:12px"></div>
     </section>
   </div>

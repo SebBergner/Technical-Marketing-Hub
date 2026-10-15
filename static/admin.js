@@ -214,23 +214,18 @@
 
     // ---- Auth
     var c3 = card("Sign-in");
-    row(c3, "Mode", auth.mode, auth.mode === "easyauth" ? "pill--ok" : "pill--warn");
-    row(c3, "Curator role", auth.curator_groups_configured ? "configured"
-        : "nobody has it", auth.curator_groups_configured ? "pill--ok" : "pill--warn");
+    // Who may do what is Users & groups' business; this says how people
+    // prove who they are.
+    var MODES = { oidc: "Microsoft sign-in", easyauth: "App Service sign-in",
+                  disabled: "Off (local only)" };
+    row(c3, "Method", MODES[auth.mode] || auth.mode,
+        auth.mode === "disabled" ? "pill--warn" : "pill--ok");
     (auth.warnings || []).forEach(function (w) {
       var p = el("p", "muted", w);
       p.style.fontSize = "12.5px";
       c3.appendChild(p);
     });
     host.appendChild(c3);
-
-    // ---- Not connected. Listed rather than omitted: silence about a system
-    // reads as "fine", and neither of these has ever been reachable.
-    var c4 = card("Not connected");
-    (d.not_connected || []).forEach(function (name) {
-      row(c4, name, "no integration", "pill--off");
-    });
-    host.appendChild(c4);
   }
 
   /* The daily sync (backend/auto_sync.py). First in "Connected systems"
@@ -362,38 +357,6 @@
     c.appendChild(note);
 
     host.insertBefore(c, host.firstChild);
-  }
-
-  function renderCoverage(cat) {
-    $("catTotal").textContent = cat.total.toLocaleString() + " assets";
-    var host = $("coverage");
-    host.innerHTML = "";
-    var intro = el("p", "muted",
-      "How much of the catalogue is missing each field. Every row links to the "
-      + "assets concerned, so a gap can be worked rather than only watched.");
-    intro.style.cssText = "font-size:12.5px;margin:0 0 10px";
-    host.appendChild(intro);
-
-    cat.coverage.slice().sort(function (a, b) {
-      return b.percent_missing - a.percent_missing;
-    }).forEach(function (c) {
-      var line = el("div", "cov");
-      var link = el("a", null, c.field.replace(/_/g, " "));
-      // The catalogue has no "missing X" filter, so this lands on the field's
-      // own filter instead -- the nearest honest destination rather than a
-      // link that would 404 or silently show everything.
-      link.href = "/#/";
-      link.title = "Open the catalogue";
-      line.appendChild(link);
-
-      var bar = el("div", "bar");
-      bar.appendChild(el("span")).style.width = c.percent_missing + "%";
-      line.appendChild(bar);
-
-      line.appendChild(el("div", "num",
-        c.missing.toLocaleString() + "  (" + c.percent_missing + "%)"));
-      host.appendChild(line);
-    });
   }
 
   /* ── time ranges ──────────────────────────────────────────────────────
@@ -1070,9 +1033,9 @@
     var c2 = card("Metadata proposals");
     row(c2, "Pending", d.proposals.pending);
     var p = el("p", "muted",
-      "Read-only here. Approving one writes into SharePoint's own columns, "
-      + "which this shared sign-in deliberately cannot do — that waits for "
-      + "single sign-on, where the write can be attributed to a person.");
+      "Suggested changes to SharePoint metadata. Deciding one needs Edit metadata "
+      + "and writes the value into SharePoint under that person's name; there is "
+      + "no review screen for them here yet.");
     p.style.cssText = "font-size:12.5px;margin:8px 0 0";
     c2.appendChild(p);
     host.appendChild(c2);
@@ -1251,11 +1214,55 @@
     (byType ? byType.buckets : []).forEach(function (b) {
       tile(totals, b.count, b.label);
     });
+    renderCompleteness(d.completeness || []);
     var host = $("contentCharts");
     host.innerHTML = "";
     d.dimensions.forEach(function (dim) {
       if (dim.key === "type") return;          // the tiles above carry it
       host.appendChild(dimCard(dim));
+    });
+  }
+
+  /* Data completeness (2026-10-14; was Catalogue health on the Overview).
+   * Each field over only the types it applies to, over the same demos as the
+   * charts; a row lists the demos missing it. Shown as how complete, worst
+   * first, the way data-quality panels read: the number to raise. */
+  function renderCompleteness(rows) {
+    var host = $("contentCompleteness");
+    host.innerHTML = "";
+    var head = el("div", "card-head");
+    head.appendChild(el("h2", null, "Data completeness"));
+    host.appendChild(head);
+    host.appendChild(el("p", "dim-note", "How much of the catalogue has each field, "
+      + "counted only where the field applies. Click a row to list the demos missing it; "
+      + "fill them in SharePoint or Consensus and the next sync picks it up."));
+    rows.forEach(function (c) {
+      var pct = c.of ? Math.round((c.of - c.missing) / c.of * 1000) / 10 : 100;
+      var r = el("button", "cmp-row");
+      r.type = "button";
+      var label = el("span", "cmp-row__label");
+      label.appendChild(el("b", null, c.title));
+      label.appendChild(el("span", null, (c.types ? c.types.join(", ") : "All types")
+        + (c.note ? " · " + c.note : "")));
+      r.appendChild(label);
+      var bar = el("span", "cmp-bar cmp-bar--" + (pct >= 90 ? "good" : pct >= 70 ? "fair" : "poor"));
+      bar.appendChild(el("span")).style.width = pct + "%";
+      r.appendChild(bar);
+      var n = el("span", "cmp-row__n", pct + "% complete");
+      n.appendChild(el("span", null, c.missing
+        ? c.missing.toLocaleString() + " of " + c.of.toLocaleString() + " missing"
+        : "nothing missing"));
+      r.appendChild(n);
+      if (c.missing) {
+        r.title = "List the " + c.missing.toLocaleString() + " demos without " + c.title.toLowerCase();
+        r.addEventListener("click", function () {
+          openContentSheet({ key: c.key, title: "Missing " + c.title.toLowerCase() },
+                           { value: "Not set", label: "", count: c.missing });
+        });
+      } else {
+        r.disabled = true;
+      }
+      host.appendChild(r);
     });
   }
 
@@ -1302,7 +1309,8 @@
   }
 
   function openContentSheet(dim, b) {
-    var body = openSheet(dim.title + ": " + b.label, b.count.toLocaleString() + " demos, newest first");
+    var body = openSheet(b.label ? dim.title + ": " + b.label : dim.title,
+                         b.count.toLocaleString() + " demos, newest first");
     body.textContent = "Loading…";
     fetch("/api/admin/content/assets?dim=" + encodeURIComponent(dim.key)
           + "&value=" + encodeURIComponent(b.value))
@@ -1333,9 +1341,9 @@
   /* Overview | Content dashboard | Users & groups. The tab is in the
    * address (#content, #access), so a refresh or a shared link opens the
    * same one. */
-  var PANELS = { overview: "tabOverview", content: "tabContent", review: "tabReview",
-                 usage: "tabUsage", internal: "tabInternal", access: "tabAccess",
-                 activity: "tabActivity" };
+  var PANELS = { overview: "tabOverview", home: "tabHome", content: "tabContent",
+                 review: "tabReview", internal: "tabInternal", usage: "tabUsage",
+                 access: "tabAccess", activity: "tabActivity" };
 
   function tabFromHash() {
     var name = location.hash.replace("#", "");
@@ -3041,7 +3049,6 @@
         loadHidden();
         contentLoaded = false;
         showTab(tabFromHash());
-        renderCoverage(d.catalogue);
         renderQueues(d);
         renderRanges();
         renderDims();

@@ -49,3 +49,24 @@ def test_a_bar_drills_into_its_assets_newest_first(tmp_path):
     assert [a["id"] for a in cd.assets_in(repo, "product", "Windchill", TODAY)] == ["video-new", "video-old"]
     assert [a["id"] for a in cd.assets_in(repo, "segment", "Not set", TODAY)] == ["video-new", "video-old"]
     assert [a["id"] for a in cd.assets_in(repo, "age", "7+ years", TODAY)] == ["video-old"]
+
+
+def test_completeness_counts_a_field_only_where_it_applies(tmp_path):
+    """2026-10-14: a funnel stage exists only on videos, so a kit without one
+    is not a gap; and the population is the dashboard's own."""
+    s = cd.summary(repo_with(tmp_path), TODAY)
+    rows = {r["key"]: r for r in s["completeness"]}
+    assert (rows["missing:stage"]["of"], rows["missing:stage"]["missing"]) == (2, 2), \
+        "the two videos; the kit is not asked"
+    assert (rows["missing:segment"]["of"], rows["missing:segment"]["missing"]) == (3, 2)
+    assert rows["missing:product"]["of"] == s["total"]
+    assert [r["percent_missing"] for r in s["completeness"]] == sorted(
+        (r["percent_missing"] for r in s["completeness"]), reverse=True), "worst first"
+
+
+def test_a_completeness_row_drills_into_the_demos_missing_it(tmp_path):
+    repo = repo_with(tmp_path)
+    assert [a["id"] for a in cd.assets_in(repo, "missing:segment", "Not set", TODAY)] == \
+        ["video-new", "video-old"]
+    assert cd.assets_in(repo, "missing:stage", "Not set", TODAY) and all(
+        a["type"] == "video" for a in cd.assets_in(repo, "missing:stage", "Not set", TODAY))

@@ -174,33 +174,14 @@ def _source_state(repo: AssetRepository, source: str) -> dict:
     }
 
 
-#: Coverage worth reporting, and only fields a person could actually fill in.
-#: `industry` is left out: it is empty across the whole SharePoint catalogue
-#: and near-empty on Consensus, so a 99.7% gap would dominate the list while
-#: describing a dimension nobody maintains.
-_COVERAGE_FIELDS = ("segment", "products", "funnel_stage", "content_depth",
-                    "description", "thumbnail_url")
-
-
 @router.get("/overview", dependencies=[VIEW_ADMIN])
 def overview(repo: AssetRepository = Depends(get_repo)):
     """One payload, in the order the page reads it."""
     oauth = get_oauth()
     oauth_status = oauth.status()
 
-    assets = repo.list(AssetQuery(limit=10 ** 6, include_older_vms=True)).items
-    total = len(assets)
-
-    coverage = []
-    for field in _COVERAGE_FIELDS:
-        missing = sum(1 for a in assets if not getattr(a, field, None))
-        coverage.append({
-            "field": field,
-            "missing": missing,
-            "total": total,
-            "percent_missing": round(missing * 100 / total, 1) if total else 0,
-        })
-
+    # Data completeness moved to the Content dashboard (2026-10-14), counted
+    # there over the same demos as its charts.
     return {
         "environment": {
             # Which slot am I looking at. Staging and production are identical
@@ -240,15 +221,9 @@ def overview(repo: AssetRepository = Depends(get_repo)):
             },
             "auth": {
                 "mode": settings.auth_mode,
-                "curator_groups_configured": bool(settings.auth_curator_groups),
                 "warnings": security_warnings(),
             },
-            # Named so the page can say "not connected" rather than stay
-            # silent about them: both appear in the mock-up and in .env.example,
-            # and neither has ever been reachable from here.
-            "not_connected": ["Brightcove", "Seismic / PTC Velocity"],
         },
-        "catalogue": {"total": total, "coverage": coverage},
         # No "usage" block: it served the first version of this page, which
         # read per-asset counters. Usage now comes from the event log via
         # /api/admin/usage, and leaving the old shape here meant scanning

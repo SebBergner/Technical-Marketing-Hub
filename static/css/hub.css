@@ -1196,7 +1196,8 @@ video.hub-inline-player__media { object-fit: contain; }
 /* The side column is exactly as tall as the preview: the card fills it
    and scrolls inside rather than stretching the row. */
 .hub-vp-side{position:relative;align-self:stretch;min-height:240px}
-.hub-vp-side .hub-facts{position:absolute;inset:0;margin:0;overflow-y:auto;padding:18px 20px}
+.hub-vp-side__inner{position:absolute;inset:0;display:flex;flex-direction:column;gap:12px}
+.hub-vp-side .hub-facts{flex:1 1 90px;min-height:90px;margin:0;overflow-y:auto;padding:18px 20px}
 .hub-vp-side .hub-facts__table th{width:118px}
 .hub-sections{margin-top:6px}
 .hub-sections__tabs{display:flex;gap:6px;border-bottom:1px solid var(--orion-border);margin-bottom:14px}
@@ -1211,7 +1212,37 @@ video.hub-inline-player__media { object-fit: contain; }
 .hub-sections .vp-card__head-title{display:none}
 .hub-sections .vp-card__head{justify-content:flex-end}
 @media (max-width:1180px){.hub-vp-top{grid-template-columns:1fr}
-.hub-vp-side{min-height:0}.hub-vp-side .hub-facts{position:static}}
+.hub-vp-side{min-height:0}.hub-vp-side__inner{position:static;display:block}
+.hub-vp-side .hub-facts{min-height:0}.hub-manage{margin-bottom:12px}}
+
+/* The Manage card (detail.js renderManage, 2026-10-15): actions that change
+   a demo, apart from the tags and shaped as buttons, not pills. */
+.hub-manage{flex:0 1 auto;min-height:0;padding:12px 16px 10px;overflow-y:auto}
+.hub-manage__head{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--orion-text-3);margin-bottom:4px}
+.hub-manage__row{padding:7px 0;border-top:1px solid var(--orion-border)}
+.hub-manage__row:first-of-type{border-top:0}
+.hub-manage__line{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:8px;align-items:center}
+.hub-manage__label{font-size:12px;color:var(--orion-text-3)}
+.hub-manage__state{min-width:0;font-size:13px;line-height:1.35}
+.hub-manage__state{cursor:help}
+.hub-manage__state b{display:block;font-weight:650;color:var(--orion-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hub-manage__actions{display:flex;gap:6px}
+.hub-manage__btn{font:inherit;font-size:12px;font-weight:600;padding:4px 10px;border-radius:7px;border:1px solid var(--orion-border-md);background:var(--orion-surface);color:var(--orion-text);cursor:pointer;white-space:nowrap}
+.hub-manage__btn:hover:not(:disabled){background:var(--orion-surface-2);border-color:var(--orion-text-3)}
+.hub-manage__btn:disabled{opacity:.55;cursor:default}
+.hub-manage__btn--primary{background:var(--orion-indigo);border-color:var(--orion-indigo);color:#fff}
+.hub-manage__btn--primary:hover:not(:disabled){background:var(--orion-indigo-strong);border-color:var(--orion-indigo-strong)}
+.hub-manage__btn:focus-visible{outline:2px solid var(--orion-indigo);outline-offset:2px}
+.hub-manage__form{margin-top:8px}
+.hub-manage__lead{margin:0 0 6px;font-size:12px;color:var(--orion-text-2)}
+.hub-manage__input{width:100%;box-sizing:border-box;font:inherit;font-size:12.5px;padding:7px 9px;border:1px solid var(--orion-border-md);border-radius:7px;background:var(--orion-surface);color:var(--orion-text);resize:vertical}
+.hub-manage__formbar{display:flex;gap:6px;margin-top:6px;align-items:center}
+.hub-manage__err{margin:4px 0 0;font-size:12px;color:#c0392b}
+.hub-manage__err:empty{display:none}
+.hub-manage__request{margin-top:8px;padding:9px 11px;border-radius:8px;background:var(--orion-surface);border:1px solid var(--orion-border-md)}
+.hub-manage__request-head{font-size:12px;font-weight:600;color:var(--orion-text)}
+.hub-manage__reason{display:block;margin:4px 0 2px;font-size:12.5px;color:var(--orion-text-2);font-style:italic}
+.hub-manage__note{margin:6px 0 0;font-size:11.5px;color:var(--orion-text-3)}
 
 /* ── Advanced Search and file lists (was ADV_CSS in hub-api.js) ──
    Inside the search field, at its right end, set off by a divider

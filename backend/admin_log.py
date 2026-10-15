@@ -50,6 +50,11 @@ ACTIONS: dict[tuple[str, str], str] = {
     ("DELETE", "/api/admin/sample-activity"): "Removed sample activity",
     ("GET", "/api/admin/activity/person"): "Looked up a person's activity",
     ("PUT", "/api/assets/{asset_id}/access"): "Set a demo Open or Internal",
+    ("POST", "/api/assets/{asset_id}/access-requests"): "Requested an access change",
+    ("POST", "/api/assets/{asset_id}/access-requests/{request_id}/withdraw"):
+        "Withdrew an access request",
+    ("POST", "/api/admin/access-requests/{request_id}/decision"): "Decided an access request",
+    ("GET", "/api/admin/admin-log.csv"): "Exported the Admin log",
     ("PUT", "/api/assets/{asset_id}/still-current"): "Set Still current",
     ("PUT", "/api/assets/{asset_id}/archive"): "Archived or restored a demo",
     ("POST", "/api/graph/sync"): "Ran the SharePoint sync",
@@ -66,7 +71,29 @@ ACTIONS: dict[tuple[str, str], str] = {
 #: Reads worth a line: about one person, not about the catalogue.
 _LOGGED_READS = {route for (method, route) in ACTIONS if method == "GET"}
 WATCHED = re.compile(r"^/api/(admin|graph|consensus/(sync|oauth)|curation/proposals|migration)/"
-                     r"|^/api/assets/[^/]+/(access|still-current|archive)$")
+                     r"|^/api/assets/[^/]+/(access|still-current|archive)$"
+                     r"|^/api/assets/[^/]+/access-requests(/|$)")
+
+#: What area of the Hub an entry is about, for filtering and for each Admin
+#: tab's "Recent changes" (2026-10-15). Worked out when read, from the path,
+#: so entries written before categories existed have one too and the hash
+#: chain is untouched. First match wins.
+CATEGORIES: list[tuple[str, re.Pattern]] = [
+    ("Content access", re.compile(r"^/api/assets/[^/]+/(access|access-requests)"
+                                  r"|^/api/admin/(hidden|access-requests)")),
+    ("Content review", re.compile(r"^/api/assets/[^/]+/(still-current|archive)$")),
+    ("Users & groups", re.compile(r"^/api/admin/access/")),
+    ("Sign-in", re.compile(r"^/api/admin/(login|logout)$")),
+    ("Home page", re.compile(r"^/api/admin/(promoted|hub-settings)$")),
+    ("Sync", re.compile(r"^/api/(graph/sync|consensus/(sync|oauth)|admin/auto-sync)")),
+    ("Metadata", re.compile(r"^/api/(graph/writeback|curation/)")),
+    ("Migration", re.compile(r"^/api/migration/")),
+    ("Usage data", re.compile(r"^/api/admin/(sample-activity|activity/person|admin-log)")),
+]
+
+
+def category_of(path: str) -> str:
+    return next((name for name, rx in CATEGORIES if rx.search(path or "")), "Other")
 _SECRET = re.compile(r"pass|secret|token|key", re.I)
 _BODY_LIMIT = 16 * 1024
 
@@ -141,12 +168,27 @@ def verify(entries: list[dict] | None = None) -> dict:
     return {"intact": True, "entries": len(entries), "broken_at": None}
 
 
+def _result(entry: dict) -> str:
+    status = entry.get("status") or 0
+    return "done" if 200 <= status < 400 else ("refused" if status in (401, 403) else "failed")
+
+
 def read(*, since: str | None = None, until: str | None = None, q: str | None = None,
-         offset: int = 0, limit: int = 50) -> dict:
-    """Newest first, filtered by period and by a word in who, what or target."""
+         category: str | None = None, result: str | None = None,
+         offset: int = 0, limit: int | None = 50) -> dict:
+    """Newest first, filtered by period, area (category), result (done /
+    refused / failed) and a word in who, what or target."""
     entries = _entries()
     check = verify(entries)
+    for e in entries:
+        e["category"] = category_of(e.get("path", ""))
+        e["result"] = _result(e)
     rows = entries
+    if category:
+        wanted = {c.strip() for c in category.split(",") if c.strip()}
+        rows = [e for e in rows if e["category"] in wanted]
+    if result:
+        rows = [e for e in rows if e["result"] == result]
     if since:
         rows = [e for e in rows if e["at"] >= since[:19]]
     if until:
@@ -158,10 +200,29 @@ def read(*, since: str | None = None, until: str | None = None, q: str | None = 
                                       ("actor", "action", "target", "path")).lower()
                 or needle in json.dumps(e.get("detail") or {}, ensure_ascii=False).lower()]
     rows = list(reversed(rows))
+    page = rows[offset:] if limit is None else rows[offset:offset + limit]
     return {"total": len(rows), "offset": offset,
-            "items": [{k: v for k, v in e.items() if k not in ("prev", "hash")}
-                      for e in rows[offset:offset + limit]],
+            "items": [{k: v for k, v in e.items() if k not in ("prev", "hash")} for e in page],
+            "categories": [name for name, _ in CATEGORIES] + ["Other"],
             "integrity": check}
+
+
+def to_csv(rows: list[dict]) -> str:
+    """The rows as CSV, for an auditor's spreadsheet: one line per entry,
+    the detail as compact JSON, times in UTC."""
+    import csv
+    import io
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["seq", "time_utc", "actor", "category", "action", "target", "result",
+                "status", "method", "path", "detail"])
+    for e in rows:
+        w.writerow([e.get("seq"), e.get("at"), e.get("actor"), e.get("category"),
+                    e.get("action"), e.get("target") or "", e.get("result"),
+                    e.get("status"), e.get("method"), e.get("path"),
+                    json.dumps(e.get("detail") or {}, ensure_ascii=False,
+                               separators=(",", ":"))])
+    return out.getvalue()
 
 
 def _redact(value):
@@ -264,7 +325,8 @@ def middleware(app):
                     detail = _detail(headers.get("content-type", ""), b"".join(chunks),
                                      size > _BODY_LIMIT,
                                      scope.get("query_string", b"").decode("latin-1"))
-                    target = " / ".join(str(v) for v in params.values()) or _target(detail)
+                    target = (state.get("hub_target")
+                              or " / ".join(str(v) for v in params.values()) or _target(detail))
                     record(state.get("hub_actor") or _who(scope),
                            ACTIONS.get((method, route), f"{method} {route}"),
                            method=method, path=scope.get("path", ""),

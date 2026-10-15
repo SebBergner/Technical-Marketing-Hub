@@ -69,6 +69,7 @@ class Perm(str, Enum):
     EDIT_METADATA = "edit_metadata"
     MANAGE_HOME = "manage_home"
     MANAGE_ACCESS = "manage_content_access"
+    REQUEST_ACCESS = "request_content_access"
     REVIEW_CONTENT = "review_content"
     VIEW_ARCHIVED = "view_archived"
     VIEW_REPORTS = "view_reports"
@@ -99,6 +100,9 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
      "people and team totals. Never partners' names."),
     (Perm.VIEW_ARCHIVED, "See archived content",
      "Open archived demos, and show them in lists with 'Show archived'."),
+    (Perm.REQUEST_ACCESS, "Request content access change",
+     "Ask, with a reason, for a demo to be made Internal or Open again; someone "
+     "with Manage content access decides."),
     (Perm.MANAGE_ACCESS, "Manage content access",
      "Mark demos Internal or Open (on the Admin page and on a demo's page), "
      "and hide demos from the Hub."),
@@ -119,11 +123,12 @@ _ADMIN_ONLY = frozenset({Perm.VIEW_ADMIN.value, Perm.MANAGE_USERS.value})
 
 #: Never a partner's, whatever group they are in or HUB_ADMIN_EMAILS says
 #: (Liwei, 2026-10-14): administering the Hub stays with PTC accounts, the
-#: usual rule for guests in a tenant. Their other permissions are unaffected.
-PARTNER_NEVER = _ADMIN_ONLY
+#: usual rule for guests in a tenant; nor do they ask for demos to be made
+#: Internal (2026-10-15). Their other permissions are unaffected.
+PARTNER_NEVER = _ADMIN_ONLY | {Perm.REQUEST_ACCESS.value}
 
 _EMPLOYEE_DEFAULT = [Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD, Perm.INTERNAL,
-                     Perm.CREATE_DEMO, Perm.VIEW_REPORTS]
+                     Perm.CREATE_DEMO, Perm.VIEW_REPORTS, Perm.REQUEST_ACCESS]
 _PARTNER_DEFAULT = [Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD]
 
 BUILTIN = {

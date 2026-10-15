@@ -145,6 +145,7 @@ async function openAssetDetail(id, fileItemId) {
   setText("vpDesc", asset.description || "No description for this one yet.");
   ensureDetailLayout(page);
   renderFactsTable(page, asset);
+  renderManage(asset);
 
   renderFileList(page, asset, fileItemId && tabOf(asset, fileItemId));
   renderVmCards(page, asset);
@@ -749,10 +750,14 @@ function ensureDetailLayout(page) {
     top.className = "hub-vp-top";
     player.parentNode.insertBefore(top, player);
     top.appendChild(player);
+    var column = document.createElement("div");
+    column.className = "hub-vp-side";
+    top.appendChild(column);
+    // Manage (when shown) above Details, together the preview's height.
     var side = document.createElement("div");
-    side.className = "hub-vp-side";
+    side.className = "hub-vp-side__inner";
     side.id = "vpSide";
-    top.appendChild(side);
+    column.appendChild(side);
     // A Details card from before the layout existed moves across too.
     var facts = document.getElementById("vpFacts");
     if (facts) side.appendChild(facts);
@@ -1225,49 +1230,325 @@ function wireDetailPage() {
  * there and opened only there, so it gets the tag and no switch.
  */
 function renderAccessMark(meta, asset) {
-  if (asset.internal) {
-    var tag = pill("Internal", "internal");
-    tag.title = asset.internal_source === "sharepoint"
-      ? "Closed to partners in SharePoint. Files open only for people with access to internal content."
-      : "Marked Internal on the Hub. Files open only for people with access to internal content.";
-    meta.appendChild(tag);
+  // State only; changing it is the Manage card's job (renderManage).
+  meta.querySelectorAll(".hub-pill--internal").forEach(function (n) { n.remove(); });
+  if (!asset.internal) return;
+  var tag = pill("Internal", "internal");
+  tag.title = asset.internal_source === "sharepoint"
+    ? "Closed to partners in SharePoint. Files open only for people with access to internal content."
+    : "Marked Internal on the Hub. Files open only for people with access to internal content.";
+  meta.appendChild(tag);
+}
+
+/* ── Manage: access, review and archive, beside Details (2026-10-15) ────
+ *
+ * Liwei: Make Internal, Mark Still current and Archive sat among the tags
+ * under the title, looking like tags, where a click meant for one could
+ * change a demo. They live here now: one card above Details, a row per
+ * thing that can change, its state on the left and its action on the
+ * right. The tag row shows state only.
+ *
+ * Access goes through requests for most people (services/access_requests.py,
+ * Elio 2026-10-07: a controlled, tracked process): "Request Internal" with a
+ * reason; someone with Manage content access approves or rejects it, here or
+ * on Admin -> Content access. They may also change it directly, with a reason.
+ * Changing access and archiving ask for confirmation; everything is in the
+ * Admin log. The card is there only for someone who may do something in it.
+ */
+function mk(tag, cls, text) {
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+function whoName(actor) {
+  if (actor === "admin-session") return "the admin account";
+  return String(actor || "someone").replace(/^(user|dev):/, "");
+}
+
+function onDay(iso) {
+  return iso ? fullDate(String(iso).slice(0, 10)) : "";
+}
+
+function manageButton(text, primary) {
+  var b = mk("button", "hub-manage__btn" + (primary ? " hub-manage__btn--primary" : ""), text);
+  b.type = "button";
+  return b;
+}
+
+function send(method, url, body) {
+  return fetch(url, {
+    method: method,
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined
+  }).then(function (r) {
+    return r.json().catch(function () { return {}; }).then(function (d) {
+      if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
+      return d;
+    });
+  });
+}
+
+/* An inline step under a row: a text box and Confirm / Cancel. */
+function confirmStep(row, opts) {
+  row.querySelectorAll(".hub-manage__form").forEach(function (n) { n.remove(); });
+  var form = mk("div", "hub-manage__form");
+  if (opts.lead) form.appendChild(mk("p", "hub-manage__lead", opts.lead));
+  var box = mk("textarea", "hub-manage__input");
+  box.rows = 2;
+  box.maxLength = 1000;
+  box.placeholder = opts.placeholder;
+  form.appendChild(box);
+  var err = mk("p", "hub-manage__err");
+  var bar = mk("div", "hub-manage__formbar");
+  var ok = manageButton(opts.confirm, true);
+  var cancel = manageButton("Cancel");
+  bar.appendChild(ok);
+  bar.appendChild(cancel);
+  form.appendChild(bar);
+  form.appendChild(err);
+  cancel.addEventListener("click", function () { form.remove(); });
+  ok.addEventListener("click", function () {
+    var text = box.value.trim();
+    if (opts.required && !text) { err.textContent = "Please say why."; box.focus(); return; }
+    ok.disabled = cancel.disabled = true;
+    err.textContent = "";
+    opts.submit(text).catch(function (e) {
+      ok.disabled = cancel.disabled = false;
+      err.textContent = e.message;
+    });
+  });
+  row.appendChild(form);
+  box.focus();
+}
+
+function manageRow(label) {
+  var row = mk("div", "hub-manage__row");
+  var line = mk("div", "hub-manage__line");
+  line.appendChild(mk("div", "hub-manage__label", label));
+  var state = mk("div", "hub-manage__state");
+  line.appendChild(state);
+  var actions = mk("div", "hub-manage__actions");
+  line.appendChild(actions);
+  row.appendChild(line);
+  return { row: row, state: state, actions: actions };
+}
+
+/* One line per row: the column beside the preview is short, so the
+   explanation is the state's tooltip rather than a second line. */
+function setState(state, main, sub) {
+  state.innerHTML = "";
+  state.appendChild(mk("b", null, main));
+  state.title = sub || "";
+}
+
+function refreshMarks(asset) {
+  var meta = document.getElementById("vpMeta");
+  if (meta) { renderAccessMark(meta, asset); renderAgeMark(meta, asset); }
+  renderManage(asset);
+}
+
+function accessRow(asset, may, view) {
+  var r = manageRow("Access");
+  var url = "/api/assets/" + encodeURIComponent(asset.id);
+  var target = asset.internal ? "open" : "internal";
+  var word = asset.internal ? "Open" : "Internal";
+  if (!asset.internal) {
+    setState(r.state, "Open", "Everyone who may preview and download opens its files.");
+  } else if (asset.internal_source === "sharepoint") {
+    setState(r.state, "Internal", "Closed to partners in SharePoint; it can be opened only there.");
+  } else {
+    setState(r.state, "Internal", "Marked on the Hub. Files open only for people with access "
+      + "to internal content.");
   }
-  if (asset.internal_source === "sharepoint") return;
-  hubPermissions.then(function (granted) {
-    if (granted.indexOf("manage_content_access") < 0 || detailAsset !== asset) return;
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "hub-access-btn";
-    btn.textContent = asset.internal ? "Make Open" : "Make Internal";
-    btn.title = asset.internal
-      ? "Let everyone who may preview and download open this demo's files"
-      : "Only people with access to internal content will open this demo's files";
-    btn.addEventListener("click", function () {
-      btn.disabled = true;
-      fetch("/api/assets/" + encodeURIComponent(asset.id) + "/access", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ level: asset.internal ? "open" : "internal" }),
-      }).then(function (r) {
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        return r.json();
-      }).then(function (d) {
-        asset.internal = d.internal;
-        asset.internal_source = d.internal_source;
-        meta.querySelectorAll(".hub-pill--internal, .hub-access-btn").forEach(function (n) {
-          n.remove();
-        });
-        renderAccessMark(meta, asset);
-      }).catch(function (err) {
-        btn.disabled = false;
-        report("Could not change this demo's access: " + err.message, true);
+  var locked = asset.internal && asset.internal_source === "sharepoint";
+  var pending = view && view.pending;
+
+  if (!locked && !pending && may.manage) {
+    var direct = manageButton("Make " + word);
+    direct.addEventListener("click", function () {
+      confirmStep(r.row, {
+        lead: target === "internal"
+          ? "Only people with access to internal content will open its files."
+          : "Everyone who may preview and download will open its files.",
+        placeholder: "Reason (optional, kept in the log)",
+        confirm: "Make " + word,
+        submit: function (reason) {
+          return send("PUT", url + "/access", { level: target, reason: reason || null })
+            .then(function (d) {
+              asset.internal = d.internal;
+              asset.internal_source = d.internal_source;
+              refreshMarks(asset);
+            });
+        }
       });
     });
-    meta.appendChild(btn);
+    r.actions.appendChild(direct);
+  } else if (!locked && !pending && may.ask) {
+    var ask = manageButton("Request " + word);
+    ask.addEventListener("click", function () {
+      confirmStep(r.row, {
+        lead: "Someone with Manage content access will decide.",
+        placeholder: target === "internal"
+          ? "Why should it be Internal? (customer data, unreleased features...)"
+          : "Why can it be Open again?",
+        confirm: "Send request",
+        required: true,
+        submit: function (reason) {
+          return send("POST", url + "/access-requests", { level: target, reason: reason })
+            .then(function () { renderManage(asset); });
+        }
+      });
+    });
+    r.actions.appendChild(ask);
+  }
+
+  if (pending) {
+    var box = mk("div", "hub-manage__request");
+    box.appendChild(mk("div", "hub-manage__request-head",
+      whoName(pending.requested_by) + " asked to make it "
+      + (pending.level === "internal" ? "Internal" : "Open") + " · " + onDay(pending.requested_at)));
+    box.appendChild(mk("q", "hub-manage__reason", pending.reason));
+    var bar = mk("div", "hub-manage__formbar");
+    if (may.manage) {
+      var approve = manageButton("Approve", true);
+      var reject = manageButton("Reject");
+      var decide = function (yes) {
+        confirmStep(box, {
+          placeholder: yes ? "Note (optional)" : "Why not? (optional, the requester sees it)",
+          confirm: yes ? "Approve and apply" : "Reject",
+          submit: function (note) {
+            return send("POST", "/api/admin/access-requests/" + encodeURIComponent(pending.id)
+                        + "/decision", { approve: yes, note: note || null })
+              .then(function () {
+                if (yes) {
+                  asset.internal = pending.level === "internal";
+                  asset.internal_source = asset.internal ? "hub" : null;
+                }
+                refreshMarks(asset);
+              });
+          }
+        });
+      };
+      approve.addEventListener("click", function () { decide(true); });
+      reject.addEventListener("click", function () { decide(false); });
+      bar.appendChild(approve);
+      bar.appendChild(reject);
+    }
+    if (view.may_withdraw) {
+      var withdraw = manageButton("Withdraw");
+      withdraw.addEventListener("click", function () {
+        withdraw.disabled = true;
+        send("POST", url + "/access-requests/" + encodeURIComponent(pending.id) + "/withdraw")
+          .then(function () { renderManage(asset); })
+          .catch(function (e) { withdraw.disabled = false; report(e.message, true); });
+      });
+      bar.appendChild(withdraw);
+    }
+    if (!bar.children.length) bar.appendChild(mk("span", "hub-manage__note", "Waiting for a decision."));
+    box.appendChild(bar);
+    r.row.appendChild(box);
+  } else if (view && view.history && view.history.length) {
+    var last = view.history[0];
+    if (last.status !== "withdrawn") {
+      var line = (last.status === "approved" ? "Last request approved" : "Last request rejected")
+        + " by " + whoName(last.decided_by) + " · " + onDay(last.decided_at)
+        + (last.note ? " — " + last.note : "");
+      r.row.appendChild(mk("p", "hub-manage__note", line));
+    }
+  }
+  return r.row;
+}
+
+function stillCurrentRow(asset) {
+  var r = manageRow("Review");
+  var on = !!asset.still_current_until;
+  setState(r.state, on ? "Still current" : "Not confirmed", on
+    ? "Until " + onDay(asset.still_current_until)
+      + (asset.still_current_by ? " · " + whoName(asset.still_current_by) : "")
+    : "Confirm the interface shown matches today's release; it lasts a year.");
+  var b = manageButton(on ? "Withdraw" : "Mark Still current");
+  b.addEventListener("click", function () {
+    b.disabled = true;
+    send("PUT", "/api/assets/" + encodeURIComponent(asset.id) + "/still-current",
+         { still_current: !on })
+      .then(function (d) {
+        asset.still_current_until = d.still_current_until;
+        asset.still_current_by = d.still_current_by;
+        refreshMarks(asset);
+      })
+      .catch(function (e) { b.disabled = false; report("Could not change Still current: " + e.message, true); });
+  });
+  r.actions.appendChild(b);
+  return r.row;
+}
+
+function archiveRow(asset) {
+  var r = manageRow("Archive");
+  setState(r.state, asset.archived ? "Archived" : "Listed", asset.archived
+    ? "Out of the Hub's lists and search" + (asset.archived_at ? " since " + onDay(asset.archived_at) : "")
+      + ". SharePoint is unchanged."
+    : "In the Hub's lists and search.");
+  var url = "/api/assets/" + encodeURIComponent(asset.id) + "/archive";
+  var apply = function (on, reason) {
+    return send("PUT", url, { archived: on, reason: reason || null }).then(function (d) {
+      asset.archived = d.archived;
+      asset.archived_at = d.archived ? new Date().toISOString() : null;
+      refreshMarks(asset);
+    });
+  };
+  var b = manageButton(asset.archived ? "Restore" : "Archive");
+  b.addEventListener("click", function () {
+    if (asset.archived) {
+      b.disabled = true;
+      apply(false).catch(function (e) { b.disabled = false; report(e.message, true); });
+      return;
+    }
+    confirmStep(r.row, {
+      lead: "It leaves the Hub's lists and search; SharePoint is not changed. Restore any time.",
+      placeholder: "Reason (optional, kept in the log)",
+      confirm: "Archive",
+      submit: function (reason) { return apply(true, reason); }
+    });
+  });
+  r.actions.appendChild(b);
+  return r.row;
+}
+
+function renderManage(asset) {
+  var old = document.getElementById("vpManage");
+  if (old) old.remove();
+  var side = document.getElementById("vpSide");
+  if (!side) return;
+  hubPermissions.then(function (granted) {
+    granted = granted || [];
+    var may = { manage: granted.indexOf("manage_content_access") >= 0,
+                ask: granted.indexOf("request_content_access") >= 0,
+                review: granted.indexOf("review_content") >= 0 };
+    if (detailAsset !== asset || (!may.manage && !may.ask && !may.review)) return null;
+    var requests = (may.manage || may.ask)
+      ? fetch("/api/assets/" + encodeURIComponent(asset.id) + "/access-requests")
+          .then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+      : Promise.resolve(null);
+    return requests.then(function (view) {
+      if (detailAsset !== asset) return;
+      var stale = document.getElementById("vpManage");
+      if (stale) stale.remove();
+      var card = mk("div", "vp-card hub-manage");
+      card.id = "vpManage";
+      card.appendChild(mk("div", "hub-manage__head", "Manage"));
+      if (may.manage || may.ask) card.appendChild(accessRow(asset, may, view));
+      if (may.review && (asset.uploaded_at || asset.still_current_until)) {
+        card.appendChild(stillCurrentRow(asset));
+      }
+      if (may.review) card.appendChild(archiveRow(asset));
+      side.insertBefore(card, side.firstChild);
+    });
   });
 }
 
 export {
-  buildFileRow, closeAssetDetail, closeFilePreview, detailAsset,
+  buildFileRow, closeAssetDetail, closeFilePreview,
   fileDownloadUrl, fileHash, filePreviewUrl, openAssetDetail, wireDetailPage
 };

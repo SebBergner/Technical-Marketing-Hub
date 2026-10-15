@@ -5,12 +5,9 @@
  * Part of the Hub page's script, split out of static/hub-api.js on
  * 2026-10-14; static/js/hub/main.js loads it. */
 
-import {
-  durationLabel, LANGUAGE_LABEL, pill, report, uploadedLabel
-} from "./util.js";
-import { hubPermissions } from "./permissions.js";
+import { durationLabel, LANGUAGE_LABEL, pill, uploadedLabel } from "./util.js";
 import { familyDisplayName } from "./nav.js";
-import { detailAsset, openAssetDetail } from "./detail.js";
+import { openAssetDetail } from "./detail.js";
 import { openShareFor } from "./share.js";
 
 /* ---------------------------------------------------------------- mapping */
@@ -733,69 +730,11 @@ function addAgeBadge(card, a) {
 /* On a demo's page: the same badge in the tag row, and for people with
  * "Review content" a switch to confirm or withdraw Still current. */
 function renderAgeMark(meta, asset) {
-  meta.querySelectorAll(".hub-age, .hub-review-btn").forEach(function (n) { n.remove(); });
+  // The badge only: Still current and Archive are buttons in the Manage
+  // card beside Details (detail.js, renderManage), not among the tags.
+  meta.querySelectorAll(".hub-age").forEach(function (n) { n.remove(); });
   var badge = ageBadge(asset);
-  // With the tags, ahead of any buttons, however often it is redrawn.
-  if (badge) meta.insertBefore(badge, meta.querySelector(
-    ".hub-pill--internal, .hub-access-btn, .hub-review-btn"));
-  if (!asset.uploaded_at && !asset.still_current_until) return;
-  hubPermissions.then(function (granted) {
-    if (granted.indexOf("review_content") < 0 || detailAsset !== asset) return;
-    var on = !!asset.still_current_until;
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "hub-review-btn";
-    btn.textContent = on ? "Withdraw Still current" : "Mark Still current";
-    btn.title = on
-      ? "The interface shown no longer matches today's release: show its age again"
-      : "The interface shown still matches today's release (lasts a year)";
-    btn.addEventListener("click", function () {
-      btn.disabled = true;
-      fetch("/api/assets/" + encodeURIComponent(asset.id) + "/still-current", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ still_current: !on }),
-      }).then(function (r) {
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        return r.json();
-      }).then(function (d) {
-        asset.still_current_until = d.still_current_until;
-        asset.still_current_by = d.still_current_by;
-        renderAgeMark(meta, asset);
-      }).catch(function (err) {
-        btn.disabled = false;
-        report("Could not change Still current: " + err.message, true);
-      });
-    });
-    meta.appendChild(btn);
-
-    var arch = document.createElement("button");
-    arch.type = "button";
-    arch.className = "hub-review-btn";
-    arch.textContent = asset.archived ? "Restore" : "Archive";
-    arch.title = asset.archived
-      ? "Put it back in the Hub's lists and search"
-      : "Take it out of the Hub's lists and search. SharePoint is not changed.";
-    arch.addEventListener("click", function () {
-      arch.disabled = true;
-      fetch("/api/assets/" + encodeURIComponent(asset.id) + "/archive", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ archived: !asset.archived }),
-      }).then(function (r) {
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        return r.json();
-      }).then(function (d) {
-        asset.archived = d.archived;
-        asset.archived_at = d.archived ? new Date().toISOString() : null;
-        renderAgeMark(meta, asset);
-      }).catch(function (err) {
-        arch.disabled = false;
-        report("Could not change the archive: " + err.message, true);
-      });
-    });
-    meta.appendChild(arch);
-  });
+  if (badge) meta.insertBefore(badge, meta.querySelector(".hub-pill--internal"));
 }
 
 export {

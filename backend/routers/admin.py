@@ -845,6 +845,45 @@ def get_content_access(repo: AssetRepository = Depends(get_repo)):
         raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
 
 
+@router.get("/access-requests", dependencies=[VIEW_ADMIN])
+def get_access_requests(status: str | None = None, limit: int = Query(100, ge=1, le=500),
+                        repo: AssetRepository = Depends(get_repo)):
+    """Requests to make demos Internal or Open (2026-10-15), newest first;
+    `status=pending` for the ones waiting."""
+    from backend.services import access_requests
+    return access_requests.listing(repo, status=status, limit=limit)
+
+
+class DecisionIn(BaseModel):
+    approve: bool
+    note: str | None = None
+
+
+@router.post("/access-requests/{request_id}/decision", dependencies=[VIEW_ADMIN])
+def decide_access_request(request_id: str, body: DecisionIn, request: Request,
+                          repo: AssetRepository = Depends(get_repo),
+                          actor: str = Depends(require_perm(Perm.MANAGE_ACCESS))):
+    """Approve -- which applies the change -- or reject, with a note."""
+    from backend.services import access_requests
+    try:
+        decided = access_requests.decide(repo, request_id, body.approve, actor, body.note)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="no such request")
+    except access_requests.RequestError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    # The Admin log names the demo, not the request's id.
+    request.state.hub_target = decided["asset_id"]
+    if body.approve:
+        who = decided["requested_by"].split(":", 1)[-1]
+        try:
+            repo.set_access(decided["asset_id"], decided["level"], actor,
+                            f"Requested by {who}: {decided['reason']}")
+        except KeyError:
+            raise HTTPException(status_code=404, detail="the demo is no longer listed")
+    log.info("access request %s %s by %s", request_id, decided["status"], actor)
+    return decided
+
+
 # ────────────────────────────────────────────────────────── users & groups
 MANAGE_USERS = require_perm(Perm.MANAGE_USERS)
 
@@ -929,12 +968,30 @@ def get_activity(since: str | None = None, until: str | None = None,
 
 @router.get("/admin-log", dependencies=[VIEW_ADMIN])
 def get_admin_log(since: str | None = None, until: str | None = None, q: str | None = None,
+                  category: str | None = None, result: str | None = None,
                   offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500)):
     """Every change made through the Admin page's API, newest first, with
     whether the hash chain is intact (backend/admin_log.py). There is no
     endpoint that changes or deletes an entry, by design."""
     from backend import admin_log
-    return admin_log.read(since=since, until=until, q=q, offset=offset, limit=limit)
+    return admin_log.read(since=since, until=until, q=q, category=category, result=result,
+                          offset=offset, limit=limit)
+
+
+@router.get("/admin-log.csv", dependencies=[VIEW_ADMIN])
+def export_admin_log(since: str | None = None, until: str | None = None, q: str | None = None,
+                     category: str | None = None, result: str | None = None):
+    """The same filters, every matching entry, as a CSV download (2026-10-15).
+    The export itself is an entry in the log."""
+    from fastapi.responses import Response as _Response
+    from backend import admin_log
+    rows = admin_log.read(since=since, until=until, q=q, category=category, result=result,
+                          limit=None)["items"]
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M")
+    # The BOM lets Excel read it as UTF-8 (names, quotes, non-English text).
+    return _Response("﻿" + admin_log.to_csv(rows), media_type="text/csv; charset=utf-8",
+                     headers={"Content-Disposition":
+                              f'attachment; filename="hub-admin-log-{stamp}.csv"'})
 
 
 @router.post("/sample-activity", dependencies=[VIEW_ADMIN])

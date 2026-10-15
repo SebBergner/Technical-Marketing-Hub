@@ -231,6 +231,16 @@
   .al-detail{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     font-family:ui-monospace,Consolas,monospace;font-size:12px}
   .al-refused{color:var(--red)}
+  .al-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .al-tools select{padding:6px 8px;font-size:13px}
+  .al-export{text-decoration:none;white-space:nowrap}
+  .req-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 0;
+    border-top:1px solid var(--border)}
+  .req-row:first-of-type{border-top:0}
+  .req-row__reason{font-style:italic;color:var(--muted);margin:3px 0 0;font-size:13px}
+  .req-row__acts{display:flex;gap:6px;align-items:flex-start}
+  .req-row__note{grid-column:1/-1;display:flex;gap:6px}
+  .req-row__note input{flex:1;min-width:0}
   .al-broken{color:var(--red);font-weight:600}
   .act-period{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:10px;
     align-items:center;padding:10px 0;margin:-10px 0 14px;background:var(--bg);
@@ -443,6 +453,10 @@
       <p class="faint" id="rvIntro" style="margin:0 0 14px;font-size:12.5px"></p>
       <div id="rvBody"></div>
     </section>
+    <section>
+      <div class="section-head"><h2>Recent changes</h2></div>
+      <div class="card tablewrap" id="rvChanges"></div>
+    </section>
   </div>
 
   <!-- How the Hub is used: views, downloads, searches (its own tab since
@@ -488,8 +502,13 @@
         have <b>Access internal content</b> (PTC employees by default, not Partners). A demo is
         Internal when its SharePoint folder is closed to partners, or when it is marked here or
         on its own page. Marks are kept in the Hub only; SharePoint is never changed.</p>
+      <div class="card" id="caRequests" style="margin-bottom:12px"></div>
       <div class="card" id="caList"></div>
       <div class="card" id="hiddenDemos" style="margin-top:12px"></div>
+    </section>
+    <section>
+      <div class="section-head"><h2>Recent changes</h2></div>
+      <div class="card tablewrap" id="caChanges"></div>
     </section>
   </div>
 
@@ -551,8 +570,18 @@
     <section>
       <div class="section-head">
         <h2 id="alTitle">Admin log</h2>
-        <input id="alSearch" class="act-search" type="search"
-               placeholder="Filter by who, what or demo…" aria-label="Filter the Admin log">
+        <div class="al-tools">
+          <select id="alCategory" aria-label="Area"><option value="">All areas</option></select>
+          <select id="alResult" aria-label="Result">
+            <option value="">All results</option>
+            <option value="done">Done</option>
+            <option value="refused">Refused</option>
+            <option value="failed">Failed</option>
+          </select>
+          <input id="alSearch" class="act-search" type="search"
+                 placeholder="Filter by who, what or demo…" aria-label="Filter the Admin log">
+          <a id="alExport" class="btn-small al-export" href="#" download>Export CSV</a>
+        </div>
       </div>
       <div class="card tablewrap" id="alLog"></div>
       <div class="pager" id="alPager"></div>

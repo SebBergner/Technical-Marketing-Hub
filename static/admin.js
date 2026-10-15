@@ -1904,6 +1904,7 @@
   }
 
   function loadReview() {
+    loadChanges("rvChanges", "Content review");
     return fetch("/api/admin/content-review")
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) { if (d) renderReview(d); });
@@ -2099,9 +2100,134 @@
   }
 
   function loadContentAccess() {
+    loadRequests();
+    loadChanges("caChanges", "Content access");
     return fetch("/api/admin/content-access")
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (items) { if (items) renderContentAccess(items); });
+  }
+
+  /* ── Requests to make a demo Internal or Open (2026-10-15) ──────────────
+   * Asked for on a demo's page, with a reason (services/access_requests.py);
+   * decided here or there. Pending first, then the last decided ones. */
+  function loadRequests() {
+    return fetch("/api/admin/access-requests?limit=60")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (items) { if (items) renderRequests(items); });
+  }
+
+  function renderRequests(items) {
+    var host = $("caRequests");
+    host.innerHTML = "";
+    var pending = items.filter(function (i) { return i.status === "pending"; });
+    var done = items.filter(function (i) { return i.status !== "pending"; }).slice(0, 8);
+    var head = el("div", "card-head");
+    head.appendChild(el("h2", null, "Requests"));
+    head.appendChild(el("span", "faint num", pending.length + " waiting"));
+    host.appendChild(head);
+    host.appendChild(el("p", "muted", "People with Request content access change ask, with a "
+      + "reason, from a demo's page. Approving applies the change; both answers are kept "
+      + "with the request and in the Admin log."));
+    if (!pending.length) host.appendChild(el("div", "faint", "Nothing is waiting."));
+    var manage = canManageAccess();
+    pending.forEach(function (q) {
+      var row = el("div", "req-row");
+      var info = el("div");
+      var title = el("a", "promo-row__title", q.title || q.asset_id);
+      title.href = "/#/asset/" + encodeURIComponent(q.asset_id);
+      title.target = "_blank";
+      title.rel = "noopener";
+      info.appendChild(title);
+      info.appendChild(el("div", "promo-row__meta", "Make " + (q.level === "internal"
+        ? "Internal" : "Open") + " · asked by " + actorWord(q.requested_by) + " · "
+        + new Date(q.requested_at).toLocaleString()));
+      info.appendChild(el("p", "req-row__reason", "“" + q.reason + "”"));
+      row.appendChild(info);
+      var acts = el("div", "req-row__acts");
+      if (manage) {
+        var note = el("div", "req-row__note");
+        var input = el("input");
+        input.type = "text";
+        input.placeholder = "Note (optional; the requester sees it)";
+        input.maxLength = 1000;
+        note.appendChild(input);
+        var status = el("span", "promo-status faint");
+        var decide = function (yes) {
+          status.textContent = "Saving…";
+          fetch("/api/admin/access-requests/" + encodeURIComponent(q.id) + "/decision", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ approve: yes, note: input.value.trim() || null }),
+          }).then(function (r) {
+            if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
+              throw new Error(b.detail || ("HTTP " + r.status));
+            });
+            return loadContentAccess();
+          }).catch(function (err) {
+            status.textContent = "Not saved: " + err.message;
+            status.className = "promo-status err";
+          });
+        };
+        var yes = el("button", "btn-primary", "Approve");
+        yes.type = "button";
+        yes.addEventListener("click", function () { decide(true); });
+        var no = el("button", null, "Reject");
+        no.type = "button";
+        no.addEventListener("click", function () { decide(false); });
+        acts.appendChild(yes);
+        acts.appendChild(no);
+        row.appendChild(acts);
+        note.appendChild(status);
+        row.appendChild(note);
+      } else {
+        row.appendChild(acts);
+      }
+      host.appendChild(row);
+    });
+    if (done.length) {
+      host.appendChild(el("div", "faint", "Recently decided"))
+        .style.cssText = "margin:12px 0 4px;font-size:12px;font-weight:600";
+      done.forEach(function (q) {
+        var line = el("div", "promo-row__meta",
+          (q.title || q.asset_id) + " · Make " + (q.level === "internal" ? "Internal" : "Open")
+          + " · " + q.status + (q.decided_by ? " by " + actorWord(q.decided_by) : "")
+          + (q.decided_at ? " · " + new Date(q.decided_at).toLocaleDateString() : "")
+          + (q.note ? " — " + q.note : ""));
+        line.style.padding = "3px 0";
+        host.appendChild(line);
+      });
+    }
+  }
+
+  /* One area's slice of the Admin log, at the foot of its own tab: the same
+   * tamper-evident log, filtered, rather than a second log to keep whole. */
+  function loadChanges(hostId, category) {
+    var host = $(hostId);
+    if (!host) return;
+    return fetch("/api/admin/admin-log?limit=15&category=" + encodeURIComponent(category))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        host.innerHTML = "";
+        if (!d) return;
+        if (!d.items.length) {
+          host.appendChild(el("div", "faint", "No changes recorded yet."));
+        } else {
+          host.appendChild(adminLogTable(d.items));
+        }
+        var more = el("a", null, "Open in the Admin log →");
+        more.href = "#activity";
+        more.style.cssText = "display:inline-block;margin-top:8px;font-size:13px";
+        more.addEventListener("click", function (e) {
+          e.preventDefault();
+          $("alCategory").value = category;
+          al.category = category;
+          al.offset = 0;
+          history.replaceState(null, "", "#activity");
+          showTab("activity");
+          setTimeout(function () { $("alTitle").scrollIntoView({ block: "start" }); }, 600);
+        });
+        host.appendChild(more);
+      });
   }
 
   function setAccess(assetId, level, status) {
@@ -2151,7 +2277,8 @@
       var why = i.source === "sharepoint"
         ? "Closed to partners in SharePoint — open it there to make it Open"
         : "Marked Internal" + (i.marked_by ? " by " + i.marked_by.replace(/^(user|dev):/, "") : "")
-          + (i.marked_at ? " · " + new Date(i.marked_at).toLocaleString() : "");
+          + (i.marked_at ? " · " + new Date(i.marked_at).toLocaleString() : "")
+          + (i.reason ? " — " + i.reason : "");
       info.appendChild(el("div", "promo-row__meta",
         [TYPE_WORD[i.type] || i.type, why].filter(Boolean).join(" · ")));
       r.appendChild(info);
@@ -2327,16 +2454,23 @@
    * Every change made through the Admin page -- and every refused attempt --
    * in the Sign-ins period. Read-only by design: the server has no way to
    * change or delete an entry, and says whether the hash chain still holds. */
-  var al = { q: "", offset: 0, limit: 50 };
+  var al = { q: "", category: "", result: "", offset: 0, limit: 50 };
 
-  function loadAdminLog() {
+  function alQuery(paged) {
     var params = actBounds();
-    params.offset = al.offset;
-    params.limit = al.limit;
+    if (paged) { params.offset = al.offset; params.limit = al.limit; }
     if (al.q) params.q = al.q;
-    var qs = Object.keys(params).map(function (k) {
+    if (al.category) params.category = al.category;
+    if (al.result) params.result = al.result;
+    return Object.keys(params).map(function (k) {
       return k + "=" + encodeURIComponent(params[k]);
     }).join("&");
+  }
+
+  function loadAdminLog() {
+    var qs = alQuery(true);
+    // The export carries the same filters, so what downloads is what is shown.
+    $("alExport").href = "/api/admin/admin-log.csv?" + alQuery(false);
     return fetch("/api/admin/admin-log?" + qs)
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) { if (d) renderAdminLog(d); });
@@ -2362,39 +2496,49 @@
     return parts.join(" · ");
   }
 
+  function adminLogTable(items, withArea) {
+    var t = el("table");
+    var hr = t.createTHead().insertRow();
+    var heads = ["When", "Who"].concat(withArea ? ["Area"] : [])
+      .concat(["What", "Demo / group", "Details", "Result"]);
+    heads.forEach(function (h) { hr.appendChild(el("th", null, h)); });
+    var tb = t.createTBody();
+    items.forEach(function (e) {
+      var tr = tb.insertRow();
+      var w = tr.insertCell();
+      w.className = "num faint";
+      w.textContent = new Date(e.at).toLocaleString();
+      tr.insertCell().textContent = actorWord(e.actor);
+      if (withArea) tr.insertCell().textContent = e.category || "—";
+      tr.insertCell().textContent = e.action;
+      tr.insertCell().textContent = e.target || "—";
+      var det = tr.insertCell();
+      det.className = "al-detail";
+      det.textContent = detailWord(e.detail) || "—";
+      det.title = det.textContent;
+      var res = tr.insertCell();
+      var ok = e.status >= 200 && e.status < 400;
+      res.textContent = ok ? "Done" : (e.status === 401 || e.status === 403
+        ? "Refused (" + e.status + ")" : "Failed (" + e.status + ")");
+      if (!ok) res.className = "al-refused";
+    });
+    return t;
+  }
+
   function renderAdminLog(d) {
     $("alTitle").textContent = "Admin log · " + periodLabel();
+    var cat = $("alCategory");
+    if (cat.options.length <= 1 && d.categories) {
+      d.categories.forEach(function (c) { cat.appendChild(new Option(c, c)); });
+      cat.value = al.category;
+    }
     var host = $("alLog");
     host.innerHTML = "";
     if (!d.items.length) {
-      host.appendChild(el("div", "faint", al.q
+      host.appendChild(el("div", "faint", al.q || al.category || al.result
         ? "No Admin log entries match." : "No Admin changes in this period."));
     } else {
-      var t = el("table");
-      var hr = t.createTHead().insertRow();
-      ["When", "Who", "What", "Demo / group", "Details", "Result"].forEach(function (h) {
-        hr.appendChild(el("th", null, h));
-      });
-      var tb = t.createTBody();
-      d.items.forEach(function (e) {
-        var tr = tb.insertRow();
-        var w = tr.insertCell();
-        w.className = "num faint";
-        w.textContent = new Date(e.at).toLocaleString();
-        tr.insertCell().textContent = actorWord(e.actor);
-        tr.insertCell().textContent = e.action;
-        tr.insertCell().textContent = e.target || "—";
-        var det = tr.insertCell();
-        det.className = "al-detail";
-        det.textContent = detailWord(e.detail) || "—";
-        det.title = det.textContent;
-        var res = tr.insertCell();
-        var ok = e.status >= 200 && e.status < 400;
-        res.textContent = ok ? "Done" : (e.status === 401 || e.status === 403
-          ? "Refused (" + e.status + ")" : "Failed (" + e.status + ")");
-        if (!ok) res.className = "al-refused";
-      });
-      host.appendChild(t);
+      host.appendChild(adminLogTable(d.items, true));
     }
 
     var pager = $("alPager");
@@ -2430,6 +2574,15 @@
         + "carries the hash of the one before it, so a change to the file itself shows here. "
         + (check.entries || 0).toLocaleString() + " entries in all; passwords are never written.";
   }
+
+  ["alCategory", "alResult"].forEach(function (id) {
+    $(id).addEventListener("change", function () {
+      al.category = $("alCategory").value;
+      al.result = $("alResult").value;
+      al.offset = 0;
+      loadAdminLog();
+    });
+  });
 
   var alTimer = null;
   $("alSearch").addEventListener("input", function (e) {

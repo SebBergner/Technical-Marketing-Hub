@@ -581,11 +581,13 @@ class JsonAssetRepository(AssetRepository):
             out.append({"asset_id": r["id"], "title": r.get("title"), "type": r.get("type"),
                         "source": r.get("internal_source"),
                         "marked_by": mark.get("by"), "marked_at": mark.get("at"),
+                        "reason": mark.get("reason"),
                         "also_marked": bool(mark) and r.get("internal_source") == "sharepoint"})
         return sorted(out, key=lambda i: (i["source"] != "hub", -_ts(i.get("marked_at")),
                                           (i.get("title") or "").lower()))
 
-    def set_access(self, asset_id: str, level: str, actor: str) -> dict:
+    def set_access(self, asset_id: str, level: str, actor: str,
+                   reason: str | None = None) -> dict:
         """Mark one listed demo Internal, or Open again. Opening only removes
         the Hub's own mark: a folder SharePoint closes stays Internal."""
         if level not in ("open", "internal"):
@@ -595,7 +597,8 @@ class JsonAssetRepository(AssetRepository):
         with self._lock:
             state = self._load("content_access") or {}
             if level == "internal":
-                state[asset_id] = {"by": actor, "at": utcnow().isoformat(timespec="seconds")}
+                state[asset_id] = {"by": actor, "at": utcnow().isoformat(timespec="seconds"),
+                                   "reason": (reason or "").strip() or None}
             else:
                 state.pop(asset_id, None)
             self._save("content_access", state)

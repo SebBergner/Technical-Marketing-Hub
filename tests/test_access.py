@@ -31,7 +31,8 @@ def no_named_admins_or_curators(monkeypatch):
 def test_staff_partners_and_nobody_by_default():
     staff = person("someone@ptc.com").permissions
     assert {Perm(p) for p in staff} == {Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD,
-                                        Perm.INTERNAL, Perm.CREATE_DEMO, Perm.VIEW_REPORTS}
+                                        Perm.INTERNAL, Perm.CREATE_DEMO, Perm.VIEW_REPORTS,
+                                        Perm.REQUEST_ACCESS}
     partner = person("p@partner.it").permissions
     assert {Perm(p) for p in partner} == {Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD}
     assert ANONYMOUS.permissions == frozenset()

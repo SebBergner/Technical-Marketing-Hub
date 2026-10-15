@@ -679,9 +679,12 @@ function stepUpload(box) {
              step: 1 };
       var done = document.getElementById("hubUpWizard");
       done.innerHTML = "";
-      done.appendChild(el("h3", "hub-up__h", "Created — waiting for review"));
-      done.appendChild(el("p", null, "“" + record.title + "” has been created. It appears "
-        + "in the Hub once a reviewer publishes it; My demos shows where it stands."));
+      var live = record.status === "published";
+      done.appendChild(el("h3", "hub-up__h", live ? "Created and published"
+                                                  : "Created — waiting for review"));
+      done.appendChild(el("p", null, "“" + record.title + "” has been created. " + (live
+        ? "It is published; it appears in the Hub within a minute or two."
+        : "It appears in the Hub once a reviewer publishes it; My demos shows where it stands.")));
       var again = button("Create another", true);
       again.addEventListener("click", function () { drawWizard(); });
       done.appendChild(again);

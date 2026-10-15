@@ -121,7 +121,8 @@ DEMO_CATALOG = TargetSpec(
         FieldSpec("product_version", "Product version", TEXT, column="Product_x0020_Version",
                   max_length=100, help="e.g. Creo 12, Windchill 13.1"),
     ]),
-    publish_date_column=None,
+    # Added by Liwei 2026-10-15 (indexed); the sync reads it first.
+    publish_date_column="OriginalPublishDate",
 )
 
 DEMO_VIDEO = TargetSpec(

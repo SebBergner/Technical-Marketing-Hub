@@ -155,7 +155,9 @@ def submit(repo, upload_id: str, actor: str, values: dict | None = None) -> dict
                              "what": "resubmitted" if was == "sent_back" else "submitted"})
     record = _update(repo, upload_id, change)
     _set_review(repo, record["folder_id"], "pending", upload_id)
-    if record["target"] == "demo_catalog":       # no date column there
+    from backend.services import upload_targets
+    spec = upload_targets.TARGETS.get(record["target"])
+    if spec is not None and not spec.publish_date_column:   # no date column there
         dates = _load(repo, DATES, {})
         dates[record["folder_id"]] = record["values"].get("original_publish_date")
         _save(repo, DATES, dates)

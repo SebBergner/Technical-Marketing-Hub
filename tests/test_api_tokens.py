@@ -119,15 +119,17 @@ def test_revoked_and_expired_tokens_stop_working(client, sp):
 
 
 def test_internal_asked_for_at_creation_holds_before_and_after_indexing(client, sp, tmp_path):
+    access.create_group("Makers", "", ["view_hub", "upload_content"], ["maker@ptc.com"], "t")
+    maker = easyauth_headers("maker@ptc.com")
     r = client.post("/api/uploads", json={"target": "demo_catalog", "kind": "ldk", "values": KIT,
-                                          "files": FILES, "internal": True}, headers=BOSS)
+                                          "files": FILES, "internal": True}, headers=maker)
     record = r.json()
     for i, f in enumerate(record["files"]):
         sp.items[f"item-{i}"] = {"id": f"item-{i}", "size": f["size"],
                                  "name": f["path"].rsplit("/", 1)[-1]}
         client.post(f"/api/uploads/{record['id']}/files/{i}/done", json={"item_id": f"item-{i}"},
-                    headers=BOSS)
-    client.post(f"/api/uploads/{record['id']}/finish", headers=BOSS)
+                    headers=maker)
+    client.post(f"/api/uploads/{record['id']}/finish", headers=maker)
     client.post(f"/api/uploads/{record['id']}/publish", json={}, headers=BOSS)
     # Indexed only now, after publishing: still Internal.
     (tmp_path / "mirror" / "sharepoint.json").write_text(json.dumps([

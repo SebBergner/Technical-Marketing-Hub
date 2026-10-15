@@ -19,6 +19,7 @@ from tests.test_auth import easyauth_headers
 BOSS = easyauth_headers("boss@ptc.com")          # administrator: uploads and reviews
 ANN = easyauth_headers("ann@ptc.com")            # PTC employee: neither
 PARTNER = easyauth_headers("p@partner.it")
+MAKER = easyauth_headers("maker@ptc.com")        # creates demos, does not review
 
 CHOICES = {"Segment": ["CAD", "PLM"], "Language": ["English", "German (Germany)"],
            "Owned_x0020_By": ["Technical Demonstration Development"],
@@ -80,6 +81,7 @@ def client(tmp_path, monkeypatch, sp):
     monkeypatch.setattr(settings, "hub_admin_emails", "boss@ptc.com")
     (tmp_path / "mirror").mkdir()
     (tmp_path / "mirror" / "sharepoint.json").write_text("[]", encoding="utf-8")
+    access.create_group("Makers", "", ["view_hub", "upload_content"], ["maker@ptc.com"], "test")
     return TestClient(app, base_url="http://localhost")
 
 
@@ -91,12 +93,12 @@ FILES = [{"path": "Videos/Overview_CF.mp4", "size": 1000},
          {"path": "Script.docx", "size": 20}]
 
 
-def start(client, values=KIT, files=FILES, who=BOSS, target="demo_catalog", kind="ldk"):
+def start(client, values=KIT, files=FILES, who=MAKER, target="demo_catalog", kind="ldk"):
     return client.post("/api/uploads", json={"target": target, "kind": kind, "values": values,
                                              "files": files}, headers=who)
 
 
-def upload_all(client, sp, record, who=BOSS):
+def upload_all(client, sp, record, who=MAKER):
     for i, f in enumerate(record["files"]):
         s = client.post(f"/api/uploads/{record['id']}/files/{i}/session", headers=who).json()
         assert s["upload_url"].startswith("https://upload/")
@@ -148,23 +150,23 @@ def test_the_whole_flow_hidden_until_published(client, sp, tmp_path):
     assert r.status_code == 201, r.text
     record = r.json()
     assert sp.created == [("Demo Catalog", "Creo Sheetmetal Kit")]
-    assert client.post(f"/api/uploads/{record['id']}/finish", headers=BOSS).status_code == 422, \
+    assert client.post(f"/api/uploads/{record['id']}/finish", headers=MAKER).status_code == 422, \
         "not before every file is in"
     upload_all(client, sp, record)
     assert sp.sessions[0] == ("folder-Creo-Sheetmetal-Kit/Videos", "Overview_CF.mp4"), \
         "sub-folders kept"
-    done = client.post(f"/api/uploads/{record['id']}/finish", headers=BOSS).json()
+    done = client.post(f"/api/uploads/{record['id']}/finish", headers=MAKER).json()
     assert done["status"] == "pending"
     folder, fields = sp.written[0]
     assert fields["Demo_x0020_Type"] == "Live Demo Kit" and fields["Segment"] == ["CAD"]
     assert fields["DocumentSetDescription"] == KIT["description"]
-    dates = json.loads((tmp_path / "owned" / "publish_dates.json").read_text())
-    assert dates[folder] == "2026-09-01", "Demo Catalog has no date column: the Hub keeps it"
+    assert fields["OriginalPublishDate"] == "2026-09-01T00:00:00Z",         "the Demo Catalog's own column since 2026-10-15; the sync reads it"
+    assert not (tmp_path / "owned" / "publish_dates.json").exists()
 
     # Indexed by a sync, it stays out of every list until published.
     (tmp_path / "mirror" / "sharepoint.json").write_text(json.dumps([
         {"id": "creo-sheetmetal-kit", "type": "ldk", "title": "Creo Sheetmetal Kit",
-         "products": ["Creo"], "source_item_id": folder, "uploaded_at": "2026-10-15"}]),
+         "products": ["Creo"], "source_item_id": folder, "uploaded_at": "2026-09-01"}]),
         encoding="utf-8")
     ids = lambda who: [a["id"] for a in client.get("/api/assets", headers=who).json()["items"]]
     assert ids(BOSS) == [] and ids(ANN) == []
@@ -180,33 +182,33 @@ def test_the_whole_flow_hidden_until_published(client, sp, tmp_path):
 def test_send_back_then_resubmit_with_corrected_metadata(client, sp):
     record = start(client).json()
     upload_all(client, sp, record)
-    client.post(f"/api/uploads/{record['id']}/finish", headers=BOSS)
+    client.post(f"/api/uploads/{record['id']}/finish", headers=MAKER)
     assert client.post(f"/api/uploads/{record['id']}/send-back", json={"note": ""},
                        headers=BOSS).status_code == 422, "say what needs changing"
     back = client.post(f"/api/uploads/{record['id']}/send-back",
                        json={"note": "Segment should be PLM"}, headers=BOSS).json()
     assert (back["status"], back["note"]) == ("sent_back", "Segment should be PLM")
     renamed = client.post(f"/api/uploads/{record['id']}/resubmit",
-                          json={"values": {**KIT, "title": "New Name"}}, headers=BOSS)
+                          json={"values": {**KIT, "title": "New Name"}}, headers=MAKER)
     assert renamed.status_code == 422, "the title is the folder name"
     again = client.post(f"/api/uploads/{record['id']}/resubmit",
-                        json={"values": {**KIT, "segment": ["PLM"]}}, headers=BOSS).json()
+                        json={"values": {**KIT, "segment": ["PLM"]}}, headers=MAKER).json()
     assert again["status"] == "pending" and sp.written[-1][1]["Segment"] == ["PLM"]
 
 
 def test_a_file_that_did_not_arrive_whole_is_refused(client, sp):
     record = start(client).json()
-    client.post(f"/api/uploads/{record['id']}/files/0/session", headers=BOSS)
+    client.post(f"/api/uploads/{record['id']}/files/0/session", headers=MAKER)
     sp.items["short"] = {"id": "short", "size": 999, "name": "Overview_CF.mp4"}
     r = client.post(f"/api/uploads/{record['id']}/files/0/done", json={"item_id": "short"},
-                    headers=BOSS)
+                    headers=MAKER)
     assert r.status_code == 422
 
 
 def test_uploads_are_in_the_admin_log(client, sp):
     record = start(client).json()
     upload_all(client, sp, record)
-    client.post(f"/api/uploads/{record['id']}/finish", headers=BOSS)
+    client.post(f"/api/uploads/{record['id']}/finish", headers=MAKER)
     log = client.get("/api/admin/admin-log?category=Uploads", headers=BOSS).json()
     actions = [e["action"] for e in log["items"]]
     assert actions[0] == "Finished an upload" and actions[-1] == "Started an upload"
@@ -261,11 +263,11 @@ def test_several_videos_need_a_chosen_preview_which_is_ticked_in_sharepoint(clie
     assert sp.created == [], "nothing created without the choice"
     r = client.post("/api/uploads", json={"target": "demo_catalog", "kind": "ldk", "values": KIT,
                                           "files": TWO_VIDEOS, "preview": "Training/Walkthrough.mp4"},
-                    headers=BOSS)
+                    headers=MAKER)
     assert r.status_code == 201 and r.json()["preview"] == "Training/Walkthrough.mp4"
     record = r.json()
     upload_all(client, sp, record)
-    client.post(f"/api/uploads/{record['id']}/finish", headers=BOSS)
+    client.post(f"/api/uploads/{record['id']}/finish", headers=MAKER)
     assert sp.previews == ["item-1"], "PreviewVideo ticked on the chosen file only"
 
 
@@ -291,7 +293,7 @@ def test_retired_segments_are_not_offered():
 def test_publishing_a_demo_the_hub_has_not_read_yet_asks_for_a_sync(client, sp):
     record = start(client).json()
     upload_all(client, sp, record)
-    client.post(f"/api/uploads/{record['id']}/finish", headers=BOSS)
+    client.post(f"/api/uploads/{record['id']}/finish", headers=MAKER)
     asked = len(sp.syncs)
     client.post(f"/api/uploads/{record['id']}/publish", json={}, headers=BOSS)
     assert len(sp.syncs) == asked + 1, "not indexed yet: publishing asks again"
@@ -301,3 +303,17 @@ def test_index_now_is_for_the_reviewer_or_the_uploader(client, sp):
     record = start(client).json()
     assert client.post(f"/api/uploads/{record['id']}/index", headers=ANN).status_code == 403
     assert client.post(f"/api/uploads/{record['id']}/index", headers=BOSS).json() == {"queued": True}
+
+
+def test_create_without_review_publishes_at_once(client, sp):
+    """2026-10-15: for the team that maintains the catalogue, as an API token can."""
+    access.create_group("TDD", "", ["view_hub", "upload_content", "publish_without_review"],
+                        ["tdd@ptc.com"], "test")
+    tdd = easyauth_headers("tdd@ptc.com")
+    record = start(client, who=tdd).json()
+    upload_all(client, sp, record, who=tdd)
+    done = client.post(f"/api/uploads/{record['id']}/finish", headers=tdd).json()
+    assert done["status"] == "published"
+    other = start(client, values={**KIT, "title": "Another Kit"}).json()   # MAKER: no such right
+    upload_all(client, sp, other)
+    assert client.post(f"/api/uploads/{other['id']}/finish", headers=MAKER).json()["status"] == "pending"

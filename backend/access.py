@@ -67,6 +67,7 @@ class Perm(str, Enum):
     INTERNAL = "access_internal"
     CREATE_DEMO = "create_demo"
     UPLOAD = "upload_content"
+    PUBLISH_DIRECT = "publish_without_review"
     EDIT_METADATA = "edit_metadata"
     MANAGE_HOME = "manage_home"
     MANAGE_ACCESS = "manage_content_access"
@@ -93,6 +94,10 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
      "Create a demo -- a video or a demo kit, with its metadata -- on a "
      "destination platform. It is listed once someone with Review content "
      "publishes it."),
+    (Perm.PUBLISH_DIRECT, "Create without review",
+     "What this person creates with Create new demo -- or corrects after a send-back "
+     "-- is listed at once, without waiting for review. For the team that maintains "
+     "the catalogue."),
     (Perm.EDIT_METADATA, "Edit metadata",
      "Review metadata proposals and write them back to SharePoint."),
     (Perm.MANAGE_HOME, "Manage the Home page",
@@ -131,7 +136,8 @@ _ADMIN_ONLY = frozenset({Perm.VIEW_ADMIN.value, Perm.MANAGE_USERS.value})
 #: usual rule for guests in a tenant; nor do they ask for demos to be made
 #: Internal or upload into PTC's libraries (2026-10-15). Their other
 #: permissions are unaffected.
-PARTNER_NEVER = _ADMIN_ONLY | {Perm.REQUEST_ACCESS.value, Perm.UPLOAD.value}
+PARTNER_NEVER = _ADMIN_ONLY | {Perm.REQUEST_ACCESS.value, Perm.UPLOAD.value,
+                               Perm.PUBLISH_DIRECT.value}
 
 _EMPLOYEE_DEFAULT = [Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD, Perm.INTERNAL,
                      Perm.CREATE_DEMO, Perm.VIEW_REPORTS, Perm.REQUEST_ACCESS]

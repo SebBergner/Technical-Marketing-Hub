@@ -228,10 +228,14 @@ def _write_and_submit(repo, record: dict, actor: str, values: dict,
         raise HTTPException(status_code=502, detail=f"SharePoint: {exc}. Try Finish again.")
     try:
         done = uploads.submit(repo, record["id"], actor, values)
-        # A program whose token is trusted as much as a reviewer (api_tokens).
-        if user is not None and user.token_skip_review:
+        # Trusted as much as a reviewer: a token set so (api_tokens), or a
+        # person with "Create without review" (2026-10-15).
+        if user is not None and (user.token_skip_review or (
+                not user.token_name and user.can(Perm.PUBLISH_DIRECT))):
             done = uploads.publish(repo, record["id"], actor,
-                                   "Published on submission: API token without review")
+                                   "Published on submission: "
+                                   + ("API token without review" if user.token_name
+                                      else "Create without review"))
     except uploads.UploadStateError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     _sync_soon(repo, actor)

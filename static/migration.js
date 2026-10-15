@@ -1,8 +1,8 @@
 /* The Migration page.
  *
- * Kept apart from the Hub page's script and admin.js on purpose, as admin.js
- * is: this page owns its own markup and shares nothing that could break
- * another page.
+ * Kept apart from the Hub page's script and the Admin page's
+ * (static/js/admin/) on purpose: this page owns its own markup and shares
+ * nothing that could break another page.
  *
  * A manager's view: how much has moved, when, how far the plan has got, and
  * what the content is. Everything on screen comes from one call per source --
@@ -12,7 +12,7 @@
 (function () {
   "use strict";
 
-  /* Same watch as admin.js: an expired SSO session answers an API call with
+  /* Same watch as the Admin page (static/js/admin/main.js): an expired SSO session answers an API call with
    * 401 plus X-Sign-In, and the page follows it back to sign-in. A 401
    * without the header means "admin password not entered" and is left alone. */
   (function watchForExpiredSession() {

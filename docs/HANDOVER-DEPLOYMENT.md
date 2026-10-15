@@ -1,5 +1,12 @@
 # Deployment Handover — TDD Portal / Technical Marketing Hub
 
+> **Out of date as of 2026-10-15.** Much below predates SSO (live on both
+> slots since 2026-10-04), users & groups, the staging slot routine and the
+> Admin page. For swapping staging into production follow
+> [`SWAP-CHECKLIST.md`](SWAP-CHECKLIST.md); for day-to-day pushes,
+> `GUIDE-zh-push-and-deploy.md`. Sections 3 (back up `owned/`), 5
+> (credentials) and 6 (rollback) still hold.
+
 **Written 2026-09-03, revised 2026-09-08.** The backend described in the
 original version of this document as "sitting in PR #1, not yet merged" has
 since been merged and deployed **many times** — every commit landed by

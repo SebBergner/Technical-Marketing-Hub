@@ -32,6 +32,9 @@ import threading
 from datetime import datetime, timezone
 
 RECORDS, REVIEW, DATES = "uploads", "upload_review", "publish_dates"
+#: Internal, asked for when it was created: by folder, so it holds before the
+#: Hub has indexed the demo (2026-10-15). Read by the repository.
+INTERNAL = "upload_internal"
 _lock = threading.Lock()
 
 OPEN = ("uploading",)
@@ -156,6 +159,11 @@ def submit(repo, upload_id: str, actor: str, values: dict | None = None) -> dict
         dates = _load(repo, DATES, {})
         dates[record["folder_id"]] = record["values"].get("original_publish_date")
         _save(repo, DATES, dates)
+    if record.get("internal"):
+        marks = _load(repo, INTERNAL, {})
+        marks.setdefault(record["folder_id"], {"by": record["uploaded_by"], "at": _now(),
+                                               "reason": "Marked Internal when created"})
+        _save(repo, INTERNAL, marks)
     return record
 
 

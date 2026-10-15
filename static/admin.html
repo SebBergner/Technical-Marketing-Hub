@@ -232,6 +232,20 @@
     font-family:ui-monospace,Consolas,monospace;font-size:12px}
   .al-refused{color:var(--red)}
   .al-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .tk-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;margin-top:14px;
+    padding-top:14px;border-top:1px solid var(--border)}
+  .tk-form label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
+  .tk-form .tk-perms{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 16px}
+  .tk-form .tk-perms label{flex-direction:row;align-items:center;gap:6px;color:var(--ink)}
+  .tk-form .tk-wide{grid-column:1/-1}
+  .tk-secret{margin-top:12px;padding:12px 14px;border-radius:8px;border:1px solid var(--amber);
+    background:var(--amber-soft)}
+  .tk-secret code{display:block;margin:8px 0;padding:8px 10px;background:var(--surface);
+    border-radius:6px;font-size:12.5px;word-break:break-all;user-select:all}
+  .tk-status{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px}
+  .tk-status--active{background:var(--green-soft);color:var(--green)}
+  .tk-status--expired,.tk-status--revoked{background:var(--red-soft);color:var(--red)}
+  @media (max-width:640px){.tk-form{grid-template-columns:1fr}}
   .al-tools select{padding:6px 8px;font-size:13px}
   .al-export{text-decoration:none;white-space:nowrap}
   .req-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 0;
@@ -603,6 +617,16 @@
         list their members here. Kept in the Hub only &mdash; nothing is written to
         SharePoint or Entra.</p>
       <div class="ug" id="ugGroups"></div>
+    </section>
+    <!-- Programs using the API (backend/api_tokens.py, 2026-10-15). -->
+    <section>
+      <div class="section-head"><h2>API tokens</h2></div>
+      <p class="muted" style="margin:-6px 0 14px">For a program that uses the Hub's API — creating
+        demos, for example. A token carries only the permissions chosen here, expires, can be
+        revoked at any time, and everything it does is in the Admin log as
+        <code>token:&lt;name&gt;</code>. It is shown once, when created.
+        <a href="/static/docs/api-create-demo.html" target="_blank" rel="noopener">How to use it</a></p>
+      <div class="card" id="tkList"></div>
     </section>
     <section>
       <div class="section-head"><h2>Change log</h2></div>

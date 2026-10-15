@@ -108,6 +108,12 @@ class CurrentUser:
     #: True when running with auth disabled, so callers and diagnostics can
     #: tell "a real curator" from "nobody, and nothing is enforced".
     is_dev_principal: bool = False
+    #: A program using an API token (backend/api_tokens.py, 2026-10-15): its
+    #: name, the permissions the token carries, and whether what it creates
+    #: is published without review.
+    token_name: str | None = None
+    token_permissions: frozenset | None = None
+    token_skip_review: bool = False
     #: The sign-in came through another directory (a guest account): its ID
     #: token named an outside identity provider. Recorded at sign-in.
     external: bool = False
@@ -123,7 +129,7 @@ class CurrentUser:
         partner's guest account signs in with their own address
         (someone@parametricdesign.it). The local development principal is
         never one."""
-        if self.is_dev_principal:
+        if self.is_dev_principal or self.token_name:
             return False
         if self.external:
             return True
@@ -137,7 +143,10 @@ class CurrentUser:
 
     @property
     def permissions(self) -> frozenset[str]:
-        """What this person may do -- the union of their groups (backend/access.py)."""
+        """What this person may do -- the union of their groups (backend/access.py).
+        A program with an API token: what its token carries, nothing more."""
+        if self.token_permissions is not None:
+            return self.token_permissions
         from backend.access import permissions_of
         return permissions_of(self)
 
@@ -295,8 +304,29 @@ def _principal_from_session(request: Request) -> CurrentUser:
     )
 
 
+def _principal_from_token(request: Request) -> CurrentUser | None:
+    """A program presenting an API token: None if there is no Bearer header,
+    ANONYMOUS if the token is unknown, revoked or expired."""
+    from backend import api_tokens
+    presented = api_tokens.bearer(request)
+    if not presented:
+        return None
+    record = api_tokens.resolve(presented)
+    if record is None:
+        return ANONYMOUS
+    return CurrentUser(name=record["name"], provider="api-token", is_authenticated=True,
+                       token_name=record["name"],
+                       token_permissions=frozenset(record["permissions"]),
+                       token_skip_review=bool(record.get("skip_review")))
+
+
 def principal_from_request(request: Request) -> CurrentUser:
-    """Build the current user. Headers are honoured only in easyauth mode."""
+    """Build the current user. Headers are honoured only in easyauth mode;
+    an API token (Authorization: Bearer) in every mode, on /api/ only."""
+    if request.url.path.startswith("/api/"):
+        from_token = _principal_from_token(request)
+        if from_token is not None:
+            return from_token
     if settings.auth_mode == AuthMode.OIDC.value:
         # The session, and only the session. X-MS-* headers are ignored here
         # for the same reason as in disabled mode: nothing puts them there, so

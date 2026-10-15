@@ -412,7 +412,14 @@ class JsonAssetRepository(AssetRepository):
             rows = [{**r, "still_current_until": live[r["id"]]["until"],
                      "still_current_by": live[r["id"]].get("by")}
                     if r["id"] in live else r for r in rows]
-        marked = self._load("content_access") or {}
+        marked = dict(self._load("content_access") or {})
+        # Internal asked for when a demo was created (services/uploads.py),
+        # by folder: it holds before and after the demo is first indexed.
+        by_folder = self._load("upload_internal") or {}
+        if by_folder:
+            for r in rows:
+                if r.get("source_item_id") in by_folder:
+                    marked.setdefault(r["id"], by_folder[r["source_item_id"]])
         if closed or marked:
             rows = [{**r, "internal": True,
                      "internal_source": "sharepoint" if r.get("partner_restricted") else "hub"}
@@ -589,12 +596,13 @@ class JsonAssetRepository(AssetRepository):
     def content_access(self) -> list[dict]:
         """Every Internal demo, and why: marked on the Hub (can be opened
         again here) or closed to partners in SharePoint (changed there)."""
-        marked = self._load("content_access") or {}
+        marked = dict(self._load("content_access") or {})
+        by_folder = self._load("upload_internal") or {}
         out = []
         for r in self._load_mirror():
             if not r.get("internal"):
                 continue
-            mark = marked.get(r["id"]) or {}
+            mark = marked.get(r["id"]) or by_folder.get(r.get("source_item_id")) or {}
             out.append({"asset_id": r["id"], "title": r.get("title"), "type": r.get("type"),
                         "source": r.get("internal_source"),
                         "marked_by": mark.get("by"), "marked_at": mark.get("at"),
@@ -618,6 +626,13 @@ class JsonAssetRepository(AssetRepository):
                                    "reason": (reason or "").strip() or None}
             else:
                 state.pop(asset_id, None)
+                # ... and a mark made when it was created, kept by folder.
+                folder = next((r.get("source_item_id") for r in self._load_mirror()
+                               if r["id"] == asset_id), None)
+                created = self._load("upload_internal") or {}
+                if folder in created:
+                    created.pop(folder)
+                    self._save("upload_internal", created)
             self._save("content_access", state)
         asset = self.get(asset_id)
         return {"asset_id": asset_id, "internal": asset.internal,

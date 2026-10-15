@@ -994,6 +994,46 @@ def export_admin_log(since: str | None = None, until: str | None = None, q: str 
                               f'attachment; filename="hub-admin-log-{stamp}.csv"'})
 
 
+@router.get("/api-tokens", dependencies=[VIEW_ADMIN])
+def get_api_tokens():
+    """The API tokens issued, without their secrets (backend/api_tokens.py)."""
+    from backend import api_tokens
+    return {"tokens": api_tokens.listing(),
+            "permissions": [p for p in access.catalogue()
+                            if p["id"] in api_tokens.TOKEN_PERMISSIONS],
+            "default_days": api_tokens.DEFAULT_DAYS, "max_days": api_tokens.MAX_DAYS}
+
+
+class TokenIn(BaseModel):
+    name: str
+    owner: str
+    permissions: list[str]
+    days: int | None = None
+    skip_review: bool = False
+
+
+@router.post("/api-tokens", dependencies=[VIEW_ADMIN], status_code=201)
+def create_api_token(body: TokenIn, actor: str = Depends(require_perm(Perm.MANAGE_USERS))):
+    """Issue a token. The secret is in this answer and nowhere else, ever."""
+    from backend import api_tokens
+    try:
+        record, secret = api_tokens.create(name=body.name, owner=body.owner,
+                                           permissions=body.permissions, days=body.days,
+                                           skip_review=body.skip_review, actor=actor)
+    except api_tokens.TokenError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"token": record, "secret": secret}
+
+
+@router.post("/api-tokens/{token_id}/revoke", dependencies=[VIEW_ADMIN])
+def revoke_api_token(token_id: str, actor: str = Depends(require_perm(Perm.MANAGE_USERS))):
+    from backend import api_tokens
+    try:
+        return api_tokens.revoke(token_id, actor)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="No such token.")
+
+
 @router.post("/sample-activity", dependencies=[VIEW_ADMIN])
 def load_sample_activity(repo: AssetRepository = Depends(get_repo),
                          actor: str = Depends(MANAGE_USERS)):

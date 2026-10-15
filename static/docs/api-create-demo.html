@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Create a demo through the API — Technical Marketing Hub</title>
+<style>
+  :root{--ink:#1f2328;--muted:#59636e;--line:#d8dee4;--soft:#f6f8fa;--accent:#00890b}
+  body{margin:0;font:15px/1.6 "Segoe UI",system-ui,sans-serif;color:var(--ink);background:#fff}
+  main{max-width:860px;margin:0 auto;padding:32px 20px 64px}
+  h1{font-size:26px;margin:0 0 6px}h2{font-size:19px;margin:36px 0 8px;padding-top:8px;border-top:1px solid var(--line)}
+  h3{font-size:15px;margin:22px 0 6px}
+  p.lead{color:var(--muted);margin:0 0 20px}
+  code{font:13px/1.5 ui-monospace,Consolas,monospace;background:var(--soft);padding:1px 5px;border-radius:4px}
+  pre{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto}
+  pre code{background:none;padding:0}
+  table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
+  th,td{border-bottom:1px solid var(--line);text-align:left;padding:7px 8px;vertical-align:top}
+  th{color:var(--muted);font-weight:600}
+  .note{border-left:3px solid var(--accent);background:#f2faf3;padding:8px 12px;border-radius:4px}
+  ol li{margin:4px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>Create a demo through the API</h1>
+<p class="lead">For programs — a pipeline, a script — that create demos in the Technical
+Marketing Hub the way <b>Create New Demo</b> does on the page: metadata first, files, then
+review. Written 2026-10-15.</p>
+
+<h2>1. Get a token</h2>
+<p>An administrator issues it on <b>Admin → Users &amp; groups → API tokens</b>: a name for
+what uses it, the person responsible, the permissions (<b>Create new demo</b> for this, plus
+<b>View the Hub</b>), how long it lasts, and whether what it creates is published without
+review. The token is shown once; keep it in a secret store, not in code.</p>
+<p>Send it on every call:</p>
+<pre><code>Authorization: Bearer tmh_xxxxxxxx_…</code></pre>
+<p>A token reaches <code>/api/</code> only, acts as <code>token:&lt;name&gt;</code> in the
+Admin log, and stops working when it expires or is revoked (HTTP 401).</p>
+
+<h2>2. The quick way: the script</h2>
+<p><code>scripts/create_demo_api.py</code> in the Hub's repository does the whole flow
+(needs Python and <code>pip install httpx</code>):</p>
+<pre><code># What can be created, and the fields each needs (* = required):
+python create_demo_api.py --hub https://tmh.ptcxc.com --token "$TMH_TOKEN" --show-form
+
+# A demo kit: a folder with its sub-folders; several videos -> name the preview.
+python create_demo_api.py --hub https://tmh.ptcxc.com --token "$TMH_TOKEN" \
+    --target demo_catalog --kind ldk --metadata kit.json \
+    --preview "Videos/Overview_CF.mp4" "C:/Demos/Creo Sheetmetal Kit"
+
+# A single video.
+python create_demo_api.py --hub https://tmh.ptcxc.com --token "$TMH_TOKEN" \
+    --target demo_video --kind video --metadata video.json "Creo Teaser.mp4"</code></pre>
+<p><code>kit.json</code> holds the fields, for example:</p>
+<pre><code>{
+  "title": "Creo Sheetmetal Kit",
+  "description": "Sheetmetal design end to end.",
+  "products": ["Creo Parametric"],
+  "segment": ["CAD"],
+  "customer_facing": true,
+  "contains_audio": false,
+  "original_publish_date": "2026-09-01",
+  "language": "English",
+  "owned_by": "Technical Demonstration Development"
+}</code></pre>
+
+<h2>3. The calls, one by one</h2>
+<table>
+<tr><th>Step</th><th>Call</th><th>What it does</th></tr>
+<tr><td>1</td><td><code>GET /api/uploads/targets</code></td><td>Destinations, their kinds, and each
+field: <code>key</code>, <code>kind</code>, <code>required</code>, the allowed
+<code>choices</code>.</td></tr>
+<tr><td>2</td><td><code>POST /api/uploads</code></td><td>Metadata and the file list. Checked
+in full; on success the demo's folder is created and an upload record returned
+(<code>id</code>, <code>files</code>).</td></tr>
+<tr><td>3</td><td><code>POST /api/uploads/{id}/files/{n}/session</code></td><td>An
+<code>upload_url</code> for file <i>n</i>.</td></tr>
+<tr><td>4</td><td><code>PUT {upload_url}</code></td><td>The file's bytes, in chunks, straight to
+the destination (no token on this call — the URL carries its own authorisation).</td></tr>
+<tr><td>5</td><td><code>POST /api/uploads/{id}/files/{n}/done</code></td><td>The created item's
+id; the Hub checks name and size.</td></tr>
+<tr><td>6</td><td><code>POST /api/uploads/{id}/finish</code></td><td>Writes the metadata; the
+demo waits for review (or is published, if the token says so).</td></tr>
+<tr><td>—</td><td><code>GET /api/uploads?mine=true</code></td><td>This token's uploads and where
+each stands (<code>uploading</code>, <code>pending</code>, <code>sent_back</code> with the
+reviewer's <code>note</code>, <code>published</code>).</td></tr>
+<tr><td>—</td><td><code>POST /api/uploads/{id}/resubmit</code></td><td>After a send-back:
+<code>{"values": {...}}</code> with the metadata corrected (the title stays).</td></tr>
+</table>
+
+<h3>Step 2 in detail</h3>
+<pre><code>POST /api/uploads
+{
+  "target": "demo_catalog",            // or "demo_video"
+  "kind": "ldk",                       // ldk | vdk (Demo Catalog), video (Demo Video)
+  "values": { ...the fields... },
+  "files": [ {"path": "Videos/Overview_CF.mp4", "size": 52428800},
+             {"path": "Script.docx", "size": 20480} ],
+  "preview": "Videos/Overview_CF.mp4", // required with two or more videos
+  "internal": false                    // true: files open only for internal access
+}</code></pre>
+<ul>
+<li><code>path</code> is where the file goes inside the demo (sub-folders kept);
+<code>size</code> in bytes, exactly.</li>
+<li>The title becomes the demo's name and link; a name already taken is refused (409).</li>
+<li>A video demo is exactly one video file.</li>
+</ul>
+
+<h3>Step 4 in detail: chunks</h3>
+<ul>
+<li>Each chunk a multiple of 320 KiB (the script uses 10 MiB), at most 60 MiB.</li>
+<li>Header <code>Content-Range: bytes {start}-{end}/{total}</code>.</li>
+<li>Answer <code>202</code>: send the next chunk. Answer <code>200</code>/<code>201</code>:
+the file is complete — its JSON has the <code>id</code> for step 5.</li>
+<li><code>429</code> or <code>5xx</code>: wait (<code>Retry-After</code>) and send the same
+chunk again.</li>
+</ul>
+<pre><code>curl -X PUT "$UPLOAD_URL" -H "Content-Range: bytes 0-10485759/52428800" \
+     --data-binary @chunk0</code></pre>
+
+<h2>4. Errors</h2>
+<table>
+<tr><th>HTTP</th><th>Meaning</th></tr>
+<tr><td>401</td><td>No token, or it is unknown, expired or revoked.</td></tr>
+<tr><td>403</td><td>The token does not carry the permission (<b>Create new demo</b>,
+<b>View the Hub</b>).</td></tr>
+<tr><td>409</td><td>A demo with that name already exists.</td></tr>
+<tr><td>422</td><td>The metadata or files: <code>detail</code> lists every problem at once.</td></tr>
+<tr><td>502</td><td>The destination refused or failed; the record keeps the error. Calling
+<code>finish</code> again retries the last step.</td></tr>
+</table>
+<p class="note">Nothing already in the destination is ever changed or deleted: each demo is a
+new folder. A run that stops half-way leaves its folder for a person to finish or remove;
+the record says where it stopped.</p>
+</main>
+</body>
+</html>

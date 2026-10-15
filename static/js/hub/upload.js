@@ -331,22 +331,10 @@ function metadataForm(target, values, opts) {
         });
         input.appendChild(b);
       });
+    } else if (f.kind === "multi" && (f.choices || []).length > 12) {
+      input = multiCombo(f, values, opts);
     } else if (f.kind === "multi") {
       input = el("span", "hub-up__multi");
-      var many = (f.choices || []).length > 12;
-      if (many) {
-        var filter = el("input", "hub-up__filter");
-        filter.type = "search";
-        filter.placeholder = "Filter " + f.label.toLowerCase() + "…";
-        filter.addEventListener("input", function () {
-          var q = filter.value.trim().toLowerCase();
-          input.querySelectorAll(".hub-up__pill").forEach(function (p) {
-            p.hidden = q && p.textContent.toLowerCase().indexOf(q) < 0 && !p.classList.contains("on");
-          });
-        });
-        filter.addEventListener("click", function (e) { e.preventDefault(); });
-        input.appendChild(filter);
-      }
       (f.choices || []).forEach(function (c) {
         var on = (values[f.key] || []).indexOf(c) >= 0;
         var b = el("button", "hub-up__pill" + (on ? " on" : ""), c);
@@ -369,6 +357,103 @@ function metadataForm(target, values, opts) {
     form.appendChild(row);
   });
   return form;
+}
+
+/* A long option list (Products: 44-49) as a searchable multi-select: the
+   chosen ones as removable chips, the rest found by typing. Keyboard: arrows
+   move, Enter adds, Backspace on an empty box removes the last chip, Escape
+   closes. A short list (Segment) stays as pills, all visible at once. */
+function multiCombo(f, values, opts) {
+  var box = el("div", "hub-up__combo");
+  box.setAttribute("role", "group");
+  var chips = el("span", "hub-up__chips");
+  var input = el("input", "hub-up__combo-input");
+  input.type = "text";
+  input.setAttribute("role", "combobox");
+  input.setAttribute("aria-autocomplete", "list");
+  input.setAttribute("aria-expanded", "false");
+  input.placeholder = "Search " + f.label.toLowerCase() + "…";
+  var list = el("ul", "hub-up__options");
+  list.setAttribute("role", "listbox");
+  list.hidden = true;
+  var active = 0, shown = [];
+
+  function chosen() { return values[f.key] || []; }
+  function set(next) { values[f.key] = next; drawChips(); opts.onChange(); }
+
+  function drawChips() {
+    chips.innerHTML = "";
+    chosen().forEach(function (c) {
+      var chip = el("span", "hub-up__chip", c);
+      var x = el("button", "hub-up__chip-x", "×");
+      x.type = "button";
+      x.setAttribute("aria-label", "Remove " + c);
+      x.addEventListener("click", function (e) {
+        e.preventDefault();
+        set(chosen().filter(function (v) { return v !== c; }));
+        input.focus();
+      });
+      chip.appendChild(x);
+      chips.appendChild(chip);
+    });
+    input.placeholder = chosen().length ? "Add another…" : "Search " + f.label.toLowerCase() + "…";
+  }
+
+  function drawList() {
+    var q = input.value.trim().toLowerCase();
+    shown = (f.choices || []).filter(function (c) {
+      return chosen().indexOf(c) < 0 && (!q || c.toLowerCase().indexOf(q) >= 0);
+    });
+    active = Math.min(active, Math.max(shown.length - 1, 0));
+    list.innerHTML = "";
+    if (!shown.length) list.appendChild(el("li", "hub-up__option hub-up__option--none",
+                                          q ? "No match" : "All chosen"));
+    shown.forEach(function (c, i) {
+      var li = el("li", "hub-up__option" + (i === active ? " on" : ""), c);
+      li.setAttribute("role", "option");
+      li.addEventListener("mousedown", function (e) { e.preventDefault(); });   // keep focus
+      li.addEventListener("click", function (e) { e.preventDefault(); pick(c); });
+      list.appendChild(li);
+    });
+    var on = list.querySelector(".on");
+    if (on && on.scrollIntoView) on.scrollIntoView({ block: "nearest" });
+  }
+
+  function open(yes) {
+    list.hidden = !yes;
+    input.setAttribute("aria-expanded", yes ? "true" : "false");
+    if (yes) drawList();
+  }
+
+  function pick(c) {
+    set(chosen().concat([c]));
+    input.value = "";
+    active = 0;
+    drawList();
+  }
+
+  input.addEventListener("focus", function () { open(true); });
+  input.addEventListener("input", function () { active = 0; open(true); });
+  input.addEventListener("blur", function () { open(false); });
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowDown") { e.preventDefault(); active = Math.min(active + 1, shown.length - 1); open(true); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); active = Math.max(active - 1, 0); open(true); }
+    else if (e.key === "Enter") { e.preventDefault(); if (shown[active]) pick(shown[active]); }
+    else if (e.key === "Escape") { open(false); }
+    else if (e.key === "Backspace" && !input.value && chosen().length) {
+      set(chosen().slice(0, -1));
+    }
+  });
+  // The field is a <label>: a click on the chips must not refocus elsewhere.
+  box.addEventListener("click", function (e) { e.preventDefault(); input.focus(); });
+
+  var field = el("div", "hub-up__combo-field");
+  field.appendChild(chips);
+  field.appendChild(input);
+  box.appendChild(field);
+  box.appendChild(list);
+  drawChips();
+  return box;
 }
 
 function stepMetadata(box) {

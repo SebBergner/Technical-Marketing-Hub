@@ -1359,7 +1359,7 @@
       t.setAttribute("aria-selected", on ? "true" : "false");
     });
     if (name === "content" && !contentLoaded) loadContent();
-    if (name === "access") loadAccess();
+    if (name === "access") { loadAccess(); loadTokens(); }
     if (name === "internal") loadContentAccess();
     if (name === "review") loadReview();
     if (name === "activity") { renderActRanges(); loadActivity(); }
@@ -1379,6 +1379,160 @@
    * fills them); Administrators always have every permission. Whatever the
    * server refuses comes back as a message beside the Save button. */
   var ug = { data: null, selected: "administrators", draft: null };
+
+  /* ── API tokens (backend/api_tokens.py, 2026-10-15) ────────────────────
+   * For programs: Seb's, creating demos through the API. The secret comes
+   * back once, from the create call, and is shown once, here. */
+  var tk = { data: null, secret: null };
+
+  function loadTokens() {
+    return fetch("/api/admin/api-tokens")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d) { tk.data = d; renderTokens(); } });
+  }
+
+  function renderTokens() {
+    var host = $("tkList");
+    host.innerHTML = "";
+    var d = tk.data;
+    var label = {};
+    d.permissions.forEach(function (p) { label[p.id] = p.label; });
+    if (tk.secret) {
+      var box = el("div", "tk-secret");
+      box.appendChild(el("b", null, "Copy this token now: it will not be shown again."));
+      box.appendChild(el("code", null, tk.secret.value));
+      var copy = el("button", "btn-small", "Copy");
+      copy.type = "button";
+      copy.addEventListener("click", function () {
+        navigator.clipboard.writeText(tk.secret.value).then(function () {
+          copy.textContent = "Copied";
+        });
+      });
+      var done = el("button", "btn-small", "Done");
+      done.type = "button";
+      done.addEventListener("click", function () { tk.secret = null; renderTokens(); });
+      box.appendChild(copy);
+      box.appendChild(document.createTextNode(" "));
+      box.appendChild(done);
+      host.appendChild(box);
+    }
+    if (!d.tokens.length) host.appendChild(el("div", "faint", "No API tokens yet."));
+    else {
+      var t = el("table");
+      var hr = t.createTHead().insertRow();
+      ["Name", "Responsible", "Permissions", "Expires", "Last used", "Status", ""].forEach(
+        function (h) { hr.appendChild(el("th", null, h)); });
+      var tb = t.createTBody();
+      d.tokens.forEach(function (x) {
+        var tr = tb.insertRow();
+        var name = tr.insertCell();
+        name.appendChild(el("b", null, x.name));
+        name.appendChild(el("div", "faint", x.hint));
+        tr.insertCell().textContent = x.owner;
+        tr.insertCell().textContent = x.permissions.map(function (p) { return label[p] || p; })
+          .join(", ") + (x.skip_review ? " · publishes without review" : "");
+        tr.insertCell().textContent = new Date(x.expires_at).toLocaleDateString();
+        tr.insertCell().textContent = x.last_used_at ? new Date(x.last_used_at).toLocaleString() : "never";
+        var st = tr.insertCell();
+        st.appendChild(el("span", "tk-status tk-status--" + x.status, x.status));
+        var act = tr.insertCell();
+        act.className = "r";
+        if (x.status === "active" && canManageUsers()) {
+          var rv = el("button", "btn-small", "Revoke");
+          rv.type = "button";
+          rv.addEventListener("click", function () {
+            if (rv.dataset.armed !== "1") {
+              rv.dataset.armed = "1";
+              rv.textContent = "Revoke now?";
+              return;
+            }
+            fetch("/api/admin/api-tokens/" + encodeURIComponent(x.id) + "/revoke", { method: "POST" })
+              .then(loadTokens);
+          });
+          act.appendChild(rv);
+        }
+      });
+      var wrap = el("div", "tablewrap");
+      wrap.appendChild(t);
+      host.appendChild(wrap);
+    }
+    if (!canManageUsers()) return;
+
+    var form = el("div", "tk-form");
+    var name = el("input");
+    name.placeholder = "e.g. AMP pipeline";
+    var owner = el("input");
+    owner.type = "email";
+    owner.placeholder = "the person responsible, e.g. seb@ptc.com";
+    var days = el("select");
+    [30, 90, 180, 365].forEach(function (n) {
+      var o = new Option(n + " days", String(n));
+      if (n === d.default_days) o.selected = true;
+      days.appendChild(o);
+    });
+    var lab = function (text, input) {
+      var l = el("label", null, text);
+      l.appendChild(input);
+      return l;
+    };
+    form.appendChild(lab("Name", name));
+    form.appendChild(lab("Responsible", owner));
+    var perms = el("div", "tk-perms");
+    var ticks = {};
+    d.permissions.forEach(function (p) {
+      var l = el("label");
+      var c = el("input");
+      c.type = "checkbox";
+      c.checked = p.id === "view_hub" || p.id === "upload_content";
+      ticks[p.id] = c;
+      l.title = p.description;
+      l.appendChild(c);
+      l.appendChild(document.createTextNode(p.label));
+      perms.appendChild(l);
+    });
+    form.appendChild(perms);
+    form.appendChild(lab("Expires after", days));
+    var skipLabel = el("label");
+    var skip = el("input");
+    skip.type = "checkbox";
+    skipLabel.style.flexDirection = "row";
+    skipLabel.style.alignItems = "center";
+    skipLabel.style.gap = "6px";
+    skipLabel.appendChild(skip);
+    skipLabel.appendChild(document.createTextNode("Publish what it creates without review"));
+    form.appendChild(skipLabel);
+    var bar = el("div", "tk-wide");
+    var go = el("button", "btn-primary", "Create token");
+    go.type = "button";
+    var status = el("span", "promo-status faint");
+    go.addEventListener("click", function () {
+      status.textContent = "Creating…";
+      fetch("/api/admin/api-tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.value, owner: owner.value, days: Number(days.value),
+          skip_review: skip.checked,
+          permissions: Object.keys(ticks).filter(function (k) { return ticks[k].checked; })
+        }),
+      }).then(function (r) {
+        return r.json().then(function (b) {
+          if (!r.ok) throw new Error(b.detail || ("HTTP " + r.status));
+          return b;
+        });
+      }).then(function (b) {
+        tk.secret = { value: b.secret };
+        return loadTokens();
+      }).catch(function (err) {
+        status.textContent = "Not created: " + err.message;
+        status.className = "promo-status err";
+      });
+    });
+    bar.appendChild(go);
+    bar.appendChild(status);
+    form.appendChild(bar);
+    host.appendChild(form);
+  }
 
   function canManageUsers() {
     return (session.permissions || []).indexOf("manage_users") >= 0;

@@ -361,6 +361,20 @@ async def require_sign_in(request: Request, call_next):
     """
     if settings.auth_mode != AuthMode.OIDC.value or request.url.path in OPEN_PATHS:
         return await call_next(request)
+    # A program with an API token (backend/api_tokens.py): the API only, and
+    # the token decides, not a session.
+    from backend import api_tokens
+    if api_tokens.bearer(request):
+        if not request.url.path.startswith("/api/"):
+            return JSONResponse({"detail": "API tokens reach /api/ only."}, status_code=403)
+        from backend.auth import principal_from_request
+        if not principal_from_request(request).is_authenticated:
+            return JSONResponse({"detail": "Invalid, expired or revoked API token."},
+                                status_code=401)
+        if not _may_view_hub(request):
+            return JSONResponse({"detail": "This token does not carry View the Hub."},
+                                status_code=403)
+        return await call_next(request)
     if session_user(request) is not None:
         from backend import activity
         from backend.auth import principal_from_request

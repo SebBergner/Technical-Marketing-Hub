@@ -163,7 +163,8 @@ def require_perm(perm):
         # Who it was, for the Admin log (backend/admin_log.py) -- refused
         # attempts included.
         request.state.hub_actor = actor or (
-            f"user:{user.email}" if user.is_authenticated else None)
+            f"token:{user.token_name}" if user.token_name
+            else f"user:{user.email}" if user.is_authenticated else None)
         if actor:
             return actor
         if user.is_authenticated:
@@ -180,6 +181,8 @@ def require_perm(perm):
 def _actor(request: Request, user, value: str) -> str | None:
     from backend.access import ADMIN_SESSION_PERMS
 
+    if user.token_name:
+        return f"token:{user.token_name}" if user.can(value) else None
     if user.is_authenticated and user.can(value):
         return f"user:{user.email}"
     if value in ADMIN_SESSION_PERMS and has_admin_session(request):

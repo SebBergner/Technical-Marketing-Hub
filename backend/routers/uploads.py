@@ -208,7 +208,8 @@ def file_done(upload_id: str, index: int, body: DoneIn,
         raise HTTPException(status_code=422, detail=str(exc))
 
 
-def _write_and_submit(repo, record: dict, actor: str, values: dict) -> dict:
+def _write_and_submit(repo, record: dict, actor: str, values: dict,
+                      user: CurrentUser | None = None) -> dict:
     from backend.integrations.graph import upload_writer as uw
     client = _client()
     target = _target(client, record["target"])
@@ -225,6 +226,10 @@ def _write_and_submit(repo, record: dict, actor: str, values: dict) -> dict:
         raise HTTPException(status_code=502, detail=f"SharePoint: {exc}. Try Finish again.")
     try:
         done = uploads.submit(repo, record["id"], actor, values)
+        # A program whose token is trusted as much as a reviewer (api_tokens).
+        if user is not None and user.token_skip_review:
+            done = uploads.publish(repo, record["id"], actor,
+                                   "Published on submission: API token without review")
     except uploads.UploadStateError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     _sync_soon(repo, actor)
@@ -243,7 +248,7 @@ def finish(upload_id: str, repo: AssetRepository = Depends(get_repo),
         raise HTTPException(status_code=422, detail=f"This upload is {record['status']}.")
     if any(not f["done"] for f in record["files"]):
         raise HTTPException(status_code=422, detail="Some files have not finished uploading.")
-    return _view(_write_and_submit(repo, record, actor, record["values"]), user)
+    return _view(_write_and_submit(repo, record, actor, record["values"], user), user)
 
 
 class ResubmitIn(BaseModel):
@@ -268,7 +273,7 @@ def resubmit(upload_id: str, body: ResubmitIn, repo: AssetRepository = Depends(g
     if values.get("title") != record["values"].get("title"):
         raise HTTPException(status_code=422, detail="The title is the folder's name and stays "
                             "as it was; rename the folder in SharePoint if it must change.")
-    return _view(_write_and_submit(repo, record, actor, values), user)
+    return _view(_write_and_submit(repo, record, actor, values, user), user)
 
 
 class NoteIn(BaseModel):
@@ -283,10 +288,8 @@ def publish(upload_id: str, body: NoteIn, repo: AssetRepository = Depends(get_re
         done = uploads.publish(repo, upload_id, actor, body.note)
     except uploads.UploadStateError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    asset_id = (repo.ids_by_folder() if hasattr(repo, "ids_by_folder") else {}).get(
-        record.get("folder_id"))
-    if record.get("internal") and asset_id and hasattr(repo, "set_access"):
-        repo.set_access(asset_id, "internal", actor, "Marked Internal when uploaded")
+    # Internal, if asked for, was marked by folder when it was submitted
+    # (services/uploads.submit), so it holds whether or not a sync has run.
     return _view(done, user)
 
 

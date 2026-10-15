@@ -89,8 +89,8 @@ class TargetSpec:
 def _common(*, description_help: str) -> list[FieldSpec]:
     return [
         FieldSpec("title", "Title", TEXT, required=True, max_length=120,
-                  help="Becomes the folder name in SharePoint and the demo's link in the "
-                       "Hub, so choose it carefully: renaming later breaks shared links."),
+                  help="The demo's name, and its link in the Hub: choose it carefully, "
+                       "renaming later breaks shared links."),
         FieldSpec("description", "Description", LONGTEXT, required=True,
                   column="DocumentSetDescription", max_length=2000, help=description_help),
         FieldSpec("products", "Products", MULTI, required=True, choices_from="products",

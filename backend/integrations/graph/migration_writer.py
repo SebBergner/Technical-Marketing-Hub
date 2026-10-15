@@ -217,6 +217,10 @@ class TermIndex:
     def __len__(self) -> int:
         return len(self._terms)
 
+    def labels(self) -> list[str]:
+        """The stored labels, sorted, for a form to offer."""
+        return sorted({label for label, _ in self._terms.values()}, key=str.lower)
+
 
 def note_value(terms: list[tuple[str, str]]) -> str:
     """The note-field format that works: "Label|Guid;Label|Guid".

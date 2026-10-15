@@ -17,6 +17,7 @@ import {
 import { familyDisplayName, openTag } from "./nav.js";
 import { renderVmCards, TYPE_LONG } from "./vm.js";
 import { closeActivity, openActivity } from "./activity.js";
+import { closeUpload, openUpload } from "./upload.js";
 import {
   advancedHash, advState, closeAdvancedSearch, fileTotalsText,
   openAdvancedSearch
@@ -131,6 +132,13 @@ async function openAssetDetail(id, fileItemId) {
     if (asset.segment) meta.appendChild(pill(asset.segment, "segment"));
     renderAccessMark(meta, asset);
     renderAgeMark(meta, asset);
+    if (asset.upload_review) {
+      var wait = pill(asset.upload_review === "sent_back" ? "Sent back" : "Waiting for review",
+                      "upload");
+      wait.title = "Uploaded through the Hub and not published yet: only its uploader and "
+        + "reviewers can see it.";
+      meta.insertBefore(wait, meta.firstChild);
+    }
   }
 
   /* Facts, and only the ones we hold. An empty stats row beats a row of
@@ -1154,10 +1162,18 @@ function routeFromHash() {
   if (hash === "#/activity") {
     closeFilePreview(false);
     closeAssetDetail();
+    closeUpload();
     openActivity();
     return;
   }
   closeActivity();
+  if (hash === "#/upload") {
+    closeFilePreview(false);
+    closeAssetDetail();
+    openUpload();
+    return;
+  }
+  closeUpload();
   var search = /^#\/search\/(.*)$/.exec(hash);
   if (search) {
     closeFilePreview(false);
@@ -1562,6 +1578,57 @@ function showSideTab(card) {
   });
 }
 
+/* An upload not yet published (services/uploads.py): the reviewer's
+   Publish / Send back, on the page where they can see what was uploaded. */
+function uploadRow(asset, record) {
+  var r = manageRow("Upload");
+  var by = whoName(record.uploaded_by);
+  setState(r.state, asset.upload_review === "sent_back" ? "Sent back" : "Waiting for review",
+           "Uploaded by " + by + " · " + onDay(record.submitted_at || record.created_at)
+           + (record.internal ? " · asked to be Internal" : ""));
+  if (record.status === "pending") {
+    var publish = manageButton("Publish", true);
+    publish.addEventListener("click", function () {
+      confirmStep(r.row, {
+        lead: "It will be listed in the Hub for everyone who may see it"
+          + (record.internal ? ", as Internal." : "."),
+        placeholder: "Note (optional)",
+        confirm: "Publish",
+        submit: function (note) {
+          return send("POST", "/api/uploads/" + encodeURIComponent(record.id) + "/publish",
+                      { note: note || null })
+            .then(function () {
+              asset.upload_review = null;
+              if (record.internal) { asset.internal = true; asset.internal_source = "hub"; }
+              var meta = document.getElementById("vpMeta");
+              if (meta) meta.querySelectorAll(".hub-pill--upload").forEach(function (n) { n.remove(); });
+              refreshMarks(asset);
+            });
+        }
+      });
+    });
+    var back = manageButton("Send back");
+    back.addEventListener("click", function () {
+      confirmStep(r.row, {
+        lead: "The uploader sees your note and can correct the metadata.",
+        placeholder: "What needs changing?",
+        confirm: "Send back",
+        required: true,
+        submit: function (note) {
+          return send("POST", "/api/uploads/" + encodeURIComponent(record.id) + "/send-back",
+                      { note: note })
+            .then(function () { asset.upload_review = "sent_back"; renderManage(asset); });
+        }
+      });
+    });
+    r.actions.appendChild(publish);
+    r.actions.appendChild(back);
+  } else if (record.note) {
+    r.row.appendChild(mk("p", "hub-manage__note", "Note: " + record.note));
+  }
+  return r.row;
+}
+
 function renderManage(asset) {
   var card = document.getElementById("vpFacts");
   if (!card) return;
@@ -1575,17 +1642,27 @@ function renderManage(asset) {
       ? fetch("/api/assets/" + encodeURIComponent(asset.id) + "/access-requests")
           .then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
       : Promise.resolve(null);
-    return requests.then(function (view) {
+    var upload = (may.review && asset.upload_review)
+      ? fetch("/api/uploads?status=pending,sent_back")
+          .then(function (r) { return r.ok ? r.json() : []; })
+          .then(function (items) {
+            return items.filter(function (u) { return u.asset_id === asset.id; })[0] || null;
+          }).catch(function () { return null; })
+      : Promise.resolve(null);
+    return Promise.all([requests, upload]).then(function (got) {
+      var view = got[0], uploadRecord = got[1];
       if (detailAsset !== asset || !sideTabs(card)) return;
       var pane = document.getElementById("vpManage");
       pane.innerHTML = "";
+      if (uploadRecord) pane.appendChild(uploadRow(asset, uploadRecord));
       if (may.manage || may.ask) pane.appendChild(accessRow(asset, may, view));
       if (may.review && (asset.uploaded_at || asset.still_current_until)) {
         pane.appendChild(stillCurrentRow(asset));
       }
       if (may.review) pane.appendChild(archiveRow(asset));
       var tab = card.querySelector('.hub-sidetabs__tab[data-pane="manage"]');
-      var waiting = !!(view && view.pending && may.manage);
+      var waiting = !!(view && view.pending && may.manage)
+        || !!(uploadRecord && uploadRecord.status === "pending");
       tab.classList.toggle("hub-sidetabs__tab--flag", waiting);
       tab.title = waiting ? "A request is waiting for a decision" : "";
       showSideTab(card);

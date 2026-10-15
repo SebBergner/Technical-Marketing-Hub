@@ -405,6 +405,10 @@ class AssetBase(BaseModel):
     #: opens the files of a demo everyone can still find.
     archived: bool = False
     archived_at: str | None = None
+    #: Uploaded through the Hub and not yet published (2026-10-15):
+    #: "pending" (waiting for review) or "sent_back". Out of every list until
+    #: a reviewer publishes it; its uploader and reviewers can open it by id.
+    upload_review: str | None = None
     #: Who made it: the SharePoint file creator of its main video, or of most
     #: of its files (sharepoint_mapping.content_creator, 2026-10-14). As
     #: SharePoint writes it, "Last, First".

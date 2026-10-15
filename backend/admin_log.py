@@ -55,6 +55,14 @@ ACTIONS: dict[tuple[str, str], str] = {
         "Withdrew an access request",
     ("POST", "/api/admin/access-requests/{request_id}/decision"): "Decided an access request",
     ("GET", "/api/admin/admin-log.csv"): "Exported the Admin log",
+    ("POST", "/api/uploads"): "Started an upload",
+    ("POST", "/api/uploads/{upload_id}/files/{index}/session"): "Opened a file upload",
+    ("POST", "/api/uploads/{upload_id}/files/{index}/done"): "Uploaded a file",
+    ("POST", "/api/uploads/{upload_id}/finish"): "Finished an upload",
+    ("POST", "/api/uploads/{upload_id}/cancel"): "Cancelled an upload",
+    ("POST", "/api/uploads/{upload_id}/resubmit"): "Resubmitted an upload",
+    ("POST", "/api/uploads/{upload_id}/publish"): "Published an upload",
+    ("POST", "/api/uploads/{upload_id}/send-back"): "Sent an upload back",
     ("PUT", "/api/assets/{asset_id}/still-current"): "Set Still current",
     ("PUT", "/api/assets/{asset_id}/archive"): "Archived or restored a demo",
     ("POST", "/api/graph/sync"): "Ran the SharePoint sync",
@@ -72,7 +80,8 @@ ACTIONS: dict[tuple[str, str], str] = {
 _LOGGED_READS = {route for (method, route) in ACTIONS if method == "GET"}
 WATCHED = re.compile(r"^/api/(admin|graph|consensus/(sync|oauth)|curation/proposals|migration)/"
                      r"|^/api/assets/[^/]+/(access|still-current|archive)$"
-                     r"|^/api/assets/[^/]+/access-requests(/|$)")
+                     r"|^/api/assets/[^/]+/access-requests(/|$)"
+                     r"|^/api/uploads(/|$)")
 
 #: What area of the Hub an entry is about, for filtering and for each Admin
 #: tab's "Recent changes" (2026-10-15). Worked out when read, from the path,
@@ -82,6 +91,7 @@ CATEGORIES: list[tuple[str, re.Pattern]] = [
     ("Content access", re.compile(r"^/api/assets/[^/]+/(access|access-requests)"
                                   r"|^/api/admin/(hidden|access-requests)")),
     ("Content review", re.compile(r"^/api/assets/[^/]+/(still-current|archive)$")),
+    ("Uploads", re.compile(r"^/api/uploads(/|$)")),
     ("Users & groups", re.compile(r"^/api/admin/access/")),
     ("Sign-in", re.compile(r"^/api/admin/(login|logout)$")),
     ("Home page", re.compile(r"^/api/admin/(promoted|hub-settings)$")),

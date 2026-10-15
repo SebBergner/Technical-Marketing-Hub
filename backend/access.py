@@ -66,6 +66,7 @@ class Perm(str, Enum):
     DOWNLOAD = "download"
     INTERNAL = "access_internal"
     CREATE_DEMO = "create_demo"
+    UPLOAD = "upload_content"
     EDIT_METADATA = "edit_metadata"
     MANAGE_HOME = "manage_home"
     MANAGE_ACCESS = "manage_content_access"
@@ -88,6 +89,9 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
      "Preview and download Internal demos: marked so on the Hub, or closed to "
      "partners in SharePoint."),
     (Perm.CREATE_DEMO, "Create new demo", "Submit a new demo request."),
+    (Perm.UPLOAD, "Upload content",
+     "Upload a video or a demo kit, with its metadata, into SharePoint through "
+     "the Hub. It is listed once someone with Review content publishes it."),
     (Perm.EDIT_METADATA, "Edit metadata",
      "Review metadata proposals and write them back to SharePoint."),
     (Perm.MANAGE_HOME, "Manage the Home page",
@@ -124,8 +128,9 @@ _ADMIN_ONLY = frozenset({Perm.VIEW_ADMIN.value, Perm.MANAGE_USERS.value})
 #: Never a partner's, whatever group they are in or HUB_ADMIN_EMAILS says
 #: (Liwei, 2026-10-14): administering the Hub stays with PTC accounts, the
 #: usual rule for guests in a tenant; nor do they ask for demos to be made
-#: Internal (2026-10-15). Their other permissions are unaffected.
-PARTNER_NEVER = _ADMIN_ONLY | {Perm.REQUEST_ACCESS.value}
+#: Internal or upload into PTC's libraries (2026-10-15). Their other
+#: permissions are unaffected.
+PARTNER_NEVER = _ADMIN_ONLY | {Perm.REQUEST_ACCESS.value, Perm.UPLOAD.value}
 
 _EMPLOYEE_DEFAULT = [Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD, Perm.INTERNAL,
                      Perm.CREATE_DEMO, Perm.VIEW_REPORTS, Perm.REQUEST_ACCESS]

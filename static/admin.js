@@ -1903,8 +1903,107 @@
     return (session.permissions || []).indexOf("review_content") >= 0;
   }
 
+  /* Uploads through the Hub waiting for review (2026-10-15): listed nowhere
+   * else until published. Opening the demo shows its files; Publish and Send
+   * back are here and on the demo's Manage tab. */
+  function loadUploads() {
+    var host = $("rvUploads");
+    return fetch("/api/uploads?status=pending,sent_back&limit=100")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (items) {
+        host.innerHTML = "";
+        if (!items) { host.hidden = true; return; }
+        host.hidden = false;
+        var pending = items.filter(function (u) { return u.status === "pending"; });
+        var head = el("div", "card-head");
+        head.appendChild(el("h2", null, "New uploads"));
+        head.appendChild(el("span", "faint num", pending.length + " waiting"
+          + (items.length > pending.length ? " · " + (items.length - pending.length)
+             + " sent back" : "")));
+        host.appendChild(head);
+        if (!items.length) {
+          host.appendChild(el("div", "faint", "Nothing uploaded is waiting for review."));
+          return;
+        }
+        items.forEach(function (u) {
+          var row = el("div", "req-row");
+          var info = el("div");
+          var title = el(u.asset_id ? "a" : "span", "promo-row__title", u.title);
+          if (u.asset_id) {
+            title.href = "/#/asset/" + encodeURIComponent(u.asset_id);
+            title.target = "_blank";
+            title.rel = "noopener";
+          }
+          info.appendChild(title);
+          var v = u.values || {};
+          info.appendChild(el("div", "promo-row__meta", [
+            (u.target === "demo_video" ? "Video" : (u.kind || "").toUpperCase()),
+            (v.products || []).join(", "), (v.segment || []).join(", "),
+            "by " + actorWord(u.uploaded_by),
+            u.submitted_at ? new Date(u.submitted_at).toLocaleDateString() : null,
+            u.internal ? "asks to be Internal" : null,
+            u.asset_id ? null : "not indexed yet — appears after the next sync"
+          ].filter(Boolean).join(" · ")));
+          if (u.status === "sent_back") {
+            info.appendChild(el("p", "req-row__reason", "Sent back: “" + (u.note || "") + "”"));
+          }
+          if (u.web_url) {
+            var sp = el("a", null, "Open in SharePoint");
+            sp.href = u.web_url;
+            sp.target = "_blank";
+            sp.rel = "noopener";
+            sp.style.fontSize = "12.5px";
+            info.appendChild(sp);
+          }
+          row.appendChild(info);
+          var acts = el("div", "req-row__acts");
+          if (u.status === "pending" && session.permissions.indexOf("review_content") >= 0) {
+            var note = el("div", "req-row__note");
+            var input = el("input");
+            input.type = "text";
+            input.placeholder = "Note (required to send back)";
+            input.maxLength = 1000;
+            note.appendChild(input);
+            var status = el("span", "promo-status faint");
+            note.appendChild(status);
+            var act = function (path) {
+              status.textContent = "Saving…";
+              fetch("/api/uploads/" + encodeURIComponent(u.id) + "/" + path, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ note: input.value.trim() || null }),
+              }).then(function (r) {
+                if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
+                  throw new Error(b.detail || ("HTTP " + r.status));
+                });
+                loadUploads();
+                loadChanges("rvChanges", "Content review,Uploads");
+              }).catch(function (err) {
+                status.textContent = "Not saved: " + err.message;
+                status.className = "promo-status err";
+              });
+            };
+            var pub = el("button", "btn-primary", "Publish");
+            pub.type = "button";
+            pub.addEventListener("click", function () { act("publish"); });
+            var back = el("button", null, "Send back");
+            back.type = "button";
+            back.addEventListener("click", function () { act("send-back"); });
+            acts.appendChild(pub);
+            acts.appendChild(back);
+            row.appendChild(acts);
+            row.appendChild(note);
+          } else {
+            row.appendChild(acts);
+          }
+          host.appendChild(row);
+        });
+      });
+  }
+
   function loadReview() {
-    loadChanges("rvChanges", "Content review");
+    loadUploads();
+    loadChanges("rvChanges", "Content review,Uploads");
     return fetch("/api/admin/content-review")
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) { if (d) renderReview(d); });
@@ -2219,8 +2318,9 @@
         more.style.cssText = "display:inline-block;margin-top:8px;font-size:13px";
         more.addEventListener("click", function (e) {
           e.preventDefault();
-          $("alCategory").value = category;
-          al.category = category;
+          // A tab may show two areas; the filter takes the first, the log shows it.
+          al.category = category.split(",")[0];
+          $("alCategory").value = al.category;
           al.offset = 0;
           history.replaceState(null, "", "#activity");
           showTab("activity");

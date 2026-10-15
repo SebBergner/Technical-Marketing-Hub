@@ -371,6 +371,21 @@ class JsonAssetRepository(AssetRepository):
         rows = _dedupe_by_id(_apply_demo_pages(live, divested_folders,
                                                switches["show_demo_page_links"],
                                                switches["show_page_only_demos"]))
+        # Uploaded through the Hub (2026-10-15, services/uploads.py), keyed
+        # by the SharePoint folder so it holds from the moment the folder
+        # exists: a date the uploader stated (Demo Catalog has no column for
+        # it), and "pending" / "sent_back" until a reviewer publishes it.
+        dates = self._load("publish_dates") or {}
+        review = self._load("upload_review") or {}
+        if dates or review:
+            def stamp(r: dict) -> dict:
+                key = r.get("source_item_id")
+                if key in dates:
+                    r = {**r, "uploaded_at": dates[key]}
+                if key in review:
+                    r = {**r, "upload_review": review[key].get("status")}
+                return r
+            rows = [stamp(r) for r in rows]
         # Hidden from the Hub on the Admin page (owned/hidden.json): out of
         # every read here, at the funnel, like a retired item.
         hidden = self._load("hidden") or {}
@@ -428,6 +443,8 @@ class JsonAssetRepository(AssetRepository):
             if not listing.is_listed(record, query.include_older_vms):
                 return False
             if record.get("archived") and not query.include_archived:
+                return False
+            if record.get("upload_review") and not query.include_pending:
                 return False
             # Membership comes from the scorer, so a record can never be
             # excluded by one rule and ranked by another.
@@ -636,6 +653,12 @@ class JsonAssetRepository(AssetRepository):
     def content_reviews(self) -> dict[str, dict]:
         """{asset id: {by, at, until}}, expired ones included (owned/)."""
         return self._load("content_review") or {}
+
+    def ids_by_folder(self) -> dict[str, str]:
+        """SharePoint folder id -> the Hub's asset id, for every indexed
+        folder, uploads waiting for review included (services/uploads.py)."""
+        return {r["source_item_id"]: r["id"] for r in self._load_mirror()
+                if r.get("source_item_id")}
 
     def set_still_current(self, asset_id: str, on: bool, actor: str,
                           months: int = 12) -> dict:
@@ -1370,6 +1393,7 @@ class JsonAssetRepository(AssetRepository):
             still_current_until=record.get("still_current_until"),
             still_current_by=record.get("still_current_by"),
             archived=bool(record.get("archived")),
+            upload_review=record.get("upload_review"),
             creator=record.get("creator"),
             archived_at=record.get("archived_at"),
             products=record.get("products") or [],

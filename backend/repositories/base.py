@@ -56,6 +56,9 @@ class AssetQuery:
     #: Archived demos (Hub-only retirement, 2026-10-14) are left out of every
     #: list, search and count unless asked for -- by someone allowed to see them.
     include_archived: bool = False
+    #: Uploads waiting for review (or sent back) are never listed; only their
+    #: uploader and reviewers reach them, by id or in the review lists.
+    include_pending: bool = False
     sort: SortKey = "relevance"
     limit: int = 50
     offset: int = 0

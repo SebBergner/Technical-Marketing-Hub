@@ -10,6 +10,7 @@ import { applyFilters, clearAll, CONTROLS, navFilter } from "./filters.js";
 import { closeAssetDetail, closeFilePreview } from "./detail.js";
 import { addActivityNav, closeActivity } from "./activity.js";
 import { closeAdvancedSearch } from "./search.js";
+import { closeUpload } from "./upload.js";
 
 /* ---------------------------------------------------------- the left nav */
 
@@ -124,8 +125,9 @@ function exitOverlays() {
   closeAssetDetail();
   closeAdvancedSearch();
   closeActivity();
+  closeUpload();
   // The hash has to follow, or a refresh reopens the page we just left.
-  if (/^#\/(asset|search|activity)/.test(location.hash || "")) {
+  if (/^#\/(asset|search|activity|upload)/.test(location.hash || "")) {
     history.pushState(null, "", location.pathname + location.search);
   }
 }

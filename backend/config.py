@@ -189,6 +189,10 @@ class Settings(BaseSettings):
     #: in the Administrators group (backend/access.py), whatever the Admin page
     #: says, so the Hub can never be left with nobody able to manage it.
     hub_admin_emails: str = ""
+    #: Point an upload target at another library while trying uploads out,
+    #: e.g. "demo_video=Gallery_Brightcove_Test" (services/upload_targets.py).
+    #: Semicolon-separated target=library pairs; empty in normal use.
+    upload_library_overrides: str = ""
 
     # ------------------------------------------------ the admin bridge (temporary)
     #: A single shared credential for the Admin page, for the stretch before

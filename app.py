@@ -13,7 +13,7 @@ from backend.db import SessionLocal, create_all
 from backend import admin_log, oidc
 from backend.routers import (
     admin, assets, auth, consensus, curation, debug, graph, migration, reports,
-    requests, segments, taxonomy, vms,
+    requests, segments, taxonomy, uploads, vms,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -96,6 +96,7 @@ app.include_router(taxonomy.router)
 app.include_router(reports.router)
 app.include_router(segments.router)
 app.include_router(requests.router)
+app.include_router(uploads.router)
 app.include_router(consensus.router)
 app.include_router(curation.router)
 app.include_router(graph.router)

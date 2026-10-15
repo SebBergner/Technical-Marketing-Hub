@@ -30,6 +30,7 @@ import {
   fillProductPills, wireRequestForm, wireScopeState
 } from "./request.js";
 import { wireShareModal } from "./share.js";
+import { addUploadNav } from "./upload.js";
 
 /* ── when the session runs out with the page open ─────────────────────
  *
@@ -151,6 +152,7 @@ async function load() {
   markUnavailable(facets);
   markNavActive();
   buildSidebarFoot();
+  addUploadNav();
 
   // Real content is in place: reveal the thread. See the #mainThread rule in
   // index.html for why it also reveals itself on a timer.

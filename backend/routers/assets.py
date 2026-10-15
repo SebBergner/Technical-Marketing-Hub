@@ -156,6 +156,12 @@ def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo),
         raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
     if asset.archived and not user.can(Perm.VIEW_ARCHIVED):
         raise HTTPException(status_code=404, detail="This demo is archived.")
+    # An upload not yet published: its uploader and reviewers only.
+    if asset.upload_review and not user.can(Perm.REVIEW_CONTENT):
+        from backend.services import uploads as _uploads
+        record = _uploads.by_folder(repo, asset.source_item_id)
+        if record is None or record["uploaded_by"].split(":", 1)[-1] != user.email:
+            raise HTTPException(status_code=404, detail="This demo is waiting for review.")
     if _locked_for(user, asset):
         asset = asset.model_copy(update={"resources": _without_file_ids(asset.resources),
                                          "files_locked": True})

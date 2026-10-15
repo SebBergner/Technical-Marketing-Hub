@@ -216,6 +216,10 @@
 
   /* sign-ins ----------------------------------------------------------- */
   .act-search{padding:6px 10px;font-size:13px;min-width:0;width:240px;max-width:100%}
+  .al-detail{max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-family:ui-monospace,Consolas,monospace;font-size:12px}
+  .al-refused{color:var(--red)}
+  .al-broken{color:var(--red);font-weight:600}
   .act-period{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:10px;
     align-items:center;padding:10px 0;margin:-10px 0 14px;background:var(--bg);
     border-bottom:1px solid var(--border)}
@@ -370,6 +374,7 @@
     <button type="button" class="tab tab--on" role="tab" data-tab="overview" aria-selected="true">Overview</button>
     <button type="button" class="tab" role="tab" data-tab="content" aria-selected="false">Content dashboard</button>
     <button type="button" class="tab" role="tab" data-tab="review" aria-selected="false">Content review</button>
+    <button type="button" class="tab" role="tab" data-tab="usage" aria-selected="false">Hub usage</button>
     <button type="button" class="tab" role="tab" data-tab="internal" aria-selected="false">Content access</button>
     <button type="button" class="tab" role="tab" data-tab="access" aria-selected="false">Users &amp; groups</button>
     <button type="button" class="tab" role="tab" data-tab="activity" aria-selected="false">Sign-ins</button>
@@ -386,41 +391,6 @@
     <div class="section-head"><h2>Home page</h2></div>
     <div class="card" id="hubDisplay" style="margin-bottom:12px"></div>
     <div class="card" id="promoted"></div>
-  </section>
-
-  <section>
-    <div class="section-head"><h2>Hidden demos</h2></div>
-    <div class="card" id="hiddenDemos"></div>
-  </section>
-
-  <section>
-    <div class="section-head">
-      <h2>Hub usage</h2>
-      <div class="ranges" id="ranges"></div>
-    </div>
-    <div class="synthetic" id="syntheticBanner" hidden>
-      <strong>Synthetic data.</strong> Some or all of the events in this window
-      were generated for testing and are tagged as such. Nothing here is a
-      measurement.
-    </div>
-    <div class="tiles" id="usageTotals"></div>
-    <div class="card" style="margin-top:12px">
-      <div id="usageChart"></div>
-    </div>
-    <div class="card" style="margin-top:12px">
-      <div class="tablebar">
-        <div class="ranges" id="breakdownDims"></div>
-        <input id="breakdownSearch" type="search" placeholder="Filter by name…"
-               autocomplete="off" aria-label="Filter the breakdown by name">
-      </div>
-      <div id="breakdownScope"></div>
-      <div id="breakdownTable"></div>
-      <div class="pager" id="breakdownPager"></div>
-    </div>
-    <div class="grid grid--2" style="margin-top:12px">
-      <div class="card" id="usageSearches"></div>
-      <div class="card" id="usageUntouched"></div>
-    </div>
   </section>
 
   <section>
@@ -465,7 +435,41 @@
     </section>
   </div>
 
-  <!-- Open / Internal per demo (2026-10-07). -->
+  <!-- How the Hub is used: views, downloads, searches (its own tab since
+       2026-10-14; it was on Overview). -->
+  <div id="tabUsage" role="tabpanel" hidden>
+    <section>
+      <div class="section-head">
+        <h2>Hub usage</h2>
+        <div class="ranges" id="ranges"></div>
+      </div>
+      <div class="synthetic" id="syntheticBanner" hidden>
+        <strong>Synthetic data.</strong> Some or all of the events in this window
+        were generated for testing and are tagged as such. Nothing here is a
+        measurement.
+      </div>
+      <div class="tiles" id="usageTotals"></div>
+      <div class="card" style="margin-top:12px">
+        <div id="usageChart"></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="tablebar">
+          <div class="ranges" id="breakdownDims"></div>
+          <input id="breakdownSearch" type="search" placeholder="Filter by name…"
+                 autocomplete="off" aria-label="Filter the breakdown by name">
+        </div>
+        <div id="breakdownScope"></div>
+        <div id="breakdownTable"></div>
+        <div class="pager" id="breakdownPager"></div>
+      </div>
+      <div class="grid grid--2" style="margin-top:12px">
+        <div class="card" id="usageSearches"></div>
+        <div class="card" id="usageUntouched"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Open / Internal per demo (2026-10-07), and hidden demos (moved here 2026-10-14). -->
   <div id="tabInternal" role="tabpanel" hidden>
     <section>
       <div class="section-head"><h2>Content access</h2></div>
@@ -475,6 +479,7 @@
         Internal when its SharePoint folder is closed to partners, or when it is marked here or
         on its own page. Marks are kept in the Hub only; SharePoint is never changed.</p>
       <div class="card" id="caList"></div>
+      <div class="card" id="hiddenDemos" style="margin-top:12px"></div>
     </section>
   </div>
 
@@ -531,6 +536,17 @@
       <div class="card tablewrap" id="actLog"></div>
       <div class="pager" id="actPager"></div>
       <p class="faint act-note" id="actNote"></p>
+    </section>
+    <!-- Every change made through the Admin page; append-only (2026-10-14). -->
+    <section>
+      <div class="section-head">
+        <h2 id="alTitle">Admin log</h2>
+        <input id="alSearch" class="act-search" type="search"
+               placeholder="Filter by who, what or demo…" aria-label="Filter the Admin log">
+      </div>
+      <div class="card tablewrap" id="alLog"></div>
+      <div class="pager" id="alPager"></div>
+      <p class="faint act-note" id="alNote"></p>
     </section>
     <section>
       <div class="section-head"><h2>Sample activity</h2></div>

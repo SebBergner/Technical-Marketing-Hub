@@ -90,7 +90,7 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
     (Perm.EDIT_METADATA, "Edit metadata",
      "Review metadata proposals and write them back to SharePoint."),
     (Perm.MANAGE_HOME, "Manage the Home page",
-     "Choose Featured demos, hide demos and switch the Hub's display options."),
+     "Choose Featured demos and switch the Hub's display options."),
     (Perm.REVIEW_CONTENT, "Review content",
      "Mark demos Still current (the interface shown matches today's release), "
      "archive or restore them, and work through the content-review list."),
@@ -100,7 +100,8 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
     (Perm.VIEW_ARCHIVED, "See archived content",
      "Open archived demos, and show them in lists with 'Show archived'."),
     (Perm.MANAGE_ACCESS, "Manage content access",
-     "Mark demos Internal or Open, on the Admin page and on a demo's page."),
+     "Mark demos Internal or Open (on the Admin page and on a demo's page), "
+     "and hide demos from the Hub."),
     (Perm.RUN_SYNC, "Run sync", "Sync SharePoint and Consensus, and set the daily sync."),
     (Perm.RUN_MIGRATION, "Run Brightcove migration",
      "Use the migration page, which uploads videos to SharePoint."),

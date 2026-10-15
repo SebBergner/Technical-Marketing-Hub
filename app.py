@@ -10,7 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from backend.config import settings
 from backend.version import app_version
 from backend.db import SessionLocal, create_all
-from backend import oidc
+from backend import admin_log, oidc
 from backend.routers import (
     admin, assets, auth, consensus, curation, debug, graph, migration, reports,
     requests, segments, taxonomy, vms,
@@ -115,6 +115,9 @@ app.include_router(vms.router)
 # All three are installed in every AUTH_MODE and decide per request whether
 # to act, so switching mode is a setting and a restart, never a code change.
 # Outside oidc mode the session is never written, so no cookie is ever set.
+# The Admin log is innermost: by the time an answer passes it, the route is
+# known and require_perm() has said who acted (backend/admin_log.py).
+app.add_middleware(admin_log.middleware)
 app.middleware("http")(oidc.require_sign_in)
 app.add_middleware(
     SessionMiddleware,

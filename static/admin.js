@@ -1334,7 +1334,8 @@
    * address (#content, #access), so a refresh or a shared link opens the
    * same one. */
   var PANELS = { overview: "tabOverview", content: "tabContent", review: "tabReview",
-                 internal: "tabInternal", access: "tabAccess", activity: "tabActivity" };
+                 usage: "tabUsage", internal: "tabInternal", access: "tabAccess",
+                 activity: "tabActivity" };
 
   function tabFromHash() {
     var name = location.hash.replace("#", "");
@@ -1354,6 +1355,7 @@
     if (name === "internal") loadContentAccess();
     if (name === "review") loadReview();
     if (name === "activity") { renderActRanges(); loadActivity(); }
+    if (name === "usage") loadUsage();
   }
 
   document.querySelectorAll("#adminTabs .tab").forEach(function (t) {
@@ -2287,12 +2289,133 @@
     return groupsReady.then(function () {
       return fetch("/api/admin/activity?" + qs);
     }).then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { if (d) renderActivity(d); });
+      .then(function (d) { if (d) renderActivity(d); })
+      .then(loadAdminLog);
   }
+
+  /* ── The Admin log (backend/admin_log.py, 2026-10-14) ──────────────────
+   * Every change made through the Admin page -- and every refused attempt --
+   * in the Sign-ins period. Read-only by design: the server has no way to
+   * change or delete an entry, and says whether the hash chain still holds. */
+  var al = { q: "", offset: 0, limit: 50 };
+
+  function loadAdminLog() {
+    var params = actBounds();
+    params.offset = al.offset;
+    params.limit = al.limit;
+    if (al.q) params.q = al.q;
+    var qs = Object.keys(params).map(function (k) {
+      return k + "=" + encodeURIComponent(params[k]);
+    }).join("&");
+    return fetch("/api/admin/admin-log?" + qs)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d) renderAdminLog(d); });
+  }
+
+  function actorWord(actor) {
+    if (actor === "admin-session") return "Admin password";
+    if (actor === "anonymous") return "Not signed in";
+    return String(actor || "—").replace(/^(user|dev):/, "");
+  }
+
+  function detailWord(d) {
+    var parts = [];
+    var add = function (obj) {
+      Object.keys(obj || {}).forEach(function (k) {
+        var v = obj[k];
+        parts.push(k + ": " + (typeof v === "object" ? JSON.stringify(v) : v));
+      });
+    };
+    add(d && d.query);
+    add(d && d.body);
+    if (d && d.body_bytes) parts.push("upload, " + d.body_bytes + " bytes");
+    return parts.join(" · ");
+  }
+
+  function renderAdminLog(d) {
+    $("alTitle").textContent = "Admin log · " + periodLabel();
+    var host = $("alLog");
+    host.innerHTML = "";
+    if (!d.items.length) {
+      host.appendChild(el("div", "faint", al.q
+        ? "No Admin log entries match." : "No Admin changes in this period."));
+    } else {
+      var t = el("table");
+      var hr = t.createTHead().insertRow();
+      ["When", "Who", "What", "Demo / group", "Details", "Result"].forEach(function (h) {
+        hr.appendChild(el("th", null, h));
+      });
+      var tb = t.createTBody();
+      d.items.forEach(function (e) {
+        var tr = tb.insertRow();
+        var w = tr.insertCell();
+        w.className = "num faint";
+        w.textContent = new Date(e.at).toLocaleString();
+        tr.insertCell().textContent = actorWord(e.actor);
+        tr.insertCell().textContent = e.action;
+        tr.insertCell().textContent = e.target || "—";
+        var det = tr.insertCell();
+        det.className = "al-detail";
+        det.textContent = detailWord(e.detail) || "—";
+        det.title = det.textContent;
+        var res = tr.insertCell();
+        var ok = e.status >= 200 && e.status < 400;
+        res.textContent = ok ? "Done" : (e.status === 401 || e.status === 403
+          ? "Refused (" + e.status + ")" : "Failed (" + e.status + ")");
+        if (!ok) res.className = "al-refused";
+      });
+      host.appendChild(t);
+    }
+
+    var pager = $("alPager");
+    pager.innerHTML = "";
+    var first = d.total ? d.offset + 1 : 0;
+    var last = Math.min(d.offset + al.limit, d.total);
+    pager.appendChild(el("span", "faint", "Showing " + first + "–" + last + " of "
+      + d.total.toLocaleString() + " entries"));
+    var nav = el("div", "pager__nav");
+    var back = el("button", null, "← Previous");
+    back.disabled = d.offset <= 0;
+    back.addEventListener("click", function () {
+      al.offset = Math.max(0, al.offset - al.limit);
+      loadAdminLog();
+    });
+    var fwd = el("button", null, "Next →");
+    fwd.disabled = last >= d.total;
+    fwd.addEventListener("click", function () {
+      al.offset += al.limit;
+      loadAdminLog();
+    });
+    nav.appendChild(back);
+    nav.appendChild(fwd);
+    pager.appendChild(nav);
+
+    var note = $("alNote");
+    var check = d.integrity || {};
+    note.className = "faint act-note" + (check.intact === false ? " al-broken" : "");
+    note.textContent = check.intact === false
+      ? "The log file has been altered outside the Hub: entry " + check.broken_at
+        + " does not follow from the one before it. Entries from there on cannot be trusted."
+      : "Append-only: entries cannot be edited or deleted from the Hub, and each one "
+        + "carries the hash of the one before it, so a change to the file itself shows here. "
+        + (check.entries || 0).toLocaleString() + " entries in all; passwords are never written.";
+  }
+
+  var alTimer = null;
+  $("alSearch").addEventListener("input", function (e) {
+    var value = e.target.value;
+    clearTimeout(alTimer);
+    alTimer = setTimeout(function () {
+      al.q = value.trim();
+      al.offset = 0;
+      loadAdminLog();
+    }, 250);
+  });
 
   function setRange(id) {
     act.range = id;
     act.offset = 0;
+    al.offset = 0;
     if (id === "custom" && !act.from && !act.to) {
       // Start from the last seven days, which the person then narrows.
       var today = startOfToday();
@@ -2922,7 +3045,6 @@
         renderQueues(d);
         renderRanges();
         renderDims();
-        loadUsage();
         $("loadedAt").textContent = "Loaded " + new Date().toLocaleString();
         show("dashView");
       })

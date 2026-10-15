@@ -153,20 +153,19 @@ def require_perm(perm):
     401 for nobody, 403 for somebody who lacks it: the second can be helped by
     an administrator, the first needs to sign in.
     """
-    from backend.access import ADMIN_SESSION_PERMS
     from backend.auth import principal_from_request   # local: avoids a cycle
 
     value = getattr(perm, "value", perm)
 
     async def dependency(request: Request) -> str:
         user = principal_from_request(request)
-        session = value in ADMIN_SESSION_PERMS and has_admin_session(request)
-        if user.is_authenticated and user.can(value):
-            return f"user:{user.email}"
-        if session:
-            return "admin-session"
-        if user.is_dev_principal and user.can(value):
-            return f"dev:{user.email}"
+        actor = _actor(request, user, value)
+        # Who it was, for the Admin log (backend/admin_log.py) -- refused
+        # attempts included.
+        request.state.hub_actor = actor or (
+            f"user:{user.email}" if user.is_authenticated else None)
+        if actor:
+            return actor
         if user.is_authenticated:
             raise HTTPException(
                 status_code=403,
@@ -176,3 +175,15 @@ def require_perm(perm):
 
     dependency.__name__ = f"require_{value}"
     return dependency
+
+
+def _actor(request: Request, user, value: str) -> str | None:
+    from backend.access import ADMIN_SESSION_PERMS
+
+    if user.is_authenticated and user.can(value):
+        return f"user:{user.email}"
+    if value in ADMIN_SESSION_PERMS and has_admin_session(request):
+        return "admin-session"
+    if user.is_dev_principal and user.can(value):
+        return f"dev:{user.email}"
+    return None

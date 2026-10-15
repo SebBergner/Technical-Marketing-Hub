@@ -103,3 +103,15 @@ def test_archived_demos_are_listed_with_who_and_why(client):
     [entry] = review["archived"]
     assert (entry["asset_id"], entry["by"], entry["reason"]) == (
         "dusty", "user:boss@ptc.com", "UI from 2018")
+
+
+def test_sample_activity_never_counts_as_use(client, tmp_path):
+    """The lists decide what to archive: a sample view must not make an unused
+    demo look used, nor move "usage recorded since" back (2026-10-14)."""
+    long_ago = (date.today() - timedelta(days=80)).isoformat() + "T10:00:00+00:00"
+    (tmp_path / "owned" / "usage_events.demo.jsonl").write_text(json.dumps(
+        {"at": long_ago, "event": "view", "asset_id": "idle", "synthetic": True,
+         "user": "sample.user.01@sample.invalid"}) + "\n", encoding="utf-8")
+    review = client.get("/api/admin/content-review", headers=BOSS).json()
+    assert "idle" in [r["asset_id"] for r in review["idle"]]
+    assert review["usage_since"] > long_ago

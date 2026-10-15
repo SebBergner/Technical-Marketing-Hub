@@ -91,6 +91,7 @@ def login(body: LoginIn, request: Request, response: Response):
         log.warning("admin sign-in refused")
         return Response(status_code=401)
     issue_session(request, response)
+    request.state.hub_actor = "admin-session"    # for the Admin log
     log.info("admin signed in")
     return {"signed_in": True}
 
@@ -333,10 +334,11 @@ def list_hidden(repo: AssetRepository = Depends(get_repo)):
 
 @router.post("/hidden", dependencies=[VIEW_ADMIN])
 def hide_demo(body: HideIn, repo: AssetRepository = Depends(get_repo),
-              actor: str = Depends(require_perm(Perm.MANAGE_HOME))):
+              actor: str = Depends(require_perm(Perm.MANAGE_ACCESS))):
     """Hide a demo from the Hub -- every list, search and page -- without
-    touching SharePoint or Consensus. Manage the Home page, on the Admin page
-    (Liwei, 2026-10-06: never the curator key alone)."""
+    touching SharePoint or Consensus. Manage content access, on the Admin
+    page's Content access tab (Liwei, 2026-10-14; Manage the Home page until
+    then, and never the curator key alone)."""
     try:
         items = repo.hide(body.asset_id, actor)
     except KeyError:
@@ -349,7 +351,7 @@ def hide_demo(body: HideIn, repo: AssetRepository = Depends(get_repo),
 
 @router.delete("/hidden/{asset_id}", dependencies=[VIEW_ADMIN])
 def unhide_demo(asset_id: str, repo: AssetRepository = Depends(get_repo),
-                actor: str = Depends(require_perm(Perm.MANAGE_HOME))):
+                actor: str = Depends(require_perm(Perm.MANAGE_ACCESS))):
     try:
         items = repo.unhide(asset_id)
     except NotImplementedError:
@@ -776,7 +778,10 @@ def content_review(min_age_days: int = Query(REVIEW_MIN_AGE_DAYS, ge=0),
     from backend.services import content_age
 
     today = _date.today()
-    events = _events(repo, None, None)
+    # Real usage only: this list decides what to archive, and the sample
+    # (services/sample_activity.py) would make an unused demo look used and
+    # move "usage recorded since" back by its 90 days (2026-10-14).
+    events = [e for e in _events(repo, None, None) if not e.get("synthetic")]
     usage_since = events[0].get("at") if events else None
     idle_from = (today - _td(days=idle_days)).isoformat()
     year_ago = (today - _td(days=365)).isoformat()
@@ -925,6 +930,16 @@ def get_activity(since: str | None = None, until: str | None = None,
                              offset=offset, limit=limit)
     report["sample_loaded"] = hasattr(repo, "owned_dir") and sample_activity.loaded(repo)
     return activity.attach_usage(report, _events(repo, None, None), since=since, until=until)
+
+
+@router.get("/admin-log", dependencies=[VIEW_ADMIN])
+def get_admin_log(since: str | None = None, until: str | None = None, q: str | None = None,
+                  offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500)):
+    """Every change made through the Admin page's API, newest first, with
+    whether the hash chain is intact (backend/admin_log.py). There is no
+    endpoint that changes or deletes an entry, by design."""
+    from backend import admin_log
+    return admin_log.read(since=since, until=until, q=q, offset=offset, limit=limit)
 
 
 @router.post("/sample-activity", dependencies=[VIEW_ADMIN])

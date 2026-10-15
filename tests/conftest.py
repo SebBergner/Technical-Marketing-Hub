@@ -85,3 +85,6 @@ def access_files_in_tmp(tmp_path_factory, monkeypatch):
     folder = tmp_path_factory.mktemp("access")
     monkeypatch.setattr(access, "_owned", lambda name: str(folder / name))
     access._cache.clear()
+    # The Admin log (backend/admin_log.py) beside them, for the same reason.
+    import backend.admin_log as admin_log
+    monkeypatch.setattr(admin_log, "_path", lambda: str(folder / admin_log.LOG_FILE))

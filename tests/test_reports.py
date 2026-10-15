@@ -134,6 +134,11 @@ def test_sample_activity_is_flagged_kept_apart_and_removable(client, tmp_path):
         body = client.get("/api/reports/activity", headers=boss).json()
         assert body["synthetic"] is True
         assert any(p["name"].startswith("Sample User") for p in body["people"])
+        # Says whether any demo has a creator yet, so an empty creator
+        # ranking can be told apart from "no sync has written creators".
+        assert body["creators_known"] == (r.json()["with_creator"] > 0)
+        if body["creators_known"]:
+            assert body["creators"], "the sample favours demos with a creator"
         assert client.delete("/api/admin/sample-activity", headers=boss).status_code == 200
         assert not demo.exists()
         assert client.get("/api/reports/activity", headers=boss).json()["synthetic"] is False

@@ -936,7 +936,10 @@ def load_sample_activity(repo: AssetRepository = Depends(get_repo),
     from backend.services import sample_activity
     n = sample_activity.generate(repo)
     log.info("sample activity loaded by %s: %d events", actor, n)
-    return {"loaded": True, "events": n}
+    # Zero means no sync has written creators yet: the creator ranking stays
+    # empty until one has, and the sample should then be loaded again.
+    return {"loaded": True, "events": n,
+            "with_creator": sample_activity.creators_available(repo)}
 
 
 @router.delete("/sample-activity", dependencies=[VIEW_ADMIN])

@@ -272,7 +272,7 @@ function renderActivityPage(d) {
   creatorCard.appendChild(actEl("div", "hub-act__sub", "Creators ranked by how much their "
     + "demos were opened and downloaded, last " + periodWord() + ". Only demos used in "
     + "this period count."));
-  creatorCard.appendChild(creatorBoard(d.creators || []));
+  creatorCard.appendChild(creatorBoard(d.creators || [], d.creators_known !== false));
 
   var bottom = actEl("div", "hub-act__mid");
   bottom.appendChild(contentCard);
@@ -493,7 +493,10 @@ function personName(raw) {
   return m ? m[2] + " " + m[1] : (raw || "");
 }
 
-function creatorBoard(list) {
+function creatorBoard(list, known) {
+  if (!known) return actEl("div", "hub-act__empty",
+    "No demo has a creator yet. Creators are read from SharePoint by a full sync "
+    + "(Admin, Sync); this fills in after the next one.");
   if (!list.length) return actEl("div", "hub-act__empty",
     "No demo with a known creator was used in this period.");
   var max = list[0].total || 1;

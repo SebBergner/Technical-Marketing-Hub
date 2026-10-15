@@ -33,9 +33,13 @@ def hub_activity(since: str | None = None, until: str | None = None,
     # Teams are the Hub's own groups; the built-in ones (everyone, partners,
     # administrators) say nothing about a team.
     teams = [g for g in access.load_state()["groups"] if not g["builtin"]]
+    creators = {k: a.creator for k, a in listed.items() if a.creator}
     out = activity.leaderboard(events, since=since, until=until, top=top,
-                               titles=titles, teams=teams,
-                               creators={k: a.creator for k, a in listed.items() if a.creator})
+                               titles=titles, teams=teams, creators=creators)
+    # Creators come from SharePoint, written by a full sync (MAPPING_VERSION
+    # 3). With none at all, the page says to sync rather than "nobody's demos
+    # were used" (2026-10-14).
+    out["creators_known"] = bool(creators)
     # Only content the Hub still lists, so a link never leads to a 404; with
     # its picture and type for the page's cards.
     out["content"] = [{**c, "thumbnail_url": listed[c["asset_id"]].thumbnail_url,

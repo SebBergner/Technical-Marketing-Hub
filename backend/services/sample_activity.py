@@ -41,6 +41,11 @@ def _path(repo) -> str:
     return os.path.join(repo.owned_dir, DEMO_FILE)
 
 
+def creators_available(repo) -> int:
+    """How many listed demos have a known creator."""
+    return sum(1 for a in repo.list(AssetQuery(limit=10 ** 6)).items if a.creator)
+
+
 def loaded(repo) -> bool:
     return os.path.exists(_path(repo))
 
@@ -55,7 +60,12 @@ def remove(repo) -> bool:
 
 def generate(repo, *, days: int = 90, events: int = 2600, seed: int | None = None,
              now: datetime | None = None) -> int:
-    """Write the sample (replacing an earlier one); returns how many events."""
+    """Write the sample (replacing an earlier one); returns how many events.
+
+    The demos it uses are picked from those with a known creator, so "whose
+    demos were used most" has something to rank. Creators are written by a
+    full sync; with none yet, any demo is used, and the sample is worth
+    loading again after that sync (see creators_available())."""
     rng = random.Random(seed)
     now = now or datetime.now(timezone.utc)
     assets = repo.list(AssetQuery(limit=10 ** 6)).items

@@ -2655,6 +2655,8 @@
   /* Sample activity for demonstrating Hub activity (2026-10-14): written
    * to its own file, flagged synthetic, made-up people; removing it leaves
    * real usage untouched (services/sample_activity.py). */
+  var sampleNote = "";   // set after loading, when no demo had a creator
+
   function renderSample(loaded) {
     var host = $("actSample");
     host.innerHTML = "";
@@ -2666,6 +2668,7 @@
         + "Adds about 90 days of made-up usage by 24 sample people (“Sample User 01”...) "
         + "on real demos, flagged as sample data everywhere it shows. Real usage is kept "
         + "apart and is never changed."));
+    if (loaded && sampleNote) host.appendChild(el("p", "promo-status", sampleNote));
     var status = el("span", "promo-status faint");
     if ((session.permissions || []).indexOf("manage_users") < 0) {
       host.appendChild(el("p", "faint", "Loading or removing it needs Manage users & groups."));
@@ -2680,6 +2683,14 @@
       fetch("/api/admin/sample-activity", { method: loaded ? "DELETE" : "POST" })
         .then(function (r) {
           if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })
+        .then(function (d) {
+          sampleNote = d.loaded && d.with_creator === 0
+            ? "No demo has a creator yet, so “Whose demos were used most” stays empty. "
+              + "Creators are read from SharePoint by a full sync: run Sync, then load "
+              + "the sample again."
+            : "";
           return loadActivity();
         })
         .catch(function (err) { status.textContent = "Did not work: " + err.message; });

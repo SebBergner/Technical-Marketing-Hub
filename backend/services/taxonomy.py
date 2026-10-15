@@ -112,7 +112,10 @@ def family_of(product: str | None) -> str | None:
     """
     if not is_product(product):
         return None
-    name = product.strip()
+    # SharePoint's own labels may carry a full-width ampersand (U+FF06,
+    # "Asset Monitoring ＆ Utilization"); the sync folds it on read, a label
+    # taken straight from SharePoint does not (upload_writer, 2026-10-15).
+    name = product.strip().replace("＆", "&")
     if alias := _ALIASES.get(name.lower()):
         return alias
     for prefix in _FAMILY_PREFIXES:

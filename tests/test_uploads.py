@@ -59,7 +59,9 @@ class FakeSharePoint:
         monkeypatch.setattr(uw, "mark_preview",
                             lambda c, t, item_id: self.previews.append(item_id))
         import backend.routers.uploads as router
+        import backend.integrations.graph.client as graph_client
         monkeypatch.setattr(router, "get_graph_client", lambda: object())
+        monkeypatch.setattr(graph_client, "get_graph_client", lambda: object())
         self.syncs = []
         monkeypatch.setattr(router, "_sync_soon", lambda repo, actor: self.syncs.append(actor))
 
@@ -317,3 +319,27 @@ def test_create_without_review_publishes_at_once(client, sp):
     other = start(client, values={**KIT, "title": "Another Kit"}).json()   # MAKER: no such right
     upload_all(client, sp, other)
     assert client.post(f"/api/uploads/{other['id']}/finish", headers=MAKER).json()["status"] == "pending"
+
+
+def test_metadata_options_hide_order_and_default(client, sp):
+    """Admin -> Metadata options (2026-10-15): applied at once, to the form
+    and to what the server accepts; Manage metadata options only."""
+    put = lambda key, body, who=BOSS: client.put(f"/api/admin/upload-options/{key}",
+                                                 json=body, headers=who)
+    assert put("Segment", {"hidden": ["PLM"]}, who=MAKER).status_code == 403
+    assert put("Segment", {"hidden": ["CAD", "PLM"]}).status_code == 422, "keep one offered"
+    assert put("Segment", {"hidden": ["PLM"], "order": ["CAD"]}).status_code == 200
+    assert put("Language", {"default": "German (Germany)"}).status_code == 200
+    form = {t["key"]: t for t in client.get("/api/uploads/targets", headers=BOSS).json()["targets"]}
+    fields = {f["key"]: f for f in form["demo_catalog"]["fields"]}
+    assert fields["segment"]["choices"] == ["CAD"]
+    assert fields["language"]["default"] == "German (Germany)"
+    r = start(client, values={**KIT, "segment": ["PLM"]})
+    assert r.status_code == 422 and "PLM" in r.json()["detail"], "a hidden option is refused"
+    log = client.get("/api/admin/admin-log?category=Metadata", headers=BOSS).json()["items"]
+    assert log[0]["action"] == "Changed metadata options"
+
+
+def test_a_full_width_ampersand_does_not_slip_past_the_divested_rule():
+    from backend.services import taxonomy
+    assert taxonomy.is_excluded(["Asset Monitoring ＆ Utilization"])

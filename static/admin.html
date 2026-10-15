@@ -123,7 +123,9 @@
   .btn-primary:hover:not(:disabled){filter:brightness(1.07);background:var(--green)}
 
   /* tabs ------------------------------------------------------------------ */
-  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:-4px 0 24px}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:-4px 0 24px;
+    overflow-x:auto;scrollbar-width:thin}
+  .tabs .tab{white-space:nowrap;flex:none}
   .tab{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;
     padding:8px 14px;margin-bottom:-1px;font-weight:600;color:var(--muted)}
   .tab:hover:not(:disabled){background:none;color:var(--ink)}
@@ -232,6 +234,18 @@
     font-family:ui-monospace,Consolas,monospace;font-size:12px}
   .al-refused{color:var(--red)}
   .al-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .opt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px;align-items:start}
+  .opt-filter{width:100%;box-sizing:border-box;margin:0 0 6px}
+  .opt-list{max-height:420px;overflow-y:auto;border-top:1px solid var(--border)}
+  .opt-row{display:grid;grid-template-columns:22px minmax(0,1fr) auto auto;gap:8px;align-items:center;
+    padding:5px 2px;border-bottom:1px solid var(--border);font-size:13.5px}
+  .opt-row--off .opt-name{color:var(--faint);text-decoration:line-through}
+  .opt-row--locked .opt-name{color:var(--faint)}
+  .opt-default{font-size:12px;color:var(--muted);white-space:nowrap}
+  .opt-moves{display:flex;gap:2px}
+  .opt-moves .btn-small{padding:1px 7px}
+  .opt-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  @media (max-width:640px){.opt-grid{grid-template-columns:1fr}}
   .tk-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;margin-top:14px;
     padding-top:14px;border-top:1px solid var(--border)}
   .tk-form label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
@@ -412,6 +426,7 @@
     <button type="button" class="tab" role="tab" data-tab="content" aria-selected="false">Content dashboard</button>
     <button type="button" class="tab" role="tab" data-tab="review" aria-selected="false">Content review</button>
     <button type="button" class="tab" role="tab" data-tab="internal" aria-selected="false">Content access</button>
+    <button type="button" class="tab" role="tab" data-tab="options" aria-selected="false">Metadata options</button>
     <button type="button" class="tab" role="tab" data-tab="usage" aria-selected="false">Hub usage</button>
     <button type="button" class="tab" role="tab" data-tab="access" aria-selected="false">Users &amp; groups</button>
     <button type="button" class="tab" role="tab" data-tab="activity" aria-selected="false">Sign-ins</button>
@@ -476,6 +491,21 @@
 
   <!-- How the Hub is used: views, downloads, searches (its own tab since
        2026-10-14; it was on Overview). -->
+  <!-- What Create New Demo offers (backend/services/upload_options.py, 2026-10-15). -->
+  <div id="tabOptions" role="tabpanel" hidden>
+    <section>
+      <div class="section-head">
+        <h2>Metadata options</h2>
+        <button type="button" class="btn-small" id="optRefresh">Refresh from SharePoint</button>
+      </div>
+      <p class="muted" style="margin:-6px 0 14px">What Create New Demo offers for each field, in
+        what order, and the default. The options come from the libraries' own columns in
+        SharePoint: add one there, then Refresh. Products PTC no longer sells and retired segments
+        are never offered.</p>
+      <div class="opt-grid" id="optList"></div>
+    </section>
+  </div>
+
   <div id="tabUsage" role="tabpanel" hidden>
     <section>
       <div class="section-head">

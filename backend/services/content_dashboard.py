@@ -109,6 +109,11 @@ COMPLETENESS = {
     "depth": ("Content depth", lambda a: bool(a.content_depth), ("video", "ldk", "vdk"),
               "Videos and demo kits."),
     "description": ("Description", lambda a: bool(a.description), None, None),
+    # Kits with two or more videos and none the Hub can play first: tick
+    # PreviewVideo on one in SharePoint (2026-10-15).
+    "preview": ("Preview video", lambda a: (a.video_count or 0) < 2 or a.has_main_video,
+                ("ldk", "vdk"), "Kits with several videos: tick PreviewVideo on one in "
+                "SharePoint."),
     "thumbnail": ("Thumbnail", lambda a: bool(a.thumbnail_url),
                   ("video", "ldk", "vdk", "cad_model"),
                   "Without one the Hub draws a product cover."),

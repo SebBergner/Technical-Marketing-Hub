@@ -84,13 +84,16 @@ def resolve(client: GraphClient, spec: ut.TargetSpec, *, fresh: bool = False) ->
         missing.append(spec.product_choice_column)
     if spec.product_terms and note is None:
         missing.append("Product's note field (Product_0)")
+    if ut.PREVIEW_COLUMN not in columns:
+        missing.append(ut.PREVIEW_COLUMN)
     if "Demo_x0020_Type" not in columns:
         missing.append("Demo_x0020_Type")
     skipped: tuple = ()
     if missing and spec.key in ut.overrides() and "Demo_x0020_Type" in columns:
         # A test library: the form is tried out whole, these are not stored.
         skipped = tuple(c for c in missing if c in {f.column for f in spec.fields}
-                        | {spec.publish_date_column, spec.product_choice_column})
+                        | {spec.publish_date_column, spec.product_choice_column,
+                           ut.PREVIEW_COLUMN})
         missing = [c for c in missing if c not in skipped]
     if missing:
         raise TargetUnavailable(f"{spec.library!r} is missing: {', '.join(missing)}")
@@ -241,6 +244,13 @@ def unknown_products(target: Target, products: list[str]) -> list[str]:
     if not target.spec.product_terms or target.terms is None:
         return []
     return [p for p in products if target.terms.get(p) is None]
+
+
+def mark_preview(client: GraphClient, target: Target, item_id: str) -> None:
+    """Tick PreviewVideo on the chosen video (a file this upload created)."""
+    if ut.PREVIEW_COLUMN in target.skipped:
+        return
+    w.write_fields(client, target, item_id, {ut.PREVIEW_COLUMN: True})
 
 
 def write_metadata(client: GraphClient, target: Target, folder_id: str,

@@ -1446,6 +1446,8 @@ a.hub-up__title:hover{text-decoration:underline}
 .hub-up__drop.over{border-color:var(--orion-indigo);background:var(--orion-surface-2)}
 .hub-up__picks{display:flex;gap:8px}
 .hub-up__files{margin-top:12px;display:grid;gap:4px}
+.hub-up__preview{margin-top:14px;display:flex;flex-direction:column;gap:5px;padding:12px 14px;border:1px solid var(--orion-border-md);border-radius:10px}
+.hub-up__radio{font-size:13px;color:var(--orion-text);display:flex;gap:6px;align-items:center;cursor:pointer}
 .hub-up__file,.hub-up__prow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;font-size:13px;padding:4px 0;border-bottom:1px solid var(--orion-border)}
 .hub-up__path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--orion-text)}
 .hub-up__summary{display:grid;grid-template-columns:170px minmax(0,1fr);gap:6px 14px;margin:0 0 12px;font-size:13px}

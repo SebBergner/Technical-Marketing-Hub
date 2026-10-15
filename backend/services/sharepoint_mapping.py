@@ -225,11 +225,19 @@ def audio_of(filename: str) -> bool | None:
 
 
 def pick_main_video(videos: list[dict]) -> str | None:
-    """One video, or exactly one Customer Facing. Otherwise leave it to a human.
+    """The video ticked PreviewVideo in SharePoint; else one video, or exactly
+    one Customer Facing. Otherwise leave it to a human.
 
-    Covers 281 of the 396 assets that have any video. Guessing at the other 122
-    is how false confidence gets shipped.
+    PreviewVideo (a Yes/No column on files, Liwei 2026-10-15) is a person's
+    choice and wins over any name rule. SharePoint cannot stop two being
+    ticked; then the most recently changed one counts (sync reports it).
+
+    The name rules cover 281 of the 396 assets that have any video. Guessing
+    at the other 122 is how false confidence gets shipped.
     """
+    ticked = [v for v in videos if v.get("preview")]
+    if ticked:
+        return max(ticked, key=lambda v: (str(v.get("modified_at") or ""), v["name"]))["name"]
     if len(videos) == 1:
         return videos[0]["name"]
     customer_facing = [v for v in videos if v["audience"] == "customer_facing"]
@@ -261,6 +269,9 @@ def build_resource(filename: str, subfolder: str | None = None,
 
     if item.get("id"):
         row["item_id"] = item["id"]
+    # Marked by the sync from the PreviewVideo column (preview_item_ids).
+    if item.get("hub_preview"):
+        row["preview"] = True
 
     if item.get("createdDateTime"):
         row["created_at"] = as_date(item["createdDateTime"])

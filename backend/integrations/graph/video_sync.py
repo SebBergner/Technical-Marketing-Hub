@@ -242,7 +242,11 @@ def sync_videos(client: GraphClient, repo, site: SiteRef | None = None,
         raise ValueError(f"no library named {library!r} on {site.web_url}")
 
     page = client.delta(drive.drive_id)
-    assets, result = build_assets(_with_fields(client, drive, page.items))
+    # Ticked PreviewVideo files lead, as in the Demo Catalog (sync.py).
+    from backend.integrations.graph.sync import mark_previews, preview_item_ids
+    ticked, _ = preview_item_ids(client, site.site_id, drive.drive_id)
+    assets, result = build_assets(_with_fields(client, drive,
+                                               mark_previews(page.items, ticked)))
     result.library = library
     add_posters(assets, result,
                 brightcove if brightcove is not None else get_brightcove_client())

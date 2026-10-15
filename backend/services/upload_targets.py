@@ -233,6 +233,24 @@ def clean_fields(spec: TargetSpec, raw: dict, choices: dict[str, list[str]]) -> 
     return out
 
 
+PREVIEW_COLUMN = "PreviewVideo"
+
+
+def preview_of(files: list[dict], chosen: str | None) -> str | None:
+    """The video ticked PreviewVideo (Liwei, 2026-10-15): the only video, or,
+    with two or more, the one the person chose -- which is then required."""
+    videos = [f["path"] for f in files if f["path"].rsplit(".", 1)[-1].lower() in VIDEO_EXT]
+    if len(videos) == 1:
+        return videos[0]
+    if len(videos) > 1:
+        chosen = (chosen or "").replace("\\", "/").strip("/")
+        if chosen not in videos:
+            raise UploadInvalid("There are several videos: choose the one to preview the "
+                                "demo with.")
+        return chosen
+    return None
+
+
 def clean_files(spec: TargetSpec, files: list) -> list[dict]:
     """The files to upload, as paths inside the new folder (sub-folders kept)."""
     if not files:

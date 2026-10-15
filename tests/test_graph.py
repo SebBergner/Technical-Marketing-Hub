@@ -729,3 +729,17 @@ def test_the_creator_survives_into_the_mirror(tmp_path):
     repo.replace_source_rows(assets, source_system="sharepoint")
     assert repo.get(assets[0].id).creator == "Hughes, Paul"
 
+
+
+def test_a_video_ticked_previewvideo_is_the_main_video_whatever_the_names_say():
+    """2026-10-15: PreviewVideo is a person's choice; it beats the name rules.
+    Two ticked: the more recently changed one."""
+    from backend.services import sharepoint_mapping as m
+    videos = [{"name": "Overview_CF.mp4", "audience": "customer_facing"},
+              {"name": "Walkthrough.mp4", "audience": "unknown", "preview": True}]
+    assert m.pick_main_video(videos) == "Walkthrough.mp4"
+    videos[0].update(preview=True, modified_at="2026-10-15")
+    videos[1]["modified_at"] = "2026-01-01"
+    assert m.pick_main_video(videos) == "Overview_CF.mp4"
+    assert m.pick_main_video([{"name": "A.mp4", "audience": "unknown"},
+                              {"name": "B.mp4", "audience": "unknown"}]) is None

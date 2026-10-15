@@ -446,6 +446,9 @@ class AssetBase(BaseModel):
     #: themselves only travel on the detail endpoint.
     resource_count: int = 0
     video_count: int = 0
+    #: Whether the Hub knows which video to play first (main_video on the
+    #: detail): the one ticked PreviewVideo, or the name rules' pick.
+    has_main_video: bool = False
     #: Complete count per ResourceKind, including kinds not listed individually.
     resource_counts: dict[str, int] = Field(default_factory=dict)
 

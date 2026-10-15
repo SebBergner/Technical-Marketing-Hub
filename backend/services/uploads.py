@@ -106,10 +106,11 @@ def _update(repo, upload_id: str, change) -> dict:
 # ───────────────────────────────────────────────────────────── the steps
 def create(repo, *, target: str, kind: str, values: dict, files: list[dict],
            internal: bool, folder_id: str, folder_name: str, web_url: str | None,
-           actor: str) -> dict:
+           actor: str, preview: str | None = None) -> dict:
     """Recorded the moment the folder exists, and hidden from the Hub then."""
     record = {"id": secrets.token_hex(6), "target": target, "kind": kind,
               "title": values.get("title"), "values": values, "internal": bool(internal),
+              "preview": preview,
               "folder_id": folder_id, "folder_name": folder_name, "web_url": web_url,
               "files": [{**f, "done": False, "item_id": None} for f in files],
               "status": "uploading", "uploaded_by": actor,

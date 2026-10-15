@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 
 from backend.integrations.sync_report import report
 from backend.integrations.graph.client import (
-    DeltaTokenExpired, DriveRef, GraphClient, SiteRef,
+    DeltaTokenExpired, DriveRef, GraphClient, GraphError, SiteRef,
 )
 from backend.models import Asset
 from backend.services import sharepoint_mapping as m
@@ -129,6 +129,11 @@ class SyncResult:
     unchanged: bool = False
     #: Spreadsheet-seed rows dropped because real data now supersedes them.
     retired_seed: int = 0
+    #: Files ticked PreviewVideo; demos with more than one ticked; why the
+    #: column could not be read, if it could not (2026-10-15).
+    preview_videos: int = 0
+    preview_conflicts: list[str] = field(default_factory=list)
+    preview_error: str | None = None
     errors: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
@@ -148,6 +153,9 @@ class SyncResult:
                 "orphan_files": self.orphan_files,
                 "full_resync": self.full_resync,
                 "retired_seed": self.retired_seed,
+                "preview_videos": self.preview_videos,
+                "preview_conflicts": self.preview_conflicts,
+                "preview_error": self.preview_error,
                 "has_delta_token": bool(self.delta_token),
                 "errors": self.errors,
             },
@@ -281,6 +289,9 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
         result.resources += 1
 
     for name, asset in assets.items():
+        ticked = [r["name"] for r in asset["resources"] if r.get("preview")]
+        if len(ticked) > 1:
+            result.preview_conflicts.append(asset["title"] if asset.get("title") else name)
         m.derive_video_facts(asset)
         m.apply_stated_flags(asset, *stated.get(name, (None, None)))
         if name not in dated:
@@ -352,7 +363,10 @@ def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
             full = True
 
     page = client.delta(drive.drive_id) if full else page
-    assets, result = build_assets(_with_fields(client, drive, page.items))
+    ticked, preview_error = preview_item_ids(client, site.site_id, drive.drive_id)
+    items = mark_previews(page.items, ticked)
+    assets, result = build_assets(_with_fields(client, drive, items))
+    result.preview_videos, result.preview_error = len(ticked), preview_error
     result.delta_token = page.delta_token
     result.full_resync = full
 
@@ -361,6 +375,41 @@ def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
     if stamp := getattr(repo, "record_sync", None):
         stamp(SOURCE_SYSTEM)
     return result
+
+
+def preview_item_ids(client: GraphClient, site_id: str,
+                     drive_id: str) -> tuple[set[str], str | None]:
+    """The files ticked PreviewVideo (a Yes/No column on files, 2026-10-15),
+    as drive item ids, in one filtered query -- delta carries no column
+    values, and reading them file by file would be ~9,000 calls.
+
+    SharePoint filters a list this size only on an INDEXED column; until the
+    index exists this returns no ids and says why, and the sync carries on
+    with the name rules alone."""
+    try:
+        list_id = ((client._request("GET", f"/drives/{drive_id}/list",
+                                    params={"$select": "id"}) or {}).get("id"))
+        if not list_id:
+            return set(), "the library's list was not found"
+        ids: set[str] = set()
+        for row in client._paged(f"/sites/{site_id}/lists/{list_id}/items",
+                                 {"$filter": "fields/PreviewVideo eq 1",
+                                  "$expand": "driveItem($select=id)",
+                                  "$select": "id", "$top": "500"}):
+            item_id = (row.get("driveItem") or {}).get("id")
+            if item_id:
+                ids.add(item_id)
+        return ids, None
+    except (GraphError, AttributeError, TypeError) as exc:
+        # Never what stops a sync: the name rules still pick main videos.
+        log.warning("PreviewVideo not read: %s", exc)
+        return set(), str(exc)[:300]
+
+
+def mark_previews(items: list[dict], ticked: set[str]) -> list[dict]:
+    if not ticked:
+        return items
+    return [{**i, "hub_preview": True} if i.get("id") in ticked else i for i in items]
 
 
 def _retire_seed(repo) -> int:

@@ -54,6 +54,9 @@ class FakeSharePoint:
         monkeypatch.setattr(uw, "file_item", lambda c, t, item_id: self.items.get(item_id) or {})
         monkeypatch.setattr(uw, "write_metadata",
                             lambda c, t, folder, fields, note: self.written.append((folder, fields)))
+        self.previews = []
+        monkeypatch.setattr(uw, "mark_preview",
+                            lambda c, t, item_id: self.previews.append(item_id))
         import backend.routers.uploads as router
         monkeypatch.setattr(router, "get_graph_client", lambda: object())
         monkeypatch.setattr(router, "_sync_soon", lambda repo, actor: None)
@@ -245,3 +248,26 @@ def test_destinations_list_sharepoint_and_the_platforms_still_to_come(client, sp
     assert [(p["key"], p["available"]) for p in body["platforms"]] == [
         ("sharepoint", True), ("consensus", False), ("brightcove", False)]
     assert {t["platform"] for t in body["targets"]} == {"sharepoint"}
+
+
+TWO_VIDEOS = [{"path": "Overview_CF.mp4", "size": 10}, {"path": "Training/Walkthrough.mp4", "size": 20},
+              {"path": "Script.docx", "size": 5}]
+
+
+def test_several_videos_need_a_chosen_preview_which_is_ticked_in_sharepoint(client, sp):
+    r = start(client, files=TWO_VIDEOS)
+    assert r.status_code == 422 and "preview" in r.json()["detail"]
+    assert sp.created == [], "nothing created without the choice"
+    r = client.post("/api/uploads", json={"target": "demo_catalog", "kind": "ldk", "values": KIT,
+                                          "files": TWO_VIDEOS, "preview": "Training/Walkthrough.mp4"},
+                    headers=BOSS)
+    assert r.status_code == 201 and r.json()["preview"] == "Training/Walkthrough.mp4"
+    record = r.json()
+    upload_all(client, sp, record)
+    client.post(f"/api/uploads/{record['id']}/finish", headers=BOSS)
+    assert sp.previews == ["item-1"], "PreviewVideo ticked on the chosen file only"
+
+
+def test_one_video_is_the_preview_without_asking(client, sp):
+    record = start(client).json()
+    assert record["preview"] == "Videos/Overview_CF.mp4"

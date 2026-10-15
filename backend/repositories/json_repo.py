@@ -1394,6 +1394,7 @@ class JsonAssetRepository(AssetRepository):
             still_current_by=record.get("still_current_by"),
             archived=bool(record.get("archived")),
             upload_review=record.get("upload_review"),
+            has_main_video=bool(record.get("main_video")),
             creator=record.get("creator"),
             archived_at=record.get("archived_at"),
             products=record.get("products") or [],

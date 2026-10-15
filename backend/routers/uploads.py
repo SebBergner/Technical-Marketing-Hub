@@ -115,6 +115,8 @@ class UploadIn(BaseModel):
     values: dict
     files: list[FileIn]
     internal: bool = False
+    #: With two or more videos, the one to preview the demo with (required).
+    preview: str | None = None
 
 
 @router.post("", status_code=201)
@@ -129,6 +131,7 @@ def start(body: UploadIn, repo: AssetRepository = Depends(get_repo),
         target = _target(client, spec.key)
         values = ut.clean_fields(spec, body.values, target.choices)
         files = ut.clean_files(spec, [f.model_dump() for f in body.files])
+        preview = ut.preview_of(files, body.preview)
     except ut.UploadInvalid as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     unknown = uw.unknown_products(target, values.get("products") or [])
@@ -145,7 +148,7 @@ def start(body: UploadIn, repo: AssetRepository = Depends(get_repo),
         raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
     record = uploads.create(repo, target=spec.key, kind=kind.key, values=values, files=files,
                             internal=body.internal, folder_id=folder["id"], folder_name=name,
-                            web_url=folder.get("webUrl"), actor=actor)
+                            web_url=folder.get("webUrl"), actor=actor, preview=preview)
     log.info("upload %s started by %s: %s/%s", record["id"], actor, spec.library, name)
     return _view(record, user)
 
@@ -211,8 +214,12 @@ def _write_and_submit(repo, record: dict, actor: str, values: dict) -> dict:
     target = _target(client, record["target"])
     kind = ut.kind_of(target.spec, record["kind"])
     fields, note = uw.metadata_fields(target, kind, values)
+    preview_item = next((f.get("item_id") for f in record["files"]
+                         if f["path"] == record.get("preview")), None)
     try:
         uw.write_metadata(client, target, record["folder_id"], fields, note)
+        if preview_item:
+            uw.mark_preview(client, target, preview_item)
     except GraphError as exc:
         uploads.failed(repo, record["id"], str(exc))
         raise HTTPException(status_code=502, detail=f"SharePoint: {exc}. Try Finish again.")

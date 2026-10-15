@@ -26,7 +26,20 @@ var STATUS_WORD = { uploading: "Uploading", pending: "Waiting for review",
                     sent_back: "Sent back", published: "Published", cancelled: "Cancelled" };
 
 var up = { platforms: null, targets: null, platform: null, target: null, kind: null,
-           values: {}, internal: false, files: [], busy: false, step: 1 };
+           values: {}, internal: false, files: [], preview: null, busy: false, step: 1 };
+var VIDEO_EXT = ["mp4", "mov", "m4v", "webm", "wmv", "avi", "mkv"];
+
+function isVideo(path) {
+  return VIDEO_EXT.indexOf(String(path).split(".").pop().toLowerCase()) >= 0;
+}
+
+/* With two or more videos the person chooses the preview (PreviewVideo,
+   Liwei 2026-10-15); with one, it is that one. */
+function previewChoice() {
+  var videos = up.files.filter(function (f) { return isVideo(f.path); });
+  if (videos.length === 1) return videos[0].path;
+  return videos.some(function (v) { return v.path === up.preview; }) ? up.preview : null;
+}
 
 function el(tag, cls, text) {
   var n = document.createElement(tag);
@@ -491,11 +504,37 @@ function stepFiles(box) {
       + (up.files.length === 1 ? "" : "s") + " · " + size(total)));
   }
   box.appendChild(list);
+
+  var videos = up.files.filter(function (f) { return isVideo(f.path); });
+  if (videos.length > 1) {
+    var pick = el("div", "hub-up__preview");
+    var label = el("span", "hub-up__label", "Preview video");
+    label.appendChild(el("i", "hub-up__req", " *"));
+    pick.appendChild(label);
+    pick.appendChild(el("span", "hub-up__help", "The video the Hub plays for this demo. "
+      + "Ticked Preview Video in SharePoint."));
+    videos.forEach(function (v) {
+      var row = el("label", "hub-up__radio");
+      var radio = el("input");
+      radio.type = "radio";
+      radio.name = "hubUpPreview";
+      radio.checked = up.preview === v.path;
+      radio.addEventListener("change", function () { up.preview = v.path; drawWizard(); });
+      row.appendChild(radio);
+      row.appendChild(document.createTextNode(" " + v.path));
+      pick.appendChild(row);
+    });
+    box.appendChild(pick);
+  }
+
   var bar = el("div", "hub-up__bar");
   var back = button("Back");
   back.addEventListener("click", function () { up.step = 2; drawWizard(); });
   var next = button("Next: check and upload", true);
-  next.disabled = !up.files.length;
+  next.disabled = !up.files.length || (videos.length > 1 && !previewChoice());
+  if (videos.length > 1 && !previewChoice()) {
+    bar.appendChild(el("span", "hub-up__muted", "Choose the preview video."));
+  }
   next.addEventListener("click", function () { up.step = 4; drawWizard(); });
   bar.appendChild(back);
   bar.appendChild(next);
@@ -517,6 +556,7 @@ function summary(box) {
   };
   add("Destination", platformLabel() + " · " + up.target.library);
   up.target.fields.forEach(function (f) { add(f.label, fieldValue(f)); });
+  add("Preview video", previewChoice());
   add("Internal only", up.internal);
   add("Files", up.files.length + " (" + size(up.files.reduce(function (s, f) {
     return s + f.size; }, 0)) + ")");
@@ -532,7 +572,9 @@ function stepUpload(box) {
   back.addEventListener("click", function () { if (!up.busy) { up.step = 3; drawWizard(); } });
   var go = button("Create demo", true);
   var missing = missingFields();
-  go.disabled = missing.length > 0 || !up.files.length;
+  var needsPreview = up.files.filter(function (f) { return isVideo(f.path); }).length > 1
+    && !previewChoice();
+  go.disabled = missing.length > 0 || !up.files.length || needsPreview;
   var msg = el("span", "hub-up__err");
   if (missing.length) msg.textContent = "Fill in: " + missing.map(function (f) { return f.label; }).join(", ");
   go.addEventListener("click", function () {
@@ -542,12 +584,14 @@ function stepUpload(box) {
     up.target.fields.forEach(function (f) { values[f.key] = fieldValue(f); });
     api("POST", "/api/uploads", {
       target: up.target.key, kind: up.kind, values: values, internal: up.internal,
+      preview: previewChoice(),
       files: up.files.map(function (f) { return { path: f.path, size: f.size }; })
     }).then(function (record) {
       return sendAll(record, up.files, progress);
     }).then(function (record) {
       up = { platforms: up.platforms, targets: up.targets, platform: null, target: null,
-             kind: null, values: {}, internal: false, files: [], busy: false, step: 1 };
+             kind: null, values: {}, internal: false, files: [], preview: null, busy: false,
+             step: 1 };
       var done = document.getElementById("hubUpWizard");
       done.innerHTML = "";
       done.appendChild(el("h3", "hub-up__h", "Created — waiting for review"));

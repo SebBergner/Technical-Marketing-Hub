@@ -58,7 +58,7 @@ def test_a_partner_never_administers_the_hub_whatever_group_they_are_in(monkeypa
     whether a partner is added to Administrators, named in HUB_ADMIN_EMAILS or
     put in a group of their own that grants them."""
     monkeypatch.setattr(settings, "hub_admin_emails", "boss@partner.it")
-    access.update_group(ADMINS, "test", members=["p@partner.it"])
+    access.update_group(ADMINS, "test", members=["p@partner.it", ME])
     access.create_group("Reviewers", "", ["view_hub", "view_admin", "review_content"],
                         ["r@partner.it", "staff@ptc.com"], "test")
     for partner in (person("p@partner.it"), person("boss@partner.it"), person("r@partner.it"),
@@ -75,7 +75,7 @@ def test_a_partner_is_refused_the_admin_page(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "auth_mode", AuthMode.EASYAUTH.value)
     monkeypatch.setattr(settings, "admin_username", "")
     monkeypatch.setattr(settings, "admin_password", "")
-    access.update_group(ADMINS, "test", members=["p@partner.it"])
+    access.update_group(ADMINS, "test", members=["p@partner.it", ME])
     client = TestClient(app, base_url="http://localhost")
     session = client.get("/api/admin/session", headers=easyauth_headers("p@partner.it")).json()
     assert session["signed_in"] is False
@@ -132,7 +132,9 @@ def test_partners_permissions_can_be_changed():
     (lambda: access.delete_group(PARTNERS, "a"), "built in"),
     (lambda: access.update_group(ADMINS, "a", permissions=[]), "every permission"),
     (lambda: access.update_group(EMPLOYEES, "a", members=["x@ptc.com"]), "automatically"),
-    (lambda: access.update_group(ADMINS, "a", members=[]), "cannot be left empty"),
+    (lambda: access.update_group(ADMINS, "a", members=[]), "at least one PTC account"),
+    (lambda: access.update_group(ADMINS, "a", members=["p@partner.it"]),
+     "partners cannot administer"),
     (lambda: access.create_group("Administrators", "", [], [], "a"), "already a group"),
     (lambda: access.create_group("New", "", [], ["not an email"], "a"), "Not an email"),
     (lambda: access.create_group("  ", "", [], [], "a"), "needs a name"),

@@ -339,9 +339,13 @@ def update_group(group_id: str, actor: str, *, name: str | None = None,
             new = _check_members(members)
             added, removed = sorted(set(new) - set(group["members"])), \
                 sorted(set(group["members"]) - set(new))
-            if group_id == ADMINS and not new and not _bootstrap_admins():
-                raise AccessError("Administrators cannot be left empty while "
-                                  "HUB_ADMIN_EMAILS names nobody.")
+            # A partner in Administrators administers nothing (PARTNER_NEVER),
+            # so only PTC accounts count towards "somebody can still get in".
+            if group_id == ADMINS and not any(
+                    _is_internal_address(e) for e in set(new) | _bootstrap_admins()):
+                raise AccessError("Administrators needs at least one PTC account while "
+                                  "HUB_ADMIN_EMAILS names none: partners cannot "
+                                  "administer the Hub.")
             if added or removed:
                 changes["members"] = {"added": added, "removed": removed}
             group["members"] = new
@@ -365,6 +369,12 @@ def delete_group(group_id: str, actor: str) -> None:
 
 
 # ─────────────────────────────────────────────────────────── who is in what
+def _is_internal_address(email: str) -> bool:
+    """An address in the PTC domains -- the address half of CurrentUser.is_partner."""
+    internal = {d.strip().lower() for d in settings.internal_email_domains.split(",") if d.strip()}
+    return _norm_email(email).rsplit("@", 1)[-1] in internal
+
+
 def _bootstrap_admins() -> set[str]:
     return {_norm_email(e) for e in (settings.hub_admin_emails or "").split(",")
             if _norm_email(e)}

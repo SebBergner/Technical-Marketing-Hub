@@ -62,6 +62,7 @@ ACTIONS: dict[tuple[str, str], str] = {
     ("POST", "/api/uploads/{upload_id}/files/{index}/done"): "Uploaded a file",
     ("POST", "/api/uploads/{upload_id}/finish"): "Finished an upload",
     ("POST", "/api/uploads/{upload_id}/cancel"): "Cancelled an upload",
+    ("POST", "/api/uploads/{upload_id}/index"): "Asked to index an upload",
     ("POST", "/api/uploads/{upload_id}/resubmit"): "Resubmitted an upload",
     ("POST", "/api/uploads/{upload_id}/publish"): "Published an upload",
     ("POST", "/api/uploads/{upload_id}/send-back"): "Sent an upload back",

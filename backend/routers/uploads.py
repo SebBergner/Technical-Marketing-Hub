@@ -20,9 +20,8 @@ is required before anything is created (services/upload_targets.py).
 from __future__ import annotations
 
 import logging
-import threading
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from backend.access import Perm
@@ -38,7 +37,6 @@ router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 
 UPLOAD = require_perm(Perm.UPLOAD)
 REVIEW = require_perm(Perm.REVIEW_CONTENT)
-_sync_lock = threading.Lock()
 
 
 def _client():
@@ -71,19 +69,16 @@ def _mine_or_reviewer(record: dict, actor: str, user: CurrentUser) -> None:
 
 
 def _sync_soon(repo: AssetRepository, actor: str) -> None:
-    """Index the new folder now rather than at the next scheduled sync.
-    In the background, and skipped if a sync is already running."""
-    def run():
-        if not _sync_lock.acquire(blocking=False):
-            return
-        try:
-            from backend.routers.graph import run_sync
-            run_sync(get_graph_client(), repo, f"upload by {actor}")
-        except Exception:                                # noqa: BLE001
-            log.exception("sync after upload failed; the next sync picks it up")
-        finally:
-            _sync_lock.release()
-    threading.Thread(target=run, daemon=True).start()
+    """Index the new folder now rather than at the next scheduled sync: in
+    the background, queued behind a sync already running, never dropped
+    (graph.sync_soon)."""
+    from backend.routers.graph import sync_soon
+    sync_soon(repo, actor)
+
+
+def _indexed(repo, record: dict) -> bool:
+    ids = repo.ids_by_folder() if hasattr(repo, "ids_by_folder") else {}
+    return record.get("folder_id") in ids
 
 
 # ───────────────────────────────────────────────────────────── the form
@@ -295,6 +290,9 @@ def publish(upload_id: str, body: NoteIn, repo: AssetRepository = Depends(get_re
         done = uploads.publish(repo, upload_id, actor, body.note)
     except uploads.UploadStateError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+    # Published but not yet read by a sync: it appears once one has, so ask.
+    if not _indexed(repo, record):
+        _sync_soon(repo, actor)
     # Internal, if asked for, was marked by folder when it was submitted
     # (services/uploads.submit), so it holds whether or not a sync has run.
     return _view(done, user)
@@ -308,6 +306,28 @@ def send_back(upload_id: str, body: NoteIn, repo: AssetRepository = Depends(get_
         return _view(uploads.send_back(repo, upload_id, actor, body.note or ""), user)
     except uploads.UploadStateError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/{upload_id}/index")
+def index_now(upload_id: str, request: Request, repo: AssetRepository = Depends(get_repo),
+              user: CurrentUser = Depends(get_current_user)):
+    """Read the demo into the Hub now (a sync, queued if one is running) --
+    for an upload whose folder the Hub has not seen yet."""
+    from backend.admin_auth import _actor
+    record = _get(repo, upload_id)
+    actor = (_actor(request, user, Perm.REVIEW_CONTENT.value)
+             or _actor(request, user, Perm.UPLOAD.value))
+    if actor is None:
+        raise HTTPException(status_code=403, detail="Not available for your account.")
+    _mine_or_reviewer(record, actor, user)
+    _sync_soon(repo, actor)
+    return {"queued": True}
+
+
+@router.get("/indexing")
+def indexing(user: CurrentUser = Depends(get_current_user)):
+    from backend.routers.graph import sync_running
+    return {"running": sync_running()}
 
 
 @router.post("/{upload_id}/cancel")

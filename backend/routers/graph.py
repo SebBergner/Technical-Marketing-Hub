@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -88,11 +89,65 @@ def sync(full: bool = False, repo: AssetRepository = Depends(get_repo),
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+#: One SharePoint sync at a time, whoever starts it -- the button, the daily
+#: schedule, a new demo (2026-10-15). Two at once each replace the mirror
+#: with what they read, and the later finisher's view wins.
+_run_lock = threading.Lock()
+_queue = {"requested": False, "worker": False, "actor": None}
+_queue_lock = threading.Lock()
+
+
+def sync_running() -> bool:
+    """A sync is running or waiting to run (for "indexing…" on the page)."""
+    with _queue_lock:
+        return _run_lock.locked() or _queue["worker"]
+
+
+def sync_soon(repo: AssetRepository, actor: str) -> None:
+    """Index soon, in the background, and never drop the request.
+
+    Started at once when nothing is running. When a sync is running -- which
+    began before whatever the caller just created, so cannot see it -- one
+    more follows it. Requests made meanwhile share that one follow-up."""
+    with _queue_lock:
+        _queue["requested"], _queue["actor"] = True, actor
+        if _queue["worker"]:
+            return
+        _queue["worker"] = True
+
+    def worker():
+        while True:
+            # The turn first, then the request: whatever was asked while the
+            # running sync went on is answered by this one run.
+            with _run_lock:
+                with _queue_lock:
+                    if not _queue["requested"]:
+                        _queue["worker"] = False
+                        return
+                    _queue["requested"] = False
+                    who = _queue["actor"]
+                try:
+                    client = get_graph_client()
+                    if client is not None:
+                        _run_sync(client, repo, f"queued for {who}")
+                except Exception:                            # noqa: BLE001
+                    log.exception("queued sync failed; the next one picks the change up")
+
+    threading.Thread(target=worker, daemon=True, name="hub-sync-soon").start()
+
+
 def run_sync(client: GraphClient, repo: AssetRepository, actor: str,
              full: bool = False) -> dict:
     """The sync itself, shared by the button and the daily schedule
     (backend/auto_sync.py), so the two can never drift apart. Records the
-    attempt either way and re-raises a failure for the caller to report."""
+    attempt either way and re-raises a failure for the caller to report.
+    One at a time (_run_lock): a second caller waits for the first."""
+    with _run_lock:
+        return _run_sync(client, repo, actor, full)
+
+
+def _run_sync(client: GraphClient, repo: AssetRepository, actor: str,
+              full: bool = False) -> dict:
     from backend.integrations.graph.sync import MAPPING_VERSION
     state = repo.sync_state(SOURCE_SYSTEM) if hasattr(repo, "sync_state") else {}
     # A mirror built by an older mapping is rebuilt in full once, whatever

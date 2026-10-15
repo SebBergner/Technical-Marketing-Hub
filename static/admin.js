@@ -2096,8 +2096,23 @@
             "by " + actorWord(u.uploaded_by),
             u.submitted_at ? new Date(u.submitted_at).toLocaleDateString() : null,
             u.internal ? "asks to be Internal" : null,
-            u.asset_id ? null : "not indexed yet — appears after the next sync"
+            u.asset_id ? null : "not in the Hub yet"
           ].filter(Boolean).join(" · ")));
+          if (!u.asset_id) {
+            var idx = el("button", "btn-small", "Index now");
+            idx.type = "button";
+            idx.title = "Read it from SharePoint now (a sync; queued if one is running)";
+            idx.addEventListener("click", function () {
+              idx.disabled = true;
+              idx.textContent = "Indexing…";
+              fetch("/api/uploads/" + encodeURIComponent(u.id) + "/index", { method: "POST" })
+                .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); })
+                .then(function () { setTimeout(loadUploads, 60000); })
+                .catch(function (err) { idx.disabled = false; idx.textContent = "Index now";
+                                        window.alert("Not started: " + err.message); });
+            });
+            info.appendChild(idx);
+          }
           if (u.status === "sent_back") {
             info.appendChild(el("p", "req-row__reason", "Sent back: “" + (u.note || "") + "”"));
           }

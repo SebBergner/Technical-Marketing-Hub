@@ -59,7 +59,8 @@ class FakeSharePoint:
                             lambda c, t, item_id: self.previews.append(item_id))
         import backend.routers.uploads as router
         monkeypatch.setattr(router, "get_graph_client", lambda: object())
-        monkeypatch.setattr(router, "_sync_soon", lambda repo, actor: None)
+        self.syncs = []
+        monkeypatch.setattr(router, "_sync_soon", lambda repo, actor: self.syncs.append(actor))
 
 
 @pytest.fixture
@@ -285,3 +286,18 @@ def test_a_product_no_longer_sold_is_refused_with_the_reason(client, sp):
 def test_retired_segments_are_not_offered():
     from backend.services import taxonomy
     assert {"IoT", "AR"} <= taxonomy.RETIRED_SEGMENTS
+
+
+def test_publishing_a_demo_the_hub_has_not_read_yet_asks_for_a_sync(client, sp):
+    record = start(client).json()
+    upload_all(client, sp, record)
+    client.post(f"/api/uploads/{record['id']}/finish", headers=BOSS)
+    asked = len(sp.syncs)
+    client.post(f"/api/uploads/{record['id']}/publish", json={}, headers=BOSS)
+    assert len(sp.syncs) == asked + 1, "not indexed yet: publishing asks again"
+
+
+def test_index_now_is_for_the_reviewer_or_the_uploader(client, sp):
+    record = start(client).json()
+    assert client.post(f"/api/uploads/{record['id']}/index", headers=ANN).status_code == 403
+    assert client.post(f"/api/uploads/{record['id']}/index", headers=BOSS).json() == {"queued": True}

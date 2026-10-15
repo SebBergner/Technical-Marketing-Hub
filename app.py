@@ -65,6 +65,24 @@ async def lifespan(app: FastAPI):
               f"from the xlsx snapshot. This data is STALE; it exists so a fresh "
               f"clone runs. Configure GRAPH_* / CONSENSUS_* and sync for real data.")
 
+    # Create New Demo reads each library's options from SharePoint; the
+    # Demo Catalog's take ~13 s cold. Read them now, in the background, so
+    # the first person to open the form does not wait (2026-10-15).
+    if settings.graph_configured:
+        import threading
+
+        def warm():
+            try:
+                from backend.integrations.graph.client import get_graph_client
+                from backend.integrations.graph import upload_writer
+                from backend.services import upload_targets
+                client = get_graph_client()
+                for key in upload_targets.TARGETS:
+                    upload_writer.resolve(client, upload_targets.target(key))
+            except Exception:                              # noqa: BLE001
+                logging.getLogger(__name__).info("upload options not warmed", exc_info=True)
+        threading.Thread(target=warm, daemon=True, name="hub-warm-upload-form").start()
+
     # The daily sync's loop. It only syncs when switched on from the Admin
     # page -- see backend/auto_sync.py.
     task = None

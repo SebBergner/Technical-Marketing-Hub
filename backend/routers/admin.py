@@ -614,9 +614,14 @@ BREAKDOWNS = {
     "demo": lambda a: [a.id] if a else [],
     "product": lambda a: (a.product_families or ["(no product)"]) if a else [],
     "segment": lambda a: [a.segment or "(no segment)"] if a else [],
-    "source": lambda a: [a.source or "(unknown)"] if a else [],
-    "type": lambda a: [a.type or "(unknown)"] if a else [],
+    "source": lambda a: [getattr(a.source, "value", a.source) or "(unknown)"] if a else [],
+    "type": lambda a: [getattr(a.type, "value", a.type) or "(unknown)"] if a else [],
 }
+#: Words for the keys above, where the key is a code ("cad_model" read as
+#: "AssetType.CAD_MODEL" until 2026-10-14).
+_BREAKDOWN_LABEL = {"type": {"video": "Videos", "ldk": "LDKs", "vdk": "VDKs",
+                             "cad_model": "CAD datasets", "vm": "Virtual machines"},
+                    "source": {"sharepoint": "SharePoint", "consensus": "Consensus"}}
 
 
 @router.get("/usage/breakdown", dependencies=[VIEW_ADMIN])
@@ -641,8 +646,17 @@ def usage_breakdown(dimension: str = "demo", since: str | None = None,
     key_of = BREAKDOWNS[dimension]
     events = [e for e in _events(repo, since, until) if e.get("asset_id")]
 
-    # One repository read per asset touched, not per event.
-    assets = {aid: repo.get(aid) for aid in {e["asset_id"] for e in events}}
+    # One listing, not a get() per demo touched: each get() rebuilds the
+    # catalogue view, and with a few hundred demos used the tab took 15 s
+    # (2026-10-14). Archived demos and older VM versions included, as get()
+    # returned them; hidden ones stay out, as before.
+    # The few a listing leaves out but get() still opens (a kit's subfolder
+    # such as "release-notes") are looked up one by one.
+    touched = {e["asset_id"] for e in events}
+    assets = {a.id: a for a in repo.list(AssetQuery(
+        limit=10 ** 6, include_older_vms=True, include_archived=True)).items
+        if a.id in touched}
+    assets.update({aid: repo.get(aid) for aid in touched - assets.keys()})
 
     # Drilling in: "by product" -> click Windchill -> the demos inside it.
     # Narrowing the events rather than the finished rows keeps every number
@@ -673,8 +687,9 @@ def usage_breakdown(dimension: str = "demo", since: str | None = None,
             row["source"] = asset.source if asset else None
             row["type"] = asset.type if asset else None
     else:
+        words = _BREAKDOWN_LABEL.get(dimension, {})
         for row in rows:
-            row["label"] = row["key"]
+            row["label"] = words.get(row["key"], row["key"])
 
     if q:
         needle = q.strip().lower()

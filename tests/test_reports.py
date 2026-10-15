@@ -144,3 +144,22 @@ def test_sample_activity_is_flagged_kept_apart_and_removable(client, tmp_path):
         assert client.get("/api/reports/activity", headers=boss).json()["synthetic"] is False
     finally:
         cfg.settings.hub_admin_emails = ""
+
+
+def test_the_usage_breakdown_reads_the_catalogue_once_and_names_types(client, monkeypatch):
+    """2026-10-14: a get() per demo used rebuilt the catalogue each time and
+    took the Hub usage tab to 15 s; and a type read "AssetType.VDK"."""
+    from backend.repositories.json_repo import JsonAssetRepository
+    calls = []
+    real_get = JsonAssetRepository.get
+    monkeypatch.setattr(JsonAssetRepository, "get",
+                        lambda self, aid: calls.append(aid) or real_get(self, aid))
+    boss = easyauth_headers("boss@ptc.com")
+    monkeypatch.setattr(settings, "hub_admin_emails", "boss@ptc.com")
+    demo = client.get("/api/admin/usage/breakdown?dimension=demo", headers=boss).json()
+    assert demo["rows"][0]["label"] == "Bobcat IPL" and calls == []
+    by_type = client.get("/api/admin/usage/breakdown?dimension=type", headers=boss).json()
+    assert [r["label"] for r in by_type["rows"]] == ["VDKs"]
+    scoped = client.get("/api/admin/usage/breakdown?dimension=demo&scope_dim=type&scope_key=vdk",
+                        headers=boss).json()
+    assert scoped["total_rows"] == 1, "drilling into a type still matches its demos"

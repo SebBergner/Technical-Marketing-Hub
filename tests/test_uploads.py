@@ -280,3 +280,8 @@ def test_a_product_no_longer_sold_is_refused_with_the_reason(client, sp):
     r = start(client, values={**KIT, "products": ["Creo", "Kepware+", "KEPServerEX"]})
     assert r.status_code == 422 and "Kepware+" in r.json()["detail"]
     assert "no longer sold" in r.json()["detail"] and sp.created == []
+
+
+def test_retired_segments_are_not_offered():
+    from backend.services import taxonomy
+    assert {"IoT", "AR"} <= taxonomy.RETIRED_SEGMENTS

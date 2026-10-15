@@ -134,6 +134,8 @@ def resolve(client: GraphClient, spec: ut.TargetSpec, *, fresh: bool = False) ->
     # can find. The Demo Catalog's old folders still carry such terms.
     from backend.services import taxonomy
     choices["products"] = [p for p in choices["products"] if not taxonomy.is_excluded([p])]
+    if "Segment" in choices:
+        choices["Segment"] = [s for s in choices["Segment"] if s not in taxonomy.RETIRED_SEGMENTS]
     target = Target(spec=spec, site_id=site_id, drive_id=drive.drive_id, list_id=list_id,
                     demo_content_type_id=demo["id"], product_note_field=note,
                     choices=choices, terms=terms, skipped=skipped)

@@ -335,6 +335,12 @@ DIVESTED_PRODUCTS = frozenset({
 })
 
 
+#: Segments of the divested lines (IoT: ThingWorx, Kepware; AR: Vuforia).
+#: Not offered for new demos, not offered as a filter (Liwei, 2026-10-15);
+#: still SharePoint choices, so existing values read as they are.
+RETIRED_SEGMENTS = frozenset({"IoT", "AR"})
+
+
 def is_excluded(products: list[str] | None) -> bool:
     """Does this asset touch a product PTC no longer owns?
 

@@ -1,7 +1,7 @@
 # Development Handover — TDD Portal / Technical Marketing Hub
 
 **Written 2026-09-03, substantially revised 2026-09-08, appended through
-2026-09-09** for a successor
+2026-09-09; "Current state" added 2026-10-15** for a successor
 developer or AI assistant with no prior context on this project. The 2026-09-09
 session, in order: recorded five unscoped asks from an Elio review (§9);
 investigated and fully solved how SharePoint's own "Supporting Demo
@@ -54,6 +54,144 @@ modal (`tdd-portal-file-preview-properties-table`, now **done** as of §5.6).
 file. Read this one to start working; read that one before changing a
 decision, because most of them were made against a measurement that is written
 down there.
+
+---
+
+## Current state — 2026-10-15 (read this before §4, §5 and §9)
+
+Sections 0–3 and 6–8 still hold. **§4's front-end entries, §5.5 and most of
+§9 describe the September code** and are kept as history: `static/hub-api.js`
+no longer exists, Elio's 2.5 MB `index.html` was rebuilt (79 KB), and the
+September backlog is either shipped or superseded. What changed, in one place:
+
+> 中文：2026-10-15 的现状。§4 的前端部分、§5.5 和 §9 是九月的代码和待办，留作历史；
+> hub-api.js 已拆成 `static/js/hub/` 下的 ES 模块，admin.js 拆成 `static/js/admin/`。
+> 权限、Create New Demo、API token、Admin log、同步队列、Metadata options 见下文。
+> 上线（swap）步骤在 `docs/SWAP-CHECKLIST.md`。
+
+### Front end: ES modules, no build step
+
+`index.html` loads `static/js/hub-ui.js` (the page's own controls: request
+form, modals, the data-action dispatcher), then `static/js/hub/main.js` as a
+module; `admin.html` loads
+`static/js/admin/main.js`. No bundler: the browser resolves the imports, and
+`RevalidatingStatic` (§4.1) keeps every module fresh.
+
+| `static/js/hub/` | What it holds |
+|---|---|
+| `main.js` | boot: fills the page from the live API, wires the modules together |
+| `util.js`, `permissions.js` | fetching JSON, escaping, dates, shared labels; what the signed-in person may do (`html.hub-no-*` classes) |
+| `cards.js` | catalogue cards, tags, language and age badges, generated covers |
+| `filters.js` | filter controls, the API query, Published and Sort, Load more, chips, sidebar counts |
+| `nav.js` | the left nav (Browse by type / product / segment), `exitOverlays()` |
+| `home.js` | the landing page's rails |
+| `detail.js` | the demo page (Details \| Manage tabs, files and preview, Open/Internal) and the hash router |
+| `search.js`, `vm.js`, `activity.js` | advanced search, VM pages, Hub activity (`#/activity`) |
+| `request.js`, `share.js` | Request new asset, DemoBoard share |
+| `upload.js` | Create New Demo and My demos (see below) |
+
+| `static/js/admin/` | Tab |
+|---|---|
+| `main.js`, `util.js` | tabs, `session` (who is signed in, their permissions) |
+| `overview.js` | Overview: sync buttons, automatic sync, sync history |
+| `home.js` | Home page: Featured, display options |
+| `content.js` | Content dashboard + Data completeness |
+| `review.js` | Content review, new demos awaiting review |
+| `access.js` | Content access: Internal marks, requests, hidden demos |
+| `options.js` | Metadata options |
+| `usage.js` | Hub usage |
+| `users.js` | Users & groups, API tokens |
+| `signins.js` | Sign-ins and the Admin log |
+
+Both splits were mechanical (no behaviour change). A module that changes
+state another module reads does it through a shared object (`session`,
+`contentState`), never by reassigning an import — an imported binding is
+read-only.
+
+### Sign-in and permissions
+
+- OIDC SSO on both slots (`backend/oidc.py`); the gate also accepts a bearer
+  API token, on `/api/` only.
+- `backend/access.py`: groups (Administrators, PTC employees, Partners, plus
+  custom ones) and **19 permissions** — `Perm` and the catalogue the Admin page
+  shows. Everyone signed in falls into PTC employees or Partners by e-mail
+  domain. `PARTNER_NEVER` (view_admin, manage_users, request_content_access,
+  upload_content, publish_without_review, manage_upload_options) cannot reach
+  a partner through any group. Administrators must keep one PTC account;
+  `HUB_ADMIN_EMAILS` names permanent administrators.
+- Partners are anonymous everywhere: usage and activity never name them.
+- `backend/admin_log.py`: an inner ASGI middleware records every Admin-level
+  write in `owned/admin_log.jsonl`, hash-chained; categories are computed when
+  read; the CSV export carries a BOM for Excel.
+
+### Create New Demo (`/api/uploads`)
+
+- `backend/services/upload_targets.py`: `PLATFORMS` (SharePoint available;
+  Consensus and Brightcove listed as not available yet) and `TARGETS`
+  (`demo_catalog`: LDK / VDK kits; `demo_video`: videos). Another library is
+  another `TargetSpec`, nothing else.
+- `backend/integrations/graph/upload_writer.py`: `resolve()` reads the target
+  library's columns and choices (required columns checked, `PreviewVideo` and
+  `HubProducts` included). The term store is closed to the app (404), so Demo
+  Catalog products are harvested from the Product values existing folders
+  carry. Divested products and `taxonomy.RETIRED_SEGMENTS` (IoT, AR) are never
+  offered, and the server refuses them.
+- Flow: metadata first → the server creates a **new** folder and Graph upload
+  sessions → the browser uploads straight to Graph in 10 MiB chunks → the
+  server checks each file's name and size → writes metadata. With 2+ videos
+  one must be ticked as the preview (`PreviewVideo` column).
+- Review: `backend/services/uploads.py`, states uploading → pending →
+  sent_back / published / cancelled, in `owned/uploads.json` and
+  `owned/upload_review.json` (keyed by SharePoint folder id). A pending demo is
+  hidden from every Hub list until someone with Review content publishes it.
+  **Create without review** (`publish_without_review`) publishes at once.
+- `OriginalPublishDate` is written on both libraries; `owned/publish_dates.json`
+  is only for a target without that column.
+- `UPLOAD_LIBRARY_OVERRIDES` points targets at a test library (missing columns
+  skipped). Empty on production. Test writes go only to
+  `Gallery_Brightcove_Test`; nothing existing in SharePoint is ever changed.
+
+### API tokens
+
+`backend/api_tokens.py`: `Authorization: Bearer tmh_<id>_<secret>`; only the
+SHA-256 is stored (`owned/api_tokens.json`); the actor is `token:<name>` in
+every log; `skip_review` is set per token. Made and revoked in Admin → Users &
+groups. Client: `scripts/create_demo_api.py`; docs:
+`static/docs/api-create-demo.html`.
+
+### Sync
+
+`backend/routers/graph.py`: one sync at a time (`_run_lock`). `sync_soon()`
+queues one follow-up and merges requests made meanwhile, so a requested sync
+is never dropped. Publishing a new demo and the **Index now** button both use
+it. The main video: a video ticked `PreviewVideo` wins (two ticked → the most
+recently modified), found by a filtered list query.
+
+### Metadata options
+
+`backend/services/upload_options.py` (`owned/upload_options.json`): per field
+(Products per library, Segment, Language, Owned by) which options are offered,
+their order, and for a single-choice field the default. The options are
+SharePoint's; one is added there and appears after Refresh. Applied in
+`routers/uploads._target(..., repo=repo)`, so a change is live at once.
+Permission `manage_upload_options`.
+
+### Owned files added since September
+
+`access.json`, `access_audit.jsonl`, `access_requests.json`, `admin_log.jsonl`,
+`api_tokens.json`, `archived.json`, `content_access.json`,
+`content_review.json`, `signin_events.jsonl`, `upload_internal.json`,
+`upload_options.json`, `upload_review.json`, `uploads.json`,
+`publish_dates.json`, `users.json`. Each slot has its own share
+(`DATA_DIR=/mnt/data`), so none of them crosses a swap.
+
+### Tests
+
+`python -m pytest -q`: 817 pass, 3 skip (2026-10-15). New suites:
+`test_uploads.py`, `test_api_tokens.py`, `test_sync_queue.py`,
+`test_access_requests.py`, `test_admin_log.py`. In upload tests the uploader is
+the MAKER member (Makers: view_hub + upload_content), because an
+Administrator's uploads now publish without review.
 
 ---
 
@@ -327,7 +465,8 @@ backend/
     sync_report.py           what a sync did, in words
   routers/                   see §4.2
 static/
-  hub-api.js                 2271 lines. The entire front-end integration
+  hub-api.js                 (September; since split into static/js/hub/,
+                             see "Current state" above)
   css/orion.css              Elio's stylesheet
 index.html                   Elio's file, 2.5 MB. See §5
 tests/                       365 pass, 2 skip
@@ -494,6 +633,11 @@ worth exposing it through an endpoint the frontend already calls (`/api/taxonomy
 or similar) rather than fixing three files again.
 
 ### 5.5 Notable `hub-api.js` internals
+
+> History: these symbols now live in `static/js/hub/` (covers and badges in
+> `cards.js`, nav maps in `nav.js`, facet counts in `filters.js`, files and
+> preview in `detail.js`). `HIDDEN_SEGMENTS` became `taxonomy.RETIRED_SEGMENTS`
+> on the server.
 
 | Symbol | Note |
 |---|---|
@@ -876,6 +1020,9 @@ either direction, both times.
 ---
 
 ## 9. Backlog, in the order it can be picked up
+
+> History: the September backlog below is shipped or superseded. For what is
+> open now, see "Current state" above and `docs/SWAP-CHECKLIST.md`.
 
 *(Revised 2026-09-08 — several items below were "ready now" on 2026-09-03 and
 have since shipped: Load More, file download and preview, the Servigistics/

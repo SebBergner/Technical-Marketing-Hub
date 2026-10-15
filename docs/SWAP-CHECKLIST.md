@@ -15,8 +15,8 @@ or later). Reusable for later swaps; update the version numbers and the
 Everything built since 2026-10-06, all of it new on production:
 
 - Users & groups (Administrators / PTC employees / Partners + custom groups) and
-  17 permissions; partners never get View Admin, Manage users, access requests
-  or Create new demo.
+  19 permissions; partners never get View Admin, Manage users, access requests,
+  Create new demo, Create without review or Manage metadata options.
 - Open / Internal per demo, the SharePoint partner rule, and **requests** to make
   a demo Internal (PTC employees ask, Manage content access decides).
 - Content age: kit dates from files, Published filter and Sort, age badges,
@@ -34,6 +34,13 @@ Everything built since 2026-10-06, all of it new on production:
   end against the test library only; the first real kit on production is worth
   watching in SharePoint (its Language / Owned By columns were never written by
   a test).
+- **Create without review** (permission, Administrators by default): a new
+  demo from such a person is listed at once. API tokens (Admin -> Users &
+  groups -> API tokens) carry the same choice per token, for scripts such as
+  Seb's (`static/docs/api-create-demo.html`).
+- **Admin -> Metadata options**: which Product, Segment, Language and Owned by
+  options Create New Demo offers, their order and the defaults. Production
+  starts with none set, i.e. SharePoint's own lists and order.
 - The Hub page rebuilt (index.html 2.6 MB → 79 KB; scripts as ES modules).
 
 ## Facts that shape the swap
@@ -118,10 +125,13 @@ Everything built since 2026-10-06, all of it new on production:
     four old page-only story pages if still wanted.
 13. **`UPLOAD_LIBRARY_OVERRIDES` must be empty** on both slots (it points
     Create New Demo at a test library; only for trials).
-14. **Do not load sample activity on production.** Hub activity starts empty
+14. **API tokens and Metadata options** are per slot like every other owned
+    setting: tokens made on staging do not work on production. Create Seb's
+    token on production after the swap and send it to him directly.
+15. **Do not load sample activity on production.** Hub activity starts empty
     and fills with real use from today; per-person tracking on production
     starts at the swap.
-15. **Spot checks**: search and filters; a demo page (Files, Manage tab for an
+16. **Spot checks**: search and filters; a demo page (Files, Manage tab for an
     admin); Hub activity opens; Admin → Sign-ins → Admin log shows your sync
     and group changes; a partner test account (if you have one) cannot open
     `/admin`.

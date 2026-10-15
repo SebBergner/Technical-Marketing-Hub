@@ -51,6 +51,18 @@ class KindSpec:
     demo_type: str     # the library's Demo Type value
 
 
+#: Where a new demo can be created (Liwei, 2026-10-15). Only SharePoint is
+#: built; the others are listed so the choice is visible from the start.
+PLATFORMS = (
+    {"key": "sharepoint", "label": "SharePoint", "available": True,
+     "description": "The TDD libraries: demo kits and videos. Listed in the Hub."},
+    {"key": "consensus", "label": "Consensus", "available": False,
+     "description": "Interactive demos. Not available yet."},
+    {"key": "brightcove", "label": "Brightcove", "available": False,
+     "description": "The video Gallery. Not available yet."},
+)
+
+
 @dataclass(frozen=True)
 class TargetSpec:
     key: str
@@ -70,6 +82,8 @@ class TargetSpec:
     publish_date_column: str | None = None
     #: The Hub's asset-id prefix for this library's sync (video_sync: "video-").
     id_prefix: str = ""
+    #: The destination platform (PLATFORMS).
+    platform: str = "sharepoint"
 
 
 def _common(*, description_help: str) -> list[FieldSpec]:
@@ -253,17 +267,19 @@ def clean_files(spec: TargetSpec, files: list) -> list[dict]:
     return out
 
 
-def form(spec: TargetSpec, choices: dict[str, list[str]]) -> dict:
+def form(spec: TargetSpec, choices: dict[str, list[str]], skipped: tuple = ()) -> dict:
     """The target as the upload form draws it."""
     today = date.today().isoformat()
     return {
         "key": spec.key, "library": spec.library, "label": spec.label,
+        "platform": spec.platform,
         "test_library": spec.key in overrides(),
         "single_video": spec.single_video,
         "kinds": [{"key": k.key, "label": k.label} for k in spec.kinds],
         "fields": [{"key": f.key, "label": f.label, "kind": f.kind, "required": f.required,
                     "help": f.help, "max_length": f.max_length,
                     "default": today if f.default == "today" else f.default,
+                    "not_stored": bool(f.column and f.column in skipped),
                     "choices": choices.get(f.choices_from) if f.choices_from else None}
                    for f in spec.fields],
     }

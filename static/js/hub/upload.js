@@ -1,7 +1,8 @@
-/* Upload a video or a demo kit (#/upload, 2026-10-15).
+/* Create New Demo (#/upload, 2026-10-15).
  *
- * Four steps -- where it goes, its metadata, its files, a last look -- and
- * the upload itself. The metadata comes first and is required: the Upload
+ * Four steps -- the destination (platform, then kind), its metadata, its
+ * files, a last look -- and the upload itself. Destinations: SharePoint
+ * today; Consensus and Brightcove are listed, not yet available. The metadata comes first and is required: the Upload
  * button stays off until every required field is filled, and the server
  * checks again (routers/uploads.py). Choices are the library's own options.
  *
@@ -24,8 +25,8 @@ var CHUNK = 32 * 320 * 1024;
 var STATUS_WORD = { uploading: "Uploading", pending: "Waiting for review",
                     sent_back: "Sent back", published: "Published", cancelled: "Cancelled" };
 
-var up = { targets: null, target: null, kind: null, values: {}, internal: false,
-           files: [], busy: false, step: 1 };
+var up = { platforms: null, targets: null, platform: null, target: null, kind: null,
+           values: {}, internal: false, files: [], busy: false, step: 1 };
 
 function el(tag, cls, text) {
   var n = document.createElement(tag);
@@ -63,8 +64,8 @@ function buildUploadPage() {
       '<button class="vp-back" type="button"><svg class="orion-ico orion-ico--sm">'
     +   '<use href="#i-chevron-left"/></svg>Back to Technical Marketing Hub</button>'
     + '<div class="vp-head"><div>'
-    +   '<div class="vp-title">Upload a demo</div>'
-    +   '<div class="orion-subtle">A video or a demo kit, with its metadata, into SharePoint. '
+    +   '<div class="vp-title">Create New Demo</div>'
+    +   '<div class="orion-subtle">A video or a demo kit, with its metadata. '
     +   'It appears in the Hub once a reviewer publishes it.</div>'
     + '</div></div>'
     + '<div class="hub-up" id="hubUp"></div>';
@@ -117,9 +118,10 @@ function render() {
   wizard.id = "hubUpWizard";
   host.appendChild(wizard);
   if (up.targets) { drawWizard(); return; }
-  wizard.appendChild(el("p", "hub-up__muted", "Reading the libraries' options from SharePoint…"));
+  wizard.appendChild(el("p", "hub-up__muted", "Reading the destinations' options…"));
   api("GET", "/api/uploads/targets").then(function (t) {
-    up.targets = t;
+    up.platforms = t.platforms;
+    up.targets = t.targets;
     drawWizard();
   }).catch(function (e) {
     wizard.innerHTML = "";
@@ -132,9 +134,9 @@ function loadMine() {
   var box = document.getElementById("hubUpMine");
   api("GET", "/api/uploads?mine=true&limit=20").then(function (items) {
     box.innerHTML = "";
-    box.appendChild(el("h3", "hub-up__h", "My uploads"));
+    box.appendChild(el("h3", "hub-up__h", "My demos"));
     if (!items.length) {
-      box.appendChild(el("p", "hub-up__muted", "Nothing uploaded yet."));
+      box.appendChild(el("p", "hub-up__muted", "Nothing created yet."));
       return;
     }
     items.forEach(function (r) {
@@ -168,7 +170,7 @@ function loadMine() {
         stop.addEventListener("click", function () {
           if (stop.dataset.armed !== "1") {
             stop.dataset.armed = "1";
-            stop.textContent = "Cancel upload?";
+            stop.textContent = "Cancel it?";
             return;
           }
           api("POST", "/api/uploads/" + r.id + "/cancel").then(loadMine)
@@ -191,7 +193,7 @@ function button(text, primary) {
 /* ── the wizard ───────────────────────────────────────────────────────── */
 function steps(box) {
   var strip = el("ol", "hub-up__steps");
-  ["Where", "Metadata", "Files", "Upload"].forEach(function (s, i) {
+  ["Destination", "Metadata", "Files", "Create"].forEach(function (s, i) {
     var li = el("li", i + 1 === up.step ? "on" : (i + 1 < up.step ? "done" : ""), s);
     strip.appendChild(li);
   });
@@ -201,7 +203,7 @@ function steps(box) {
 function drawWizard() {
   var box = document.getElementById("hubUpWizard");
   box.innerHTML = "";
-  box.appendChild(el("h3", "hub-up__h", "New upload"));
+  box.appendChild(el("h3", "hub-up__h", "New demo"));
   steps(box);
   if (up.step === 1) stepWhere(box);
   else if (up.step === 2) stepMetadata(box);
@@ -210,16 +212,36 @@ function drawWizard() {
 }
 
 function stepWhere(box) {
+  box.appendChild(el("p", "hub-up__label", "Platform"));
+  var platforms = el("div", "hub-up__choices");
+  up.platforms.forEach(function (p) {
+    var card = el("button", "hub-up__choice" + (up.platform === p.key ? " on" : ""));
+    card.type = "button";
+    card.disabled = !p.available;
+    card.appendChild(el("b", null, p.label));
+    card.appendChild(el("span", null, p.description));
+    card.addEventListener("click", function () {
+      if (up.platform !== p.key) { up.target = null; up.kind = null; }
+      up.platform = p.key;
+      drawWizard();
+    });
+    platforms.appendChild(card);
+  });
+  box.appendChild(platforms);
+  if (!up.platform) return;
+  box.appendChild(el("p", "hub-up__label hub-up__label--gap", "What kind of demo"));
   var grid = el("div", "hub-up__choices");
-  up.targets.forEach(function (t) {
+  up.targets.filter(function (t) { return t.platform === up.platform; }).forEach(function (t) {
     t.kinds.forEach(function (k) {
       var card = el("button", "hub-up__choice");
       card.type = "button";
+      card.disabled = !!t.unavailable;
+      if (t.unavailable) card.title = t.unavailable;
       var on = up.target && up.target.key === t.key && up.kind === k.key;
       if (on) card.classList.add("on");
       card.appendChild(el("b", null, k.label));
-      card.appendChild(el("span", null, t.library + (t.single_video
-        ? " · one video file" : " · any files and folders")));
+      card.appendChild(el("span", null, t.single_video
+        ? "One video file" : "Any files and folders"));
       if (t.test_library) card.appendChild(el("span", "hub-up__err", "Test library — not listed in the Hub"));
       card.addEventListener("click", function () {
         if (!up.target || up.target.key !== t.key) { up.values = {}; up.files = []; }
@@ -330,6 +352,7 @@ function metadataForm(target, values, opts) {
     }
     row.appendChild(input);
     if (f.help) row.appendChild(el("span", "hub-up__help", f.help));
+    if (f.not_stored) row.appendChild(el("span", "hub-up__err", "Not stored in the test library."));
     form.appendChild(row);
   });
   return form;
@@ -346,9 +369,8 @@ function stepMetadata(box) {
     note.textContent = missing.length
       ? "Still needed: " + missing.map(function (f) { return f.label; }).join(", ") : "";
   };
-  box.appendChild(el("p", "hub-up__muted", up.target.library + " · "
-    + up.target.kinds.filter(function (k) { return k.key === up.kind; })[0].label
-    + ". Fields marked * are required."));
+  box.appendChild(el("p", "hub-up__muted", up.target.kinds.filter(function (k) {
+    return k.key === up.kind; })[0].label + ". Fields marked * are required."));
   box.appendChild(metadataForm(up.target, up.values, { onChange: refresh }));
   var internal = el("label", "hub-up__check");
   var tick = el("input");
@@ -480,6 +502,11 @@ function stepFiles(box) {
   box.appendChild(bar);
 }
 
+function platformLabel() {
+  var p = (up.platforms || []).filter(function (x) { return x.key === up.platform; })[0];
+  return p ? p.label : "";
+}
+
 function summary(box) {
   var dl = el("dl", "hub-up__summary");
   var add = function (k, v) {
@@ -488,7 +515,7 @@ function summary(box) {
     dl.appendChild(el("dd", null, Array.isArray(v) ? v.join(", ")
       : v === true ? "Yes" : v === false ? "No" : String(v)));
   };
-  add("Goes to", up.target.library);
+  add("Destination", platformLabel() + " · " + up.target.library);
   up.target.fields.forEach(function (f) { add(f.label, fieldValue(f)); });
   add("Internal only", up.internal);
   add("Files", up.files.length + " (" + size(up.files.reduce(function (s, f) {
@@ -503,7 +530,7 @@ function stepUpload(box) {
   var bar = el("div", "hub-up__bar");
   var back = button("Back");
   back.addEventListener("click", function () { if (!up.busy) { up.step = 3; drawWizard(); } });
-  var go = button("Upload", true);
+  var go = button("Create demo", true);
   var missing = missingFields();
   go.disabled = missing.length > 0 || !up.files.length;
   var msg = el("span", "hub-up__err");
@@ -519,15 +546,14 @@ function stepUpload(box) {
     }).then(function (record) {
       return sendAll(record, up.files, progress);
     }).then(function (record) {
-      up = { targets: up.targets, target: null, kind: null, values: {}, internal: false,
-             files: [], busy: false, step: 1 };
+      up = { platforms: up.platforms, targets: up.targets, platform: null, target: null,
+             kind: null, values: {}, internal: false, files: [], busy: false, step: 1 };
       var done = document.getElementById("hubUpWizard");
       done.innerHTML = "";
-      done.appendChild(el("h3", "hub-up__h", "Uploaded — waiting for review"));
-      done.appendChild(el("p", null, "“" + record.title + "” is in SharePoint ("
-        + record.folder_name + "). It appears in the Hub once a reviewer publishes it; "
-        + "My uploads shows where it stands."));
-      var again = button("Upload another", true);
+      done.appendChild(el("h3", "hub-up__h", "Created — waiting for review"));
+      done.appendChild(el("p", null, "“" + record.title + "” has been created. It appears "
+        + "in the Hub once a reviewer publishes it; My demos shows where it stands."));
+      var again = button("Create another", true);
       again.addEventListener("click", function () { drawWizard(); });
       done.appendChild(again);
       loadMine();
@@ -535,7 +561,7 @@ function stepUpload(box) {
       up.busy = false;
       go.disabled = back.disabled = false;
       msg.textContent = e.message + (e.partial ? " Files already sent are kept; use Continue "
-        + "in My uploads to finish." : "");
+        + "in My demos to finish." : "");
       loadMine();
     });
   });
@@ -638,6 +664,13 @@ function sendFile(uploadId, index, file, row) {
 /* An interrupted upload: choose the same files again; what is already in
    SharePoint is skipped. */
 function continueUpload(record) {
+  // Every file is in and only the last step failed: retry it, no files needed.
+  if (record.files.every(function (f) { return f.done; })) {
+    api("POST", "/api/uploads/" + record.id + "/finish")
+      .then(function () { loadMine(); })
+      .catch(function (e) { report(e.message, true); loadMine(); });
+    return;
+  }
   var input = el("input");
   input.type = "file";
   input.multiple = true;
@@ -707,7 +740,7 @@ function addUploadNav() {
     var item = el("div", "orion-navitem");
     item.id = "navUpload";
     item.innerHTML = '<span class="label"><svg class="orion-ico orion-ico--sm ico-indigo">'
-      + '<use href="#i-upload"/></svg> Upload demo</span>';
+      + '<use href="#i-upload"/></svg> Create New Demo</span>';
     item.addEventListener("click", function () { location.hash = "#/upload"; });
     request.insertAdjacentElement("afterend", item);
     if (location.hash === "#/upload") markNav(true);

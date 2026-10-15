@@ -89,9 +89,19 @@ def _sync_soon(repo: AssetRepository, actor: str) -> None:
 # ───────────────────────────────────────────────────────────── the form
 @router.get("/targets")
 def targets(fresh: bool = False, actor: str = Depends(UPLOAD)):
+    """The destination platforms, and the form of every target on the ones
+    that are built."""
     client = _client()
-    return [ut.form(ut.target(key), _target(client, key, fresh=fresh).choices)
-            for key in ut.TARGETS]
+    out = []
+    for key in ut.TARGETS:
+        spec = ut.target(key)
+        try:
+            resolved = _target(client, key, fresh=fresh)
+            out.append(ut.form(spec, resolved.choices, resolved.skipped))
+        except HTTPException as exc:
+            # One library that cannot be read does not take the others down.
+            out.append({**ut.form(spec, {}), "fields": [], "unavailable": exc.detail})
+    return {"platforms": list(ut.PLATFORMS), "targets": out}
 
 
 class FileIn(BaseModel):

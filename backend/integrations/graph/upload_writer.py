@@ -46,6 +46,9 @@ class Target:
     #: choices_from key -> options, read live.
     choices: dict = field(default_factory=dict)
     terms: w.TermIndex | None = None
+    #: Columns a TEST library lacks (UPLOAD_LIBRARY_OVERRIDES): asked for and
+    #: checked as usual, not written. Always empty for a real library.
+    skipped: tuple = ()
 
 
 def resolve(client: GraphClient, spec: ut.TargetSpec, *, fresh: bool = False) -> Target:
@@ -77,12 +80,31 @@ def resolve(client: GraphClient, spec: ut.TargetSpec, *, fresh: bool = False) ->
     missing = [f.column for f in spec.fields if f.column and f.column not in columns]
     if spec.publish_date_column and spec.publish_date_column not in columns:
         missing.append(spec.publish_date_column)
+    if spec.product_choice_column and spec.product_choice_column not in columns:
+        missing.append(spec.product_choice_column)
     if spec.product_terms and note is None:
         missing.append("Product's note field (Product_0)")
     if "Demo_x0020_Type" not in columns:
         missing.append("Demo_x0020_Type")
+    skipped: tuple = ()
+    if missing and spec.key in ut.overrides() and "Demo_x0020_Type" in columns:
+        # A test library: the form is tried out whole, these are not stored.
+        skipped = tuple(c for c in missing if c in {f.column for f in spec.fields}
+                        | {spec.publish_date_column, spec.product_choice_column})
+        missing = [c for c in missing if c not in skipped]
     if missing:
         raise TargetUnavailable(f"{spec.library!r} is missing: {', '.join(missing)}")
+    if skipped:
+        # Options for the skipped columns come from the real library (read-only),
+        # so the form is the one people will see.
+        real = client.find_drive(site_id, ut.TARGETS[spec.key].library)
+        if real is not None:
+            real_list = (client._request("GET", f"/drives/{real.drive_id}/list",
+                                         params={"$select": "id"}) or {})["id"]
+            for c in client._paged(f"/sites/{site_id}/lists/{real_list}/columns",
+                                   {"$select": "name,choice"}):
+                if c["name"] in skipped:
+                    columns[c["name"]] = c
 
     choices = {f.choices_from: options(f.choices_from) for f in spec.fields
                if f.choices_from and f.choices_from != "products"}
@@ -100,10 +122,13 @@ def resolve(client: GraphClient, spec: ut.TargetSpec, *, fresh: bool = False) ->
             terms = harvest_terms(client, drive.drive_id)
         choices["products"] = terms.labels()
     else:
-        choices["products"] = options(spec.product_choice_column) if spec.product_choice_column             else _hub_products(client, site_id)
+        # The library's own list, or -- a test library with an empty column --
+        # the Hub's product list from Demo Video.
+        choices["products"] = (options(spec.product_choice_column)
+                               if spec.product_choice_column else [])             or _hub_products(client, site_id)
     target = Target(spec=spec, site_id=site_id, drive_id=drive.drive_id, list_id=list_id,
                     demo_content_type_id=demo["id"], product_note_field=note,
-                    choices=choices, terms=terms)
+                    choices=choices, terms=terms, skipped=skipped)
     with _lock:
         _cache[spec.key] = (now, target)
     return target
@@ -191,16 +216,17 @@ def metadata_fields(target: Target, kind: ut.KindSpec, values: dict) -> tuple[di
     spec = target.spec
     fields: dict = {"Demo_x0020_Type": kind.demo_type}
     for f in spec.fields:
-        if not f.column or f.key not in values:
+        if not f.column or f.key not in values or f.column in target.skipped:
             continue
         value = values[f.key]
         if f.kind == ut.MULTI:
             fields[f"{f.column}@odata.type"] = "Collection(Edm.String)"
         fields[f.column] = value
-    if spec.publish_date_column and values.get("original_publish_date"):
+    if (spec.publish_date_column and values.get("original_publish_date")
+            and spec.publish_date_column not in target.skipped):
         fields[spec.publish_date_column] = values["original_publish_date"] + "T00:00:00Z"
     products = values.get("products") or []
-    if spec.product_choice_column and products:
+    if spec.product_choice_column and products             and spec.product_choice_column not in target.skipped:
         fields[f"{spec.product_choice_column}@odata.type"] = "Collection(Edm.String)"
         fields[spec.product_choice_column] = products
     note = {}

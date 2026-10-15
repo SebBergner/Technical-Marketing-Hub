@@ -238,3 +238,10 @@ def test_product_terms_are_gathered_from_the_library_when_the_term_store_is_clos
     terms = uw.harvest_terms(Client(), "drive")
     assert terms.labels() == ["Creo Parametric", "Windchill PDMLink"]
     assert terms.get("creo parametric") == ("Creo Parametric", "g-1")
+
+
+def test_destinations_list_sharepoint_and_the_platforms_still_to_come(client, sp):
+    body = client.get("/api/uploads/targets", headers=BOSS).json()
+    assert [(p["key"], p["available"]) for p in body["platforms"]] == [
+        ("sharepoint", True), ("consensus", False), ("brightcove", False)]
+    assert {t["platform"] for t in body["targets"]} == {"sharepoint"}

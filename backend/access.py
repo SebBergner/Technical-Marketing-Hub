@@ -88,10 +88,11 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
     (Perm.INTERNAL, "Access internal content",
      "Preview and download Internal demos: marked so on the Hub, or closed to "
      "partners in SharePoint."),
-    (Perm.CREATE_DEMO, "Create new demo", "Submit a new demo request."),
-    (Perm.UPLOAD, "Upload content",
-     "Upload a video or a demo kit, with its metadata, into SharePoint through "
-     "the Hub. It is listed once someone with Review content publishes it."),
+    (Perm.CREATE_DEMO, "Request new asset", "Submit a request for a new demo or asset."),
+    (Perm.UPLOAD, "Create new demo",
+     "Create a demo -- a video or a demo kit, with its metadata -- on a "
+     "destination platform. It is listed once someone with Review content "
+     "publishes it."),
     (Perm.EDIT_METADATA, "Edit metadata",
      "Review metadata proposals and write them back to SharePoint."),
     (Perm.MANAGE_HOME, "Manage the Home page",

@@ -1670,6 +1670,19 @@
     var shown = el("div", "faint ug-mfoot");
     box.appendChild(shown);
 
+    /* A partner (an address outside the PTC domains) never gets View Admin
+     * or Manage users & groups, whatever group they are in (2026-10-14). Said
+     * on the row, so a partner added here is not mistaken for a broken save. */
+    var domains = ug.data.internal_domains || [];
+    var isPartner = function (e) {
+      return domains.length && domains.indexOf(String(e).split("@").pop().toLowerCase()) < 0;
+    };
+    var withheld = (ug.data.partner_never || []).filter(function (p) {
+      return g.id === "administrators" || draft.permissions.indexOf(p) >= 0;
+    });
+    var permName = {};
+    (ug.data.catalogue || []).forEach(function (p) { permName[p.id] = p.label; });
+
     var rows = fixed.map(function (e) { return { email: e, fixed: true }; })
       .concat(draft.members.map(function (e) {
         return { email: e, fresh: added.indexOf(e) >= 0 };
@@ -1689,6 +1702,15 @@
         var em = tr.insertCell();
         em.textContent = r.email;
         if (r.fresh) em.appendChild(el("span", "pill pill--warn ug-tag", "new"));
+        if (isPartner(r.email)) {
+          var tag = el("span", "pill pill--off ug-tag", "Partner");
+          tag.title = withheld.length
+            ? "A partner account: everything this group allows except "
+              + withheld.map(function (p) { return permName[p] || p; }).join(" and ")
+              + ", which the Hub never gives to partners."
+            : "A partner (guest) account.";
+          em.appendChild(tag);
+        }
         tr.insertCell().textContent = name || "—";
         var when = tr.insertCell();
         when.className = "num faint";

@@ -53,6 +53,36 @@ def test_admins_are_matched_on_the_upn_as_well_as_the_email(monkeypatch):
     assert person("liwei.alias@ptc.com", username=ME).can(Perm.MANAGE_USERS)
 
 
+def test_a_partner_never_administers_the_hub_whatever_group_they_are_in(monkeypatch):
+    """2026-10-14: View Admin and Manage users & groups stay with PTC accounts,
+    whether a partner is added to Administrators, named in HUB_ADMIN_EMAILS or
+    put in a group of their own that grants them."""
+    monkeypatch.setattr(settings, "hub_admin_emails", "boss@partner.it")
+    access.update_group(ADMINS, "test", members=["p@partner.it"])
+    access.create_group("Reviewers", "", ["view_hub", "view_admin", "review_content"],
+                        ["r@partner.it", "staff@ptc.com"], "test")
+    for partner in (person("p@partner.it"), person("boss@partner.it"), person("r@partner.it"),
+                    person("guest@ptc.com", external=True)):
+        assert not partner.can(Perm.VIEW_ADMIN) and not partner.can(Perm.MANAGE_USERS), partner.email
+    assert person("p@partner.it").can(Perm.RUN_SYNC), "the rest of the group's permissions stand"
+    assert person("r@partner.it").can(Perm.REVIEW_CONTENT)
+    assert person("staff@ptc.com").can(Perm.VIEW_ADMIN), "a PTC member is unaffected"
+
+
+def test_a_partner_is_refused_the_admin_page(monkeypatch, tmp_path):
+    from app import app
+    monkeypatch.setattr(settings, "data_dir", str(tmp_path))
+    monkeypatch.setattr(settings, "auth_mode", AuthMode.EASYAUTH.value)
+    monkeypatch.setattr(settings, "admin_username", "")
+    monkeypatch.setattr(settings, "admin_password", "")
+    access.update_group(ADMINS, "test", members=["p@partner.it"])
+    client = TestClient(app, base_url="http://localhost")
+    session = client.get("/api/admin/session", headers=easyauth_headers("p@partner.it")).json()
+    assert session["signed_in"] is False
+    assert client.get("/api/admin/overview",
+                      headers=easyauth_headers("p@partner.it")).status_code == 403
+
+
 def test_local_development_has_everything_but_the_admin_page():
     """So the Admin page still needs a real sign-in on a laptop, as before."""
     assert not DEV_PRINCIPAL.can(Perm.VIEW_ADMIN)

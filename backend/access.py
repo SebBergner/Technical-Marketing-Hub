@@ -105,8 +105,10 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
     (Perm.RUN_SYNC, "Run sync", "Sync SharePoint and Consensus, and set the daily sync."),
     (Perm.RUN_MIGRATION, "Run Brightcove migration",
      "Use the migration page, which uploads videos to SharePoint."),
-    (Perm.VIEW_ADMIN, "View Admin", "Open the Admin page: usage, content and sync status."),
-    (Perm.MANAGE_USERS, "Manage users & groups", "Create groups, add members, set permissions."),
+    (Perm.VIEW_ADMIN, "View Admin", "Open the Admin page: usage, content and sync status. "
+     "Never given to partner (guest) accounts."),
+    (Perm.MANAGE_USERS, "Manage users & groups", "Create groups, add members, set permissions. "
+     "Never given to partner (guest) accounts."),
 ]
 ALL = frozenset(p.value for p in Perm)
 
@@ -114,6 +116,11 @@ ADMINS, EMPLOYEES, PARTNERS = "administrators", "ptc-employees", "partners"
 
 #: The Admin page's own permissions, which a local run does not get for free.
 _ADMIN_ONLY = frozenset({Perm.VIEW_ADMIN.value, Perm.MANAGE_USERS.value})
+
+#: Never a partner's, whatever group they are in or HUB_ADMIN_EMAILS says
+#: (Liwei, 2026-10-14): administering the Hub stays with PTC accounts, the
+#: usual rule for guests in a tenant. Their other permissions are unaffected.
+PARTNER_NEVER = _ADMIN_ONLY
 
 _EMPLOYEE_DEFAULT = [Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD, Perm.INTERNAL,
                      Perm.CREATE_DEMO, Perm.VIEW_REPORTS]
@@ -398,6 +405,8 @@ def permissions_of(user) -> frozenset[str]:
     if user.can_curate:
         # AUTH_CURATOR_* -- the way in before groups existed.
         perms.add(Perm.EDIT_METADATA.value)
+    if user.is_partner:
+        perms -= PARTNER_NEVER
     return frozenset(perms)
 
 

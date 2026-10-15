@@ -861,6 +861,11 @@ def _access_view() -> dict:
         "catalogue": access.catalogue(),
         "groups": access.load_state()["groups"],
         "bootstrap_admins": sorted(access._bootstrap_admins()),
+        # For marking partners among members: an address outside these is one,
+        # and never gets PARTNER_NEVER from any group (2026-10-14).
+        "internal_domains": sorted({d.strip().lower() for d in
+                                    settings.internal_email_domains.split(",") if d.strip()}),
+        "partner_never": sorted(access.PARTNER_NEVER),
         "users": access.users_view(),
         "audit": access.audit_log(100),
     }

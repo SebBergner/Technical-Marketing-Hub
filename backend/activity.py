@@ -502,8 +502,12 @@ def leaderboard(events: list[dict], *, since: str | None = None, until: str | No
         "content": [{"asset_id": aid, "title": titles.get(aid) or aid, "views": c["views"],
                      "downloads": c["downloads"], "people": len(c["people"])}
                     for aid, c in top_content[:top]],
+        # The tiles count everyone's actions, like the daily line beside them
+        # (2026-10-16): counting only people known by name showed 0 views on
+        # production, whose log before the swap names nobody. Only
+        # active_people is PTC people by name.
         "totals": {"active_people": len(people),
-                   **{k: sum(c[k] for c in people.values()) for k in USAGE_KINDS},
+                   **{k: sum(d.get(k, 0) for d in days.values()) for k in USAGE_KINDS},
                    "anonymous": sum(1 for e in window if not e.get("external")
                                     and not e.get("user"))},
         "creators": [{"rank": i + 1, "creator": who, "demos": len(k["demos"]),

@@ -41,6 +41,10 @@ def test_the_top_n_only_and_partners_only_as_a_count():
     assert out["external_not_ranked"] == 2
     assert all("partner" not in json.dumps(p) for p in out["people"])
     assert out["totals"]["active_people"] == 12 and out["totals"]["anonymous"] == 1
+    # The tiles count everyone, like the daily line: named, anonymous and
+    # partners alike (2026-10-16) -- 78 named views + 1 anonymous + 1 partner.
+    assert (out["totals"]["view"], out["totals"]["download"], out["totals"]["search"]) == (80, 2, 1)
+    assert sum(d["view"] for d in out["series"]) == out["totals"]["view"]
 
 
 def test_teams_are_hub_groups_with_their_totals():

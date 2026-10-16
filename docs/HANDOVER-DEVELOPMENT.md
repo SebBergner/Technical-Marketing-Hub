@@ -66,7 +66,7 @@ September backlog is either shipped or superseded. What changed, in one place:
 
 > 中文：2026-10-15 的现状。§4 的前端部分、§5.5 和 §9 是九月的代码和待办，留作历史；
 > hub-api.js 已拆成 `static/js/hub/` 下的 ES 模块，admin.js 拆成 `static/js/admin/`。
-> 权限、Create New Demo、API token、Admin log、同步队列、Metadata options 见下文。
+> 权限、Create New Demo、API token、Admin log、同步队列、Hub Tasks 见下文。
 > 上线（swap）步骤在 `docs/SWAP-CHECKLIST.md`。
 
 ### Front end: ES modules, no build step
@@ -98,7 +98,6 @@ module; `admin.html` loads
 | `content.js` | Content dashboard + Data completeness |
 | `review.js` | Content review, new demos awaiting review |
 | `access.js` | Content access: Internal marks, requests, hidden demos |
-| `options.js` | Metadata options |
 | `usage.js` | Hub usage |
 | `users.js` | Users & groups, API tokens |
 | `signins.js` | Sign-ins and the Admin log |
@@ -113,10 +112,10 @@ read-only.
 - OIDC SSO on both slots (`backend/oidc.py`); the gate also accepts a bearer
   API token, on `/api/` only.
 - `backend/access.py`: groups (Administrators, PTC employees, Partners, plus
-  custom ones) and **19 permissions** — `Perm` and the catalogue the Admin page
+  custom ones) and **18 permissions** — `Perm` and the catalogue the Admin page
   shows. Everyone signed in falls into PTC employees or Partners by e-mail
   domain. `PARTNER_NEVER` (view_admin, manage_users, request_content_access,
-  upload_content, publish_without_review, manage_upload_options) cannot reach
+  upload_content, publish_without_review) cannot reach
   a partner through any group. Administrators must keep one PTC account;
   `HUB_ADMIN_EMAILS` names permanent administrators.
 - Partners are anonymous everywhere: usage and activity never name them.
@@ -177,21 +176,20 @@ Cancelled). A copy only, written in the background from
 HubId. Graph cannot write a Hyperlink column (HubLink is text with column
 formatting) and cannot clear a date. `HUB_TASKS_LIST` empty switches it off.
 
-### Metadata options
+### Metadata options -- built, then removed (2026-10-15)
 
-`backend/services/upload_options.py` (`owned/upload_options.json`): per field
-(Products per library, Segment, Language, Owned by) which options are offered,
-their order, and for a single-choice field the default. The options are
-SharePoint's; one is added there and appears after Refresh. Applied in
-`routers/uploads._target(..., repo=repo)`, so a change is live at once.
-Permission `manage_upload_options`.
+An Admin tab chose which Product / Segment / Language / Owned by options
+Create New Demo offered, their order and defaults. Removed the same day
+(Liwei): the options are the libraries' own columns and are managed there,
+in SharePoint. The form offers what the column offers, in its order; the
+Hub only keeps out divested products and retired segments.
 
 ### Owned files added since September
 
 `access.json`, `access_audit.jsonl`, `access_requests.json`, `admin_log.jsonl`,
 `api_tokens.json`, `archived.json`, `content_access.json`,
 `content_review.json`, `signin_events.jsonl`, `upload_internal.json`,
-`upload_options.json`, `upload_review.json`, `uploads.json`,
+`hub_tasks.json`, `upload_review.json`, `uploads.json`,
 `publish_dates.json`, `users.json`. Each slot has its own share
 (`DATA_DIR=/mnt/data`), so none of them crosses a swap.
 

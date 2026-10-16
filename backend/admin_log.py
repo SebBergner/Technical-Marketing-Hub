@@ -46,7 +46,6 @@ ACTIONS: dict[tuple[str, str], str] = {
     ("POST", "/api/admin/access/groups"): "Created a group",
     ("PUT", "/api/admin/access/groups/{group_id}"): "Changed a group",
     ("DELETE", "/api/admin/access/groups/{group_id}"): "Deleted a group",
-    ("PUT", "/api/admin/upload-options/{key}"): "Changed metadata options",
     ("POST", "/api/admin/api-tokens"): "Created an API token",
     ("POST", "/api/admin/api-tokens/{token_id}/revoke"): "Revoked an API token",
     ("POST", "/api/admin/sample-activity"): "Loaded sample activity",
@@ -100,7 +99,7 @@ CATEGORIES: list[tuple[str, re.Pattern]] = [
     ("Sign-in", re.compile(r"^/api/admin/(login|logout)$")),
     ("Home page", re.compile(r"^/api/admin/(promoted|hub-settings)$")),
     ("Sync", re.compile(r"^/api/(graph/sync|consensus/(sync|oauth)|admin/auto-sync)")),
-    ("Metadata", re.compile(r"^/api/(graph/writeback|curation/|admin/upload-options)")),
+    ("Metadata", re.compile(r"^/api/(graph/writeback|curation/)")),
     ("Migration", re.compile(r"^/api/migration/")),
     ("Usage data", re.compile(r"^/api/admin/(sample-activity|activity/person|admin-log)")),
 ]

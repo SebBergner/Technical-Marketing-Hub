@@ -46,12 +46,6 @@ class Target:
     #: choices_from key -> options, read live.
     choices: dict = field(default_factory=dict)
     terms: w.TermIndex | None = None
-    #: Options the Hub's own rules keep out (divested products, retired
-    #: segments): choices_from -> [(option, why)], for the Admin page.
-    excluded: dict = field(default_factory=dict)
-    #: choices_from -> default chosen on Admin -> Metadata options (applied
-    #: by the upload router, not cached here).
-    defaults: dict = field(default_factory=dict)
     #: Columns a TEST library lacks (UPLOAD_LIBRARY_OVERRIDES): asked for and
     #: checked as usual, not written. Always empty for a real library.
     skipped: tuple = ()
@@ -139,16 +133,12 @@ def resolve(client: GraphClient, spec: ut.TargetSpec, *, fresh: bool = False) ->
     # (taxonomy.DIVESTED_PRODUCTS), so offering it would create a demo nobody
     # can find. The Demo Catalog's old folders still carry such terms.
     from backend.services import taxonomy
-    excluded = {"products": [(p, "No longer sold by PTC") for p in choices["products"]
-                             if taxonomy.is_excluded([p])]}
     choices["products"] = [p for p in choices["products"] if not taxonomy.is_excluded([p])]
     if "Segment" in choices:
-        excluded["Segment"] = [(s, "A divested line's segment") for s in choices["Segment"]
-                               if s in taxonomy.RETIRED_SEGMENTS]
         choices["Segment"] = [s for s in choices["Segment"] if s not in taxonomy.RETIRED_SEGMENTS]
     target = Target(spec=spec, site_id=site_id, drive_id=drive.drive_id, list_id=list_id,
                     demo_content_type_id=demo["id"], product_note_field=note,
-                    choices=choices, terms=terms, skipped=skipped, excluded=excluded)
+                    choices=choices, terms=terms, skipped=skipped)
     with _lock:
         _cache[spec.key] = (now, target)
     return target

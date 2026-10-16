@@ -994,62 +994,6 @@ def export_admin_log(since: str | None = None, until: str | None = None, q: str 
                               f'attachment; filename="hub-admin-log-{stamp}.csv"'})
 
 
-@router.get("/upload-options", dependencies=[VIEW_ADMIN])
-def get_upload_options(fresh: bool = False, repo: AssetRepository = Depends(get_repo)):
-    """Admin -> Metadata options: each managed field, the options SharePoint
-    has, the ones the Hub's own rules keep out, and what is set here."""
-    from backend.integrations.graph.client import get_graph_client
-    from backend.integrations.graph import upload_writer as uw
-    from backend.services import upload_options, upload_targets as ut
-    client = get_graph_client()
-    if client is None:
-        raise HTTPException(status_code=503, detail="SharePoint is not configured here.")
-    saved = upload_options.load(repo)
-    out = []
-    for key, (label, source, targets, single) in upload_options.MANAGED.items():
-        try:
-            resolved = uw.resolve(client, ut.target(targets[0]), fresh=fresh)
-        except Exception as exc:                            # noqa: BLE001
-            out.append({"key": key, "label": label, "error": str(exc)[:300]})
-            continue
-        builtin = next((f.default for f in ut.target(targets[0]).fields
-                        if f.choices_from == source and f.default not in (None, "today")), None)
-        out.append({"key": key, "label": label, "single": single,
-                    "builtin_default": builtin,
-                    "libraries": [ut.target(t).library for t in targets],
-                    "options": resolved.choices.get(source) or [],
-                    "locked": [{"option": o, "why": why}
-                               for o, why in resolved.excluded.get(source, [])],
-                    "settings": saved.get(key) or {}})
-    return out
-
-
-class OptionsIn(BaseModel):
-    hidden: list[str] = []
-    order: list[str] = []
-    default: str | None = None
-
-
-@router.put("/upload-options/{key}", dependencies=[VIEW_ADMIN])
-def put_upload_options(key: str, body: OptionsIn, repo: AssetRepository = Depends(get_repo),
-                       actor: str = Depends(require_perm(Perm.MANAGE_OPTIONS))):
-    from backend.integrations.graph.client import get_graph_client
-    from backend.integrations.graph import upload_writer as uw
-    from backend.services import upload_options, upload_targets as ut
-    if key not in upload_options.MANAGED:
-        raise HTTPException(status_code=404, detail="No such field.")
-    _, source, targets, _ = upload_options.MANAGED[key]
-    client = get_graph_client()
-    if client is None:
-        raise HTTPException(status_code=503, detail="SharePoint is not configured here.")
-    offered = uw.resolve(client, ut.target(targets[0])).choices.get(source) or []
-    try:
-        return upload_options.save(repo, key, hidden=body.hidden, order=body.order,
-                                   default=body.default, offered_now=offered, actor=actor)
-    except upload_options.OptionsError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-
-
 @router.get("/api-tokens", dependencies=[VIEW_ADMIN])
 def get_api_tokens():
     """The API tokens issued, without their secrets (backend/api_tokens.py)."""

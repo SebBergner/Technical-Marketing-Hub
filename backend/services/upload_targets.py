@@ -286,11 +286,8 @@ def clean_files(spec: TargetSpec, files: list) -> list[dict]:
     return out
 
 
-def form(spec: TargetSpec, choices: dict[str, list[str]], skipped: tuple = (),
-         defaults: dict | None = None) -> dict:
-    """The target as the upload form draws it. `defaults`: choices_from ->
-    the default chosen on Admin -> Metadata options."""
-    defaults = defaults or {}
+def form(spec: TargetSpec, choices: dict[str, list[str]], skipped: tuple = ()) -> dict:
+    """The target as the upload form draws it."""
     today = date.today().isoformat()
     return {
         "key": spec.key, "library": spec.library, "label": spec.label,
@@ -300,8 +297,7 @@ def form(spec: TargetSpec, choices: dict[str, list[str]], skipped: tuple = (),
         "kinds": [{"key": k.key, "label": k.label} for k in spec.kinds],
         "fields": [{"key": f.key, "label": f.label, "kind": f.kind, "required": f.required,
                     "help": f.help, "max_length": f.max_length,
-                    "default": (defaults.get(f.choices_from) if f.choices_from in defaults
-                                else today if f.default == "today" else f.default),
+                    "default": today if f.default == "today" else f.default,
                     "not_stored": bool(f.column and f.column in skipped),
                     "choices": choices.get(f.choices_from) if f.choices_from else None}
                    for f in spec.fields],

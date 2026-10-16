@@ -46,22 +46,14 @@ def _client():
     return client
 
 
-def _target(client, key: str, *, repo=None, fresh: bool = False):
-    """The target's library, with Admin -> Metadata options applied when a
-    repository is given: what is offered, in what order (upload_options)."""
-    from dataclasses import replace
+def _target(client, key: str, *, fresh: bool = False):
     from backend.integrations.graph import upload_writer as uw
-    from backend.services import upload_options
     try:
-        target = uw.resolve(client, ut.target(key), fresh=fresh)
+        return uw.resolve(client, ut.target(key), fresh=fresh)
     except ut.UploadInvalid as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     except GraphError as exc:
         raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
-    if repo is None:
-        return target
-    choices, defaults = upload_options.apply(repo, key, target.choices)
-    return replace(target, choices=choices, defaults=defaults)
 
 
 def _view(record: dict, user: CurrentUser | None = None) -> dict:
@@ -91,8 +83,7 @@ def _indexed(repo, record: dict) -> bool:
 
 # ───────────────────────────────────────────────────────────── the form
 @router.get("/targets")
-def targets(fresh: bool = False, repo: AssetRepository = Depends(get_repo),
-            actor: str = Depends(UPLOAD)):
+def targets(fresh: bool = False, actor: str = Depends(UPLOAD)):
     """The destination platforms, and the form of every target on the ones
     that are built."""
     client = _client()
@@ -100,8 +91,8 @@ def targets(fresh: bool = False, repo: AssetRepository = Depends(get_repo),
     for key in ut.TARGETS:
         spec = ut.target(key)
         try:
-            resolved = _target(client, key, repo=repo, fresh=fresh)
-            out.append(ut.form(spec, resolved.choices, resolved.skipped, resolved.defaults))
+            resolved = _target(client, key, fresh=fresh)
+            out.append(ut.form(spec, resolved.choices, resolved.skipped))
         except HTTPException as exc:
             # One library that cannot be read does not take the others down.
             out.append({**ut.form(spec, {}), "fields": [], "unavailable": exc.detail})
@@ -139,7 +130,7 @@ def start(body: UploadIn, repo: AssetRepository = Depends(get_repo),
     try:
         spec = ut.target(body.target)
         kind = ut.kind_of(spec, body.kind)
-        target = _target(client, spec.key, repo=repo)
+        target = _target(client, spec.key)
         values = ut.clean_fields(spec, body.values, target.choices)
         files = ut.clean_files(spec, [f.model_dump() for f in body.files])
         preview = ut.preview_of(files, body.preview)
@@ -281,7 +272,7 @@ def resubmit(upload_id: str, body: ResubmitIn, repo: AssetRepository = Depends(g
     if record["status"] != "sent_back":
         raise HTTPException(status_code=422, detail=f"This upload is {record['status']}.")
     client = _client()
-    target = _target(client, record["target"], repo=repo)
+    target = _target(client, record["target"])
     try:
         values = ut.clean_fields(target.spec, body.values, target.choices)
     except ut.UploadInvalid as exc:

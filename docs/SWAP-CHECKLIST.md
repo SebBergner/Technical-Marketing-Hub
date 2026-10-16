@@ -15,8 +15,8 @@ or later). Reusable for later swaps; update the version numbers and the
 Everything built since 2026-10-06, all of it new on production:
 
 - Users & groups (Administrators / PTC employees / Partners + custom groups) and
-  19 permissions; partners never get View Admin, Manage users, access requests,
-  Create new demo, Create without review or Manage metadata options.
+  18 permissions; partners never get View Admin, Manage users, access requests,
+  Create new demo or Create without review.
 - Open / Internal per demo, the SharePoint partner rule, and **requests** to make
   a demo Internal (PTC employees ask, Manage content access decides).
 - Content age: kit dates from files, Published filter and Sort, age badges,
@@ -38,9 +38,6 @@ Everything built since 2026-10-06, all of it new on production:
   demo from such a person is listed at once. API tokens (Admin -> Users &
   groups -> API tokens) carry the same choice per token, for scripts such as
   Seb's (`static/docs/api-create-demo.html`).
-- **Admin -> Metadata options**: which Product, Segment, Language and Owned by
-  options Create New Demo offers, their order and the defaults. Production
-  starts with none set, i.e. SharePoint's own lists and order.
 - The Hub page rebuilt (index.html 2.6 MB → 79 KB; scripts as ES modules).
 
 ## Facts that shape the swap
@@ -125,7 +122,7 @@ Everything built since 2026-10-06, all of it new on production:
     four old page-only story pages if still wanted.
 13. **`UPLOAD_LIBRARY_OVERRIDES` must be empty** on both slots (it points
     Create New Demo at a test library; only for trials).
-14. **API tokens and Metadata options** are per slot like every other owned
+14. **API tokens** are per slot like every other owned
     setting: tokens made on staging do not work on production. Create Seb's
     token on production after the swap and send it to him directly.
 15. **Hub Tasks list**: both slots write to the same SharePoint list. After

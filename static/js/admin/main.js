@@ -7,7 +7,6 @@
  * sign-in watch on fetch, who is signed in, then the Overview.
  */
 
-import { loadOptions } from "./options.js";
 import { $, session, show } from "./util.js";
 import {
   renderAutoSync, renderEnvironment, renderIntegrations, renderQueues
@@ -52,8 +51,8 @@ import { loadActivity, renderActRanges } from "./signins.js";
  * address (#content, #access), so a refresh or a shared link opens the
  * same one. */
 var PANELS = { overview: "tabOverview", home: "tabHome", content: "tabContent",
-               review: "tabReview", internal: "tabInternal", options: "tabOptions",
-               usage: "tabUsage", access: "tabAccess", activity: "tabActivity" };
+               review: "tabReview", internal: "tabInternal", usage: "tabUsage",
+               access: "tabAccess", activity: "tabActivity" };
 
 function tabFromHash() {
   var name = location.hash.replace("#", "");
@@ -74,11 +73,7 @@ function showTab(name) {
   if (name === "review") loadReview();
   if (name === "activity") { renderActRanges(); loadActivity(); }
   if (name === "usage") loadUsage();
-  if (name === "options" && !optionsShown) { optionsShown = true; loadOptions(false); }
 }
-
-var optionsShown = false;          // read once per page load; Refresh re-reads
-$("optRefresh").addEventListener("click", function () { loadOptions(true); });
 
 document.querySelectorAll("#adminTabs .tab").forEach(function (t) {
   t.addEventListener("click", function () {

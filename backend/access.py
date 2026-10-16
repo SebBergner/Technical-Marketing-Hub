@@ -68,7 +68,6 @@ class Perm(str, Enum):
     CREATE_DEMO = "create_demo"
     UPLOAD = "upload_content"
     PUBLISH_DIRECT = "publish_without_review"
-    MANAGE_OPTIONS = "manage_upload_options"
     EDIT_METADATA = "edit_metadata"
     MANAGE_HOME = "manage_home"
     MANAGE_ACCESS = "manage_content_access"
@@ -103,9 +102,6 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
      "Review metadata proposals and write them back to SharePoint."),
     (Perm.MANAGE_HOME, "Manage the Home page",
      "Choose Featured demos and switch the Hub's display options."),
-    (Perm.MANAGE_OPTIONS, "Manage metadata options",
-     "Choose which Product, Segment, Language and Owned by options Create new demo "
-     "offers, in what order, and the defaults (Admin -> Metadata options)."),
     (Perm.REVIEW_CONTENT, "Review content",
      "Mark demos Still current (the interface shown matches today's release), "
      "archive or restore them, and work through the content-review list."),
@@ -141,7 +137,7 @@ _ADMIN_ONLY = frozenset({Perm.VIEW_ADMIN.value, Perm.MANAGE_USERS.value})
 #: Internal or upload into PTC's libraries (2026-10-15). Their other
 #: permissions are unaffected.
 PARTNER_NEVER = _ADMIN_ONLY | {Perm.REQUEST_ACCESS.value, Perm.UPLOAD.value,
-                               Perm.PUBLISH_DIRECT.value, Perm.MANAGE_OPTIONS.value}
+                               Perm.PUBLISH_DIRECT.value}
 
 _EMPLOYEE_DEFAULT = [Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD, Perm.INTERNAL,
                      Perm.CREATE_DEMO, Perm.VIEW_REPORTS, Perm.REQUEST_ACCESS]

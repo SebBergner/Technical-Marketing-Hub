@@ -1,5 +1,5 @@
 /* The Sign-ins tab: sign-ins, active now, people and their usage,
- * the sample activity, and the Admin log.
+ * and the Admin log.
  *
  * Part of the Admin page's script, split out of static/admin.js on
  * 2026-10-15; static/js/admin/main.js loads it. */
@@ -351,7 +351,6 @@ function renderActivity(d) {
     host.appendChild(t);
   }
 
-  renderSample(!!d.sample_loaded);
   act.people = d.people;
   drawPeople();
   renderLogFilter();
@@ -605,54 +604,6 @@ function renderLogFilter() {
   clear.type = "button";
   clear.addEventListener("click", clearPerson);
   filter.appendChild(clear);
-}
-
-/* Sample activity for demonstrating Hub activity (2026-10-14): written
- * to its own file, flagged synthetic, made-up people; removing it leaves
- * real usage untouched (services/sample_activity.py). */
-var sampleNote = "";   // set after loading, when no demo had a creator
-
-function renderSample(loaded) {
-  var host = $("actSample");
-  host.innerHTML = "";
-  host.appendChild(el("p", "muted", loaded
-    ? "Sample activity is loaded: about 90 days of made-up usage by 24 sample people "
-      + "on real demos. Hub activity and these tables show a banner while it is "
-      + "in the period. Remove it before reading any figure as real."
-    : "For demonstrating Hub activity while real usage is still building up. "
-      + "Adds about 90 days of made-up usage by 24 sample people (“Sample User 01”...) "
-      + "on real demos, flagged as sample data everywhere it shows. Real usage is kept "
-      + "apart and is never changed."));
-  if (loaded && sampleNote) host.appendChild(el("p", "promo-status", sampleNote));
-  var status = el("span", "promo-status faint");
-  if ((session.permissions || []).indexOf("manage_users") < 0) {
-    host.appendChild(el("p", "faint", "Loading or removing it needs Manage users & groups."));
-    return;
-  }
-  var row = el("div", "ug-actions");
-  var btn = el("button", loaded ? "btn-small" : "btn-primary", loaded
-    ? "Remove sample activity" : "Load sample activity");
-  btn.type = "button";
-  btn.addEventListener("click", function () {
-    status.textContent = loaded ? "Removing…" : "Loading…";
-    fetch("/api/admin/sample-activity", { method: loaded ? "DELETE" : "POST" })
-      .then(function (r) {
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        return r.json();
-      })
-      .then(function (d) {
-        sampleNote = d.loaded && d.with_creator === 0
-          ? "No demo has a creator yet, so “Whose demos were used most” stays empty. "
-            + "Creators are read from SharePoint by a full sync: run Sync, then load "
-            + "the sample again."
-          : "";
-        return loadActivity();
-      })
-      .catch(function (err) { status.textContent = "Did not work: " + err.message; });
-  });
-  row.appendChild(btn);
-  row.appendChild(status);
-  host.appendChild(row);
 }
 
 $("actSearch").addEventListener("input", function (e) {

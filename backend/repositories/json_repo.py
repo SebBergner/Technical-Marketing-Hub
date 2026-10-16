@@ -278,25 +278,6 @@ class WouldShrinkMirror(RuntimeError):
     """
 
 
-#: A second, read-only usage log for demonstration data, merged into every
-#: read of the real one.
-#:
-#: Separate rather than mixed in, and the reason is the day it gets removed.
-#: Demo events and real ones accumulate in the same window, so a single file
-#: means "delete the made-up figures" turns into downloading the log,
-#: filtering it and uploading it back -- and the obvious shortcut, deleting
-#: the file, silently throws away however much genuine history has built up
-#: beside them. Two files make the safe action the easy one: remove this file
-#: from the share and nothing real is touched.
-#:
-#: Nothing writes it. `record_usage_event` only ever appends to the real log,
-#: so a demo file cannot grow by itself or absorb a real event. Its contents
-#: still carry `"synthetic": true` per event, which is what raises the banner
-#: on the Admin page -- the filename is the operational convenience, the flag
-#: is the guarantee.
-DEMO_USAGE_EVENTS = "usage_events.demo.jsonl"
-
-
 class JsonAssetRepository(AssetRepository):
     #: Guards read-modify-write within the process. See the module docstring on
     #: why this is not sufficient across processes.
@@ -1143,7 +1124,9 @@ class JsonAssetRepository(AssetRepository):
         the file would turn that into losing all of them.
         """
         out: list[dict] = []
-        for name in ("usage_events.jsonl", DEMO_USAGE_EVENTS):
+        # Only the real log. A usage_events.demo.jsonl left on a share by the
+        # sample activity (removed 2026-10-16) is never read.
+        for name in ("usage_events.jsonl",):
             path = os.path.join(self.owned_dir, name)
             if not os.path.exists(path):
                 continue
@@ -1162,8 +1145,6 @@ class JsonAssetRepository(AssetRepository):
                     if until and at > until:
                         continue
                     out.append(entry)
-        # Two files merged, so the order has to be restored rather than
-        # inherited from the reads.
         out.sort(key=lambda e: e.get("at") or "")
         return out
 

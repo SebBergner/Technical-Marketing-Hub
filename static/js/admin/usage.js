@@ -163,7 +163,6 @@ function drawChart(host, daily) {
 }
 
 function renderUsage(u) {
-  $("syntheticBanner").hidden = !u.synthetic;
   var prev = u.previous;
   var vs = prev
     ? "vs previous " + rangeLabel().toLowerCase().replace(/^this /, "")
@@ -496,14 +495,6 @@ function renderSearches(u) {
 
 /* ── drill-downs ───────────────────────────────────────────────────── */
 
-function syntheticNotice() {
-  var warn = el("div", "synthetic");
-  warn.appendChild(el("strong", null, "Synthetic data. "));
-  warn.appendChild(document.createTextNode(
-    "Generated for testing; not a measurement."));
-  return warn;
-}
-
 function openAssetSheet(assetId) {
   var b = rangeBounds(currentRange);
   var qs = b.since ? "?since=" + encodeURIComponent(b.since) : "";
@@ -512,7 +503,6 @@ function openAssetSheet(assetId) {
     .then(function (d) {
       var body = openSheet(d.asset.title, [d.asset.type, d.asset.source,
         rangeLabel()].filter(Boolean).join(" · "));
-      if (d.synthetic) body.appendChild(syntheticNotice());
 
       var tiles = el("div", "tiles");
       body.appendChild(tiles);

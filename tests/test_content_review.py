@@ -105,9 +105,9 @@ def test_archived_demos_are_listed_with_who_and_why(client):
         "dusty", "user:boss@ptc.com", "UI from 2018")
 
 
-def test_sample_activity_never_counts_as_use(client, tmp_path):
-    """The lists decide what to archive: a sample view must not make an unused
-    demo look used, nor move "usage recorded since" back (2026-10-14)."""
+def test_a_leftover_sample_file_never_counts_as_use(client, tmp_path):
+    """The sample activity was removed (2026-10-16); a file it left on a share
+    is never read, so it cannot make an unused demo look used."""
     long_ago = (date.today() - timedelta(days=80)).isoformat() + "T10:00:00+00:00"
     (tmp_path / "owned" / "usage_events.demo.jsonl").write_text(json.dumps(
         {"at": long_ago, "event": "view", "asset_id": "idle", "synthetic": True,

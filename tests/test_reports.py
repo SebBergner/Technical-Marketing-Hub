@@ -115,37 +115,6 @@ def test_the_hub_page_is_revalidated_and_carries_no_inline_handlers(client):
     assert '<script src="/static/js/hub-ui.js" defer></script>' in r.text
 
 
-def test_sample_activity_is_flagged_kept_apart_and_removable(client, tmp_path):
-    """2026-10-14: for demonstrations. Synthetic, its own file, made-up people."""
-    real = (tmp_path / "owned" / "usage_events.jsonl").read_text(encoding="utf-8")
-    boss = easyauth_headers("boss@ptc.com")
-    import backend.config as cfg
-    cfg.settings.hub_admin_emails = "boss@ptc.com"
-    try:
-        assert client.post("/api/admin/sample-activity",
-                           headers=easyauth_headers("someone@ptc.com")).status_code == 403
-        r = client.post("/api/admin/sample-activity", headers=boss)
-        assert r.status_code == 200 and r.json()["events"] > 1000
-        demo = tmp_path / "owned" / "usage_events.demo.jsonl"
-        rows = [json.loads(line) for line in demo.read_text(encoding="utf-8").splitlines()]
-        assert all(e["synthetic"] for e in rows)
-        assert {e["user"].split("@")[1] for e in rows if e.get("user")} == {"sample.invalid"}
-        assert (tmp_path / "owned" / "usage_events.jsonl").read_text(encoding="utf-8") == real
-        body = client.get("/api/reports/activity", headers=boss).json()
-        assert body["synthetic"] is True
-        assert any(p["name"].startswith("Sample User") for p in body["people"])
-        # Says whether any demo has a creator yet, so an empty creator
-        # ranking can be told apart from "no sync has written creators".
-        assert body["creators_known"] == (r.json()["with_creator"] > 0)
-        if body["creators_known"]:
-            assert body["creators"], "the sample favours demos with a creator"
-        assert client.delete("/api/admin/sample-activity", headers=boss).status_code == 200
-        assert not demo.exists()
-        assert client.get("/api/reports/activity", headers=boss).json()["synthetic"] is False
-    finally:
-        cfg.settings.hub_admin_emails = ""
-
-
 def test_the_usage_breakdown_reads_the_catalogue_once_and_names_types(client, monkeypatch):
     """2026-10-14: a get() per demo used rebuilt the catalogue each time and
     took the Hub usage tab to 15 s; and a type read "AssetType.VDK"."""

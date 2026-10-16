@@ -495,9 +495,6 @@ def usage(since: str | None = None, until: str | None = None,
                 [r for r in search_tally.values() if r["zero_results"]],
                 key=lambda r: -r["zero_results"])[:15],
         },
-        # Loud on purpose: a demo log and a real one must never be mistaken
-        # for each other. See scripts/seed_usage_events.py.
-        "synthetic": any(e.get("synthetic") for e in events),
     }
 
 
@@ -550,7 +547,6 @@ def usage_for_asset(asset_id: str, since: str | None = None,
         "daily": _daily(events),
         "files": sorted(files.values(),
                         key=lambda r: (-r["download"], -r["preview"])),
-        "synthetic": any(e.get("synthetic") for e in events),
     }
 
 
@@ -768,10 +764,7 @@ def content_review(min_age_days: int = Query(REVIEW_MIN_AGE_DAYS, ge=0),
     from backend.services import content_age
 
     today = _date.today()
-    # Real usage only: this list decides what to archive, and the sample
-    # (services/sample_activity.py) would make an unused demo look used and
-    # move "usage recorded since" back by its 90 days (2026-10-14).
-    events = [e for e in _events(repo, None, None) if not e.get("synthetic")]
+    events = _events(repo, None, None)
     usage_since = events[0].get("at") if events else None
     idle_from = (today - _td(days=idle_days)).isoformat()
     year_ago = (today - _td(days=365)).isoformat()
@@ -959,10 +952,8 @@ def get_activity(since: str | None = None, until: str | None = None,
     each PTC person's views, previews, downloads and searches in the window
     (backend/activity.py). Bounds come from the browser, as for /usage."""
     from backend import activity
-    from backend.services import sample_activity
     report = activity.report(since=since, until=until, today=today, q=q, user=user,
                              offset=offset, limit=limit)
-    report["sample_loaded"] = hasattr(repo, "owned_dir") and sample_activity.loaded(repo)
     return activity.attach_usage(report, _events(repo, None, None), since=since, until=until)
 
 
@@ -1032,31 +1023,6 @@ def revoke_api_token(token_id: str, actor: str = Depends(require_perm(Perm.MANAG
         return api_tokens.revoke(token_id, actor)
     except LookupError:
         raise HTTPException(status_code=404, detail="No such token.")
-
-
-@router.post("/sample-activity", dependencies=[VIEW_ADMIN])
-def load_sample_activity(repo: AssetRepository = Depends(get_repo),
-                         actor: str = Depends(MANAGE_USERS)):
-    """Write sample usage for demonstrating Hub activity (2026-10-14) --
-    flagged synthetic, in its own file, made-up people; see
-    services/sample_activity.py. Replaces an earlier sample."""
-    from backend.services import sample_activity
-    n = sample_activity.generate(repo)
-    log.info("sample activity loaded by %s: %d events", actor, n)
-    # Zero means no sync has written creators yet: the creator ranking stays
-    # empty until one has, and the sample should then be loaded again.
-    return {"loaded": True, "events": n,
-            "with_creator": sample_activity.creators_available(repo)}
-
-
-@router.delete("/sample-activity", dependencies=[VIEW_ADMIN])
-def remove_sample_activity(repo: AssetRepository = Depends(get_repo),
-                           actor: str = Depends(MANAGE_USERS)):
-    """Delete the sample; real usage is in another file and stays."""
-    from backend.services import sample_activity
-    removed = sample_activity.remove(repo)
-    log.info("sample activity removed by %s (%s)", actor, removed)
-    return {"loaded": False}
 
 
 @router.get("/activity/person", dependencies=[VIEW_ADMIN])

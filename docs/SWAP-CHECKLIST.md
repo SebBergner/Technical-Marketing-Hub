@@ -45,7 +45,7 @@ Everything built since 2026-10-06, all of it new on production:
 - **Each slot has its own data share** (`portaldata` for production,
   `portaldatastaging` for staging; the mount is a slot setting). Nothing set on
   staging — groups, Featured, hidden demos, archive marks, Still current,
-  access requests, the Admin log, usage history, sample activity — exists on
+  access requests, the Admin log, usage history — exists on
   production. Production starts from its own `owned/` as of 2026-10-06.
 - **Sticky (slot) settings stay with the slot:** the nine SSO settings
   (AUTH_MODE, OIDC_*, SECRET_KEY, HTTPS_ONLY, AUTH_CURATOR_EMAILS,
@@ -129,9 +129,10 @@ Everything built since 2026-10-06, all of it new on production:
     the swap, set `HUB_TASKS_LIST` to empty **as a slot setting on staging**,
     so trials there do not reach the team's to-do list (production keeps the
     default, "Hub Tasks").
-16. **Do not load sample activity on production.** Hub activity starts empty
-    and fills with real use from today; per-person tracking on production
-    starts at the swap.
+16. **Hub activity starts empty** on production and fills with real use from
+    today; per-person tracking there starts at the swap. (Sample activity was
+    removed on 2026-10-16; a `usage_events.demo.jsonl` left on staging's share
+    is never read and can be deleted.)
 17. **Spot checks**: search and filters; a demo page (Files, Manage tab for an
     admin); Hub activity opens; Admin → Sign-ins → Admin log shows your sync
     and group changes; a partner test account (if you have one) cannot open

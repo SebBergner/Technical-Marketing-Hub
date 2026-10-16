@@ -207,14 +207,6 @@ function statCard(label, value, before, values) {
 function renderActivityPage(d) {
   var host = document.getElementById("hubAct");
   host.innerHTML = "";
-  if (d.synthetic) {
-    // services/sample_activity.py: a demonstration must never be read as
-    // a measurement.
-    host.appendChild(actEl("div", "hub-act__sample",
-      "Sample data: this period includes made-up activity loaded for a demonstration. "
-      + "The people are not real; the demos are. An administrator removes it in "
-      + "Admin → Sign-ins."));
-  }
   var t = d.totals, prev = d.previous || {};
   var views = t.view + t.preview;
   var series = d.series || [];

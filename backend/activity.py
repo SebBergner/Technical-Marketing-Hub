@@ -246,8 +246,8 @@ def _within(events: list[dict], since: str | None, until: str | None) -> list[di
 
 
 def readable(email: str) -> str:
-    """A name for someone who never signed in here (or a sample person): the
-    address's own words, "sample.user.01" -> "Sample User 01"."""
+    """A name for someone who never signed in here: the
+    address's own words, "jane.doe" -> "Jane Doe"."""
     return " ".join(w.capitalize() for w in email.split("@")[0].replace("_", ".").split("."))
 
 
@@ -513,9 +513,6 @@ def leaderboard(events: list[dict], *, since: str | None = None, until: str | No
         "unattributed_uses": unattributed,
         "external_not_ranked": external,
         "top": top,
-        # Any sample event in the window (services/sample_activity.py): the
-        # page says so, so a demonstration is never read as a measurement.
-        "synthetic": any(e.get("synthetic") for e in window),
         "series": _daily(days, since, until),
     }
 

@@ -303,8 +303,6 @@
   .ranges button{padding:4px 11px;font-size:12.5px;border-radius:99px}
   .ranges button[aria-pressed="true"]{background:var(--green);border-color:var(--green);
     color:#fff;font-weight:600}
-  .synthetic{background:var(--red-soft);color:var(--red);border:1px solid var(--red);
-    border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;font-size:13px}
 
   .tiles{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
   .tile{background:var(--surface);border:1px solid var(--border);
@@ -486,11 +484,6 @@
         <h2>Hub usage</h2>
         <div class="ranges" id="ranges"></div>
       </div>
-      <div class="synthetic" id="syntheticBanner" hidden>
-        <strong>Synthetic data.</strong> Some or all of the events in this window
-        were generated for testing and are tagged as such. Nothing here is a
-        measurement.
-      </div>
       <div class="tiles" id="usageTotals"></div>
       <div class="card" style="margin-top:12px">
         <div id="usageChart"></div>
@@ -605,10 +598,6 @@
       <div class="card tablewrap" id="alLog"></div>
       <div class="pager" id="alPager"></div>
       <p class="faint act-note" id="alNote"></p>
-    </section>
-    <section>
-      <div class="section-head"><h2>Sample activity</h2></div>
-      <div class="card" id="actSample"></div>
     </section>
   </div>
 

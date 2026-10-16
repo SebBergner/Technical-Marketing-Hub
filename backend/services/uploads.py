@@ -139,8 +139,10 @@ def file_done(repo, upload_id: str, index: int, item_id: str, actor: str) -> dic
     return _update(repo, upload_id, change)
 
 
-def submit(repo, upload_id: str, actor: str, values: dict | None = None) -> dict:
-    """Files and metadata are in: waiting for review."""
+def submit(repo, upload_id: str, actor: str, values: dict | None = None,
+           task: bool = True) -> dict:
+    """Files and metadata are in: waiting for review. `task`: give it a row
+    in the Hub Tasks list -- not when it is published on submission."""
     def change(r):
         if r["status"] not in OPEN + ("sent_back",):
             raise UploadStateError(f"This upload is {r['status']}.")
@@ -166,7 +168,15 @@ def submit(repo, upload_id: str, actor: str, values: dict | None = None) -> dict
         marks.setdefault(record["folder_id"], {"by": record["uploaded_by"], "at": _now(),
                                                "reason": "Marked Internal when created"})
         _save(repo, INTERNAL, marks)
+    if task:
+        _task(repo, record)
     return record
+
+
+def _task(repo, record: dict) -> None:
+    """Its row in the Hub Tasks list (integrations/graph/hub_tasks.py)."""
+    from backend.integrations.graph import hub_tasks
+    hub_tasks.note_upload(repo, record)
 
 
 def failed(repo, upload_id: str, error: str) -> dict:
@@ -185,6 +195,7 @@ def publish(repo, upload_id: str, actor: str, note: str | None = None) -> dict:
         r["history"].append({"at": _now(), "by": actor, "what": "published"})
     record = _update(repo, upload_id, change)
     _set_review(repo, record["folder_id"], None, upload_id)
+    _task(repo, record)
     return record
 
 
@@ -199,6 +210,7 @@ def send_back(repo, upload_id: str, actor: str, note: str) -> dict:
         r["history"].append({"at": _now(), "by": actor, "what": "sent back", "note": note[:1000]})
     record = _update(repo, upload_id, change)
     _set_review(repo, record["folder_id"], "sent_back", upload_id)
+    _task(repo, record)
     return record
 
 
@@ -213,4 +225,5 @@ def cancel(repo, upload_id: str, actor: str) -> dict:
     # Stays hidden: its folder is still in SharePoint for a person to remove.
     record = _update(repo, upload_id, change)
     _set_review(repo, record["folder_id"], "cancelled", upload_id)
+    _task(repo, record)
     return record

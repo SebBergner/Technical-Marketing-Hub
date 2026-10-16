@@ -143,7 +143,11 @@ def run_sync(client: GraphClient, repo: AssetRepository, actor: str,
     attempt either way and re-raises a failure for the caller to report.
     One at a time (_run_lock): a second caller waits for the first."""
     with _run_lock:
-        return _run_sync(client, repo, actor, full)
+        result = _run_sync(client, repo, actor, full)
+    # Rows the Hub Tasks list missed (Graph was down) go again now.
+    from backend.integrations.graph import hub_tasks
+    hub_tasks.flush_soon(repo)
+    return result
 
 
 def _run_sync(client: GraphClient, repo: AssetRepository, actor: str,

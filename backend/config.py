@@ -177,6 +177,12 @@ class Settings(BaseSettings):
     #: download from a demo folder only where this group holds Read there
     #: (backend/integrations/graph/partner_access.py, 2026-10-06).
     partner_group_name: str = "GPX TDD Scalable Demo Catalog Visitors"
+    #: The SharePoint list the Hub keeps its to-dos in -- new demos to review,
+    #: access requests -- so the team can sort them and be alerted
+    #: (backend/integrations/graph/hub_tasks.py, 2026-10-15). Empty: write
+    #: nothing. Both slots share one SharePoint site, so a slot that is only
+    #: for trying things should set it empty.
+    hub_tasks_list: str = "Hub Tasks"
     #: How long a "Still current" confirmation lasts before the demo shows its
     #: age badge again and needs another look (Liwei, 2026-10-14: it expires;
     #: software interfaces change every release).

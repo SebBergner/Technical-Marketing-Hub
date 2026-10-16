@@ -167,6 +167,16 @@ is never dropped. Publishing a new demo and the **Index now** button both use
 it. The main video: a video ticked `PreviewVideo` wins (two ticked → the most
 recently modified), found by a filtered list query.
 
+### Hub Tasks list
+
+`backend/integrations/graph/hub_tasks.py`: a row in the SharePoint list
+"Hub Tasks" for each new demo awaiting review and each Internal / Open
+request, closed when it is decided (Done / Rejected / Withdrawn /
+Cancelled). A copy only, written in the background from
+`owned/hub_tasks.json`, retried after each sync; found again by the indexed
+HubId. Graph cannot write a Hyperlink column (HubLink is text with column
+formatting) and cannot clear a date. `HUB_TASKS_LIST` empty switches it off.
+
 ### Metadata options
 
 `backend/services/upload_options.py` (`owned/upload_options.json`): per field

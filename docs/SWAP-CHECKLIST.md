@@ -128,10 +128,14 @@ Everything built since 2026-10-06, all of it new on production:
 14. **API tokens and Metadata options** are per slot like every other owned
     setting: tokens made on staging do not work on production. Create Seb's
     token on production after the swap and send it to him directly.
-15. **Do not load sample activity on production.** Hub activity starts empty
+15. **Hub Tasks list**: both slots write to the same SharePoint list. After
+    the swap, set `HUB_TASKS_LIST` to empty **as a slot setting on staging**,
+    so trials there do not reach the team's to-do list (production keeps the
+    default, "Hub Tasks").
+16. **Do not load sample activity on production.** Hub activity starts empty
     and fills with real use from today; per-person tracking on production
     starts at the swap.
-16. **Spot checks**: search and filters; a demo page (Files, Manage tab for an
+17. **Spot checks**: search and filters; a demo page (Files, Manage tab for an
     admin); Hub activity opens; Admin → Sign-ins → Admin log shows your sync
     and group changes; a partner test account (if you have one) cannot open
     `/admin`.

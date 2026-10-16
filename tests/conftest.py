@@ -24,6 +24,14 @@ from backend.config import settings
 
 
 @pytest.fixture(autouse=True)
+def no_hub_tasks_list(monkeypatch):
+    """The Hub Tasks list is real and the team watches it
+    (integrations/graph/hub_tasks.py); tests that want it switch it on with
+    a fake client."""
+    monkeypatch.setattr(settings, "hub_tasks_list", "")
+
+
+@pytest.fixture(autouse=True)
 def no_daily_sync_loop(monkeypatch):
     """The app's startup would otherwise start the daily-sync loop, and the
     suite shares the developer's real data directory -- where the schedule

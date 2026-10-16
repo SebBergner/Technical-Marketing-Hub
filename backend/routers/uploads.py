@@ -235,12 +235,13 @@ def _write_and_submit(repo, record: dict, actor: str, values: dict,
     except GraphError as exc:
         uploads.failed(repo, record["id"], str(exc))
         raise HTTPException(status_code=502, detail=f"SharePoint: {exc}. Try Finish again.")
+    # Trusted as much as a reviewer: a token set so (api_tokens), or a
+    # person with "Create without review" (2026-10-15).
+    direct = user is not None and (user.token_skip_review or (
+        not user.token_name and user.can(Perm.PUBLISH_DIRECT)))
     try:
-        done = uploads.submit(repo, record["id"], actor, values)
-        # Trusted as much as a reviewer: a token set so (api_tokens), or a
-        # person with "Create without review" (2026-10-15).
-        if user is not None and (user.token_skip_review or (
-                not user.token_name and user.can(Perm.PUBLISH_DIRECT))):
+        done = uploads.submit(repo, record["id"], actor, values, task=not direct)
+        if direct:
             done = uploads.publish(repo, record["id"], actor,
                                    "Published on submission: "
                                    + ("API token without review" if user.token_name

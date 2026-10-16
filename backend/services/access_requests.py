@@ -13,7 +13,8 @@ controlled, tracked process, not only a switch. So:
 
 One pending request per demo at a time: a second one would only ask the
 same question again. Hub-only, like the marks themselves
-(owned/access_requests.json); SharePoint is never written.
+(owned/access_requests.json). SharePoint is written only as a copy: each
+request is a row in the Hub Tasks list (integrations/graph/hub_tasks.py).
 """
 from __future__ import annotations
 
@@ -93,7 +94,14 @@ def create(repo, asset, level: str, reason: str, actor: str) -> dict:
                    "decided_by": None, "decided_at": None, "note": None}
         items.append(request)
         _save(repo, items)
+    _task(repo, request)
     return request
+
+
+def _task(repo, request: dict) -> None:
+    """Its row in the Hub Tasks list (integrations/graph/hub_tasks.py)."""
+    from backend.integrations.graph import hub_tasks
+    hub_tasks.note_access(repo, request)
 
 
 def _settle(repo, request_id: str, status: str, actor: str, note: str | None,
@@ -110,6 +118,7 @@ def _settle(repo, request_id: str, status: str, actor: str, note: str | None,
         request.update(status=status, decided_by=actor, decided_at=_now(),
                        note=(note or "").strip()[:REASON_MAX] or None)
         _save(repo, items)
+    _task(repo, request)
     return request
 
 

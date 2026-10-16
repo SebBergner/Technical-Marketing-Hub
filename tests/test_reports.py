@@ -47,6 +47,23 @@ def test_the_top_n_only_and_partners_only_as_a_count():
     assert sum(d["view"] for d in out["series"]) == out["totals"]["view"]
 
 
+def test_the_page_says_from_when_people_are_counted_by_name(tmp_path, monkeypatch):
+    """Production's log before 2026-10-16 names nobody: a period reaching
+    back past the first named event says so; one inside it does not."""
+    from backend.routers import reports
+    events = [ev("view", days=20), ev("view", "p0@ptc.com", days=3),
+              ev("view", "p1@ptc.com", days=1)]
+    repo = type("R", (), {"usage_events": lambda self: events,
+                          "list": lambda self, q: type("L", (), {"items": []})()})()
+    monkeypatch.setattr(reports.access, "load_state", lambda: {"groups": []})
+    month = reports.hub_activity(since=(NOW - timedelta(days=30)).isoformat(), until=None,
+                                 top=10, repo=repo)
+    assert month["named_since"] == events[1]["at"][:10]
+    two_days = reports.hub_activity(since=(NOW - timedelta(days=2)).isoformat(), until=None,
+                                    top=10, repo=repo)
+    assert two_days["named_since"] is None
+
+
 def test_teams_are_hub_groups_with_their_totals():
     teams = [{"name": "CAD team", "members": ["p11@ptc.com", "p10@ptc.com", "x@ptc.com"]}]
     out = activity.leaderboard(EVENTS, top=3, teams=teams)

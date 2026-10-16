@@ -47,6 +47,12 @@ def hub_activity(since: str | None = None, until: str | None = None,
                        "products": listed[c["asset_id"]].products,
                        "age_band": listed[c["asset_id"]].age_band}
                       for c in out["content"] if c["asset_id"] in listed]
+    # When PTC people were first counted by name (2026-10-16): production's log
+    # before that day names nobody, so a period reaching further back shows
+    # fewer people than used the Hub, and the page says from when it counts.
+    named = [e.get("at") for e in events if e.get("user") and not e.get("external")]
+    first = min(named) if named else None
+    out["named_since"] = first[:10] if first and (not since or first > since) else None
     # The same span just before, for the "+12% vs previous 30 days" on tiles.
     out["previous"] = None
     lo, hi = activity._parse(since), activity._parse(until) or activity._now()

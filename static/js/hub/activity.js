@@ -204,6 +204,13 @@ function statCard(label, value, before, values) {
   return c;
 }
 
+/* People are counted by name only from the day the Hub began recording who
+ * (2026-10-16 on production); said while the period reaches back past it. */
+function namedNote(day) {
+  return "Counted by name since " + new Date(day + "T00:00:00").toLocaleDateString(
+    "en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 function renderActivityPage(d) {
   var host = document.getElementById("hubAct");
   host.innerHTML = "";
@@ -218,6 +225,7 @@ function renderActivityPage(d) {
   hero.appendChild(actEl("div", "hub-act__hero-n", compact(t.active_people)));
   hero.appendChild(delta(t.active_people, d.previous ? prev.active_people : null));
   hero.appendChild(actEl("div", "hub-act__sub", "in the last " + periodWord()));
+  if (d.named_since) hero.appendChild(actEl("div", "hub-act__sub", namedNote(d.named_since)));
   top.appendChild(hero);
   top.appendChild(statCard("Views and previews", views,
     d.previous ? (prev.view || 0) + (prev.preview || 0) : null,
@@ -241,7 +249,7 @@ function renderActivityPage(d) {
   var lbCard = actEl("div", "hub-act__card");
   lbCard.appendChild(actEl("h3", null, "Most active people"));
   lbCard.appendChild(actEl("div", "hub-act__sub", "Top " + d.top + " PTC people, last "
-    + periodWord()));
+    + periodWord() + (d.named_since ? ". " + namedNote(d.named_since) : "")));
   lbCard.appendChild(leaderboard(d.people));
   mid.appendChild(lbCard);
   host.appendChild(mid);

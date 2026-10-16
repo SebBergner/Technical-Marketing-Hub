@@ -149,6 +149,10 @@ def main() -> None:
     done = check(api.post(f"/api/uploads/{record['id']}/finish"))
     print(f"Done: '{done['title']}' is {done['status'].replace('_', ' ')} "
           f"(upload {done['id']}).")
+    print(f"  SharePoint: {done['sharepoint_url']}")
+    # Permanent: opens the demo's page once the Hub has read the new folder
+    # (a sync starts by itself), My demos until then.
+    print(f"  Hub:        {done['hub_url']}")
 
 
 if __name__ == "__main__":

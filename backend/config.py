@@ -257,6 +257,17 @@ class Settings(BaseSettings):
         return bool(self.admin_username and self.admin_password)
 
     @property
+    def public_base_url(self) -> str:
+        """The Hub's own address, for links it hands out (API answers, the
+        Hub Tasks list): the custom domain where one is set, else the App
+        Service's own name, else a local server."""
+        domain = (self.custom_domain or "").strip()
+        if domain:
+            return f"https://{domain}"
+        host = os.environ.get("WEBSITE_HOSTNAME")
+        return f"https://{host}" if host else "http://localhost:8000"
+
+    @property
     def graph_configured(self) -> bool:
         return all((self.graph_tenant_id, self.graph_client_id, self.graph_client_secret))
 

@@ -95,13 +95,8 @@ def _date(iso: str | None) -> str | None:
 
 
 def _base() -> str:
-    """The Hub's address, for HubLink: the custom domain where one is set,
-    else the App Service's own name, else a local server."""
-    domain = (settings.custom_domain or "").strip()
-    if domain:
-        return f"https://{domain}"
-    host = os.environ.get("WEBSITE_HOSTNAME")
-    return f"https://{host}" if host else "http://localhost:8000"
+    """The Hub's address, for HubLink (config.Settings.public_base_url)."""
+    return settings.public_base_url
 
 
 # ─────────────────────────────────────────────── what a row should say

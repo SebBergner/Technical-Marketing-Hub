@@ -20,12 +20,14 @@ is required before anything is created (services/upload_targets.py).
 from __future__ import annotations
 
 import logging
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from backend.access import Perm
 from backend.admin_auth import require_perm
+from backend.config import settings
 from backend.deps import CurrentUser, get_current_user, get_repo
 from backend.integrations.graph.client import GraphError, get_graph_client
 from backend.repositories.base import AssetRepository
@@ -56,10 +58,24 @@ def _target(client, key: str, *, fresh: bool = False):
         raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
 
 
-def _view(record: dict, user: CurrentUser | None = None) -> dict:
+def _view(record: dict, user: CurrentUser | None = None, repo=None,
+          ids: dict | None = None) -> dict:
+    """An upload as the API answers it, with where to find the demo (Seb,
+    2026-10-16): `sharepoint_url`, its folder; `hub_url`, a permanent Hub
+    link that works at once and opens the demo's page once the Hub has read
+    it (app.py, /demo/upload/{id}); `asset_id` and `asset_url` from then on,
+    null before -- the Hub names a demo when it first reads it."""
     out = {k: v for k, v in record.items() if k != "values"}
     out["values"] = record.get("values")
     out["mine"] = bool(user) and record.get("uploaded_by", "").split(":", 1)[-1] == user.email
+    base = settings.public_base_url
+    out["sharepoint_url"] = record.get("web_url")
+    out["hub_url"] = f"{base}/demo/upload/{record['id']}"
+    if ids is None and repo is not None and hasattr(repo, "ids_by_folder"):
+        ids = repo.ids_by_folder()
+    asset_id = (ids or {}).get(record.get("folder_id"))
+    out["asset_id"] = asset_id
+    out["asset_url"] = f"{base}/#/asset/{quote(asset_id, safe='')}" if asset_id else None
     return out
 
 
@@ -152,7 +168,7 @@ def start(body: UploadIn, repo: AssetRepository = Depends(get_repo),
                             internal=body.internal, folder_id=folder["id"], folder_name=name,
                             web_url=folder.get("webUrl"), actor=actor, preview=preview)
     log.info("upload %s started by %s: %s/%s", record["id"], actor, spec.library, name)
-    return _view(record, user)
+    return _view(record, user, repo)
 
 
 @router.post("/{upload_id}/files/{index}/session")
@@ -205,7 +221,7 @@ def file_done(upload_id: str, index: int, body: DoneIn,
         raise HTTPException(status_code=422, detail=f"{expected['path']} did not arrive whole; "
                             "upload it again.")
     try:
-        return _view(uploads.file_done(repo, upload_id, index, body.item_id, actor), user)
+        return _view(uploads.file_done(repo, upload_id, index, body.item_id, actor), user, repo)
     except uploads.UploadStateError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -255,7 +271,7 @@ def finish(upload_id: str, repo: AssetRepository = Depends(get_repo),
         raise HTTPException(status_code=422, detail=f"This upload is {record['status']}.")
     if any(not f["done"] for f in record["files"]):
         raise HTTPException(status_code=422, detail="Some files have not finished uploading.")
-    return _view(_write_and_submit(repo, record, actor, record["values"], user), user)
+    return _view(_write_and_submit(repo, record, actor, record["values"], user), user, repo)
 
 
 class ResubmitIn(BaseModel):
@@ -280,7 +296,7 @@ def resubmit(upload_id: str, body: ResubmitIn, repo: AssetRepository = Depends(g
     if values.get("title") != record["values"].get("title"):
         raise HTTPException(status_code=422, detail="The title is the folder's name and stays "
                             "as it was; rename the folder in SharePoint if it must change.")
-    return _view(_write_and_submit(repo, record, actor, values, user), user)
+    return _view(_write_and_submit(repo, record, actor, values, user), user, repo)
 
 
 class NoteIn(BaseModel):
@@ -300,7 +316,7 @@ def publish(upload_id: str, body: NoteIn, repo: AssetRepository = Depends(get_re
         _sync_soon(repo, actor)
     # Internal, if asked for, was marked by folder when it was submitted
     # (services/uploads.submit), so it holds whether or not a sync has run.
-    return _view(done, user)
+    return _view(done, user, repo)
 
 
 @router.post("/{upload_id}/send-back")
@@ -308,7 +324,7 @@ def send_back(upload_id: str, body: NoteIn, repo: AssetRepository = Depends(get_
               actor: str = Depends(REVIEW), user: CurrentUser = Depends(get_current_user)):
     _get(repo, upload_id)
     try:
-        return _view(uploads.send_back(repo, upload_id, actor, body.note or ""), user)
+        return _view(uploads.send_back(repo, upload_id, actor, body.note or ""), user, repo)
     except uploads.UploadStateError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -340,7 +356,7 @@ def cancel(upload_id: str, repo: AssetRepository = Depends(get_repo),
            actor: str = Depends(UPLOAD), user: CurrentUser = Depends(get_current_user)):
     _get(repo, upload_id)
     try:
-        return _view(uploads.cancel(repo, upload_id, actor), user)
+        return _view(uploads.cancel(repo, upload_id, actor), user, repo)
     except uploads.UploadStateError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -363,9 +379,7 @@ def listing(status: str | None = None, mine: bool = False,
     ids = repo.ids_by_folder() if hasattr(repo, "ids_by_folder") else {}
     out = []
     for r in records[:limit]:
-        view = _view(r, user)
-        view["asset_id"] = ids.get(r.get("folder_id"))
-        out.append(view)
+        out.append(_view(r, user, ids=ids))
     return out
 
 

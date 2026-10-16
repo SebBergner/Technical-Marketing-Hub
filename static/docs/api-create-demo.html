@@ -26,7 +26,7 @@
 <h1>Create a demo through the API</h1>
 <p class="lead">For programs — a pipeline, a script — that create demos in the Technical
 Marketing Hub the way <b>Create New Demo</b> does on the page: metadata first, files, then
-review. Written 2026-10-15.</p>
+review. Written 2026-10-15; SharePoint and Hub URLs in every answer since 2026-10-16.</p>
 
 <h2>1. Get a token</h2>
 <p>An administrator issues it on <b>Admin → Users &amp; groups → API tokens</b>: a name for
@@ -89,6 +89,19 @@ reviewer's <code>note</code>, <code>published</code>).</td></tr>
 <code>{"values": {...}}</code> with the metadata corrected (the title stays).</td></tr>
 </table>
 
+<h3>Where the demo is</h3>
+<p>Every answer about an upload (steps 2, 5, 6 and the list) carries:</p>
+<table>
+<tr><th>Field</th><th>What it is</th></tr>
+<tr><td><code>sharepoint_url</code></td><td>The demo's folder in SharePoint, from step 2 on.</td></tr>
+<tr><td><code>hub_url</code></td><td>A permanent link to the demo in the Hub, from step 2 on. It
+opens the demo's page once the Hub has read the new folder &mdash; a sync starts by itself
+when the demo is published, usually a few minutes &mdash; and My demos until then.</td></tr>
+<tr><td><code>asset_id</code>, <code>asset_url</code></td><td>The demo's own id and page in the
+Hub, once it has been read; <code>null</code> before. Poll
+<code>GET /api/uploads?mine=true</code> if you need them.</td></tr>
+</table>
+
 <h3>Step 2 in detail</h3>
 <pre><code>POST /api/uploads
 {
@@ -103,7 +116,7 @@ reviewer's <code>note</code>, <code>published</code>).</td></tr>
 <ul>
 <li><code>path</code> is where the file goes inside the demo (sub-folders kept);
 <code>size</code> in bytes, exactly.</li>
-<li>The title becomes the demo's name and link; a name already taken is refused (409).</li>
+<li>The title becomes the demo's name; a name already taken is refused (409).</li>
 <li>A video demo is exactly one video file.</li>
 </ul>
 

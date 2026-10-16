@@ -169,6 +169,25 @@ async def reports_page():
     return RedirectResponse("/#/activity", status_code=302)
 
 
+@app.get("/demo/upload/{upload_id}", include_in_schema=False)
+async def demo_of_upload(upload_id: str):
+    """The permanent Hub link the upload API hands out (Seb, 2026-10-16): the
+    demo's page once the Hub has read the new folder, until then My demos,
+    which says where it stands. Behind sign-in like every page."""
+    from urllib.parse import quote
+    from backend.deps import get_repo
+    from backend.services import uploads
+    repo = get_repo()
+    try:
+        record = uploads.get(repo, upload_id)
+    except LookupError:
+        return RedirectResponse("/", status_code=302)
+    ids = repo.ids_by_folder() if hasattr(repo, "ids_by_folder") else {}
+    asset_id = ids.get(record.get("folder_id"))
+    return RedirectResponse(f"/#/asset/{quote(asset_id, safe='')}" if asset_id else "/#/upload",
+                            status_code=302)
+
+
 @app.get("/migration", include_in_schema=False)
 async def migration_page():
     """Content migrations into SharePoint, one section per source

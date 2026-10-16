@@ -317,3 +317,30 @@ def test_create_without_review_publishes_at_once(client, sp):
     other = start(client, values={**KIT, "title": "Another Kit"}).json()   # MAKER: no such right
     upload_all(client, sp, other)
     assert client.post(f"/api/uploads/{other['id']}/finish", headers=MAKER).json()["status"] == "pending"
+
+
+def test_every_answer_says_where_the_demo_is(client, sp, tmp_path, monkeypatch):
+    """Seb, 2026-10-16: the API returns the SharePoint URL and the Hub URL.
+    The Hub link is permanent: My demos until the Hub has read the folder,
+    the demo's page from then on."""
+    monkeypatch.setattr(settings, "custom_domain", "tmh.ptcxc.com")
+    record = start(client).json()
+    assert record["sharepoint_url"] == "https://sp/Creo Sheetmetal Kit"
+    assert record["hub_url"] == f"https://tmh.ptcxc.com/demo/upload/{record['id']}"
+    assert (record["asset_id"], record["asset_url"]) == (None, None), "not read yet"
+    upload_all(client, sp, record)
+    done = client.post(f"/api/uploads/{record['id']}/finish", headers=MAKER).json()
+    assert done["hub_url"] == record["hub_url"] and done["sharepoint_url"]
+    link = client.get(f"/demo/upload/{record['id']}", headers=MAKER, follow_redirects=False)
+    assert (link.status_code, link.headers["location"]) == (302, "/#/upload")
+
+    folder = sp.written[0][0]
+    (tmp_path / "mirror" / "sharepoint.json").write_text(json.dumps([
+        {"id": "creo-sheetmetal-kit", "type": "ldk", "title": "Creo Sheetmetal Kit",
+         "products": ["Creo"], "source_item_id": folder}]), encoding="utf-8")
+    [mine] = client.get("/api/uploads?mine=true", headers=MAKER).json()
+    assert mine["asset_url"] == "https://tmh.ptcxc.com/#/asset/creo-sheetmetal-kit"
+    link = client.get(f"/demo/upload/{record['id']}", headers=MAKER, follow_redirects=False)
+    assert link.headers["location"] == "/#/asset/creo-sheetmetal-kit"
+    assert client.get("/demo/upload/nope", headers=MAKER,
+                      follow_redirects=False).headers["location"] == "/"

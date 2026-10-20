@@ -147,6 +147,9 @@ def run_sync(client: GraphClient, repo: AssetRepository, actor: str,
     # Rows the Hub Tasks list missed (Graph was down) go again now.
     from backend.integrations.graph import hub_tasks
     hub_tasks.flush_soon(repo)
+    # SharePoint-hosted pictures fetched ahead of the first viewer.
+    from backend.services import thumbnails
+    thumbnails.warm_soon(repo)
     return result
 
 

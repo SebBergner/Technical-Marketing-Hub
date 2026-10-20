@@ -24,6 +24,14 @@ from backend.config import settings
 
 
 @pytest.fixture(autouse=True)
+def no_thumbnail_warming(monkeypatch):
+    """After a sync the Hub fetches SharePoint pictures in the background
+    (services/thumbnails.py) -- with the developer's real Graph client."""
+    from backend.services import thumbnails
+    monkeypatch.setattr(thumbnails, "warm_soon", lambda repo: None)
+
+
+@pytest.fixture(autouse=True)
 def no_hub_tasks_list(monkeypatch):
     """The Hub Tasks list is real and the team watches it
     (integrations/graph/hub_tasks.py); tests that want it switch it on with

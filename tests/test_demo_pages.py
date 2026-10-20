@@ -42,7 +42,8 @@ def test_page_and_folder_add_the_thumbnail_and_link_to_the_folders_demo(tmp_path
     ids = [a.id for a in repo.list(AssetQuery(limit=10)).items]
     assert ids == ["kit-1"], "the page is not listed beside its demo"
     kit = repo.get("kit-1")
-    assert kit.page_url.endswith("bobcat.aspx") and "getpreview" in kit.thumbnail_url
+    assert kit.page_url.endswith("bobcat.aspx") and kit.thumbnail_url == "/api/assets/kit-1/thumbnail"
+    assert "getpreview" in repo.thumbnail_source("kit-1"), "served through the Hub (services/thumbnails.py)"
     assert len(kit.resources) == 1, "files stay as they were"
 
 
@@ -104,7 +105,8 @@ def test_page_links_are_hidden_by_default_and_never_leave_the_server(tmp_path):
                      [page_row("bobcat", "Bobcat - IPL", "Bobcat - IPL"),
                       page_row("lamborghini", "Lamborghini - IPL", None)], links=False)
     kit = repo.get("kit-1")
-    assert kit.page_url is None and "getpreview" in kit.thumbnail_url, "thumbnail stays, link goes"
+    assert kit.page_url is None and kit.thumbnail_url == "/api/assets/kit-1/thumbnail", \
+        "thumbnail stays, link goes"
     lambo = repo.get("page-lamborghini")
     assert lambo is not None and lambo.page_url is None and lambo.web_url is None,         "a page-only demo stays listed, with no address to its page"
 
@@ -141,7 +143,7 @@ def test_page_only_demos_are_listed_by_default_and_can_be_switched_off(tmp_path)
     repo.set_hub_settings("admin-session", show_page_only_demos=False)
     assert [a.id for a in repo.list(AssetQuery(limit=10)).items] == ["kit-1"]
     assert repo.get("page-lamborghini") is None
-    assert "getpreview" in repo.get("kit-1").thumbnail_url, "a folder's demo keeps its page thumbnail"
+    assert "getpreview" in repo.thumbnail_source("kit-1"), "a folder's demo keeps its page thumbnail"
     assert repo.hub_settings()["show_demo_page_links"] is False, "one switch never moves the other"
 
 

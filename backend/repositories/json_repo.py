@@ -45,7 +45,7 @@ from backend.models import (
     Page, ProposalState, ProposalSummary, ValueRoadmap, video_type,
 )
 from backend.repositories.base import AssetQuery, AssetRepository
-from backend.services import content_age, listing, relevance, taxonomy
+from backend.services import content_age, listing, relevance, taxonomy, thumbnails
 from backend.tables import utcnow
 
 log = logging.getLogger(__name__)
@@ -760,6 +760,12 @@ class JsonAssetRepository(AssetRepository):
             total=len(hits), limit=query.limit, offset=query.offset,
         )
 
+    def thumbnail_source(self, asset_id: str) -> str | None:
+        """The asset's own thumbnail address, before public_url() rewrites a
+        SharePoint one -- what /api/assets/{id}/thumbnail fetches."""
+        record = next((r for r in self._load_mirror() if r["id"] == asset_id), None)
+        return (record or {}).get("thumbnail_url")
+
     def get(self, asset_id: str) -> Asset | None:
         record = next((r for r in self._load_mirror() if r["id"] == asset_id), None)
         if record is None:
@@ -1408,7 +1414,8 @@ class JsonAssetRepository(AssetRepository):
             named_customer=record.get("named_customer"),
             uploaded_at=_as_date(record.get("uploaded_at")),
             duration_seconds=record.get("duration_seconds"),
-            thumbnail_url=record.get("thumbnail_url"),
+            # A SharePoint picture goes through the Hub (services/thumbnails.py).
+            thumbnail_url=thumbnails.public_url(record["id"], record.get("thumbnail_url")),
             source_item_id=record.get("source_item_id"),
             brightcove_id=record.get("brightcove_id"),
             consensus_uuid=record.get("consensus_uuid"),

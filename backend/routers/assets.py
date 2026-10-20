@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel
 
 from backend.access import Perm
@@ -299,6 +299,25 @@ def _asset_drive(client: GraphClient, asset_id: str):
             status_code=502,
             detail=f"no drive named {library!r} on {site.web_url}")
     return drive
+
+
+@router.get("/{asset_id}/thumbnail")
+def asset_thumbnail(asset_id: str, repo: AssetRepository = Depends(get_repo),
+                    user: CurrentUser = Depends(get_current_user)):
+    """A SharePoint-hosted picture, fetched by the Hub so every viewer sees it,
+    signed into SharePoint or not (services/thumbnails.py, 2026-10-20). Seen by
+    whoever may see the demo; 404 lets the card fall back to its cover."""
+    from backend.integrations.graph.client import get_graph_client
+    from backend.services import thumbnails
+    get_asset(asset_id, repo, user)                      # the same 404s as the page
+    source = getattr(repo, "thumbnail_source", lambda _id: None)(asset_id)
+    if not thumbnails.is_sharepoint(source):
+        raise HTTPException(status_code=404, detail="No SharePoint picture for this demo.")
+    picture = thumbnails.get(repo.mirror_dir, get_graph_client(), source)
+    if picture is None:
+        raise HTTPException(status_code=404, detail="Picture not available.")
+    return Response(content=picture[0], media_type=picture[1],
+                    headers={"Cache-Control": "private, max-age=86400"})
 
 
 @router.get("/{asset_id}/files/{item_id}/download")

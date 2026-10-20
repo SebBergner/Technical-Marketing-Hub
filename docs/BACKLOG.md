@@ -80,8 +80,8 @@ Value Roadmap 搜索卡在 AMP 数据上。
   用 ETag 防并发覆盖；每次修改记进 Admin log，可在 SharePoint 版本历史里追溯。
   Consensus 的条目只读（Consensus 不由 Hub 写）。
 - **要先定的事**：
-  1. **允许覆盖已有值吗？** 这会改变"Hub 不修改 SharePoint 已有内容"的原则，需要你明确同意。
-     折中做法：只允许改有 `edit_metadata` 权限的人，并且每次改动都留痕。
+  1. **允许覆盖已有值**——已定（Liwei 10/20）：Hub 已能在 SharePoint 创建 demo，"不修改 SharePoint"
+     的原则不再适用；只要确保只有有 `edit_metadata` 权限的人能改，每次改动留痕。
   2. 改动要不要审核后才写回，还是直接写？
   3. 谁有权限：目前 Administrators 和 TDD Team 都勾了 `edit_metadata`。
 - **工作量**：2–3 天。

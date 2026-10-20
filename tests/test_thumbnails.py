@@ -87,3 +87,27 @@ def test_warming_fetches_each_picture_once(client, monkeypatch, tmp_path):
     assert thumbnails.warm(repo, client=object()) == 1
     assert thumbnails.warm(repo, client=object()) == 0, "fresh in the cache"
     assert calls == [HILL]
+
+
+def test_a_missing_picture_is_not_asked_for_on_every_view(client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(thumbnails, "fetch", lambda graph, url: calls.append(url))
+    monkeypatch.setattr("backend.integrations.graph.client.get_graph_client", lambda: object())
+    for _ in range(3):
+        assert client.get("/api/assets/hill/thumbnail", headers=ANN).status_code == 404
+    assert calls == [HILL], "remembered as missing for MISS_HOURS"
+
+
+def test_a_viewer_never_queues_behind_sharepoint(client, monkeypatch):
+    """All fetch slots taken: a quick 404 (the card's cover) and a warm-up."""
+    warmed = []
+    monkeypatch.setattr(thumbnails, "warm_soon", lambda repo: warmed.append(1))
+    monkeypatch.setattr("backend.integrations.graph.client.get_graph_client", lambda: object())
+    for _ in range(thumbnails.SLOTS):
+        thumbnails._slots.acquire()
+    try:
+        r = client.get("/api/assets/hill/thumbnail", headers=ANN)
+    finally:
+        for _ in range(thumbnails.SLOTS):
+            thumbnails._slots.release()
+    assert (r.status_code, r.headers["cache-control"], warmed) == (404, "no-store", [1])

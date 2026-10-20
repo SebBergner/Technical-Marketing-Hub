@@ -313,7 +313,13 @@ def asset_thumbnail(asset_id: str, repo: AssetRepository = Depends(get_repo),
     source = getattr(repo, "thumbnail_source", lambda _id: None)(asset_id)
     if not thumbnails.is_sharepoint(source):
         raise HTTPException(status_code=404, detail="No SharePoint picture for this demo.")
-    picture = thumbnails.get(repo.mirror_dir, get_graph_client(), source)
+    try:
+        picture = thumbnails.get(repo.mirror_dir, get_graph_client(), source, wait=False)
+    except thumbnails.Busy:
+        # Never queue a viewer behind SharePoint: the cover now, the picture
+        # once the background warm-up has it (not cached, so no-store).
+        thumbnails.warm_soon(repo)
+        return Response(status_code=404, headers={"Cache-Control": "no-store"})
     if picture is None:
         raise HTTPException(status_code=404, detail="Picture not available.")
     return Response(content=picture[0], media_type=picture[1],

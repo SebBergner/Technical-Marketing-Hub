@@ -559,7 +559,10 @@ function topContent(items) {
     var a = actEl("a", "hub-act__item");
     a.href = "#/asset/" + encodeURIComponent(c.asset_id);
     var thumb = actEl("div", "hub-act__thumb");
-    var safe = c.thumbnail_url && /^https?:/i.test(c.thumbnail_url) ? c.thumbnail_url : null;
+    // An outside picture, or the Hub's own address for a SharePoint-hosted
+    // one (/api/assets/{id}/thumbnail, 2026-10-20).
+    var safe = c.thumbnail_url && /^(https?:|\/api\/assets\/)/i.test(c.thumbnail_url)
+      ? c.thumbnail_url : null;
     if (safe) thumb.style.backgroundImage = 'url("' + safe.replace(/"/g, "%22") + '")';
     // The cards' own rule: a picture only if it loads (SharePoint-hosted
     // ones need a SharePoint sign-in), else the generated cover.

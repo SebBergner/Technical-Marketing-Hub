@@ -342,7 +342,9 @@ async function openAssetDetail(id, fileItemId) {
     player.style.background = asset.thumbnail_url
       ? "#000 url(" + JSON.stringify(asset.thumbnail_url) + ") center/contain no-repeat"
       : "";
-    if (!asset.thumbnail_url) paintCoverInto(player, asset);
+    // No picture, or one that does not load (a CAD Image naming a file that
+    // is not there): the generated cover, as on the cards.
+    paintCoverInto(player, asset);
     var play = player.querySelector(".vp-player__play");
     if (play) {
       // Seb, review: "play the video in that thumbnail frame ... same for

@@ -109,6 +109,8 @@ def main() -> None:
     ap.add_argument("--metadata", help="JSON file with the fields")
     ap.add_argument("--preview", help="with several videos: the one to play first")
     ap.add_argument("--internal", action="store_true", help="files only for internal access")
+    ap.add_argument("--submitted-by", help="the PTC person this upload is for (a token allowed "
+                    "to name who it uploads for)")
     ap.add_argument("--show-form", action="store_true", help="print the targets and their fields")
     ap.add_argument("files", nargs="*", help="files and/or one folder")
     a = ap.parse_args()
@@ -136,7 +138,7 @@ def main() -> None:
     print(f"Creating '{values.get('title')}' with {len(listed)} file(s)…")
     record = check(api.post("/api/uploads", json={
         "target": a.target, "kind": a.kind, "values": values, "files": listed,
-        "internal": a.internal, "preview": a.preview}))
+        "internal": a.internal, "preview": a.preview, "submitted_by": a.submitted_by}))
     print(f"  upload {record['id']}: folder '{record['folder_name']}' created")
 
     local_of = dict(files)

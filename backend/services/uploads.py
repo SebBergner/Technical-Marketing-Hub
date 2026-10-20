@@ -109,11 +109,19 @@ def _update(repo, upload_id: str, change) -> dict:
 # ───────────────────────────────────────────────────────────── the steps
 def create(repo, *, target: str, kind: str, values: dict, files: list[dict],
            internal: bool, folder_id: str, folder_name: str, web_url: str | None,
-           actor: str, preview: str | None = None) -> dict:
-    """Recorded the moment the folder exists, and hidden from the Hub then."""
+           actor: str, preview: str | None = None, submitted_by: str | None = None,
+           person: str | None = None) -> dict:
+    """Recorded the moment the folder exists, and hidden from the Hub then.
+
+    `submitted_by`: the PTC person an API upload is for, as its token said.
+    `person`: who the demo counts as made by (2026-10-20) -- that person, else
+    the token's owner, else whoever uploaded through the page. SharePoint
+    records the Hub's app as the files' creator, so without this a demo made
+    through the Hub was nobody's in "Whose demos were used most"."""
     record = {"id": secrets.token_hex(6), "target": target, "kind": kind,
               "title": values.get("title"), "values": values, "internal": bool(internal),
               "preview": preview,
+              "submitted_by": submitted_by, "person": (person or "").strip().lower() or None,
               "folder_id": folder_id, "folder_name": folder_name, "web_url": web_url,
               "files": [{**f, "done": False, "item_id": None} for f in files],
               "status": "uploading", "uploaded_by": actor,

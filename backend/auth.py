@@ -114,6 +114,10 @@ class CurrentUser:
     token_name: str | None = None
     token_permissions: frozenset | None = None
     token_skip_review: bool = False
+    #: The token's responsible person, and whether it may name, per upload,
+    #: the PTC person it uploads for (`submitted_by`, 2026-10-20).
+    token_owner: str | None = None
+    token_on_behalf: bool = False
     #: The sign-in came through another directory (a guest account): its ID
     #: token named an outside identity provider. Recorded at sign-in.
     external: bool = False
@@ -317,7 +321,9 @@ def _principal_from_token(request: Request) -> CurrentUser | None:
     return CurrentUser(name=record["name"], provider="api-token", is_authenticated=True,
                        token_name=record["name"],
                        token_permissions=frozenset(record["permissions"]),
-                       token_skip_review=bool(record.get("skip_review")))
+                       token_skip_review=bool(record.get("skip_review")),
+                       token_owner=record.get("owner"),
+                       token_on_behalf=bool(record.get("on_behalf")))
 
 
 def principal_from_request(request: Request) -> CurrentUser:

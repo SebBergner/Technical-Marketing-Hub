@@ -113,13 +113,20 @@ Hub, once it has been read; <code>null</code> before. Poll
   "files": [ {"path": "Videos/Overview_CF.mp4", "size": 52428800},
              {"path": "Script.docx", "size": 20480} ],
   "preview": "Videos/Overview_CF.mp4", // required with two or more videos
-  "internal": false                    // true: files open only for internal access
+  "internal": false,                   // true: files open only for internal access
+  "submitted_by": "jane.doe@ptc.com"   // optional: who this upload is for (see below)
 }</code></pre>
 <ul>
 <li><code>path</code> is where the file goes inside the demo (sub-folders kept);
 <code>size</code> in bytes, exactly.</li>
 <li>The title becomes the demo's name; a name already taken is refused (409).</li>
 <li>A video demo is exactly one video file.</li>
+<li><code>submitted_by</code> (optional, since 2026-10-20): for a tool several people use
+through one token, the PTC email address of the person this upload is for. The token must be
+allowed to name who it uploads for (a tick when the token is created); otherwise, or for a
+non-PTC address, the call is refused (422). The person is recorded on the upload, shown to
+reviewers, and credited as the demo's creator in Hub activity. Without it, the token's
+responsible person is credited.</li>
 </ul>
 
 <h3>The fields and their values</h3>

@@ -157,3 +157,61 @@ def test_under_sign_in_a_token_reaches_the_api_and_nothing_else(tmp_path, monkey
     assert c.get("/api/assets", headers=bearer("tmh_bad_token")).status_code == 401
     assert c.get("/api/assets", headers=bearer(no_hub)).status_code == 403
     assert c.get("/api/assets").status_code == 401, "no token, no session: sign in"
+
+
+def start_for(client, secret, submitted_by):
+    return client.post("/api/uploads", json={"target": "demo_catalog", "kind": "ldk",
+                                             "values": KIT, "files": FILES,
+                                             "submitted_by": submitted_by},
+                       headers=bearer(secret))
+
+
+def test_a_token_may_name_who_an_upload_is_for_only_when_allowed(client, sp):
+    """Seb, 2026-10-20: one token, several people using his tool."""
+    plain = issue(client).json()["secret"]
+    r = start_for(client, plain, "ann@ptc.com")
+    assert r.status_code == 422 and "submitted_by" in r.json()["detail"]
+
+    behalf = issue(client, name="AMP UI", on_behalf=True).json()
+    assert behalf["token"]["on_behalf"] is True
+    assert start_for(client, behalf["secret"], "p@partner.it").status_code == 422, \
+        "a PTC person only"
+    r = start_for(client, behalf["secret"], "Ann@PTC.com")
+    assert r.status_code == 201, r.text
+    record = r.json()
+    assert (record["uploaded_by"], record["submitted_by"], record["person"]) == \
+        ("token:AMP UI", "ann@ptc.com", "ann@ptc.com")
+    log = client.get("/api/admin/admin-log?category=Uploads", headers=BOSS).json()
+    assert "ann@ptc.com" in json.dumps(log), "the Admin log keeps the request body"
+
+
+def test_a_person_cannot_send_submitted_by(client, sp):
+    access.create_group("Makers", "", ["view_hub", "upload_content"], ["maker@ptc.com"], "test")
+    r = client.post("/api/uploads", json={"target": "demo_catalog", "kind": "ldk",
+                                          "values": KIT, "files": FILES,
+                                          "submitted_by": "ann@ptc.com"},
+                    headers=easyauth_headers("maker@ptc.com"))
+    assert r.status_code == 422
+
+
+def test_a_demo_made_through_the_hub_is_credited_to_its_person(client, sp, tmp_path):
+    """SharePoint names the Hub's app as the files' creator; the upload
+    record knows the person, and "Whose demos were used most" now does too."""
+    behalf = issue(client, name="AMP UI", on_behalf=True).json()["secret"]
+    record = start_for(client, behalf, "jane.doe@ptc.com").json()
+    plain = issue(client, name="Batch").json()["secret"]
+    by_token = client.post("/api/uploads", json={"target": "demo_catalog", "kind": "ldk",
+                                                 "values": {**KIT, "title": "Second Kit"},
+                                                 "files": FILES}, headers=bearer(plain)).json()
+    assert by_token["person"] == "seb@ptc.com", "no submitted_by: the token's owner"
+    (tmp_path / "mirror" / "sharepoint.json").write_text(json.dumps([
+        {"id": "kit-a", "type": "ldk", "title": "Creo Sheetmetal Kit", "products": ["Creo"],
+         "source_item_id": record["folder_id"], "creator": None},
+        {"id": "kit-b", "type": "ldk", "title": "Second Kit", "products": ["Creo"],
+         "source_item_id": by_token["folder_id"], "creator": "SharePoint App"}]),
+        encoding="utf-8")
+    from backend.deps import get_repo
+    from backend.repositories.base import AssetQuery
+    creators = {a.id: a.creator for a in get_repo().list(
+        AssetQuery(limit=10, include_pending=True)).items}
+    assert creators == {"kit-a": "Jane Doe", "kit-b": "Seb"}

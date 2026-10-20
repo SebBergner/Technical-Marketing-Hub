@@ -82,7 +82,10 @@ def listing() -> list[dict]:
 
 
 def create(*, name: str, owner: str, permissions: list[str], days: int | None,
-           skip_review: bool, actor: str) -> tuple[dict, str]:
+           skip_review: bool, actor: str, on_behalf: bool = False) -> tuple[dict, str]:
+    """`on_behalf` (2026-10-20): the program may name, per upload, the PTC
+    person it uploads for (`submitted_by`) -- for a tool several people use
+    through one token."""
     """(the token's record, the secret to show once)."""
     name = (name or "").strip()
     owner = (owner or "").strip().lower()
@@ -96,6 +99,8 @@ def create(*, name: str, owner: str, permissions: list[str], days: int | None,
         raise TokenError("A token may carry only: " + ", ".join(TOKEN_PERMISSIONS) + ".")
     if skip_review and "upload_content" not in perms:
         raise TokenError("Publishing without review only applies to Create new demo.")
+    if on_behalf and "upload_content" not in perms:
+        raise TokenError("Naming who an upload is for only applies to Create new demo.")
     days = days or DEFAULT_DAYS
     if not 1 <= days <= MAX_DAYS:
         raise TokenError(f"A token lasts between 1 and {MAX_DAYS} days.")
@@ -106,7 +111,8 @@ def create(*, name: str, owner: str, permissions: list[str], days: int | None,
         token_id = secrets.token_hex(4)
         secret = f"{PREFIX}{token_id}_{secrets.token_urlsafe(32)}"
         record = {"id": token_id, "name": name, "owner": owner, "permissions": perms,
-                  "skip_review": bool(skip_review), "created_by": actor,
+                  "skip_review": bool(skip_review), "on_behalf": bool(on_behalf),
+                  "created_by": actor,
                   "created_at": _now().isoformat(timespec="seconds"),
                   "expires_at": (_now() + timedelta(days=days)).isoformat(timespec="seconds"),
                   "last_used_at": None, "revoked_at": None, "revoked_by": None,

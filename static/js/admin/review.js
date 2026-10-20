@@ -54,7 +54,8 @@ function loadUploads() {
         info.appendChild(el("div", "promo-row__meta", [
           (u.target === "demo_video" ? "Video" : (u.kind || "").toUpperCase()),
           (v.products || []).join(", "), (v.segment || []).join(", "),
-          "by " + actorWord(u.uploaded_by),
+          "by " + actorWord(u.uploaded_by)
+            + (u.submitted_by ? " for " + u.submitted_by : ""),
           u.submitted_at ? new Date(u.submitted_at).toLocaleDateString() : null,
           u.internal ? "asks to be Internal" : null,
           u.asset_id ? null : "not in the Hub yet"

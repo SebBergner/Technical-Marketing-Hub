@@ -148,3 +148,12 @@ def test_switched_off_writes_nothing(access_client, sp_list, monkeypatch, tmp_pa
     ask(access_client)
     assert hub_tasks.flush(_repo(), client=sp_list) == {"sent": 0, "failed": 0, "skipped": 0}
     assert not (tmp_path / "owned" / "hub_tasks.json").exists()
+
+
+def test_an_api_upload_for_someone_names_them_in_the_list(monkeypatch):
+    monkeypatch.setattr(settings, "custom_domain", "tmh.ptcxc.com")
+    row = hub_tasks.upload_fields({"id": "u1", "status": "pending", "title": "Kit",
+                                   "uploaded_by": "token:AMP UI",
+                                   "submitted_by": "ann@ptc.com", "values": {}})
+    assert row["RequestedBy"] == "ann@ptc.com"
+    assert "Uploaded through API token AMP UI." in row["Details"]

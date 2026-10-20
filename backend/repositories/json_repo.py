@@ -278,6 +278,28 @@ class WouldShrinkMirror(RuntimeError):
     """
 
 
+def _upload_people(records) -> dict[str, str]:
+    """SharePoint folder id -> who made the demo, for demos created through
+    the Hub (services/uploads.py `person`): the name they signed in with when
+    the Hub knows it -- the same "Last, First" SharePoint shows -- else one
+    read from the address."""
+    if not isinstance(records, list) or not records:
+        return {}
+    from backend import access
+    from backend.activity import readable
+    names = {}
+    for u in access.known_users():
+        for key in (u.get("email"), u.get("username")):
+            if key and u.get("name"):
+                names[key.lower()] = u["name"]
+    out = {}
+    for r in records:
+        who = (r.get("person") or "").lower()
+        if who and r.get("folder_id") and r.get("status") != "cancelled":
+            out[r["folder_id"]] = names.get(who) or readable(who)
+    return out
+
+
 class JsonAssetRepository(AssetRepository):
     #: Guards read-modify-write within the process. See the module docstring on
     #: why this is not sufficient across processes.
@@ -358,13 +380,18 @@ class JsonAssetRepository(AssetRepository):
         # it), and "pending" / "sent_back" until a reviewer publishes it.
         dates = self._load("publish_dates") or {}
         review = self._load("upload_review") or {}
-        if dates or review:
+        made_by = _upload_people(self._load("uploads"))
+        if dates or review or made_by:
             def stamp(r: dict) -> dict:
                 key = r.get("source_item_id")
                 if key in dates:
                     r = {**r, "uploaded_at": dates[key]}
                 if key in review:
                     r = {**r, "upload_review": review[key].get("status")}
+                if key in made_by:
+                    # SharePoint names the Hub's app as these files' creator;
+                    # the upload record knows the person (2026-10-20).
+                    r = {**r, "creator": made_by[key]}
                 return r
             rows = [stamp(r) for r in rows]
         # Hidden from the Hub on the Admin page (owned/hidden.json): out of

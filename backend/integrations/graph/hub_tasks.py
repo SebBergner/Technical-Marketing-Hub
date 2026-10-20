@@ -108,6 +108,8 @@ def upload_fields(record: dict) -> dict | None:
     what = "Video" if record.get("target") == "demo_video" else (record.get("kind") or "").upper()
     lines = [" · ".join(x for x in (what, ", ".join(values.get("products") or []),
                                     ", ".join(values.get("segment") or [])) if x)]
+    if record.get("submitted_by"):
+        lines.append(f"Uploaded through {_who(record.get('uploaded_by'))}.")
     if record.get("internal"):
         lines.append("Asks to be Internal.")
     if record.get("web_url"):
@@ -122,7 +124,8 @@ def upload_fields(record: dict) -> dict | None:
     decided = status != "Open"
     return {"Title": f"Review: {record.get('title') or record.get('folder_name') or '(untitled)'}"[:255],
             "TaskType": "Upload review", "TaskStatus": status,
-            "RequestedBy": _who(record.get("uploaded_by")),
+            # The person an API upload is for, when its token named one.
+            "RequestedBy": record.get("submitted_by") or _who(record.get("uploaded_by")),
             "HubLink": f"{_base()}/admin#review",
             "Details": "\n".join(lines),
             "DecidedBy": _who(record.get("reviewed_by") if record.get("status") != "cancelled"

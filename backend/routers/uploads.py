@@ -58,6 +58,21 @@ def _target(client, key: str, *, fresh: bool = False):
         raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
 
 
+def _submitted_by(value: str | None, user: CurrentUser) -> str | None:
+    """Who an API upload is for, when its token may say (api_tokens.on_behalf):
+    a PTC address. Refused rather than ignored, so a script learns at once."""
+    value = (value or "").strip().lower()
+    if not value:
+        return None
+    if not (user.token_name and user.token_on_behalf):
+        raise HTTPException(status_code=422, detail="submitted_by needs an API token allowed to "
+                            "name who it uploads for (Admin -> Users & groups -> API tokens).")
+    from backend.access import _is_internal_address
+    if "@" not in value or not _is_internal_address(value):
+        raise HTTPException(status_code=422, detail="submitted_by: a PTC email address.")
+    return value
+
+
 def _view(record: dict, user: CurrentUser | None = None, repo=None,
           ids: dict | None = None) -> dict:
     """An upload as the API answers it, with where to find the demo (Seb,
@@ -128,6 +143,9 @@ class UploadIn(BaseModel):
     internal: bool = False
     #: With two or more videos, the one to preview the demo with (required).
     preview: str | None = None
+    #: An API token allowed to (on_behalf): the PTC person this upload is for,
+    #: when one token serves several people (Seb, 2026-10-20).
+    submitted_by: str | None = None
 
 
 @router.post("", status_code=201)
@@ -135,6 +153,7 @@ def start(body: UploadIn, repo: AssetRepository = Depends(get_repo),
           actor: str = Depends(UPLOAD), user: CurrentUser = Depends(get_current_user)):
     from backend.integrations.graph import upload_writer as uw
     from backend.integrations.graph.migration_writer import safe_folder_name
+    submitted_by = _submitted_by(body.submitted_by, user)
     client = _client()
     from backend.services import taxonomy
     divested = [p for p in (body.values.get("products") or [])
@@ -166,7 +185,10 @@ def start(body: UploadIn, repo: AssetRepository = Depends(get_repo),
         raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
     record = uploads.create(repo, target=spec.key, kind=kind.key, values=values, files=files,
                             internal=body.internal, folder_id=folder["id"], folder_name=name,
-                            web_url=folder.get("webUrl"), actor=actor, preview=preview)
+                            web_url=folder.get("webUrl"), actor=actor, preview=preview,
+                            submitted_by=submitted_by,
+                            person=submitted_by or (user.token_owner if user.token_name
+                                                    else user.email))
     log.info("upload %s started by %s: %s/%s", record["id"], actor, spec.library, name)
     return _view(record, user, repo)
 

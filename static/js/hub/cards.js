@@ -574,6 +574,21 @@ function coverFamily(a) {
   return (a.product_families || [])[0] || null;
 }
 
+/* What a text cover says for a family, where the family's own name is not
+ * what the team calls it (Liwei, 2026-10-20). Display only: the family, its
+ * colour and every filter stay as they are. Keys are lower case. */
+var COVER_LABEL = {
+  "ptc modeler": "PTC ALM",
+  "modeler": "PTC ALM",
+  "pure::variants": "PV",
+  "pure variants": "PV",
+  "purevariants": "PV"
+};
+
+function coverLabel(name) {
+  return COVER_LABEL[String(name || "").trim().toLowerCase()] || name;
+}
+
 /* Same name, same colour, always -- an asset must not change appearance
  * between two renders of the same grid. */
 function hueFor(name) {
@@ -620,7 +635,7 @@ function renderCoverMark(thumb, a) {
     mark.className += " hub-cover__mark--text";
     // The type is never the fallback: its chip is already in the corner, and
     // a cover reading "VDK" says nothing the card has not already said.
-    mark.textContent = family || (a.products || [])[0] || "";
+    mark.textContent = coverLabel(family || (a.products || [])[0] || "");
   }
   thumb.insertBefore(mark, thumb.firstChild);
 }

@@ -19,6 +19,8 @@
   th{color:var(--muted);font-weight:600}
   .note{border-left:3px solid var(--accent);background:#f2faf3;padding:8px 12px;border-radius:4px}
   ol li{margin:4px 0}
+  details{margin:6px 0}summary{cursor:pointer}
+  ul.vals{columns:2;font-size:13.5px;margin:6px 0 10px}@media (max-width:600px){ul.vals{columns:1}}
 </style>
 </head>
 <body>
@@ -26,7 +28,7 @@
 <h1>Create a demo through the API</h1>
 <p class="lead">For programs — a pipeline, a script — that create demos in the Technical
 Marketing Hub the way <b>Create New Demo</b> does on the page: metadata first, files, then
-review. Written 2026-10-15; SharePoint and Hub URLs in every answer since 2026-10-16.</p>
+review. Written 2026-10-15; SharePoint and Hub URLs in every answer since 2026-10-16; fields and their values listed 2026-10-20.</p>
 
 <h2>1. Get a token</h2>
 <p>An administrator issues it on <b>Admin → Users &amp; groups → API tokens</b>: a name for
@@ -119,6 +121,54 @@ Hub, once it has been read; <code>null</code> before. Poll
 <li>The title becomes the demo's name; a name already taken is refused (409).</li>
 <li>A video demo is exactly one video file.</li>
 </ul>
+
+<h3>The fields and their values</h3>
+<p>Each target's fields, and for a list field the values it accepts, come from that library's
+own SharePoint columns. <b>Read them from <code>GET /api/uploads/targets</code> and build your
+dropdowns from that answer</b> rather than copying the lists below: a new product or language
+added in SharePoint appears there at once. A value must match exactly, capitals and
+punctuation included (some Windchill names use the full-width <code>＆</code>).</p>
+<pre><code>targets = requests.get(HUB + "/api/uploads/targets", headers=AUTH).json()["targets"]
+for t in targets:                      # demo_catalog, demo_video
+    for f in t["fields"]:              # key, label, kind, required, default, choices
+        if f["choices"]:
+            dropdown(t["key"], f["key"], f["choices"], default=f["default"])</code></pre>
+
+<h3><code>demo_catalog</code> — Demo Catalog (kind: <code>ldk</code>, <code>vdk</code>)</h3>
+<table><tr><th>Field</th><th>Required</th><th>Value</th><th>Notes</th></tr>
+<tr><td><code>title</code></td><td>yes</td><td>text</td><td>at most 120 characters</td></tr>
+<tr><td><code>description</code></td><td>yes</td><td>text</td><td>at most 2000 characters</td></tr>
+<tr><td><code>products</code></td><td>yes</td><td>list of values</td><td>30 values, listed below</td></tr>
+<tr><td><code>segment</code></td><td>yes</td><td>list of values</td><td>5 values, listed below</td></tr>
+<tr><td><code>customer_facing</code></td><td>yes</td><td><code>true</code> / <code>false</code></td><td></td></tr>
+<tr><td><code>contains_audio</code></td><td>yes</td><td><code>true</code> / <code>false</code></td><td></td></tr>
+<tr><td><code>original_publish_date</code></td><td>yes</td><td><code>YYYY-MM-DD</code>, not in the future</td><td>defaults to today</td></tr>
+<tr><td><code>language</code></td><td>yes</td><td>one value</td><td>default <code>English</code>; 41 values, listed below</td></tr>
+<tr><td><code>owned_by</code></td><td>yes</td><td>one value</td><td>default <code>Technical Demonstration Development</code>; 4 values, listed below</td></tr>
+<tr><td><code>product_version</code></td><td>no</td><td>text</td><td>at most 100 characters</td></tr>
+</table>
+<details><summary><code>demo_catalog</code> · <code>products</code> — 30 values as of 2026-10-20</summary><ul class="vals"><li><code>Arbortext Content Delivery</code></li><li><code>Arbortext Editor</code></li><li><code>Arbortext IsoDraw CADprocess</code></li><li><code>Arbortext Publishing Engine</code></li><li><code>Arbortext Styler</code></li><li><code>Codebeamer</code></li><li><code>Creo Elements/Direct Modeling</code></li><li><code>Creo Elements/Pro</code></li><li><code>Creo Illustrate</code></li><li><code>Creo Parametric</code></li><li><code>Creo Schematics</code></li><li><code>Creo Simulate</code></li><li><code>Creo View</code></li><li><code>Creo+</code></li><li><code>Mathcad</code></li><li><code>Mathcad Prime</code></li><li><code>pure::variants</code></li><li><code>ServiceMax</code></li><li><code>Windchill Aerospace ＆ Defense</code></li><li><code>Windchill Enterprise Systems Integration</code></li><li><code>Windchill Foundation ＆ PDM</code></li><li><code>Windchill MPMLink</code></li><li><code>Windchill PartsLink</code></li><li><code>Windchill PDMLink</code></li><li><code>Windchill ProjectLink</code></li><li><code>Windchill QMS</code></li><li><code>Windchill Quality Solutions Enterprise Edition</code></li><li><code>Windchill Service Information Manager</code></li><li><code>Windchill Service Parts</code></li><li><code>Windchill Supplier Management</code></li></ul></details>
+<details><summary><code>demo_catalog</code> · <code>segment</code> — 5 values as of 2026-10-20</summary><ul class="vals"><li><code>ALM</code></li><li><code>CAD</code></li><li><code>PLM</code></li><li><code>SCO</code></li><li><code>SLM</code></li></ul></details>
+<details><summary><code>demo_catalog</code> · <code>language</code> — 41 values as of 2026-10-20</summary><ul class="vals"><li><code>Arabic (Saudi Arabia)</code></li><li><code>Bulgarian (Bulgaria)</code></li><li><code>Chinese (Hong Kong S.A.R.)</code></li><li><code>Chinese (People&#x27;s Republic of China)</code></li><li><code>Chinese (Taiwan)</code></li><li><code>Croatian (Croatia)</code></li><li><code>Czech (Czech Republic)</code></li><li><code>Danish (Denmark)</code></li><li><code>Dutch (Netherlands)</code></li><li><code>English</code></li><li><code>Estonian (Estonia)</code></li><li><code>Finnish (Finland)</code></li><li><code>French (France)</code></li><li><code>German (Germany)</code></li><li><code>Greek (Greece)</code></li><li><code>Hebrew (Israel)</code></li><li><code>Hindi (India)</code></li><li><code>Hungarian (Hungary)</code></li><li><code>Indonesian (Indonesia)</code></li><li><code>Italian (Italy)</code></li><li><code>Japanese (Japan)</code></li><li><code>Korean (Korea)</code></li><li><code>Latvian (Latvia)</code></li><li><code>Lithuanian (Lithuania)</code></li><li><code>Malay (Malaysia)</code></li><li><code>Norwegian (Bokmal) (Norway)</code></li><li><code>Polish (Poland)</code></li><li><code>Portuguese (Brazil)</code></li><li><code>Portuguese (Portugal)</code></li><li><code>Romanian (Romania)</code></li><li><code>Russian (Russia)</code></li><li><code>Serbian (Latin) (Serbia)</code></li><li><code>Slovak (Slovakia)</code></li><li><code>Slovenian (Slovenia)</code></li><li><code>Spanish (Spain)</code></li><li><code>Swedish (Sweden)</code></li><li><code>Thai (Thailand)</code></li><li><code>Turkish (Turkey)</code></li><li><code>Ukrainian (Ukraine)</code></li><li><code>Urdu (Islamic Republic of Pakistan)</code></li><li><code>Vietnamese (Vietnam)</code></li></ul></details>
+<details><summary><code>demo_catalog</code> · <code>owned_by</code> — 4 values as of 2026-10-20</summary><ul class="vals"><li><code>Electronics and High Tech Field Team</code></li><li><code>Life Sciences Field Team</code></li><li><code>SSE Field Team</code></li><li><code>Technical Demonstration Development</code></li></ul></details>
+<h3><code>demo_video</code> — Demo Video (kind: <code>video</code>)</h3>
+<table><tr><th>Field</th><th>Required</th><th>Value</th><th>Notes</th></tr>
+<tr><td><code>title</code></td><td>yes</td><td>text</td><td>at most 120 characters</td></tr>
+<tr><td><code>description</code></td><td>yes</td><td>text</td><td>at most 2000 characters</td></tr>
+<tr><td><code>products</code></td><td>yes</td><td>list of values</td><td>49 values, listed below</td></tr>
+<tr><td><code>segment</code></td><td>yes</td><td>list of values</td><td>5 values, listed below</td></tr>
+<tr><td><code>customer_facing</code></td><td>yes</td><td><code>true</code> / <code>false</code></td><td></td></tr>
+<tr><td><code>contains_audio</code></td><td>yes</td><td><code>true</code> / <code>false</code></td><td></td></tr>
+<tr><td><code>original_publish_date</code></td><td>yes</td><td><code>YYYY-MM-DD</code>, not in the future</td><td>defaults to today</td></tr>
+<tr><td><code>video_type</code></td><td>yes</td><td>one value</td><td>5 values, listed below</td></tr>
+<tr><td><code>video_subtype</code></td><td>no</td><td>one value</td><td>5 values, listed below</td></tr>
+<tr><td><code>named_customer</code></td><td>no</td><td>text</td><td>at most 100 characters</td></tr>
+<tr><td><code>long_description</code></td><td>no</td><td>text</td><td>at most 8000 characters</td></tr>
+</table>
+<details><summary><code>demo_video</code> · <code>products</code> — 49 values as of 2026-10-20</summary><ul class="vals"><li><code>Arbortext</code></li><li><code>Arbortext Content Delivery</code></li><li><code>Codebeamer</code></li><li><code>Codebeamer AI</code></li><li><code>Creo</code></li><li><code>Creo AAX</code></li><li><code>Creo Advanced Manufacturing</code></li><li><code>Creo AI</code></li><li><code>Creo AMX</code></li><li><code>Creo Ansys Simulation</code></li><li><code>Creo CFD</code></li><li><code>Creo Composite Design &amp; Manufacturing</code></li><li><code>Creo DEX</code></li><li><code>Creo EZ Tolerance</code></li><li><code>Creo Generative</code></li><li><code>Creo HMX</code></li><li><code>Creo IFX</code></li><li><code>Creo Illustrate</code></li><li><code>Creo ISDX</code></li><li><code>Creo MMX</code></li><li><code>Creo Parametric</code></li><li><code>Creo PCX</code></li><li><code>Creo Performance Advisor</code></li><li><code>Creo Schematics</code></li><li><code>Creo Simulation Live</code></li><li><code>Creo View ECAD</code></li><li><code>Creo View MCAD</code></li><li><code>Creo View Web</code></li><li><code>Creo+</code></li><li><code>IPE</code></li><li><code>Mathcad</code></li><li><code>Onshape</code></li><li><code>PTC Illustrate</code></li><li><code>PTC Jetstream</code></li><li><code>PTC Modeler</code></li><li><code>PTC Orbit</code></li><li><code>PTC Orbit AI</code></li><li><code>pure::variants</code></li><li><code>ServiceMax</code></li><li><code>ServiceMax AI</code></li><li><code>Servigistics</code></li><li><code>Windchill</code></li><li><code>Windchill AI</code></li><li><code>Windchill Extension Center</code></li><li><code>Windchill for Multi-CAD</code></li><li><code>Windchill Navigate</code></li><li><code>Windchill Quality</code></li><li><code>Creo Piping and Cableing</code></li><li><code>Creo Generative Design</code></li></ul></details>
+<details><summary><code>demo_video</code> · <code>segment</code> — 5 values as of 2026-10-20</summary><ul class="vals"><li><code>ALM</code></li><li><code>CAD</code></li><li><code>PLM</code></li><li><code>SCO</code></li><li><code>SLM</code></li></ul></details>
+<details><summary><code>demo_video</code> · <code>video_type</code> — 5 values as of 2026-10-20</summary><ul class="vals"><li><code>Technical Overview</code></li><li><code>Technical Walkthrough</code></li><li><code>Technical Teaser</code></li><li><code>Presenter Support</code></li><li><code>Other</code></li></ul></details>
+<details><summary><code>demo_video</code> · <code>video_subtype</code> — 5 values as of 2026-10-20</summary><ul class="vals"><li><code>Feature</code></li><li><code>Solution</code></li><li><code>Customer</code></li><li><code>Release</code></li><li><code>N/A</code></li></ul></details>
 
 <h3>Step 4 in detail: chunks</h3>
 <ul>

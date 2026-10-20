@@ -221,6 +221,18 @@ def test_products_come_from_the_title_or_not_at_all():
     assert products_in_title("3rd Party CAD - PTC ONLY - Virtual Machine", known) == []
 
 
+def test_pure_variants_by_either_spelling():
+    """Liwei, 2026-10-20: the pure::variants VM named no product, so its cover
+    and the product filter both missed it."""
+    known = {"Codebeamer", "Modeler", "pure::variants"}
+    assert products_in_title("ALM Pure Variants 7.3.0 v.1.0 - Virtual Machine", known) \
+        == ["pure::variants"]
+    combined = products_in_title(
+        "ALM (CB 3.3.0 RVS 13.5 Modeler 10.3 PV 7.3.0) - Virtual Machine", known)
+    assert combined[0] == "Modeler", "the cover still says PTC ALM"
+    assert "pure::variants" in combined and "Codebeamer" in combined
+
+
 def test_a_segment_only_when_the_title_says_it():
     assert segment_in_title("ALM (CB 3.3.0) - Virtual Machine") == "ALM"
     assert segment_in_title("Windchill 13.1.4.1 - Virtual Machine") is None

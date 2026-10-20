@@ -513,6 +513,11 @@ _TITLE_ABBREVIATIONS = {
     "cb": "Codebeamer",
     "twx": "ThingWorx",
     "modeler": "PTC Modeler",
+    # Liwei, 2026-10-20: "ALM Pure Variants 7.3.0" named no product, and the
+    # combined ALM VMs say "PV 7.3.0". Checked: only those three titles use
+    # either spelling, all of them pure::variants VMs.
+    "pure variants": "pure::variants",
+    "pv": "pure::variants",
 }
 _VERSION = re.compile(r"\b\d+(?:\.\d+){1,3}\b")
 

@@ -150,7 +150,9 @@ async function openAssetDetail(id, fileItemId) {
   if (asset.external_views) facts.push(asset.external_views + " views");
   setText("vpStats", facts.join(" \u00b7 "));
 
-  setText("vpDesc", asset.description || "No description for this one yet.");
+  if (!renderStoryIntro(asset)) {
+    setText("vpDesc", asset.description || "No description for this one yet.");
+  }
   ensureDetailLayout(page);
   renderFactsTable(page, asset);
   renderManage(asset);
@@ -1026,6 +1028,127 @@ function buildFileRow(asset, f, nameEl, noActions) {
   return row;
 }
 
+/* ── The page's own story (Jorge, 2026-10-21) ───────────────────────────
+ *
+ * A demo whose SharePoint page an author laid out (Hill Helicopters IPL)
+ * brings that page's intro, sections and file order along
+ * (backend/integrations/graph/demo_pages.overview_of). Merged into the
+ * page rather than added below it, so nothing is said twice: the intro
+ * takes the description's place, clamped with "Read more"; the sections
+ * take the flat file list's place, each one folding, the first open, and
+ * the folder's other files last, folded. */
+function storyBlocks(host, blocks) {
+  var list = null;
+  (blocks || []).forEach(function (b) {
+    if (b.kind === "li") {
+      if (!list) { list = document.createElement("ul"); host.appendChild(list); }
+      var li = document.createElement("li");
+      li.textContent = b.text;
+      list.appendChild(li);
+      return;
+    }
+    list = null;
+    var p = document.createElement("p");
+    p.textContent = b.text;
+    host.appendChild(p);
+  });
+}
+
+/* The page's text in place of the description. When its sections name no
+ * file the Hub lists (a written guide, not a story), their headings and
+ * text follow the intro here and the files keep their tabs. */
+function renderStoryIntro(asset) {
+  var overview = asset.overview;
+  var desc = document.getElementById("vpDesc");
+  if (!desc || !overview) return false;
+  var intro = overview.intro || [];
+  var sections = storySections(asset) ? [] : (overview.sections || []);
+  if (!intro.length && !sections.length) return false;
+  desc.innerHTML = "";
+  var body = document.createElement("div");
+  body.className = "hub-story__intro";
+  storyBlocks(body, intro);
+  sections.forEach(function (s) {
+    if (s.title) {
+      var h = document.createElement("h4");
+      h.textContent = s.title;
+      body.appendChild(h);
+    }
+    storyBlocks(body, s.text);
+  });
+  desc.appendChild(body);
+  // Clamped once it has been laid out; "Read more" only when it overflows.
+  requestAnimationFrame(function () {
+    if (body.scrollHeight <= body.clientHeight + 2) return;
+    var more = document.createElement("button");
+    more.type = "button";
+    more.className = "hub-story__more";
+    more.textContent = "Read more";
+    more.addEventListener("click", function () {
+      var open = body.classList.toggle("hub-story__intro--open");
+      more.textContent = open ? "Show less" : "Read more";
+    });
+    desc.appendChild(more);
+  });
+  return true;
+}
+
+function storyPath(f) {
+  return ((f.subfolder ? f.subfolder + "/" : "") + (f.name || "")).toLowerCase();
+}
+
+/* The sections, or null when none of them names a file the Hub lists. */
+function storySections(asset) {
+  var sections = (asset.overview && asset.overview.sections) || [];
+  var files = asset.resources || [];
+  var byPath = {};
+  files.forEach(function (f) { byPath[storyPath(f)] = f; });
+  var used = {};
+  var out = sections.map(function (s) {
+    var mine = (s.files || []).map(function (p) { return byPath[String(p).toLowerCase()]; })
+      .filter(function (f) { return f && !used[storyPath(f)] && (used[storyPath(f)] = true); });
+    return { title: s.title, text: s.text, files: mine };
+  });
+  if (!out.some(function (s) { return s.files.length; })) return null;
+  var rest = files.filter(function (f) { return !used[storyPath(f)]; });
+  if (rest.length) out.push({ title: "Other files", text: [], files: rest, other: true });
+  return out;
+}
+
+function renderStorySections(box, asset, sections) {
+  var first = true;
+  sections.forEach(function (s) {
+    var group = document.createElement("details");
+    group.className = "hub-story__section" + (s.other ? " hub-story__section--other" : "");
+    group.open = first && !s.other;
+    first = false;
+    var head = document.createElement("summary");
+    head.className = "hub-story__head";
+    var title = document.createElement("span");
+    title.className = "hub-story__title";
+    title.textContent = s.title || "Files";
+    head.appendChild(title);
+    var count = document.createElement("span");
+    count.className = "hub-story__count";
+    count.textContent = s.files.length + (s.files.length === 1 ? " file" : " files");
+    head.appendChild(count);
+    group.appendChild(head);
+    if (s.text && s.text.length) {
+      var text = document.createElement("div");
+      text.className = "hub-story__text";
+      storyBlocks(text, s.text);
+      group.appendChild(text);
+    }
+    var list = document.createElement("div");
+    list.className = "vp-files__list";
+    s.files.forEach(function (f) {
+      list.appendChild(buildFileRow(asset, f, detailFileName(asset, f)));
+    });
+    group.appendChild(list);
+    box.appendChild(group);
+  });
+}
+
 function renderFileList(page, asset, openTab) {
   var existing = page.querySelector(".vp-files");
   if (existing) existing.remove();
@@ -1069,6 +1192,14 @@ function renderFileList(page, asset, openTab) {
    * a folder rarely holds more than a couple of those. A tab with nothing
    * in it stays visible, disabled, so "no videos" reads as a fact rather
    * than a missing control. */
+  // The author's sections and order, when the demo's page has them.
+  var story = !openTab && storySections(asset);
+  if (story) {
+    renderStorySections(box, asset, story);
+    (document.getElementById("vpPaneFiles") || page).appendChild(box);
+    return;
+  }
+
   var byTab = { video: [], document: [] };
   files.forEach(function (f) { byTab[fileTab(f)].push(f); });
   var active = openTab || (byTab.video.length ? "video" : "document");

@@ -75,7 +75,7 @@ _MIRROR_FIELDS = (
     # Detail page only; see Asset.long_description.
     "long_description",
     # Demo pages (backend/integrations/graph/demo_pages.py).
-    "page_url", "page_folder", "page_modified",
+    "page_url", "page_folder", "page_modified", "overview",
 )
 
 #: Under mirror/, and never read as catalogue data: _load_mirror only reads
@@ -226,7 +226,9 @@ def _apply_demo_pages(tagged: list[tuple[str, dict]],
         page = by_target.get(r["id"]) if src == "sharepoint" else None
         if page:
             r = {**r, "page_url": page.get("page_url") if show_page_links else None,
-                 "thumbnail_url": page.get("thumbnail_url") or r.get("thumbnail_url")}
+                 "thumbnail_url": page.get("thumbnail_url") or r.get("thumbnail_url"),
+                 # The author's intro, sections and file order (2026-10-21).
+                 "overview": page.get("overview")}
         out.append((src, r))
     if show_page_only:
         out.extend(("demo_pages", p if show_page_links else {**p, "page_url": None, "web_url": None})
@@ -821,6 +823,7 @@ class JsonAssetRepository(AssetRepository):
             resources=record.get("resources") or [],
             main_video=record.get("main_video"),
             long_description=record.get("long_description"),
+            overview=record.get("overview"),
             rails=own.get("rails") or [],
             is_editor_pick=bool(own.get("is_editor_pick")),
             value_roadmap=self._to_roadmap(roadmap),

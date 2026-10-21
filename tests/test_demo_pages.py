@@ -153,3 +153,61 @@ def test_a_page_with_no_folder_link_matches_the_folder_named_like_it(tmp_path):
                      [page_row("lamborghini", "Lamborghini - IPL", None)])
     assert [a.id for a in repo.list(AssetQuery(limit=10)).items] == ["kit-1"]
     assert repo.get("kit-1").page_url.endswith("lamborghini.aspx")
+
+
+# ───────────────────────────────────────────── the page's own story (2026-10-21)
+def _control(data: dict, inner: str) -> str:
+    attr = json.dumps(data).replace("&", "&amp;").replace('"', "&quot;")
+    return f'<div data-sp-canvascontrol="" data-sp-canvasdataversion="1.0" data-sp-controldata="{attr}">{inner}</div>'
+
+
+def _text(zone, html, flex=None, control=1):
+    data = {"position": {"layoutIndex": 1, "zoneIndex": zone, "sectionIndex": 1, "controlIndex": control},
+            "controlType": 4}
+    if flex:
+        data["flexibleLayoutPosition"] = {"lg": flex}
+    return _control(data, f'<div data-sp-rte="">{html}</div>')
+
+
+def _links(zone, paths, flex=None, control=2):
+    data = {"position": {"layoutIndex": 1, "zoneIndex": zone, "sectionIndex": 1, "controlIndex": control},
+            "controlType": 3}
+    if flex:
+        data["flexibleLayoutPosition"] = {"lg": flex}
+    wpd = {"title": "Quick links", "serverProcessedContent": {"links": {
+        f"items[{i}].sourceItem.url": f"/sites/EXT-TDD/Demo%20Catalog/Hill/{p}" for i, p in enumerate(paths)}}}
+    attr = json.dumps(wpd).replace("&", "&amp;").replace('"', "&quot;")
+    return _control(data, f'<div data-sp-webpart="" data-sp-webpartdata="{attr}"></div>')
+
+
+def test_a_flexible_section_is_read_column_by_column():
+    """Graph returns a flexible section empty; CanvasContent1 has it, as a grid."""
+    content = (_text(1, "<p>Intro one.</p><p>Intro two.</p>")
+               + _text(2, "<h2>Deck</h2><p>The deck.</p>", flex={"x": 36, "y": 0, "w": 34, "h": 7}, control=1)
+               + _text(2, "<h2>Scripts</h2><p>The scripts.</p>", flex={"x": 0, "y": 0, "w": 34, "h": 7}, control=2)
+               + _links(2, ["Enablement Content/deck.pptx"], flex={"x": 45, "y": 7, "w": 16, "h": 5}, control=3)
+               + _links(2, ["Enablement Content/b.docx", "Enablement Content/a.docx"],
+                        flex={"x": 1, "y": 7, "w": 32, "h": 28}, control=4)
+               + _text(3, "<h2>Videos</h2>")
+               + _links(3, ["Videos/1.mp4"]))
+    overview = dp.overview_of(dp.canvas_from_content(content), "Hill")
+    assert [b["text"] for b in overview["intro"]] == ["Intro one.", "Intro two."]
+    assert [(s["title"], s["files"]) for s in overview["sections"]] == [
+        ("Scripts", ["Enablement Content/b.docx", "Enablement Content/a.docx"]),
+        ("Deck", ["Enablement Content/deck.pptx"]),
+        ("Videos", ["Videos/1.mp4"])]
+
+
+def test_the_standard_page_has_no_overview():
+    """A File and Media viewer and one line (DEX): the line is already the description."""
+    content = _links(1, ["Layout.pptx"], control=1) + _text(1, "<p>VCOE: Use for T3 cert.</p>", control=2)
+    assert dp.overview_of(dp.canvas_from_content(content), "Hill") is None
+
+
+def test_a_written_page_keeps_its_text_though_no_file_is_linked():
+    content = _text(1, "<p>About.</p><h3>Step one</h3><p>Do this.</p><ul><li>a</li><li>b</li></ul>")
+    overview = dp.overview_of(dp.canvas_from_content(content), "Hill")
+    assert overview["intro"] == [{"kind": "p", "text": "About."}]
+    assert overview["sections"] == [{"title": "Step one", "files": [],
+                                     "text": [{"kind": "p", "text": "Do this."},
+                                              {"kind": "li", "text": "a"}, {"kind": "li", "text": "b"}]}]

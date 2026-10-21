@@ -501,6 +501,10 @@ class Asset(AssetBase):
     #: last changed (so an unchanged page's web parts are not re-read).
     page_folder: str | None = None
     page_modified: str | None = None
+    #: The page's own story (demo_pages.overview_of, 2026-10-21): {"intro":
+    #: [{kind, text}], "sections": [{title, text, files}]}, carried to the
+    #: demo of the folder it describes; the demo page draws it.
+    overview: dict | None = None
     #: Set on the response for a partner on a partner-restricted demo: the
     #: files are listed without the ids that open or download them.
     files_locked: bool = False

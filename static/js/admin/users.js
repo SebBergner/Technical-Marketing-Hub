@@ -64,8 +64,7 @@ function renderTokens() {
       name.appendChild(el("div", "faint", x.hint));
       tr.insertCell().textContent = x.owner;
       tr.insertCell().textContent = x.permissions.map(function (p) { return label[p] || p; })
-        .join(", ") + (x.skip_review ? " · publishes without review" : "")
-        + (x.on_behalf ? " · names who each upload is for" : "");
+        .join(", ") + (x.skip_review ? " · publishes without review" : "");
       tr.insertCell().textContent = new Date(x.expires_at).toLocaleDateString();
       tr.insertCell().textContent = x.last_used_at ? new Date(x.last_used_at).toLocaleString() : "never";
       var st = tr.insertCell();
@@ -136,19 +135,6 @@ function renderTokens() {
   skipLabel.appendChild(skip);
   skipLabel.appendChild(document.createTextNode("Publish what it creates without review"));
   form.appendChild(skipLabel);
-  // 2026-10-20: a tool several people use through one token says, per
-  // upload, which PTC person it is for (submitted_by in the API).
-  var behalfLabel = el("label");
-  var behalf = el("input");
-  behalf.type = "checkbox";
-  behalfLabel.style.flexDirection = "row";
-  behalfLabel.style.alignItems = "center";
-  behalfLabel.style.gap = "6px";
-  behalfLabel.title = "The program sends submitted_by: the PTC person each upload is for. "
-    + "It is recorded, shown to reviewers and credited as the demo's creator.";
-  behalfLabel.appendChild(behalf);
-  behalfLabel.appendChild(document.createTextNode("May name who each upload is for (submitted_by)"));
-  form.appendChild(behalfLabel);
   var bar = el("div", "tk-wide");
   var go = el("button", "btn-primary", "Create token");
   go.type = "button";
@@ -160,7 +146,7 @@ function renderTokens() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: name.value, owner: owner.value, days: Number(days.value),
-        skip_review: skip.checked, on_behalf: behalf.checked,
+        skip_review: skip.checked,
         permissions: Object.keys(ticks).filter(function (k) { return ticks[k].checked; })
       }),
     }).then(function (r) {

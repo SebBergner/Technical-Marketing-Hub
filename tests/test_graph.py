@@ -743,3 +743,12 @@ def test_a_video_ticked_previewvideo_is_the_main_video_whatever_the_names_say():
     assert m.pick_main_video(videos) == "Overview_CF.mp4"
     assert m.pick_main_video([{"name": "A.mp4", "audience": "unknown"},
                               {"name": "B.mp4", "audience": "unknown"}]) is None
+
+
+def test_submitted_by_is_read_from_the_folder():
+    """submitted_by (2026-10-21): who submitted a demo made through the Hub.
+    Read back as an address; the catalogue credits it as the creator."""
+    items = [folder("Hub Kit", submitted_by="Jane.Doe@ptc.com"), folder("Old Kit")]
+    by_title = {a.title: a for a in build_assets(items)[0]}
+    assert by_title["Hub Kit"].submitted_by == "jane.doe@ptc.com"
+    assert by_title["Old Kit"].submitted_by is None

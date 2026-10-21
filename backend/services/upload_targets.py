@@ -235,6 +235,11 @@ def clean_fields(spec: TargetSpec, raw: dict, choices: dict[str, list[str]]) -> 
 
 
 PREVIEW_COLUMN = "PreviewVideo"
+#: Who submitted a demo made through the Hub (2026-10-21): a single line of
+#: text on the demo's folder -- an email address, since Graph cannot write a
+#: Person column. Written only where the library has it; read by the syncs
+#: as the demo's creator.
+SUBMITTED_COLUMN = "submitted_by"     # as Liwei created it in both libraries
 
 
 def preview_of(files: list[dict], chosen: str | None) -> str | None:

@@ -72,6 +72,8 @@ COLUMNS = {
     "original_publish_date": ("OriginalPublishDate",),
     "customer_facing": ("Customer_x0020_Facing",),
     "has_audio": ("Contains_x0020_Audio",),
+    # Who submitted a video made through the Hub (upload_targets.SUBMITTED_COLUMN).
+    "submitted_by": ("submitted_by",),
 }
 
 
@@ -168,6 +170,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], VideoSyncResult]:
             source_item_id=item.get("id"),
             search_text=_search_text(fields, hub_products),
             long_description=m.clean_text(_field(fields, "long_description")),
+            submitted_by=(m.clean_text(_field(fields, "submitted_by")) or "").lower() or None,
         )
         stated[name] = (m.as_bool(_field(fields, "customer_facing")),
                         m.as_bool(_field(fields, "has_audio")))

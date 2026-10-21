@@ -59,14 +59,16 @@ def _target(client, key: str, *, fresh: bool = False):
 
 
 def _submitted_by(value: str | None, user: CurrentUser) -> str | None:
-    """Who an API upload is for, when its token may say (api_tokens.on_behalf):
-    a PTC address. Refused rather than ignored, so a script learns at once."""
+    """Who an API upload is for: a PTC address (it is credited as the demo's
+    creator, and partners stay anonymous). Refused rather than ignored, so a
+    script learns at once. A person uploading through the page is the
+    submitter already."""
     value = (value or "").strip().lower()
     if not value:
         return None
-    if not (user.token_name and user.token_on_behalf):
-        raise HTTPException(status_code=422, detail="submitted_by needs an API token allowed to "
-                            "name who it uploads for (Admin -> Users & groups -> API tokens).")
+    if not user.token_name:
+        raise HTTPException(status_code=422, detail="submitted_by is for API tokens; "
+                            "a person uploading is the submitter.")
     from backend.access import _is_internal_address
     if "@" not in value or not _is_internal_address(value):
         raise HTTPException(status_code=422, detail="submitted_by: a PTC email address.")
@@ -90,6 +92,14 @@ def _view(record: dict, user: CurrentUser | None = None, repo=None,
         ids = repo.ids_by_folder()
     asset_id = (ids or {}).get(record.get("folder_id"))
     out["asset_id"] = asset_id
+    # An API upload that names nobody is credited to the token's owner;
+    # say so in every answer, so the script's author notices (2026-10-21).
+    out["warnings"] = []
+    if str(record.get("uploaded_by") or "").startswith("token:") and not record.get("submitted_by"):
+        out["warnings"].append(
+            "submitted_by is empty: this upload is credited to the token's responsible person"
+            + (f" ({record['person']})" if record.get("person") else "")
+            + ". Send the PTC email address of the person it is for.")
     out["asset_url"] = f"{base}/#/asset/{quote(asset_id, safe='')}" if asset_id else None
     return out
 
@@ -143,8 +153,8 @@ class UploadIn(BaseModel):
     internal: bool = False
     #: With two or more videos, the one to preview the demo with (required).
     preview: str | None = None
-    #: An API token allowed to (on_behalf): the PTC person this upload is for,
-    #: when one token serves several people (Seb, 2026-10-20).
+    #: An API upload: the PTC person it is for, when one token serves several
+    #: people (Seb, 2026-10-20). Optional; without it, every answer warns.
     submitted_by: str | None = None
 
 
@@ -258,6 +268,14 @@ def _write_and_submit(repo, record: dict, actor: str, values: dict,
     preview_item = next((f.get("item_id") for f in record["files"]
                          if f["path"] == record.get("preview")), None)
     try:
+        # Who submitted it, in SharePoint too where the library has the
+        # column (2026-10-21): the API's submitted_by, or the person who used
+        # the page. Read back by the sync as the demo's creator.
+        submitter = record.get("submitted_by") or (
+            None if str(record.get("uploaded_by") or "").startswith("token:")
+            else record.get("person"))
+        if submitter and target.has_submitted_by:
+            fields[ut.SUBMITTED_COLUMN] = submitter
         uw.write_metadata(client, target, record["folder_id"], fields, note)
         if preview_item:
             uw.mark_preview(client, target, preview_item)
@@ -391,7 +409,10 @@ def listing(status: str | None = None, mine: bool = False,
     """Reviewers see every upload; uploaders their own."""
     if not (user.can(Perm.UPLOAD) or user.can(Perm.REVIEW_CONTENT)):
         raise HTTPException(status_code=403, detail="Not available for your account.")
-    me = f"{'dev' if user.is_dev_principal else 'user'}:{user.email}"
+    # A token's uploads are recorded as token:<name> (2026-10-21: this read
+    # user:None for a token, so ?mine=true always came back empty to one).
+    me = (f"token:{user.token_name}" if user.token_name
+          else f"{'dev' if user.is_dev_principal else 'user'}:{user.email}")
     records = uploads.all_records(repo)
     if mine or not user.can(Perm.REVIEW_CONTENT):
         records = [r for r in records if r["uploaded_by"] == me]

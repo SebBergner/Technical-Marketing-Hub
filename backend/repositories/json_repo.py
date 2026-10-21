@@ -63,8 +63,9 @@ _MIRROR_FIELDS = (
     "internal_title",
     "resources", "resource_counts", "resource_count", "video_count", "main_video",
     "external_views",
-    # Who made it (sharepoint_mapping.content_creator, 2026-10-14).
-    "creator",
+    # Who made it (sharepoint_mapping.content_creator, 2026-10-14), and who
+    # submitted it through the Hub (submitted_by column, 2026-10-21).
+    "creator", "submitted_by",
     # VM pages only. Public by construction: credentials are sealed out of it
     # before it is built (backend/integrations/graph/vm_pages.py) and live in
     # PRIVATE_DIR instead.
@@ -278,25 +279,34 @@ class WouldShrinkMirror(RuntimeError):
     """
 
 
-def _upload_people(records) -> dict[str, str]:
-    """SharePoint folder id -> who made the demo, for demos created through
-    the Hub (services/uploads.py `person`): the name they signed in with when
-    the Hub knows it -- the same "Last, First" SharePoint shows -- else one
-    read from the address."""
-    if not isinstance(records, list) or not records:
-        return {}
+def _person_names() -> dict[str, str]:
+    """Address -> the name the person signed in with: the same "Last, First"
+    SharePoint shows, so one person is one creator."""
     from backend import access
-    from backend.activity import readable
     names = {}
     for u in access.known_users():
         for key in (u.get("email"), u.get("username")):
             if key and u.get("name"):
                 names[key.lower()] = u["name"]
+    return names
+
+
+def _name_of(email: str, names: dict[str, str]) -> str:
+    from backend.activity import readable
+    return names.get(email.lower()) or readable(email)
+
+
+def _upload_people(records) -> dict[str, str]:
+    """SharePoint folder id -> who made the demo, for demos created through
+    the Hub (services/uploads.py `person`)."""
+    if not isinstance(records, list) or not records:
+        return {}
+    names = _person_names()
     out = {}
     for r in records:
         who = (r.get("person") or "").lower()
         if who and r.get("folder_id") and r.get("status") != "cancelled":
-            out[r["folder_id"]] = names.get(who) or readable(who)
+            out[r["folder_id"]] = _name_of(who, names)
     return out
 
 
@@ -381,16 +391,20 @@ class JsonAssetRepository(AssetRepository):
         dates = self._load("publish_dates") or {}
         review = self._load("upload_review") or {}
         made_by = _upload_people(self._load("uploads"))
-        if dates or review or made_by:
+        named = _person_names() if made_by or any(r.get("submitted_by") for r in rows) else {}
+        if dates or review or made_by or named:
             def stamp(r: dict) -> dict:
                 key = r.get("source_item_id")
                 if key in dates:
                     r = {**r, "uploaded_at": dates[key]}
                 if key in review:
                     r = {**r, "upload_review": review[key].get("status")}
-                if key in made_by:
-                    # SharePoint names the Hub's app as these files' creator;
-                    # the upload record knows the person (2026-10-20).
+                # SharePoint names the Hub's app as the files' creator of a
+                # demo made through the Hub: its submitted_by column says who it was
+                # (2026-10-21), else this slot's upload record (2026-10-20).
+                if r.get("submitted_by"):
+                    r = {**r, "creator": _name_of(r["submitted_by"], named)}
+                elif key in made_by:
                     r = {**r, "creator": made_by[key]}
                 return r
             rows = [stamp(r) for r in rows]

@@ -43,6 +43,8 @@ COLUMNS = {
     # future pass to clean up Demo Catalog data quality directly in
     # SharePoint, not something to work around further in code here.
     "demo_type": ("Demo_x0020_Type", "DemoType", "Demo Type"),
+    # Who submitted a demo made through the Hub (upload_targets.SUBMITTED_COLUMN).
+    "submitted_by": ("submitted_by",),
     "segment": ("Segment",),
     "language": ("Language", "Language0"),
     "product": ("Product", "Product0"),
@@ -245,6 +247,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
                              or m.as_date(item.get("lastModifiedDateTime"))),
                 web_url=item.get("webUrl"),
                 source_item_id=item.get("id"),
+                submitted_by=(m.clean_text(_field(fields, "submitted_by")) or "").lower() or None,
             )
             stated[name] = (m.as_bool(_field(fields, "customer_facing")),
                             m.as_bool(_field(fields, "has_audio")))

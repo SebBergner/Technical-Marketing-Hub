@@ -109,8 +109,8 @@ def main() -> None:
     ap.add_argument("--metadata", help="JSON file with the fields")
     ap.add_argument("--preview", help="with several videos: the one to play first")
     ap.add_argument("--internal", action="store_true", help="files only for internal access")
-    ap.add_argument("--submitted-by", help="the PTC person this upload is for (a token allowed "
-                    "to name who it uploads for)")
+    ap.add_argument("--submitted-by", help="the PTC email address of the person this upload "
+                    "is for (recommended; without it the token's owner is credited)")
     ap.add_argument("--show-form", action="store_true", help="print the targets and their fields")
     ap.add_argument("files", nargs="*", help="files and/or one folder")
     a = ap.parse_args()
@@ -149,6 +149,8 @@ def main() -> None:
         check(api.post(f"/api/uploads/{record['id']}/files/{i}/done", json={"item_id": item_id}))
 
     done = check(api.post(f"/api/uploads/{record['id']}/finish"))
+    for warning in done.get("warnings") or []:
+        print(f"  warning: {warning}")
     print(f"Done: '{done['title']}' is {done['status'].replace('_', ' ')} "
           f"(upload {done['id']}).")
     print(f"  SharePoint: {done['sharepoint_url']}")

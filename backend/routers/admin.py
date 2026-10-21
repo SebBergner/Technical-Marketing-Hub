@@ -1001,7 +1001,6 @@ class TokenIn(BaseModel):
     permissions: list[str]
     days: int | None = None
     skip_review: bool = False
-    on_behalf: bool = False
 
 
 @router.post("/api-tokens", dependencies=[VIEW_ADMIN], status_code=201)
@@ -1011,8 +1010,7 @@ def create_api_token(body: TokenIn, actor: str = Depends(require_perm(Perm.MANAG
     try:
         record, secret = api_tokens.create(name=body.name, owner=body.owner,
                                            permissions=body.permissions, days=body.days,
-                                           skip_review=body.skip_review, actor=actor,
-                                           on_behalf=body.on_behalf)
+                                           skip_review=body.skip_review, actor=actor)
     except api_tokens.TokenError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return {"token": record, "secret": secret}

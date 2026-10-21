@@ -166,23 +166,30 @@ def start_for(client, secret, submitted_by):
                        headers=bearer(secret))
 
 
-def test_a_token_may_name_who_an_upload_is_for_only_when_allowed(client, sp):
-    """Seb, 2026-10-20: one token, several people using his tool."""
-    plain = issue(client).json()["secret"]
-    r = start_for(client, plain, "ann@ptc.com")
-    assert r.status_code == 422 and "submitted_by" in r.json()["detail"]
-
-    behalf = issue(client, name="AMP UI", on_behalf=True).json()
-    assert behalf["token"]["on_behalf"] is True
-    assert start_for(client, behalf["secret"], "p@partner.it").status_code == 422, \
-        "a PTC person only"
-    r = start_for(client, behalf["secret"], "Ann@PTC.com")
+def test_any_token_may_name_who_an_upload_is_for(client, sp):
+    """Seb, 2026-10-20/21: one token, several people using his tool -- always
+    available, no special token needed."""
+    secret = issue(client).json()["secret"]
+    assert start_for(client, secret, "p@partner.it").status_code == 422, "a PTC person only"
+    r = start_for(client, secret, "Ann@PTC.com")
     assert r.status_code == 201, r.text
     record = r.json()
-    assert (record["uploaded_by"], record["submitted_by"], record["person"]) == \
-        ("token:AMP UI", "ann@ptc.com", "ann@ptc.com")
+    assert (record["uploaded_by"], record["submitted_by"], record["person"]) ==         ("token:AMP pipeline", "ann@ptc.com", "ann@ptc.com")
+    assert record["warnings"] == []
     log = client.get("/api/admin/admin-log?category=Uploads", headers=BOSS).json()
-    assert "ann@ptc.com" in json.dumps(log), "the Admin log keeps the request body"
+    assert "ann@ptc.com" in json.dumps(log).lower(), "the Admin log keeps the request body"
+
+
+def test_without_submitted_by_every_answer_warns(client, sp):
+    secret = issue(client).json()["secret"]
+    record = client.post("/api/uploads", json={"target": "demo_catalog", "kind": "ldk",
+                                               "values": KIT, "files": FILES},
+                         headers=bearer(secret)).json()
+    assert record["submitted_by"] is None and record["person"] == "seb@ptc.com"
+    assert "submitted_by is empty" in record["warnings"][0]
+    assert "seb@ptc.com" in record["warnings"][0]
+    mine = client.get("/api/uploads?mine=true", headers=bearer(secret)).json()
+    assert mine[0]["warnings"], "in the list too"
 
 
 def test_a_person_cannot_send_submitted_by(client, sp):
@@ -192,26 +199,56 @@ def test_a_person_cannot_send_submitted_by(client, sp):
                                           "submitted_by": "ann@ptc.com"},
                     headers=easyauth_headers("maker@ptc.com"))
     assert r.status_code == 422
+    r = client.post("/api/uploads", json={"target": "demo_catalog", "kind": "ldk",
+                                          "values": KIT, "files": FILES},
+                    headers=easyauth_headers("maker@ptc.com"))
+    assert r.json()["warnings"] == [], "a person is the submitter; nothing to warn about"
+
+
+def test_submitted_by_is_written_to_sharepoint_where_the_column_exists(client, sp, monkeypatch):
+    from dataclasses import replace
+    from backend.integrations.graph import upload_writer as uw
+    from backend.services import upload_targets as ut
+    real = uw.resolve
+    secret = issue(client).json()["secret"]
+    for has_column, who in ((False, "ann@ptc.com"), (True, "jane.doe@ptc.com")):
+        monkeypatch.setattr(uw, "resolve", lambda c, spec, fresh=False:
+                            replace(real(c, spec, fresh), has_submitted_by=has_column))
+        values = {**KIT, "title": "Kit " + who}
+        record = client.post("/api/uploads", json={"target": "demo_catalog", "kind": "ldk",
+                                                   "values": values, "files": FILES,
+                                                   "submitted_by": who},
+                             headers=bearer(secret)).json()
+        for i, f in enumerate(record["files"]):
+            sp.items[f"i{i}"] = {"id": f"i{i}", "size": f["size"],
+                                 "name": f["path"].rsplit("/", 1)[-1]}
+            client.post(f"/api/uploads/{record['id']}/files/{i}/done",
+                        json={"item_id": f"i{i}"}, headers=bearer(secret))
+        assert client.post(f"/api/uploads/{record['id']}/finish",
+                           headers=bearer(secret)).status_code == 200
+        written = sp.written[-1][1]
+        assert written.get(ut.SUBMITTED_COLUMN) == (who if has_column else None)
 
 
 def test_a_demo_made_through_the_hub_is_credited_to_its_person(client, sp, tmp_path):
-    """SharePoint names the Hub's app as the files' creator; the upload
-    record knows the person, and "Whose demos were used most" now does too."""
-    behalf = issue(client, name="AMP UI", on_behalf=True).json()["secret"]
-    record = start_for(client, behalf, "jane.doe@ptc.com").json()
-    plain = issue(client, name="Batch").json()["secret"]
+    """SharePoint names the Hub's app as the files' creator. submitted_by (read
+    back by the sync) wins; else this slot's upload record knows the person."""
+    secret = issue(client).json()["secret"]
+    record = start_for(client, secret, "jane.doe@ptc.com").json()
     by_token = client.post("/api/uploads", json={"target": "demo_catalog", "kind": "ldk",
                                                  "values": {**KIT, "title": "Second Kit"},
-                                                 "files": FILES}, headers=bearer(plain)).json()
-    assert by_token["person"] == "seb@ptc.com", "no submitted_by: the token's owner"
+                                                 "files": FILES}, headers=bearer(secret)).json()
     (tmp_path / "mirror" / "sharepoint.json").write_text(json.dumps([
         {"id": "kit-a", "type": "ldk", "title": "Creo Sheetmetal Kit", "products": ["Creo"],
          "source_item_id": record["folder_id"], "creator": None},
         {"id": "kit-b", "type": "ldk", "title": "Second Kit", "products": ["Creo"],
-         "source_item_id": by_token["folder_id"], "creator": "SharePoint App"}]),
-        encoding="utf-8")
+         "source_item_id": by_token["folder_id"], "creator": "SharePoint App"},
+        {"id": "kit-c", "type": "ldk", "title": "From elsewhere", "products": ["Creo"],
+         "source_item_id": "folder-elsewhere", "creator": None,
+         "submitted_by": "max.mustermann@ptc.com"}]), encoding="utf-8")
     from backend.deps import get_repo
     from backend.repositories.base import AssetQuery
     creators = {a.id: a.creator for a in get_repo().list(
         AssetQuery(limit=10, include_pending=True)).items}
-    assert creators == {"kit-a": "Jane Doe", "kit-b": "Seb"}
+    assert creators == {"kit-a": "Jane Doe", "kit-b": "Seb",
+                        "kit-c": "Max Mustermann"}, "submitted_by alone is enough"

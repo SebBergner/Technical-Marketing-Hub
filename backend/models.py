@@ -413,6 +413,10 @@ class AssetBase(BaseModel):
     #: of its files (sharepoint_mapping.content_creator, 2026-10-14). As
     #: SharePoint writes it, "Last, First".
     creator: str | None = None
+    #: Who submitted it, for a demo made through the Hub: the submitted_by
+    #: column (upload_targets.SUBMITTED_COLUMN, 2026-10-21), an email address.
+    #: Credited as the creator ahead of the files' creator.
+    submitted_by: str | None = None
 
     # cross-references — the four ID spaces the Portal exists to correlate
     source_item_id: str | None = None         # SharePoint list item

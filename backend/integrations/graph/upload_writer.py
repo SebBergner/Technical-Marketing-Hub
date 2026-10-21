@@ -49,6 +49,8 @@ class Target:
     #: Columns a TEST library lacks (UPLOAD_LIBRARY_OVERRIDES): asked for and
     #: checked as usual, not written. Always empty for a real library.
     skipped: tuple = ()
+    #: The library has submitted_by (optional: written only where it exists).
+    has_submitted_by: bool = False
 
 
 def resolve(client: GraphClient, spec: ut.TargetSpec, *, fresh: bool = False) -> Target:
@@ -138,7 +140,8 @@ def resolve(client: GraphClient, spec: ut.TargetSpec, *, fresh: bool = False) ->
         choices["Segment"] = [s for s in choices["Segment"] if s not in taxonomy.RETIRED_SEGMENTS]
     target = Target(spec=spec, site_id=site_id, drive_id=drive.drive_id, list_id=list_id,
                     demo_content_type_id=demo["id"], product_note_field=note,
-                    choices=choices, terms=terms, skipped=skipped)
+                    choices=choices, terms=terms, skipped=skipped,
+                    has_submitted_by=ut.SUBMITTED_COLUMN in columns)
     with _lock:
         _cache[spec.key] = (now, target)
     return target

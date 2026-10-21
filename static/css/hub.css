@@ -146,7 +146,9 @@ body {
   font-size: 14px;
   line-height: 1.5;
   color: var(--orion-text);
-  background: var(--orion-app-bg);
+  /* The app fills the window; the page behind it is the same surface, so
+     an overscroll or a resize never shows a dark band. */
+  background: var(--orion-surface);
   -webkit-font-smoothing: antialiased;
 }
 a { color: var(--orion-link); text-decoration: none; }
@@ -158,11 +160,13 @@ a:hover { text-decoration: underline; }
 .orion-app {
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
-  height: calc(100vh - 24px);
-  margin: 12px;
+  /* Edge to edge (Liwei, 2026-10-21): the mock-up's dark frame -- 12px of
+     dark canvas and a 3px border, dark in both themes -- read as a black
+     rim once the browser was light. */
+  height: 100vh;
+  height: 100dvh;
+  margin: 0;
   background: var(--orion-surface);
-  border: 3px solid var(--orion-frame);
-  border-radius: 10px;
   overflow: hidden;
 }
 .orion-workarea { display: flex; flex-direction: column; min-width: 0; min-height: 0; }

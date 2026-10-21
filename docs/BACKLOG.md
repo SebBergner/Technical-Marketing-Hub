@@ -76,7 +76,9 @@ Value Roadmap 搜索卡在 AMP 数据上。
 - **现状**：后台有权限 `edit_metadata` 和写回接口（`backend/integrations/graph/writeback.py`、
   `/api/curation`），但**没有任何界面**。写回目前只填**空**列；列里已有不同的值时会停下、不写。
 - **做法**：直接在 demo 页的 Details 卡片上原地编辑（Liwei 10/21：不需要 Admin 页面）。有 Edit metadata
-  权限的人在 Details 表格右上角看到 "Edit"，点开后字段变成下拉框和输入框，没有权限的人看不到这个按钮。可改 Product、Segment、Language、
+  权限的人在 Details 表格右上角看到 "Edit"，点开后字段变成下拉框和输入框，没有权限的人看不到这个按钮。
+  缩略图也在这里一起改（Liwei 10/21）：Automatic / Pick a frame / Upload an image，与 B5 共用同一套存储和
+  组件，另加约半天。可改 Product、Segment、Language、
   Original publish date、Customer facing（Demo Video 另有 Video Type）。保存时先重读 SharePoint，
   用 ETag 防并发覆盖；每次修改记进 Admin log，可在 SharePoint 版本历史里追溯。
   Consensus 的条目只读（Consensus 不由 Hub 写）。
@@ -269,7 +271,8 @@ Value Roadmap 搜索卡在 AMP 数据上。
 - **封面优先顺序**：自选图片或帧 → 故事页图片 → Brightcove 海报 → 主视频自动画面 → 生成的封面。
 - **工作量**（合计约 3 天）：自动画面约半天；网页上传图片约 1 天；网页选帧约 1–1.5 天；API 可选字段约 2 小时。
   自动画面不依赖任何人，可以先做。
-- **要和 Elio 定**：这个分工是否可行；已有 demo 以后能否在 Manage 标签里换图。
+- **要和 Elio 定**：这个分工是否可行。（已有 demo 怎么换图已定：在 A1 的 Details 原地编辑里一起改，
+  权限用 Edit metadata。）
 
 ---
 

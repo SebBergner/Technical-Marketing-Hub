@@ -153,6 +153,29 @@ Value Roadmap 搜索卡在 AMP 数据上。
 - **要先定的事**：发信渠道（Power Automate / Seb 的 Azure 邮件服务）；是否值得做。
 - **工作量**：1–2 天。
 
+### A8. 归档改为移入 SharePoint 的 _Archive 文件夹（Liwei 10/21 定，开始做时再建文件夹）
+- **来源**：Liwei 2026-10-21。现在的 Archive 只在 Hub 里隐藏，partner 和其他内部人员在 SharePoint 里
+  仍能打开。改为把 demo 文件夹移进一个只有 Admin group 能看的文件夹，真正收起来。
+- **为什么不用 SharePoint 自带的归档**：Microsoft 365 Archive 只能归档整个站点（付费、恢复有延迟）；
+  Purview 保留标签只锁定不隐藏；没有单个文件夹的归档功能。权限受限的归档文件夹是常见做法。
+- **设置（你来做）**：Demo Catalog 和 Demo Video **各在库内**建一个 `_Archive` 文件夹，只给 Admin group
+  权限。放在同一个库里，是因为库内移动文件 ID 不变，Hub 一直认得出是哪个 demo；跨库是复制再删除，ID 会变。
+  开始做这一项时再建。
+- **新权限 Archive content**：只有有这个权限的人能归档和恢复（和 Review content 分开）；partner 永远拿不到。
+  每次归档要二次确认、写理由、记进 Admin log。
+- **独立权限的 demo：拒绝归档**。Graph 做不到"恢复继承"（只有 SharePoint REST 有，而 Hub 的应用用客户端
+  密钥认证，调不了）；只删单条权限会留下一个断开继承的孤岛，而且需要 Full Control。所以归档前，Hub 检查
+  demo 文件夹**及其中所有文件和子文件夹**的权限（移动时它们也会保留各自的权限）；发现任何独立权限就拒绝，
+  列出是哪些，提示在 SharePoint 里"删除唯一权限"后再归档。如何判断"继承 / 独立"要先在测试库只读验证。
+- **还要处理的**：
+  1. 同步：`_Archive` 本身不是 demo，它里面的子文件夹是"已归档的 demo"，Admin 里可列出并 Restore（移回原位）。
+  2. 故事页：页面指向的文件夹已归档时，页面也一并隐藏，不让它作为"只有页面的 demo"复活。
+  3. 链接：文件夹的 SharePoint 地址会变，收藏的链接和故事页里的链接失效；Hub 自己的链接不受影响。
+  4. 先确认 Hub 的应用身份能访问受限的 `_Archive`（理论上应用权限是站点级的）；写入测试先在测试库做。
+  5. Consensus 的 demo 不在 SharePoint，继续只在 Hub 里隐藏。
+- **和 A6 的关系**：A6 的批量归档就是批量移入 `_Archive`，同样要逐个做权限检查。
+- **工作量**：约 2–3 天（移动与恢复、新权限、权限检查、同步识别 `_Archive`、故事页、测试库验证）。
+
 ---
 
 ## B. 要先定方向

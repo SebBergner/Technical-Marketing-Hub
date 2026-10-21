@@ -274,6 +274,25 @@ Value Roadmap 搜索卡在 AMP 数据上。
 - **要和 Elio 定**：这个分工是否可行。（已有 demo 怎么换图已定：在 A1 的 Details 原地编辑里一起改，
   权限用 Edit metadata。）
 
+### B6. 在 Hub 里编写 demo 介绍，SharePoint 只当数据存储（Seb 的设想，待讨论）
+- **来源**：Seb，2026-10-21 会议；由 Jorge 的 IPL 故事页引出。
+- **现状**（e945cae，staging v2026.3.140）：Hub 已能读取作者在 SharePoint 页面里写的简介、分节和文件顺序，
+  合并进 demo 页面。实测 278 个页面：4 个故事页（Hill、Bobcat、E&HT、SDV）分节显示，56 个文字页显示全文，
+  218 个普通页不变。页面仍然只能在 SharePoint 里编辑。
+- **设想**：作者直接在 Hub 的 demo 页面里写简介、加小标题、把文件拖进各节；内容由 Hub 写回 SharePoint
+  （demo 文件夹里一个 `hub-overview.json`），不再需要单独做 SharePoint 页面。
+- **好处**：PM 不用学 SharePoint 页面编辑；所有 demo 格式统一；只在一个地方维护；用 Hub 新建 demo 时
+  可以一步写好介绍；权限沿用 A1 的 Edit metadata。
+- **要讨论的**：
+  1. 已有的 SharePoint 页面：继续读取，两者并存（Hub 写的优先）；还是一次性导入 Hub 后不再维护页面？
+  2. SharePoint 页面是否还被别处引用（Seismic、邮件、Teams 链接），能否停止更新？
+  3. 编辑器范围：建议只做文字、小标题、列表和文件分节；是否还要图片、嵌入视频、按钮？
+  4. 谁能编辑：demo 作者本人 + Edit metadata 持有者？改动是否需要审核？
+  5. 存储：文件夹里的 JSON 文件（随文件夹移动和归档，建议这样），还是 SharePoint 列表（便于汇总查询）？
+- **工作量**（粗估）：编辑器（文字、小标题、列表、拖放分节）2–3 天；写回与同步 1 天；导入已有页面半天。
+  合计约 4 天。
+- **依赖**：A1（同一个编辑入口和权限）。
+
 ---
 
 ## C. 等别人
@@ -321,3 +340,6 @@ PTC Ignition、语言标签和筛选、LDK 关联 VM、VM 页面、只显示最�
 CAD model 浏览、隐藏旧 CAD 产品、去掉来源标签、Bobcat、Featured、Brightcove 迁移工具、
 用户管理和权限、PTC 员工按人统计（partner 匿名）、Hub activity、SSO、Consensus V2（OAuth）、
 描述移出卡片（旧设计）、LDK/VDK 名称（源于旧的错误 VDK 列，已修正）。
+
+2026-10-21 新增：SharePoint 故事页的简介、分节和文件顺序合并进 demo 页面（Jorge 的 IPL 页面；
+读取 CanvasContent1，含 flexible 区域）。Creo Illustrate - Capabilities 页面内嵌的视频不读取，保持现状（Liwei 10/21）。

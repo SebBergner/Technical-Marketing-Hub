@@ -75,7 +75,8 @@ Value Roadmap 搜索卡在 AMP 数据上。
 - **来源**：管理层 10/02 第 3 项 "Tag assets as needed"；workshop 上"请大家修日期、修元数据"。
 - **现状**：后台有权限 `edit_metadata` 和写回接口（`backend/integrations/graph/writeback.py`、
   `/api/curation`），但**没有任何界面**。写回目前只填**空**列；列里已有不同的值时会停下、不写。
-- **做法**：在 demo 页的 Manage 标签加 "Edit details"，可改 Product、Segment、Language、
+- **做法**：直接在 demo 页的 Details 卡片上原地编辑（Liwei 10/21：不需要 Admin 页面）。有 Edit metadata
+  权限的人在 Details 表格右上角看到 "Edit"，点开后字段变成下拉框和输入框，没有权限的人看不到这个按钮。可改 Product、Segment、Language、
   Original publish date、Customer facing（Demo Video 另有 Video Type）。保存时先重读 SharePoint，
   用 ETag 防并发覆盖；每次修改记进 Admin log，可在 SharePoint 版本历史里追溯。
   Consensus 的条目只读（Consensus 不由 Hub 写）。
@@ -175,6 +176,21 @@ Value Roadmap 搜索卡在 AMP 数据上。
   5. Consensus 的 demo 不在 SharePoint，继续只在 Hub 里隐藏。
 - **和 A6 的关系**：A6 的批量归档就是批量移入 `_Archive`，同样要逐个做权限检查。
 - **工作量**：约 2–3 天（移动与恢复、新权限、权限检查、同步识别 `_Archive`、故事页、测试库验证）。
+
+### A9. View as：以某个组的身份预览 Hub（Liwei 10/21）
+- **来源**：Liwei 2026-10-21：只有自己的账号，没法测试 partner 和其他权限的人在 Hub 里看到什么。
+- **做法**：Admin → Users & groups 里，对某个组点 "View the Hub as this group"（Partners、PTC employees、
+  TDD Team 等）。打开的 Hub 完全按那个组的权限显示：看得到哪些 demo、哪些文件被锁、哪些按钮没有、能否进 Admin。
+  页面顶部一直有横幅 "Viewing as Partners — Exit"。
+- **安全要求**：
+  1. 只能降不能升：预览的权限 = 那个组的权限与自己权限的交集。
+  2. 预览期间一律只读：上传、归档、改元数据、提申请等写操作全部拒绝。
+  3. 不计入使用统计：不记成 partner，也不记成本人。
+  4. 只有 Manage users & groups 的人能用；开始和结束预览都记进 Admin log。
+- **测不到的**：SharePoint 本身的权限（比如 partner 直接点 SharePoint 链接会不会被挡）。
+- **配合：向 IT 申请两个测试账号**：一个 PTC 测试用户，一个外部来宾测试用户（模拟 partner），用于偶尔的
+  端到端验证。日常用 View as，重要改动用测试账号。
+- **工作量**：约 1.5–2 天。
 
 ---
 

@@ -128,13 +128,23 @@ Value Roadmap 搜索卡在 AMP 数据上。
 - **要先定的事**：无（同义词表可以先给你过目）。
 - **工作量**：1 天。
 
-### A6. 给团队用的内容复查清单
-- **来源**：TDD Team 没有 View Admin，看不到 Admin → Content review 的清单（太旧、很久没人用、
-  Still current 快过期）。
-- **做法**：把这份清单放进 Hub（例如 Hub activity 旁边一个 "Content to review"），
-  只对有 `review_content` 的人显示。不暴露任何按人的使用数据。
-- **要先定的事**：Serge 希望团队自己过这份清单吗？
-- **工作量**：1 天。
+### A6. 协助团员归档过期 demo（Liwei 10/21，含原"团队用的内容复查清单"）
+- **来源**：Liwei 2026-10-21：团员需要在 Hub 里把过期的 demo 归档。归档标准来自 10/07 会议
+  （Elio：约 1 年；Seb：还要看使用量）和 Serge 的年龄方案。
+- **现状**：归档功能已有，只在 Hub 里隐藏、SharePoint 不动、可以 Restore。TDD Team 有 Review content，
+  能在 demo 页的 Manage 标签里逐个归档。但"哪些该归档"的清单（超过 7 年、一年以上且半年没人用、
+  Still current 快过期）只在 Admin → Content review 里，团员没有 View Admin，看不到；也没有批量操作。
+- **做法**：
+  1. Hub 里加一个 "Content to review" 视图，只对有 Review content 的人显示。默认先显示**自己创建的**
+     demo（按创建者匹配，归档请求首先落在作者身上），可切换到全部、按产品 / 年龄筛选。
+  2. 每行显示年龄、最近一次被使用的日期、为什么出现在清单里。不带任何按人的使用数据。
+  3. **批量操作**：勾选多个后 "Archive"（填一个理由）或 "Still current"；都可以撤销，都写进 Admin log。
+  4. 可选：一次性"清理行动"，给每位创建者在 Hub Tasks 里写一行"你有 N 个 demo 待复查"，
+     配合 workshop 上 "own your content" 的请求。
+- **要先定**：归档标准（年龄和未使用时长的阈值）；团员能否归档**别人**的 demo，还是只能处理自己的
+  （其余由 Serge 或管理员处理）；要不要做清理行动。
+- **注意**：创建者来自 SharePoint 文件创建者，代传的 demo 会算到代传人名下；做了 A4（Demo Owner）后会更准。
+- **工作量**：清单视图 1 天；批量操作半天；清理行动半天。合计约 2 天。
 
 ### A7. 订阅新 demo 通知
 - **来源**：常见门户功能；让销售知道"我关心的产品有新 demo 了"。

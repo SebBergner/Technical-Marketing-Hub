@@ -1,7 +1,8 @@
 # Technical Marketing Hub — 待办清单
 
-更新于 2026-10-20（生产 v2026.3.123）。来源：9/2–10/7 的会议笔记、管理层 10/02 的六项要求、
-Serge / Seb / Elio 的意见、2026-10-16 的全面代码扫描，以及常见内部内容门户的做法。
+更新于 2026-10-23（staging v2026.3.140）。来源：9/2–10/7 的会议笔记、管理层 10/02 的六项要求、
+Serge / Seb / Elio 的意见、2026-10-16 的全面代码扫描、FY27 Summit 的 Hub 讨论（10/20 那周）、
+Serge 10/23 的会议，以及常见内部内容门户的做法。
 
 每一项写明：**来源**、**现状**、**做法**、**要先定的事**、**工作量**、**依赖**。
 工作量是粗估，按"开发 + 测试 + 上 staging"计。
@@ -11,61 +12,100 @@ SharePoint 里的数据清理（kit 日期、Demo Type、标错的 LDK/VDK、旧
 
 ---
 
-## TMH Checkpoint（Serge 的会议，2026-10-23）
+## Serge 会议（2026-10-23）：已定要做的
 
-Serge 列了 5 个话题：表格视图和卡片日期可以直接做；订阅和 Dashboard 要先问清楚范围；
-Value Roadmap 搜索卡在 AMP 数据上。
+Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TMH Checkpoint 的 5 个话题都有了结论。
+**推广顺序**：先把 Hub 在本团队里做稳，再开放给整个 Marketing，最后全 PTC；先收集反馈、确认关键功能可靠，
+不急着发全员通知。Elio 已给 Brian Thompson、John Hennessy 演示过，反馈很好（他们要的功能大多已经有了）。
 
-| 话题 | 现状 | 工作量 | 卡在哪里 |
+| 话题 | 结论 | 负责 | 工作量 |
 |---|---|---|---|
-| S1. 订阅新内容 | 无（即 A7）；只有 Recently published | 半天到 2 天，看做法 | 渠道和范围未定 |
-| S2. Dashboard | 部分已有（Hub activity；Admin 的 Content dashboard） | 1–3 天 | 要先定是哪一种 |
-| S3. 年龄 / 卡片显示发布日期 | 已有年龄标签 | 约 2 小时 | 日期数据质量 |
-| S4. 卡片视图 vs 表格视图 | 只有卡片 | 1–1.5 天（加导出 CSV 再半天） | 无，可直接做 |
-| S5. Value Roadmap 搜索（Process、Capability） | demo 页已留位置；1,715 条数据里一条都没有 | 数据到后 2–3 天 | 等 AMP 和 Seb（即 C4） |
+| S1. 订阅新内容 | 先做最简单的个人邮件订阅：有新内容就发邮件；以后再按类别 | Liwei | Hub 1–1.5 天 + 流程半天 |
+| S2. 公开 Dashboard | 使用数据 + 内容统计（各类型数量、最常用、历史趋势），标准图表，能截图汇报 | Liwei | 2–3 天 |
+| S3. 卡片显示原始发布日期 | 标题下方显示；用原始发布日期，不用复制或导入日期 | Liwei | 半天 + 补数据 |
+| S4. 卡片 / 表格切换 | 真正的表格，列可排序；导出看需要 | Liwei | 1–1.5 天（导出再半天） |
+| S5. Value Roadmap 索引 | 新上传自动索引，重新索引要受控，存量分批；Hub 暂不直接接 AI | Seb + Liwei | 读取与显示 1–2 天（有样例后） |
+| S6. Value Roadmap 导航 | Hub 里浏览 Process → Capability → 视频；以后 Pathfinder 带着预筛列表打开 Hub；不急 | Seb + Liwei | 数据到后 3–4 天 |
 
-### S1. 订阅新内容
-- **他要的**：不用天天来 Hub 翻，也能知道有新 demo。
-- **做法 a：Teams 频道推送**（约半天）：新 demo 上线时自动发到一个 Teams 频道，全组共享；
-  用 Power Automate，和 Hub Tasks 同一套机制。
-- **做法 b：Hub 内"自你上次来以后的新内容"**（约 1 天）：首页显示"上次访问后新增了 N 个 demo"，
-  卡片标 "New for you"，按登录时间计算。
-- **做法 c：每周邮件摘要**（约 2 天，加发信渠道配置）：按产品或 segment 订阅；用 Power Automate
-  或 Seb 的 Azure 邮件服务。
-- **建议**：先 a，再 b；c 留到下一阶段。
-- **要问他**：给个人还是全组；Hub 内、邮件还是 Teams；实时、每天还是每周；按产品、segment 还是全部。
+### S1. 订阅新内容（已定：个人邮件订阅）
+- **结论**：先做"有新内容就给我发邮件"的个人订阅，一个开关即可；以后再扩展到按产品或类型订阅。取代原 A7。
+- **做法**：Hub 里加一个 "Email me about new content" 开关（个人菜单或通知设置页，B1 设想的设置页可复用）。
+  每次同步后 Hub 算出新出现的 demo，写进一个 SharePoint 列表（如 "Hub New Content"）；Power Automate
+  监听这个列表，按订阅名单发邮件。和 Hub Tasks 同一套机制，Hub 不自建发信。
+- **要定**：
+  1. 频率：每有一个新 demo 发一封，还是当天新增合并成一封（建议每天最多一封）。
+  2. 发信账号：Power Automate 用谁的账号或共享邮箱发。
+  3. 订阅名单存哪里：SharePoint 列表（流程直接能读，建议）或 Hub 自己的数据。
+  4. partner 能否订阅：邮件里只能列他们有权限看的内容；建议第一期只开放给 PTC 员工。
+- **工作量**：Hub 侧 1–1.5 天；Power Automate 流程约半天（你来配置）。
 
-### S2. Dashboard
-- **现状**：Hub activity（所有 PTC 员工）有使用量、最常用 demo、创建者排行、每日趋势；
-  Admin → Content dashboard（只有管理员）有内容总量、分布和数据完整度。
-- **要问清是哪一种**：
-  1. 使用情况：给 Hub activity 补视角（按产品 / segment 的使用量、搜索热词），约 1 天。
-  2. 内容健康度：每个产品有多少 demo、年龄分布、哪些产品缺内容、多少已过时，约 2–3 天。
-  3. 给管理层的一页汇总。
-- **注意**：内容健康度公开给所有人，"未填写"的比例也会被大家看到（与 B4 同一个问题）。
+### S2. 公开 Dashboard（已定：使用 + 内容统计，对 PTC 员工公开）
+- **结论**：Hub activity 只是使用数据；Serge 要的 Dashboard 还要有内容统计：内容有多全、各类型数量、
+  最常用、历史趋势、类型之间的对比。内容统计放到 Dashboard 下；首页保留可点击的类型入口（Videos、VMs 等）。
+  Serge 要**标准图表**，可以直接截图做汇报，不必每次找人导数据；Elio 问能否导出，Seb 说数据本来就是表格。
+  创建者排行保留（Serge：良性竞争，推动使用）。取代 B4。
+- **做法**：侧边栏 "Dashboard"（和 Hub activity 合并），三块：
+  1. Library：各类型、产品、segment、语言的数量；年龄分布；每月新增。
+  2. Usage：现有 Hub activity 的全部内容（浏览、下载、搜索、活跃用户、最常用、创建者排行），加上按类型对比。
+  3. Trends：按月的使用和新增趋势。
+  每个图表可导出 CSV；版面适合截图。数据来自现有 Admin 的 Content dashboard 和 Hub activity。
+- **要定**：数据完整度（"未填写"的比例）是否公开（建议留在 Admin）；partner 不可见；趋势从哪天算起
+  （使用记录开始的那天）。
+- **工作量**：2–3 天。
 
-### S3. 年龄 / 卡片显示发布日期
-- **现状**：卡片上已有他 10/13 给的年龄标签：1 年内 New；1–2 年无标签；2–4 年显示年份；
-  4 年以上 "Older UI · 年份"；有 Still current 时显示 Still current。
-- **做法**（约 2 小时）：卡片文字行加 "Published Mar 2024"，或让 1–2 年那一档也显示年份。
-- **要提醒他**：许多 kit 的日期仍是批量上传日（10/15 测过，比如 104 个 kit 都是 2018-12-13），
-  显示具体日期会让这批错误很扎眼。建议只显示到月份，或只在填了 Original publish date 的 demo
-  上显示日期；同时借此推动团队补日期。
+### S3. 卡片显示原始发布日期（已定）
+- **结论**：每张卡片在**标题下方**显示发布日期（不放在图片上），让人分清"真的是新发布的"和"只是标了 New"。
+  Elio 提醒：迁移到新地方时系统日期会变成导入日，所以必须用**原始发布日期**；迁移的内容从来源系统
+  （如 Consensus）取日期，不用 SharePoint 的复制日期。
+- **做法**：卡片标题下一行 "Published Mar 2024"，表格视图同一列（可排序）。日期顺序：Original publish date →
+  来源系统的发布日期（Consensus、Brightcove）→ 都没有时不显示具体日期。C1 迁移时把 Consensus 的日期写进
+  Original publish date。Create New Demo 已经强制填 Original publish date。
+- **数据**：许多 kit 的日期仍是批量上传日（如 104 个都是 2018-12-13），由团队在 SharePoint 补，
+  或在 A1 的原地编辑里改。
+- **要定**：只有批量上传日的 demo 显示什么（建议不显示具体日期，或只显示年份）。
+- **工作量**：显示半天；补数据由团队。
 
-### S4. 卡片视图 vs 表格视图
-- **做法**：结果区右上角加视图切换。表格列：标题、类型、产品、segment、语言、发布日期 / 年龄、
-  浏览量；点列名排序，点一行打开 demo；筛选和搜索对两种视图都生效；每人的选择记在自己的浏览器里。
-  可顺带加"导出 CSV"。
-- **要问他**：要哪些列；默认哪种视图；要不要导出。
+### S4. 卡片 / 表格切换（已定）
+- **结论**：要真正的表格（行、列、元数据），点列名排序，比如按发布日期排；不是一张张卡片。Liwei 确认是小改动。
+  导出 CSV 看需要。
+- **做法**：结果区右上角加视图切换。列：标题、类型、产品、segment、语言、发布日期 / 年龄、浏览量；
+  点列名排序，点一行打开 demo；筛选和搜索对两种视图都生效；每人的选择记在自己的浏览器里。
+- **工作量**：1–1.5 天；导出 CSV 半天（和 S2 的导出共用）。
 
-### S5. Value Roadmap 搜索（Process、Capability）
-- **他要的**：按业务流程（如 Change Management、BOM）和能力找 demo。
-- **现状**：数据由 AMP 分析视频生成，Seb 会把每个 demo 的 JSON 文件放进对应文件夹（9/8 定的方案），
-  目前还没有。
-- **数据到了以后**：同步时读取 JSON，demo 页显示内容，搜索和筛选加上 Process / Capability。
-- **要确认**：AMP 什么时候开始产出、先覆盖哪些 demo（问 Seb）；Process 和 Capability 有没有固定分类
-  （有就做筛选下拉，没有只能文字搜索）；能否先给 1–2 个 JSON 样例，提前做好读取和显示。
-  最好请 Seb 一起参会。
+### S5. Value Roadmap 索引（已定方向，Seb + Liwei）
+- **结论**：
+  1. **新上传自动索引**：Seb 现有的 AMP 流程已经按 Value Roadmap（2027 版）索引上传的视频；内容进 Hub 时
+     把索引结果一起带进来。
+  2. **重新索引要受控**：不让所有人随便点（耗 AI 额度、多人同时点会拖慢页面），限权限或排队。
+  3. **Hub 暂不直接接 AI**：Hub 现在没有 AI，要接 Claude 得先解决费用（现在用 Seb 的个人信用卡；
+     Seb 去解决公司付费）。存量几百个视频的费用比偶尔用高得多。
+  4. **过渡方案**：Seb 在现有 Claude 会话里批量处理，产出索引文件，上传到 Hub；Value Roadmap 本身转成 JSON，
+     不用每次重读 PDF。Liwei 研究这个方案。存量分批处理。
+  5. AMP 用字幕 + 抽帧截图分析，产出描述、solution coverage、roadmap 主题、场景、value drivers、
+     business initiatives；AI 选的 roadmap 条目可以人工改。画面分析不如字幕可靠。
+  6. 内容先由内部产品专家（Neal、Elio、Scott 等）审核，再给外部 PM；这个流程由 Serge 和 Elio 建立。
+- **Hub 要做的**：
+  1. 和 Seb 定索引文件格式和放法（每个 demo 文件夹一个 JSON，9/8 定的方案；或一个批量文件在 Admin 上传），
+     先要 1–2 个样例。
+  2. 同步时读取；demo 页的 Value Roadmap 卡片显示内容；搜索和筛选加上 Process、Capability。
+  3. Admin 里"导入索引文件"和"请求重新索引"（只有新权限的人能点，进队列，由 Seb 的流程处理）。
+  4. 人工修改 AI 选的条目：放进 A1 的原地编辑。
+- **要定**：文件格式；Value Roadmap 的层级（Process → Capability → Feature，Summit 也说粒度未定）；
+  重新索引的权限和上限；AI 费用（Seb）。
+- **工作量**：读取与显示 1–2 天（有样例后）；导入和重新索引请求 1 天；Hub 直接接 Claude 另算。
+- 取代 C4。
+
+### S6. Value Roadmap 导航（新，不急）
+- **结论**：Serge 想在 Hub 里有一个 HTML 的 Value Roadmap 菜单：浏览流程和能力，选中后看到相关视频。
+  场景：BDM 和客户讨论时，从"详细设计"这样的话题点到业务驱动、能力和支撑视频。Serge 已有开发中的原型
+  （流程全景、portfolio 视图、能力选择）。Seb：以后 Pathfinder 可以带着预筛的列表打开 Hub（他在和 Martin 谈，
+  Serge 作为直接相关方参与）。
+- **做法**：侧边栏 "Value Roadmap"：左边是流程和能力的树（来自 roadmap JSON），右边是映射到选中节点的 demo
+  （复用卡片和表格视图）。
+- **Pathfinder 的前提：筛选条件写进链接**。现在 Hub 的筛选不在 URL 里（只有搜索词在），所以别的系统没法
+  打开一份筛好的列表。这一步可以先做，顺便让任何筛选结果都能复制链接分享。约半天到 1 天。
+- **依赖**：S5 的数据；Serge 的原型（参考结构）。
+- **工作量**：数据到后 3–4 天；筛选进链接半天到 1 天。
 
 ---
 
@@ -90,27 +130,30 @@ Value Roadmap 搜索卡在 AMP 数据上。
 - **工作量**：2–3 天。
 - **依赖**：无。
 
-### A2. 支持 / 内容问题表单（用 Hub Tasks 接收）
+### A2. Report asset：报告内容问题（用 Hub Tasks 接收）
 - **来源**：Seb，10/07 会议 —— 和 "Share feedback"（对应用的反馈）、"Request New Asset"
-  （申请新 demo）分开，专门处理已有内容的问题和求助。
+  （申请新 demo）分开，专门处理已有内容的问题和求助。**Summit 确认**：用 "Report asset" 代替开放评论和点赞
+  （见 B1）；报告存进 SharePoint 中央列表，**按产品或 segment 分派给负责团队，不发给上传者本人**；
+  用邮件或任务通知；partner 能访问后也要考虑。
 - **现状**：没有。Hub Tasks 列表的 TaskType 已预留 "Support request"。
 - **做法**：两个入口 —— demo 页上的 "Report an issue"（自动带上 demo 链接）和侧边栏的 "Get help"。
   表单字段：类别（文件打不开/缺失、内容过时或有错、演示环境/VM、找不到内容、其他）、说明、
   可选附件。提交后写进 Hub Tasks（Open），处理人在 SharePoint 里改状态；Hub 里提交人能看到状态。
 - **要先定的事**：
-  1. 类别列表，以及每类发给谁（Elio 提过：CAD → Avi 和 Elio）。按类别分派可以在 Hub Tasks 上用
-     Power Automate 做，需要再加一个 "Category" 列（你来建）。
+  1. 类别列表，以及**每个产品或 segment 发给谁**（Elio 提过：CAD → Avi 和 Elio）。分派在 Hub Tasks 上用
+     Power Automate 做，需要再加 "Category" 和 "Product" 列（你来建）。
   2. Partner 能不能提交？能的话，按匿名原则不记名字，只记"partner"。
 - **工作量**：1–2 天。
 - **依赖**：A2 的分派规则。
 
-### A3. 收藏 / 我的清单
+### A3. 我的 Hub：收藏与最近看过
 - **来源**：常见门户的基本功能；侧边栏原设计里就有 Favorites，目前被移除（"需要按人存储"）。
+  **Summit**：每人一个固定的起点——收藏 + 最近看过；partner 能访问后也要有。
 - **现状**：没有。
-- **做法**：卡片和 demo 页加星标；侧边栏 "Favorites" 打开自己的清单。按登录邮箱存在
-  `owned/favorites.json`，只有本人能看到。
+- **做法**：卡片和 demo 页加星标；侧边栏 "My Hub" 显示自己的收藏和最近看过的 demo（最近看过取自已有的
+  使用记录）。按登录身份存在 `owned/favorites.json`，只有本人能看到。
 - **要先定的事**：Partner 也要有吗？有的话按 Entra 对象 ID 存，不在任何报表里出现。
-- **工作量**：1 天。
+- **工作量**：1–1.5 天。
 - **依赖**：无。
 
 ### A4. Demo 负责人 / 联系人
@@ -147,16 +190,12 @@ Value Roadmap 搜索卡在 AMP 数据上。
 - **要先定**：归档标准（年龄和未使用时长的阈值）；团员能否归档**别人**的 demo，还是只能处理自己的
   （其余由 Serge 或管理员处理）；要不要做清理行动。
 - **注意**：创建者来自 SharePoint 文件创建者，代传的 demo 会算到代传人名下；做了 A4（Demo Owner）后会更准。
+- **Summit**：复查流程（谁复查、怎么发出复查请求、怎么通知）由团队定；Hub 提供清单、批量操作和通知。
 - **工作量**：清单视图 1 天；批量操作半天；清理行动半天。合计约 2 天。
 
-### A7. 订阅新 demo 通知
-- **来源**：常见门户功能；让销售知道"我关心的产品有新 demo 了"。
-- **做法**：按产品或 segment 订阅，每周一封摘要。可以用 SharePoint 列表加 Power Automate 发信，
-  Hub 不用自建发信。
-- **要先定的事**：发信渠道（Power Automate / Seb 的 Azure 邮件服务）；是否值得做。
-- **工作量**：1–2 天。
+### A7. 订阅新 demo 通知 —— 已并入 S1（Serge 10/23 定为个人邮件订阅）
 
-### A8. 归档改为移入 SharePoint 的 _Archive 文件夹（Liwei 10/21 定，开始做时再建文件夹）
+### A8. 归档改为移入 SharePoint 的 _Archive 文件夹（Liwei 10/21 定，Summit 确认，开始做时再建文件夹）
 - **来源**：Liwei 2026-10-21。现在的 Archive 只在 Hub 里隐藏，partner 和其他内部人员在 SharePoint 里
   仍能打开。改为把 demo 文件夹移进一个只有 Admin group 能看的文件夹，真正收起来。
 - **为什么不用 SharePoint 自带的归档**：Microsoft 365 Archive 只能归档整个站点（付费、恢复有延迟）；
@@ -194,11 +233,56 @@ Value Roadmap 搜索卡在 AMP 数据上。
   端到端验证。日常用 View as，重要改动用测试账号。
 - **工作量**：约 1.5–2 天。
 
+### A10. Create New Demo 模板（Summit，Liwei）
+- **来源**：Summit：创建 demo 时可以选模板，文件按 Scripts、Presentation deck、Videos、Documents、
+  Supporting files 等分好节，Hub 按这个结构和顺序显示，不用再直接维护 SharePoint。
+- **现状**：Create New Demo 已有元数据和文件上传；demo 页已能按作者的分节显示（10/21 的故事页，
+  e945cae），但分节只来自 SharePoint 页面。
+- **做法**：上传时先选模板（如 "Video Demo Kit"、"Live Demo Kit"、"IPL story"），每个模板定义几节；
+  每个文件放进一节（按扩展名预填，可改）；文件按节传进对应子文件夹；分节信息写成 demo 的 overview，
+  demo 页直接按节显示。模板由管理员在 Admin 里维护。
+- **和 B6 的关系**：B6（在 Hub 里写介绍）是同一件事的另一半：模板定结构，B6 补每节的文字。建议一起设计。
+- **要定**：有哪些模板、每个模板有哪些节（团队定）；子文件夹命名是否统一。
+- **工作量**：2–3 天（不含 B6 的编辑器）。
+
+### A11. 元数据必填项补齐（Summit，Liwei）
+- **来源**：Summit：发布前必须填完元数据——标题、描述、产品、segment、customer facing、narrated audio、
+  语言、product version。
+- **现状**：除 **product version** 外都已强制（另外还强制 Original publish date 和 Owned by）；
+  product version 目前选填。
+- **要定**：product version 是否必填，对哪些类型（视频？LDK、VDK？）；不适用时允许填 "N/A" 吗。
+- **工作量**：2 小时。
+
+### A12. Request New Asset 改进（Summit）
+- **来源**：Summit：叫 "request" 容易让人以为一定会做。
+- **做法**：
+  1. 改名（如 "New asset inquiry"），表单顶部说明"提交后进入队列，不保证制作"。
+  2. **提交前查重**：根据填的标题、描述、产品，先用 Hub 的搜索列出相似的已有 demo，"这些是否已经满足需要？"；
+     以后可以用 AMP 做语义匹配。
+  3. 提交权限已经由 Create demos 权限控制（不必新做）。
+- **团队定**：措辞和免责说明；排优先级的后台流程；定期汇总申请，看出反复出现的需求。
+- **工作量**：改名和说明 1 小时；查重 1 天。
+
+### A13. 相关推荐（Summit）
+- **来源**：Summit：demo 页显示"你可能也需要"。
+- **做法**：demo 页底部 "Related demos"：同产品、同 segment、同类型的 demo，按相似度和使用量排；
+  有了 Value Roadmap 数据后加上"同一能力"。
+- **工作量**：1 天。可直接做。
+
+### A14. 显示数据更新时间（Summit，Liwei）
+- **来源**：Summit：Hub 每天从 SharePoint 同步两次，SharePoint 的改动最多约 12 小时后才出现；要说明清楚，
+  保留手动刷新。
+- **做法**：Hub 页脚或搜索结果旁显示 "Catalogue updated 3 h ago · refreshes twice a day"；
+  上传完成页说明"新 demo 立即可见，SharePoint 里的改动会在下次同步后出现"；写进用户文档。
+- **工作量**：2 小时。
+
 ---
 
 ## B. 要先定方向
 
-### B1. 点赞、评论与作者通知（Liwei 10/20 的设想，含原"评论功能"）
+### B1. 点赞、评论与作者通知（Liwei 10/20 的设想）—— 建议暂缓
+- **Summit 的意见**：倾向用 Report asset（A2）代替开放评论和社交式点赞。建议暂缓 B1；其中"作者 / 负责团队
+  收到通知"和"通知设置页"的设计并入 A2 和 S1。以下保留原设想备查。
 - **来源**：9/8、9/9 与 Elio 的会议（评论）；Liwei 2026-10-20 扩展为点赞、评论、评论点赞、
   作者邮件通知和退订。
 - **要解决的**：作者看不到对自己 demo 的反馈；使用者没有地方问问题、补充用法。补上 Hub activity
@@ -247,11 +331,7 @@ Value Roadmap 搜索卡在 AMP 数据上。
   要不要包含 CAD 文件。风险：所有字节都经过 App Service，下载不能断点续传。
 - **工作量**：2 天。
 
-### B4. 主页 dashboard 的范围
-- **来源**：管理层 10/02 第 5 项。
-- **现状**：Hub activity 已对所有 PTC 员工开放。
-- **要先定的事**：是否还需要更多（比如内容统计、数据完整度对所有人公开）？公开意味着
-  "未填写"的比例也会被所有人看到。
+### B4. 主页 dashboard 的范围 —— 已定，见 S2（对 PTC 员工公开的 Dashboard）
 
 ### B5. 缩略图：网页上传可选帧或传图，API 默认用 SharePoint 自动画面（待与 Elio 讨论）
 - **来源**：Liwei，2026-10-20 / 21。许多 demo 只有生成的封面：没有故事页的 kit、通过 Hub 上传的视频
@@ -291,7 +371,15 @@ Value Roadmap 搜索卡在 AMP 数据上。
   5. 存储：文件夹里的 JSON 文件（随文件夹移动和归档，建议这样），还是 SharePoint 列表（便于汇总查询）？
 - **工作量**（粗估）：编辑器（文字、小标题、列表、拖放分节）2–3 天；写回与同步 1 天；导入已有页面半天。
   合计约 4 天。
-- **依赖**：A1（同一个编辑入口和权限）。
+- **依赖**：A1（同一个编辑入口和权限）；和 A10（模板）一起设计。
+
+### B7. 搜索文档内容和视频字幕（Summit，团队评估）
+- **来源**：Summit：现在能搜到包里的文件名，但搜不到文档里的文字和视频里说的话。
+- **可能的做法**：
+  1. 文档：同步时提取 PPTX、DOCX、PDF 的文字，存成搜索索引（只对常用文件做，控制同步时间）。
+  2. 视频：用 AMP 的字幕（S5 的索引文件里已有）；或 SharePoint / Stream 自动生成的字幕（要先确认能否读取）。
+- **要定**：值不值得做、先覆盖哪些内容；和 S5 的索引文件一起设计最省事。
+- **工作量**：调研半天；文档文字 2 天；字幕看来源。
 
 ---
 
@@ -300,11 +388,14 @@ Value Roadmap 搜索卡在 AMP 数据上。
 | 项目 | 等谁 / 什么 | 到了以后做什么 |
 |---|---|---|
 | C1. Consensus 内容迁移到 Demo Video | Elio 向 Myles（Consensus CSM）要的库导出 | 对照清单已做好；按导出跑迁移，视频带 Consensus ID |
-| C2. Playlists | C1 完成 | 按 10/07 定的模型：playlist 是单独条目，组成视频记 playlist ID，视频页写"属于 playlist X" |
-| C3. 对外分享 / Share DemoBoard / 接 Consensus AI Assistant | Christine 和 Serge 的政策决定 | 分享按钮目前隐藏；政策定了再接 |
-| C4. Value Roadmap（AMP） | Seb 把每个 demo 的 JSON 放进其文件夹 | 同步时读取 JSON，demo 页的 Value Roadmap 卡片显示内容 |
+| C2. Playlists 与 DemoBoard | C1 完成；Consensus 是否允许程序创建 DemoBoard | 按 10/07 定的模型：playlist 是单独条目，组成视频记 playlist ID。Summit 新设想：在 Hub 里把多个 demo 放进"剪贴板"，一键生成 Consensus DemoBoard（只链接不重传，可给某个客户专属链接、带个人介绍、以后可补内容，保留历史可复用） |
+| C3. 对外分享 / 接 Consensus AI Assistant | Christine 和 Serge 的政策决定；D11 安全审查 | 分享按钮目前隐藏。Summit 讨论的方案：公开链接（可加留资）给没有 Consensus 许可证的人用，有许可证的人用 Consensus 给某个客户生成专属链接，两者并存；只有 customer-facing 的内容显示对外分享；需要对外分享时才把视频传到 Consensus，不再多处维护 |
+| C4. Value Roadmap（AMP） | —— | 已并入 S5、S6（Serge 10/23） |
 | C5. 其余 flagship story | Cody | Bobcat、Lamborghini 已是正式文件夹；Hill Helicopter、SDV Automotive、E&HT、Medtech Quidel Ortho 待确认 |
 | C6. Partner 数据可否做区域级汇总 | Elio 问 legal（Chris McCrell） | 目前 partner 完全匿名 |
+| C7. 命名、版本和分类规范 | 团队（Summit 后续任务） | 如 Jetstream 有些视频标题和时长几乎一样，分不清。规范定了以后：Hub 按规范显示版本、上传时校验命名 |
+| C8. Release Notes 怎么关联 | 团队 | 继续作为 SharePoint 文档链接，还是在 Hub 里自动关联到对应产品版本的 demo |
+| C9. LDK 用视频还是脚本 | 团队向一线调查 | 结果影响 A10 的模板（脚本节、视频节）；AI 从视频生成脚本是远期方向 |
 
 ---
 
@@ -322,6 +413,8 @@ Value Roadmap 搜索卡在 AMP 数据上。
 | D8. 更新 HANDOVER-DEPLOYMENT.md | 还写着 SSO 之前的生产 | 按现在的 slot、设置、swap 流程重写 | 半天 |
 | D9. 删测试库和测试数据 | Gallery_Brightcove、Gallery_Brightcove_Test，Hub Tasks 第 1 行 | 每项删除前由你确认 | 你来删，10 分钟 |
 | D10. 手机和无障碍检查 | 销售会用手机打开 | 手机宽度逐页过一遍，修布局；检查键盘操作和对比度 | 1 天 |
+| D11. 对外开放前的安全审查 | Summit：做公开链接、对外下载之前要先验证 | 安全扫描（文件、链接、下载、公开页面），和 D3 一起做；作为 C3 的前提 | 1–2 天 + 安全团队 |
+| D12. 上传被网络拦截时说清原因 | Serge 会议：一次 Create demo 失败是 Zscaler 没登录，拦住了浏览器直传 SharePoint 的请求 | 浏览器报网络错误时提示"可能被公司代理（Zscaler）拦截，请确认 Zscaler 已运行并登录后重试" | 2 小时 |
 
 ---
 
@@ -343,3 +436,6 @@ CAD model 浏览、隐藏旧 CAD 产品、去掉来源标签、Bobcat、Featured
 
 2026-10-21 新增：SharePoint 故事页的简介、分节和文件顺序合并进 demo 页面（Jorge 的 IPL 页面；
 读取 CanvasContent1，含 flexible 区域）。Creo Illustrate - Capabilities 页面内嵌的视频不读取，保持现状（Liwei 10/21）。
+
+Summit 列为后续任务、但其实已经有的：上传时选择预览视频（两个以上视频时必须选 PreviewVideo，网页和 API 都是）；
+对内分享直接定位到包里的某个视频（每个文件都有 Share 链接）；手动刷新；年龄标签；文件级搜索；API token 管理。

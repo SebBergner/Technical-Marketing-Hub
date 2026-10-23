@@ -156,14 +156,21 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - **工作量**：2–3 天（含 Report owners 约 1 天）。
 - **依赖**：在 Report owners 里填好各 segment 的 owner；Hub Tasks 加 "Segment" 和 "NotifyTo" 两列（你来建）。
 
-### A3. 我的 Hub：收藏与最近看过
+### A3. 我的 Hub：收藏、最近看过、个人播放列表（PTC 员工和 partner 都有）
 - **来源**：常见门户的基本功能；侧边栏原设计里就有 Favorites，目前被移除（"需要按人存储"）。
   **Summit**：每人一个固定的起点——收藏 + 最近看过；partner 能访问后也要有。
 - **现状**：没有。
 - **做法**：卡片和 demo 页加星标；侧边栏 "My Hub" 显示自己的收藏和最近看过的 demo（最近看过取自已有的
   使用记录）。按登录身份存在 `owned/favorites.json`，只有本人能看到。
+- **个人播放列表**（Liwei 10/23）：在卡片或 demo 页点 "Add to playlist"，放进自己建的列表（可改名、排序、删除）；
+  My Hub 里列出自己的全部播放列表。
+  - "Copy link" 复制一个 Hub 链接分享给同事或其他 partner；打开时仍要登录，每个人只看得到自己有权限的 demo
+    （没权限的隐藏，并提示"有 N 个你无法查看"）。收到的人可以 "Save a copy" 变成自己的列表。
+  - 只是 Hub 内部的列表，不是对客户的分享；给客户的 Consensus DemoBoard 见 C2。
+  - **partner 的匿名**：按 Entra 对象 ID 存，不进任何报表；partner 建的列表分享出去时不显示创建者姓名。
+- **已定**（Liwei 10/23）：partner 也有我的 Hub：收藏、最近看过、播放列表和分享。
 - **要先定的事**：Partner 也要有吗？有的话按 Entra 对象 ID 存，不在任何报表里出现。
-- **工作量**：1–1.5 天。
+- **工作量**：2.5–3 天（收藏和最近看过 1–1.5 天；播放列表和分享约 1.5 天）。
 - **依赖**：无。
 
 ### A4. Demo 负责人 / 联系人

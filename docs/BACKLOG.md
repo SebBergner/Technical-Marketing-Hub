@@ -139,12 +139,22 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - **做法**：两个入口 —— demo 页上的 "Report an issue"（自动带上 demo 链接）和侧边栏的 "Get help"。
   表单字段：类别（文件打不开/缺失、内容过时或有错、演示环境/VM、找不到内容、其他）、说明、
   可选附件。提交后写进 Hub Tasks（Open），处理人在 SharePoint 里改状态；Hub 里提交人能看到状态。
+- **Admin → Report owners**（Liwei 10/23）：Admin 新增一个标签 "Report owners"，放在 "Content review" 旁边
+  （同属内容治理）。
+  - 每个 segment 一栏（CAD、PLM、ALM、SLM，外加 "General"，接收没有 segment 的报告和 Get help），
+    可添加多位 owner：姓名、邮箱、Notify 开关（On / Off）。
+  - 每个 segment 显示收到的 Report 数：未处理 / 总数 / 最近 30 天；点数字打开该 segment 的报告列表。
+  - 分派：提交 Report 时，Hub 按 demo 的 segment 找出开着 Notify 的 owner，把这些邮箱写进 Hub Tasks 的
+    "NotifyTo" 列；Power Automate 只按这一列发邮件，不用自己查名单。demo 有多个 segment 时通知各 segment 的
+    owner（去重）；某个 segment 没有开着 Notify 的 owner 时转给 General，并在 Admin 里标红提醒。
+  - 名单存在 Hub 自己的数据里，改动记进 Admin log；只有有 Manage users & groups 权限的人能改。
+  - 约 1 天。
 - **要先定的事**：
   1. 类别列表，以及**每个产品或 segment 发给谁**（Elio 提过：CAD → Avi 和 Elio）。分派在 Hub Tasks 上用
      Power Automate 做，需要再加 "Category" 和 "Product" 列（你来建）。
   2. Partner 能不能提交？能的话，按匿名原则不记名字，只记"partner"。
-- **工作量**：1–2 天。
-- **依赖**：A2 的分派规则。
+- **工作量**：2–3 天（含 Report owners 约 1 天）。
+- **依赖**：在 Report owners 里填好各 segment 的 owner；Hub Tasks 加 "Segment" 和 "NotifyTo" 两列（你来建）。
 
 ### A3. 我的 Hub：收藏与最近看过
 - **来源**：常见门户的基本功能；侧边栏原设计里就有 Favorites，目前被移除（"需要按人存储"）。

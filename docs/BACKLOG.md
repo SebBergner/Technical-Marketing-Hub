@@ -176,11 +176,15 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 ### A4. Demo 负责人 / 联系人
 - **来源**："这个 demo 该问谁"；排行榜把代传的 demo 算到上传人名下（如 Lamborghini）。
 - **现状**：负责人取自 SharePoint 文件的创建者。
-- **做法**：你在 Demo Catalog 和 Demo Video 各加一个 Person 列 "Demo Owner"；Hub 优先读它，
-  没填再用文件创建者。demo 页显示 "Contact: 姓名"（可点发邮件），"Whose demos were used most"
-  也按它统计。Hub 只读这一列（Person 列 Hub 写不了，已在 Demo Requests 列表验证）。
-- **要先定的事**：要不要加这一列；谁负责填。
-- **工作量**：1 天（加列由你在 SharePoint 里做）。
+- **做法**：你在 Demo Catalog 和 Demo Video 各加一列 "Demo Owner"。**建议用单行文本列，存邮箱**
+  （和 submitted_by 一样），不要用 Person 列：Graph 写不了 Person 列（已在 Demo Requests 列表验证），而下面的
+  自动填写和修改都要 Hub 来写。Hub 优先读它，没填再用文件创建者。demo 页显示 "Contact: 姓名"（可点发邮件），
+  "Whose demos were used most" 也按它统计。
+- **已定**（Liwei 10/23）：你在 SharePoint 加列。
+  - 上传时自动填上传的人：网页上传填 SSO 登录邮箱；API 上传填 submitted_by，没填就填 token 的所有人。
+  - 可以在 A1 的原地编辑里改 Owner（有 Edit metadata 权限的人，改动记进 Admin log）。
+  - 批量导入的 demo 全部留空，Hub 不自动补写；显示时仍退回文件创建者。
+- **工作量**：1.5 天（读取和显示、上传时写入、A1 里可改；加列由你在 SharePoint 里做）。
 - **依赖**：列建好。
 
 ### A5. 搜索质量

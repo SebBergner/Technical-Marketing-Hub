@@ -10,6 +10,7 @@ import {
   setText
 } from "./util.js";
 import { hubPermissions } from "./permissions.js";
+import { editButton } from "./edit.js";
 import {
   consensusUrl, embedInlinePlayer, paintCoverInto, previewUrl, renderAgeMark,
   stopInlinePlayer, TYPE_CHIP, videoTypeOf
@@ -104,6 +105,9 @@ async function openAssetDetail(id, fileItemId) {
     }
     return;
   }
+  // The card's chosen picture (HubThumbnail, B5) is a file in the folder,
+  // but not one of the demo's files to list.
+  asset.resources = (asset.resources || []).filter(function (r) { return !r.hub_thumbnail; });
   detailAsset = asset;
   recordView(id);
 
@@ -933,6 +937,11 @@ function renderFactsTable(page, asset) {
   head.innerHTML = '<div class="vp-card__head-title"><svg class="orion-ico">'
                  + '<use href="#i-hex"/></svg>Details</div>';
   card.appendChild(head);
+  // Edit, for people with Edit metadata (A1, 2026-10-26; edit.js).
+  var tools = document.createElement("div");
+  tools.className = "hub-edit__tools";
+  tools.appendChild(editButton(asset));
+  card.appendChild(tools);
   card.appendChild(table);
 
   /* The sheet's Long Description, last in the section (Liwei,

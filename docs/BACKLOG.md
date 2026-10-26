@@ -54,6 +54,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   3. 订阅名单存哪里：SharePoint 列表（流程直接能读，建议）或 Hub 自己的数据。
   4. partner 能否订阅：邮件里只能列他们有权限看的内容；建议第一期只开放给 PTC 员工。
 - **工作量**：Hub 侧 1–1.5 天；Power Automate 流程约半天（你来配置）。
+- **10/26 备注**：押后处理，还需要讨论（Liwei）。
 
 ### S2. 公开 Dashboard（已定：使用 + 内容统计，对 PTC 员工公开）
 - **结论**：Hub activity 只是使用数据；Serge 要的 Dashboard 还要有内容统计：内容有多全、各类型数量、
@@ -144,6 +145,11 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   2. 改动要不要审核后才写回，还是直接写？
   3. 谁有权限：目前 Administrators 和 TDD Team 都勾了 `edit_metadata`。
 - **工作量**：2–3 天。
+- **10/26 已定并已做（本地，待推送）**：能改的字段是该库上传表单的全部字段（标题除外）加 Demo Owner，另可改 PreviewVideo
+  和卡片图片（上传图片或从视频选一帧）；不审核，直接写回，记进 Admin log；只有 Administrators 和 TDD Team（Edit metadata）。
+  - **标题不可改**：标题就是文件夹名，Hub 的 ID 和所有分享链接由它生成；Title 列与文件夹名在 15 个 kit 上不一致（有的明显错误），
+    所以也不能改用 Title 列。Liwei：暂不允许改标题。
+  - **Funnel stage 不能改**：SharePoint 两个库都没有这一列（只有 Consensus 的 demo 有）。要改需先在库里建列。
 - **依赖**：无。
 
 ### A2. Report asset：报告内容问题（用 Hub Tasks 接收）

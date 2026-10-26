@@ -153,3 +153,27 @@ def test_the_usage_breakdown_reads_the_catalogue_once_and_names_types(client, mo
     scoped = client.get("/api/admin/usage/breakdown?dimension=demo&scope_dim=type&scope_key=vdk",
                         headers=boss).json()
     assert scoped["total_rows"] == 1, "drilling into a type still matches its demos"
+
+
+# ── the Dashboard (Serge, 2026-10-23) ─────────────────────────────────────
+def test_usage_comes_by_asset_type_too(client):
+    """PTC people only, like the content list: partners' uses are not in it."""
+    body = client.get("/api/reports/activity",
+                      headers=easyauth_headers("someone@ptc.com")).json()
+    # 78 named views, one recorded without a name, one 400 days back (no
+    # period asked for); the partner's view and download are not counted.
+    assert body["by_type"] == [{"type": "vdk", "views": 80, "downloads": 1, "demos": 1}]
+    assert "used" not in body, "the per-demo map stays on the server"
+
+
+def test_the_library_is_for_ptc_people_and_counts_by_type_and_month(client):
+    from datetime import date
+    body = client.get("/api/reports/library", headers=easyauth_headers("someone@ptc.com"))
+    assert body.status_code == 200
+    d = body.json()
+    assert d["total"] == 1
+    assert {t["type"]: t["count"] for t in d["types"]}["vdk"] == 1
+    assert [x["key"] for x in d["dimensions"]] == ["type", "product", "segment", "language", "age"]
+    assert len(d["by_month"]) == 24 and d["by_month"][-1]["month"] == date.today().strftime("%Y-%m")
+    assert client.get("/api/reports/library",
+                      headers=easyauth_headers("p@partner.it")).status_code == 403

@@ -5,7 +5,7 @@
  * Part of the Hub page's script, split out of static/hub-api.js on
  * 2026-10-14; static/js/hub/main.js loads it. */
 
-import { durationLabel, LANGUAGE_LABEL, pill, uploadedLabel } from "./util.js";
+import { dateLabel, durationLabel, LANGUAGE_LABEL, pill } from "./util.js";
 import { familyDisplayName } from "./nav.js";
 import { openAssetDetail } from "./detail.js";
 import { openShareFor } from "./share.js";
@@ -20,10 +20,7 @@ function statsLine(a) {
   var bits = [];
   if (a.external_views) bits.push(a.external_views + " views");
   if (a.resource_count) bits.push(a.resource_count + " files");
-  // A video's date is when it was published; a kit's is its SharePoint
-  // folder's last edit (see buildHome), so it says "Updated".
-  if (a.uploaded_at) bits.push((a.type === "video" ? "Published " : "Updated ")
-                               + uploadedLabel(a.uploaded_at));
+  // The date has its own line under the title (dateLabel, 2026-10-26).
   return bits.join(" · ");
 }
 
@@ -209,6 +206,12 @@ function cardShell(a) {
   });
   title.appendChild(open);
 
+  // Under the title, not on the picture (Serge, 2026-10-23): so a demo
+  // that is really new can be told from one that only carries the badge.
+  var when = document.createElement("div");
+  when.className = "asset-card__date";
+  when.textContent = dateLabel(a);
+
   var meta = document.createElement("div");
   meta.className = "asset-card__meta";          // renderCardTags() fills it
 
@@ -221,7 +224,9 @@ function cardShell(a) {
 
   var body = document.createElement("div");
   body.className = "asset-card__body";
-  [title, meta, stats, actions].forEach(function (n) { body.appendChild(n); });
+  [title, when, meta, stats, actions].forEach(function (n) {
+    if (n !== when || when.textContent) body.appendChild(n);
+  });
   card.appendChild(thumb);
   card.appendChild(body);
   return card;

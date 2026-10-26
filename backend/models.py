@@ -375,6 +375,12 @@ class AssetBase(BaseModel):
     named_customer: str | None = None
 
     uploaded_at: date | None = None
+    #: `uploaded_at` is a date someone stated -- the Original publish date
+    #: column, the source platform's own date (Consensus), or the date given
+    #: on a Hub upload -- rather than one read off the files (Serge,
+    #: 2026-10-23: show the publication date, not a copy or import date).
+    #: The tile says "Published" for one and "Updated" for the other.
+    date_stated: bool = False
     duration_seconds: int | None = None
     thumbnail_url: str | None = None
     #: Where to open this on its own platform. On list responses because a grid

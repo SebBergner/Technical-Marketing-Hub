@@ -1,5 +1,6 @@
-/* Hub activity (#/activity): the team showcase -- totals, the daily
- * chart, people, teams, demo creators and the most-used content.
+/* The Dashboard (#/activity; "Hub activity" until 2026-10-26): the library
+ * (dashboard.js) above how the Hub is used -- totals, the daily chart,
+ * usage by type, people, teams, demo creators and the most-used content.
  *
  * Part of the Hub page's script, split out of static/hub-api.js on
  * 2026-10-14; static/js/hub/main.js loads it. */
@@ -8,6 +9,7 @@ import { debounce, report } from "./util.js";
 import { hubPermissions } from "./permissions.js";
 import { paintCoverInto } from "./cards.js";
 import { closeAdvancedSearch } from "./search.js";
+import { renderLibrary, usageByTypeCard } from "./dashboard.js";
 
 /* ── Hub activity (#/activity), 2026-10-14 ────────────────────────────
  *
@@ -21,7 +23,7 @@ import { closeAdvancedSearch } from "./search.js";
  * chart is also in a table or a label, so nothing hides behind a hover.
  */
 var ACT_RANGES = [["30", "30 days"], ["90", "90 days"], ["365", "12 months"]];
-var actState = { range: "30", seq: 0 };
+var actState = { range: "30", seq: 0, library: null };
 
 function actEl(tag, cls, text) {
   var n = document.createElement(tag);
@@ -59,8 +61,8 @@ function buildActivityPage() {
       '<button class="vp-back" type="button"><svg class="orion-ico orion-ico--sm">'
     +   '<use href="#i-chevron-left"/></svg>Back to Technical Marketing Hub</button>'
     + '<div class="vp-head"><div>'
-    +   '<div class="vp-title">Hub activity</div>'
-    +   '<div class="orion-subtle">How PTC uses the Technical Marketing Hub: '
+    +   '<div class="vp-title">Dashboard</div>'
+    +   '<div class="orion-subtle">What the Technical Marketing Hub holds, and how PTC uses it: '
     +   'what is opened, downloaded and searched for, and by how many people.</div>'
     + '</div><div class="hub-act__ranges" role="group" aria-label="Period" id="hubActRanges"></div></div>'
     + '<div class="hub-act" id="hubAct"></div>';
@@ -86,6 +88,7 @@ function buildActivityPage() {
 }
 
 function openActivity() {
+  actState.library = null;          // a fresh count each time it is opened
   var page = buildActivityPage();
   closeAdvancedSearch();
   document.getElementById("requestViewPage").classList.remove("active");
@@ -122,25 +125,31 @@ function loadActivity() {
   host.classList.add("hub-act--loading");       // keep the frame while refetching
   var seq = ++actState.seq;
   var since = new Date(Date.now() - Number(actState.range) * 86400000).toISOString();
-  fetch("/api/reports/activity?since=" + encodeURIComponent(since))
-    .then(function (r) {
-      if (r.status === 401 || r.status === 403) return { forbidden: true };
-      return r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status));
-    })
-    .then(function (d) {
+  function json(r) {
+    if (r.status === 401 || r.status === 403) return { forbidden: true };
+    return r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status));
+  }
+  // The library does not change with the period: fetched once per visit.
+  var library = actState.library ? Promise.resolve(actState.library)
+    : fetch("/api/reports/library").then(json);
+  Promise.all([fetch("/api/reports/activity?since=" + encodeURIComponent(since)).then(json),
+               library])
+    .then(function (both) {
+      var d = both[0];
+      actState.library = both[1] && !both[1].forbidden ? both[1] : null;
       if (seq !== actState.seq) return;
       host.classList.remove("hub-act--loading");
       if (d.forbidden) {
         host.innerHTML = "";
         host.appendChild(actEl("div", "hub-act__card hub-act__empty",
-          "Your account is not in a group that may view Hub activity."));
+          "Your account is not in a group that may view the Dashboard."));
         return;
       }
       renderActivityPage(d);
     })
     .catch(function (err) {
       host.classList.remove("hub-act--loading");
-      report("Could not load Hub activity: " + err.message, true);
+      report("Could not load the Dashboard: " + err.message, true);
     });
 }
 
@@ -218,6 +227,9 @@ function renderActivityPage(d) {
   var views = t.view + t.preview;
   var series = d.series || [];
 
+  if (actState.library) renderLibrary(host, actState.library);
+  host.appendChild(actEl("h2", "hub-dash__h", "Usage"));
+
   // ── the headline row
   var top = actEl("div", "hub-act__top");
   var hero = actEl("div", "hub-act__card hub-act__hero");
@@ -253,6 +265,7 @@ function renderActivityPage(d) {
   lbCard.appendChild(leaderboard(d.people));
   mid.appendChild(lbCard);
   host.appendChild(mid);
+  host.appendChild(usageByTypeCard(d.by_type || [], periodWord()));
 
   // ── teams and content
   var teamCard = actEl("div", "hub-act__card");
@@ -600,7 +613,7 @@ function addActivityNav() {
     item.className = "orion-navitem";
     item.id = "navActivity";
     item.innerHTML = '<span class="label"><svg class="orion-ico orion-ico--sm">'
-      + '<use href="#i-trend"/></svg> Hub activity</span>';
+      + '<use href="#i-trend"/></svg> Dashboard</span>';
     item.addEventListener("click", function () { location.hash = "#/activity"; });
     after.insertAdjacentElement("afterend", item);
     // Opened straight from a link: the view came up before this entry did.

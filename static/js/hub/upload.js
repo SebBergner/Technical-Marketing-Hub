@@ -48,12 +48,22 @@ function el(tag, cls, text) {
   return n;
 }
 
+/* A request that never got an answer at all -- fetch's bare "Failed to
+ * fetch" -- is, on a PTC laptop, nearly always Zscaler: not running or not
+ * signed in, it drops the request (Serge's meeting, 2026-10-23: a Create
+ * demo that failed that way). Say so rather than echo the browser. */
+function unreachable(what) {
+  return new Error("Could not reach " + what + ". The company proxy (Zscaler) may be "
+                   + "blocking it: check that Zscaler is running and signed in, then try again "
+                   + "-- an interrupted upload can be continued.");
+}
+
 function api(method, url, body) {
   return fetch(url, {
     method: method,
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined
-  }).then(function (r) {
+  }).catch(function () { throw unreachable("the Hub"); }).then(function (r) {
     return r.json().catch(function () { return {}; }).then(function (d) {
       if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
       return d;
@@ -685,6 +695,9 @@ function stepUpload(box) {
       done.appendChild(el("p", null, "“" + record.title + "” has been created. " + (live
         ? "It is published; it appears in the Hub within a minute or two."
         : "It appears in the Hub once a reviewer publishes it; My demos shows where it stands.")));
+      // A14: what happens to edits made afterwards straight in SharePoint.
+      done.appendChild(el("p", "hub-up__muted", "Changes made later directly in SharePoint "
+        + "show up in the Hub after its next refresh from SharePoint (twice a day)."));
       var again = button("Create another", true);
       again.addEventListener("click", function () { drawWizard(); });
       done.appendChild(again);
@@ -767,7 +780,7 @@ function sendFile(uploadId, index, file, row) {
               return new Promise(function (res) { setTimeout(res, 1500 * (attempt + 1)); })
                 .then(function () { return put(attempt + 1); });
             }
-            throw err;
+            throw unreachable("SharePoint to upload " + file.name);
           });
         };
         return put(0).then(function (r) {

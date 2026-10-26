@@ -253,6 +253,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
                             m.as_bool(_field(fields, "has_audio")))
             if m.as_date(_field(fields, "original_publish_date")):
                 dated.add(name)
+                asset["date_stated"] = True
         elif m.clean_text(_field(fields, "content_type")) == "CAD Model":
             # A standalone CAD dataset, not a demo -- no Demo Type, no
             # Segment, no managed-metadata Product column on this content

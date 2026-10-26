@@ -40,6 +40,18 @@ function fullDate(iso) {
     : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
+/* A demo's date as a tile and a table say it (Serge, 2026-10-23):
+ * "Published 12 Mar 2024" when someone stated it (date_stated), else
+ * "Updated Dec 2018" -- read off the files, so to the month only, and not
+ * passed off as a publication date. "" without a date. */
+function dateLabel(a) {
+  if (!a || !a.uploaded_at) return "";
+  if (a.date_stated) return "Published " + fullDate(a.uploaded_at);
+  var d = new Date(a.uploaded_at + "T00:00:00");
+  return isNaN(d) ? ""
+    : "Updated " + d.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+}
+
 function setText(id, text) {
   var el = document.getElementById(id);
   if (el) el.textContent = text || "";
@@ -86,6 +98,6 @@ function report(text, isError) {
 }
 
 export {
-  debounce, durationLabel, escapeHtml, fullDate, getJSON, LANGUAGE_LABEL,
+  dateLabel, debounce, durationLabel, escapeHtml, fullDate, getJSON, LANGUAGE_LABEL,
   pill, report, setText, TYPE_LABELS, uploadedLabel
 };

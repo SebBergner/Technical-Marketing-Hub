@@ -515,6 +515,10 @@ def leaderboard(events: list[dict], *, since: str | None = None, until: str | No
                       "people": len(k["people"]), "total": k["views"] + k["downloads"]}
                      for i, (who, k) in enumerate(creator_rows[:top])],
         "unattributed_uses": unattributed,
+        # Every demo PTC people used in the window, for the Dashboard's
+        # comparison by type (2026-10-26); the caller turns it into totals.
+        "used": {aid: {"views": c["views"], "downloads": c["downloads"]}
+                 for aid, c in content.items()},
         "external_not_ranked": external,
         "top": top,
         "series": _daily(days, since, until),

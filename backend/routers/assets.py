@@ -58,10 +58,16 @@ def list_assets(
         default=False,
         description="also list VMs a newer version of the same VM supersedes"),
     sort: str = Query(
-        default="relevance", pattern="^(relevance|recent|oldest|most_viewed|title)$",
+        default="relevance",
+        pattern="^(relevance|recent|oldest|most_viewed|title|type|product|segment|language)$",
         description="relevance ranks title matches above description matches and "
                     "opening matches above buried ones; with no search text it "
-                    "is identical to recent"),
+                    "is identical to recent. type, product, segment and language "
+                    "are the table view's columns"),
+    order: str | None = Query(
+        default=None, pattern="^(asc|desc)$",
+        description="for most_viewed, title, type, product, segment and language: "
+                    "the direction (most_viewed defaults to desc, the rest to asc)"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     repo: AssetRepository = Depends(get_repo),
@@ -77,6 +83,7 @@ def list_assets(
         has_consensus_uuid=has_consensus_uuid, rail=rail, editor_picks_only=editor_picks,
         include_older_vms=include_older_vms,
         sort=sort, limit=limit, offset=offset,
+        descending=(order == "desc") if order else sort == "most_viewed",
     ))
 
 
@@ -91,6 +98,26 @@ def promoted_summaries(repo: AssetRepository) -> list[AssetSummary]:
             out.append(AssetSummary.model_validate(
                 asset.model_dump(include=set(AssetSummary.model_fields))))
     return out
+
+
+#: Every source the catalogue is built from (each sync's SOURCE_SYSTEM).
+_SOURCES = ("sharepoint", "demo_video", "demo_pages", "vm_pages", "consensus")
+
+
+@router.get("/freshness")
+def freshness(repo: AssetRepository = Depends(get_repo)):
+    """When the catalogue last changed hands with its sources, and when it
+    will next (Summit, 2026-10: say plainly that a SharePoint change shows
+    up after the next sync, up to about twelve hours later).
+
+    `updated_at`: the newest successful sync of any source, UTC. `hours_utc`:
+    the daily runs, empty while the schedule is off."""
+    from backend import auto_sync                       # local: no import cycle
+    state = getattr(repo, "sync_state", None)
+    stamps = [(state(s) or {}).get("last_success_at") for s in _SOURCES] if state else []
+    schedule = auto_sync.load_state()
+    return {"updated_at": max((t for t in stamps if t), default=None),
+            "hours_utc": schedule["hours_utc"] if schedule.get("enabled") else []}
 
 
 @router.get("/promoted", response_model=list[AssetSummary])

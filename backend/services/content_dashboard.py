@@ -30,6 +30,10 @@ TYPE_ORDER = ["video", "ldk", "vdk", "cad_model", "vm"]
 TYPE_LABEL = {"video": "Videos", "ldk": "LDKs", "vdk": "VDKs",
               "cad_model": "CAD datasets", "vm": "Virtual machines"}
 
+#: LANGUAGE_LABEL in static/js/hub/util.js.
+LANGUAGE_LABEL = {"en": "English", "zh": "Chinese", "de": "German", "fr": "French",
+                  "es": "Spanish", "it": "Italian", "ja": "Japanese", "ko": "Korean"}
+
 #: Same renames the Hub's own pages show (UMBRELLA_DISPLAY in static/js/hub/nav.js).
 PRODUCT_LABEL = {"IPE": "PTC Ignition"}
 
@@ -81,6 +85,8 @@ DIMENSIONS = {
     "product": ("Product", lambda a, t: list(a.umbrella_families) or [NOT_SET],
                 lambda v: PRODUCT_LABEL.get(v, v), None, None),
     "segment": ("Segment", lambda a, t: [a.segment or NOT_SET], None, None, None),
+    "language": ("Language", lambda a, t: [a.language or "en"],
+                 lambda v: LANGUAGE_LABEL.get(v, v.upper()), None, None),
     "stage": ("Funnel stage", lambda a, t: [a.funnel_stage or NOT_SET], None,
               ["Awareness", "Consideration", "Decision", "Post-Sale"], None),
     "customer": ("Named customer", lambda a, t: [a.named_customer or NOT_SET],
@@ -153,11 +159,11 @@ def listed(repo: AssetRepository) -> list[AssetSummary]:
     return repo.list(AssetQuery(sort="title", limit=max(first.total, 1))).items
 
 
-def summary(repo: AssetRepository, today: date | None = None) -> dict:
-    today = today or date.today()
-    assets = listed(repo)
+def _dimensions(assets: list[AssetSummary], today: date, only=None) -> list[dict]:
     out = []
     for key, (title, values_of, label_of, order, applies) in DIMENSIONS.items():
+        if only is not None and key not in only:
+            continue
         pool = [a for a in assets if applies is None or applies(a)]
         counts: dict[str, int] = {}
         for a in pool:
@@ -177,8 +183,48 @@ def summary(repo: AssetRepository, today: date | None = None) -> dict:
                          if v != NOT_SET else NOT_SET, "count": counts[v]}
                         for v in keys],
         })
-    return {"total": len(assets), "as_of": today.isoformat(), "dimensions": out,
-            "completeness": completeness(assets)}
+    return out
+
+
+def summary(repo: AssetRepository, today: date | None = None) -> dict:
+    today = today or date.today()
+    assets = listed(repo)
+    return {"total": len(assets), "as_of": today.isoformat(),
+            "dimensions": _dimensions(assets, today), "completeness": completeness(assets)}
+
+
+#: What the Dashboard shows of the library (Serge, 2026-10-23), in order.
+LIBRARY_DIMENSIONS = ("type", "product", "segment", "language", "age")
+
+
+def library(repo: AssetRepository, today: date | None = None, months: int = 24) -> dict:
+    """The Dashboard's library half, for every PTC employee: the same counts
+    as the Admin content dashboard minus the completeness gaps, plus the
+    content by month for the last `months` months, per type.
+
+    A month is the item's own date: its publication date where one is stated
+    (date_stated), otherwise its files' last update -- the same date the
+    tiles show."""
+    today = today or date.today()
+    assets = listed(repo)
+    first = date(today.year, today.month, 1)
+    keys = []
+    y, m = first.year, first.month
+    for _ in range(months):
+        keys.append(f"{y:04d}-{m:02d}")
+        y, m = (y, m - 1) if m > 1 else (y - 1, 12)
+    keys.reverse()
+    by_month = {k: {t: 0 for t in TYPE_ORDER} for k in keys}
+    for a in assets:
+        if a.uploaded_at:
+            k = a.uploaded_at.strftime("%Y-%m")
+            if k in by_month:
+                by_month[k][_type_value(a)] = by_month[k].get(_type_value(a), 0) + 1
+    return {"total": len(assets), "as_of": today.isoformat(),
+            "types": [{"type": t, "label": TYPE_LABEL[t], "count": sum(
+                1 for a in assets if _type_value(a) == t)} for t in TYPE_ORDER],
+            "dimensions": _dimensions(assets, today, LIBRARY_DIMENSIONS),
+            "by_month": [{"month": k, **by_month[k]} for k in keys]}
 
 
 def assets_in(repo: AssetRepository, dim: str, value: str,

@@ -166,6 +166,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], VideoSyncResult]:
             uploaded_at=(m.as_date(_field(fields, "original_publish_date"))
                          or m.as_date(item.get("createdDateTime"))
                          or m.as_date(item.get("lastModifiedDateTime"))),
+            date_stated=bool(m.as_date(_field(fields, "original_publish_date"))),
             web_url=item.get("webUrl"),
             source_item_id=item.get("id"),
             search_text=_search_text(fields, hub_products),

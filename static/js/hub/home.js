@@ -70,6 +70,7 @@ function homeGo(set) {
   navFilter.umbrella = null;
   navFilter.tag = null;
   navFilter.sort = null;
+  navFilter.order = null;
   set();
   applyFilters();
   var thread = document.getElementById("mainThread");
@@ -181,8 +182,8 @@ function buildHome(assets, facets) {
       row.appendChild(text);
       var when = document.createElement("span");
       when.className = "hub-home-recent__when";
-      var dated = a.type === "video" ? "Published " : "Updated ";
-      when.textContent = (a.type === "video" ? "" : "updated ") + whenLabel(a.uploaded_at);
+      var dated = a.date_stated ? "Published " : "Updated ";
+      when.textContent = (a.date_stated ? "" : "updated ") + whenLabel(a.uploaded_at);
       when.title = dated + fullDate(a.uploaded_at);
       row.appendChild(when);
       list.appendChild(row);

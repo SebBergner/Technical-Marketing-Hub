@@ -536,6 +536,15 @@ def test_a_stated_publish_date_still_wins_over_the_files():
     asset = build_assets([folder("Kit v.1", OriginalPublishDate="2024-09-01T00:00:00Z"),
                           dated_file("Kit Demo Video.mp4", "/Kit v.1", "2019-03-02")])[0][0]
     assert str(asset.uploaded_at) == "2024-09-01"
+    assert asset.date_stated is True, "the tile says Published"
+
+
+def test_a_date_read_off_the_files_is_not_a_stated_one():
+    """Serge, 2026-10-23: show the publication date, not a copy date."""
+    asset = build_assets([folder("Kit v.1"),
+                          dated_file("Kit Demo Video.mp4", "/Kit v.1", "2018-12-13")])[0][0]
+    assert str(asset.uploaded_at) == "2018-12-13"
+    assert asset.date_stated is False, "the tile says Updated"
 
 
 def test_deleted_items_are_ignored():

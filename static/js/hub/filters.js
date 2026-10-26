@@ -8,6 +8,7 @@
 import { debounce, escapeHtml, getJSON, pill, report } from "./util.js";
 import { hubPermissions } from "./permissions.js";
 import { buildCard } from "./cards.js";
+import { exportCsv, rememberView, renderRows, tableView } from "./table.js";
 import {
   markNavActive, NAV_TYPE, NO_COUNT_GROUPS, renderSegmentHeader,
   umbrellaDisplayName
@@ -343,8 +344,11 @@ var baselineFacets = null;     // whole-catalogue counts, for when all clear
  * tag: the tag a chip on a details page has taken you to, held the same way
  *   and for the same reason. The results heading says which tag is on, so a
  *   narrowed grid always explains itself -- a filter that is invisible AND
- *   unexplained is the trap this pattern exists to avoid. Liwei, 2026-09-16. */
-var navFilter = { sort: null, umbrella: null, tag: null };
+ *   unexplained is the trap this pattern exists to avoid. Liwei, 2026-09-16.
+ *
+ * order: which way a table column is sorted (asc/desc, 2026-10-26), set
+ *   only by clicking a column; anything else that sets `sort` clears it. */
+var navFilter = { sort: null, umbrella: null, tag: null, order: null };
 
 /* What "Load more" repeats. Liwei asked about this one filtering Creo down
  * to "showing 200 of 422" with no way to reach the other 222 -- the grid
@@ -562,6 +566,7 @@ function ensureSortControl() {
   });
   select.addEventListener("change", function () {
     navFilter.sort = select.value;
+    navFilter.order = null;
     applyFilters();
   });
   pill.appendChild(select);
@@ -576,6 +581,95 @@ function ensureSortControl() {
 function reflectSort() {
   var select = ensureSortControl();
   if (select) select.value = effectiveSort() || "relevance";
+  ensureViewToggle();
+}
+
+/* Tiles or a table (Serge, 2026-10-23), beside Sort. In the table the
+ * columns sort, so the Sort control steps aside, and Export CSV appears. */
+var COLUMN_ONLY_SORTS = ["type", "product", "segment", "language"];
+
+function ensureViewToggle() {
+  var sortPill = document.getElementById("hubSort");
+  sortPill = sortPill && sortPill.closest("label");
+  var head = document.querySelector("#allAssetsSection .section-head");
+  if (!head || !sortPill) return;
+  var box = document.getElementById("hubViewToggle");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "hubViewToggle";
+    box.className = "hub-view";
+    var exportBtn = document.createElement("button");
+    exportBtn.type = "button";
+    exportBtn.className = "hub-view__export";
+    exportBtn.id = "hubExportCsv";
+    exportBtn.textContent = "Export CSV";
+    exportBtn.addEventListener("click", function () {
+      exportCsv(fetchParams(currentQuery()), exportBtn);
+    });
+    box.appendChild(exportBtn);
+    var seg = document.createElement("div");
+    seg.className = "hub-view__seg";
+    seg.setAttribute("role", "group");
+    seg.setAttribute("aria-label", "Show results as");
+    [["tiles", "Tiles"], ["table", "Table"]].forEach(function (v) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.dataset.view = v[0];
+      b.textContent = v[1];
+      b.addEventListener("click", function () {
+        var table = v[0] === "table";
+        if (table === tableView()) return;
+        rememberView(table);
+        // A column-only sort has no tile equivalent: back to the default.
+        if (!table && COLUMN_ONLY_SORTS.indexOf(navFilter.sort) >= 0) {
+          navFilter.sort = null;
+          navFilter.order = null;
+        }
+        applyFilters();
+      });
+      seg.appendChild(b);
+    });
+    box.appendChild(seg);
+    head.insertBefore(box, sortPill);
+  }
+  var table = tableView();
+  box.querySelectorAll("[data-view]").forEach(function (b) {
+    var on = (b.dataset.view === "table") === table;
+    b.classList.toggle("is-on", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+  document.getElementById("hubExportCsv").style.display = table ? "" : "none";
+  sortPill.style.display = table ? "none" : "";
+}
+
+/* The query plus the order results come in: what the grid, Load more and
+ * the CSV export all ask for. */
+function fetchParams(params) {
+  var p = new URLSearchParams(params);
+  var sort = effectiveSort();
+  if (sort) p.set("sort", sort);
+  if (navFilter.order) p.set("order", navFilter.order);
+  return p;
+}
+
+/* Cards, or rows of the table: fresh, or appended by Load more. */
+function renderResults(grid, items, append) {
+  var table = tableView();
+  grid.classList.toggle("is-table", table);
+  if (table) {
+    renderRows(grid, items, append, {
+      sort: effectiveSort() || (val("hubSearchInput").length >= 2 ? "relevance" : "recent"),
+      order: navFilter.order,
+      onSort: function (next) {
+        navFilter.sort = next.sort;
+        navFilter.order = next.order;
+        applyFilters();
+      }
+    });
+    return;
+  }
+  if (!append) grid.innerHTML = "";
+  items.forEach(function (a) { grid.appendChild(buildCard(a)); });
 }
 
 /* "Archived: Show" under More filters, only for people who may see
@@ -602,6 +696,52 @@ function ensureArchivedFilter() {
   panel.appendChild(pill);
 }
 
+/* The filters in the address (2026-10-26): what is on screen can be copied
+ * and sent, and another system -- Pathfinder, opening the Hub on a
+ * pre-filtered list (Serge's meeting, 2026-10-23) -- can link straight to
+ * it: /?family=Creo&type=video&sort=recent. The query string, not the hash,
+ * which already says which page is open (#/asset/..., #/search/...). */
+var URL_CONTROLS = [["q", "hubSearchInput"], ["type", "hubFilterType"],
+                    ["family", "hubFilterProduct"], ["segment", "hubFilterSegment"],
+                    ["stage", "hubFilterStage"], ["language", "hubFilterLanguage"],
+                    ["published", "hubFilterPublished"], ["depth", "hubFilterVideoType"]];
+
+function writeUrl(params) {
+  var p = new URLSearchParams(params);
+  p.delete("archived");             // a permission, not something to pass on
+  p.delete("include_older_vms");
+  if (navFilter.sort) p.set("sort", navFilter.sort);
+  if (navFilter.order) p.set("order", navFilter.order);
+  var qs = p.toString();
+  var url = location.pathname + (qs ? "?" + qs : "") + location.hash;
+  if (url !== location.pathname + location.search + location.hash) {
+    history.replaceState(history.state, "", url);
+  }
+}
+
+/* A link opened cold: put its filters on the controls and show them.
+ * False when the address carries none. */
+function restoreFiltersFromUrl() {
+  var p = new URLSearchParams(location.search);
+  var any = false;
+  URL_CONTROLS.forEach(function (pair) {
+    var value = p.get(pair[0]);
+    var el = document.getElementById(pair[1]);
+    if (!value || !el) return;
+    el.value = value;
+    // A select keeps its old value for an option it does not have.
+    if (el.value === value) any = true;
+  });
+  var cf = p.get("customer_facing");
+  var cfEl = document.getElementById("hubFilterCf");
+  if (cfEl && (cf === "true" || cf === "false")) { cfEl.value = cf === "true" ? "yes" : "no"; any = true; }
+  ["umbrella", "tag", "sort", "order"].forEach(function (key) {
+    if (p.get(key)) { navFilter[key] = p.get(key); any = true; }
+  });
+  if (any) applyFilters();
+  return any;
+}
+
 async function applyFilters() {
   updateVideoTypeFilterVisibility();
   updateVmVersionFilter();
@@ -612,6 +752,7 @@ async function applyFilters() {
   reflectSort();
   var params = currentQuery();
   var active = params.toString().length > 0 || !!navFilter.sort;
+  writeUrl(params);
 
   markNavActive();
   renderActiveFilters();
@@ -660,10 +801,9 @@ async function applyFilters() {
   if (all) all.style.display = "";
 
   var ticket = ++inFlight;
-  var assetParams = new URLSearchParams(params);
+  var assetParams = fetchParams(params);
   assetParams.set("limit", RESULT_LIMIT);
   var sort = effectiveSort();
-  if (sort) assetParams.set("sort", sort);
 
   var page, facets;
   try {
@@ -677,8 +817,8 @@ async function applyFilters() {
   if (ticket !== inFlight) return;   // a slower earlier reply must not win
 
   var grid = document.getElementById("allAssetsGrid");
-  grid.innerHTML = "";
-  page.items.forEach(function (a) { grid.appendChild(buildCard(a)); });
+  renderResults(grid, page.items, false);
+  ensureViewToggle();
 
   // "All Assets" under a PLM page is misleading -- they are all PLM assets.
   var heading = document.querySelector("#allAssetsSection .section-head__title");
@@ -707,7 +847,8 @@ async function applyFilters() {
   // here (recency, the default) and URLSearchParams.get() cannot tell an
   // absent key from an empty one.
   loadMoreState = page.total > page.items.length
-    ? { baseParams: params, sort: sort || "", offset: page.items.length, total: page.total }
+    ? { baseParams: params, sort: sort || "", order: navFilter.order || "",
+        offset: page.items.length, total: page.total }
     : null;
   updateLoadMoreBar();
 
@@ -827,6 +968,7 @@ async function loadMoreAssets() {
   params.set("limit", RESULT_LIMIT);
   params.set("offset", loadMoreState.offset);
   if (loadMoreState.sort) params.set("sort", loadMoreState.sort);
+  if (loadMoreState.order) params.set("order", loadMoreState.order);
 
   var page;
   try {
@@ -840,7 +982,7 @@ async function loadMoreAssets() {
   if (ticket !== inFlight || !loadMoreState) return;   // the filter moved on
 
   var grid = document.getElementById("allAssetsGrid");
-  page.items.forEach(function (a) { grid.appendChild(buildCard(a)); });
+  renderResults(grid, page.items, true);
 
   loadMoreState.offset += page.items.length;
   loadMoreState.total = page.total;
@@ -993,6 +1135,7 @@ function clearAll() {
     if (el) el.value = "";
   });
   navFilter.sort = null;
+  navFilter.order = null;
   navFilter.umbrella = null;
   navFilter.tag = null;
   applyFilters();
@@ -1000,6 +1143,6 @@ function clearAll() {
 
 export {
   applyFilters, clearAll, CONTROLS, enhanceSearchableSelect, fillPublished,
-  fillSelect, fillSidebarCounts, HIDDEN_SEGMENTS, navFilter, takeOverControls,
-  val, wireFilterBar
+  fillSelect, fillSidebarCounts, HIDDEN_SEGMENTS, navFilter, restoreFiltersFromUrl,
+  takeOverControls, val, wireFilterBar
 };

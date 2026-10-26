@@ -55,10 +55,31 @@ log = logging.getLogger(__name__)
 #: beats it -- see _dedupe_by_id.
 _FALLBACK_SOURCE = "seed"
 
+#: The table view's sortable columns (Serge, 2026-10-23): what each sorts by.
+#: None for a row with nothing there, which _by_column keeps last.
+_COLUMNS = {
+    "title": lambda r, stats: (r.get("title") or "").lower() or None,
+    "type": lambda r, stats: r.get("type"),
+    "product": lambda r, stats: next(iter(taxonomy.families_of(r.get("products"))), None),
+    "segment": lambda r, stats: r.get("segment"),
+    "language": lambda r, stats: r.get("language") or "en",
+    "most_viewed": lambda r, stats: (stats.get(r["id"]) or {}).get("views", 0),
+}
+
+
+def _by_column(rows: list[dict], key, descending: bool, stats: dict) -> list[dict]:
+    """Rows sorted on one column, either way, empty ones last; ties keep
+    their order (newest first, the order rows arrive in)."""
+    rows = sorted(rows, key=lambda r: _as_date(r.get("uploaded_at")) or date.min, reverse=True)
+    present = [r for r in rows if key(r, stats) is not None]
+    empty = [r for r in rows if key(r, stats) is None]
+    present.sort(key=lambda r: key(r, stats), reverse=descending)
+    return present + empty
+
 _MIRROR_FIELDS = (
     "id", "type", "source", "title", "description", "products", "funnel_stage", "content_depth",
     "language", "segment", "industry", "value_drivers", "tags", "customer_facing",
-    "has_narrated_audio", "named_customer", "uploaded_at", "duration_seconds",
+    "has_narrated_audio", "named_customer", "uploaded_at", "date_stated", "duration_seconds",
     "thumbnail_url", "web_url", "source_item_id", "brightcove_id", "consensus_uuid",
     "internal_title",
     "resources", "resource_counts", "resource_count", "video_count", "main_video",
@@ -398,7 +419,7 @@ class JsonAssetRepository(AssetRepository):
             def stamp(r: dict) -> dict:
                 key = r.get("source_item_id")
                 if key in dates:
-                    r = {**r, "uploaded_at": dates[key]}
+                    r = {**r, "uploaded_at": dates[key], "date_stated": True}
                 if key in review:
                     r = {**r, "upload_review": review[key].get("status")}
                 # SharePoint names the Hub's app as the files' creator of a
@@ -541,13 +562,11 @@ class JsonAssetRepository(AssetRepository):
         def recency(record: dict) -> date:
             return _as_date(record.get("uploaded_at")) or date.min
 
-        if query.sort == "most_viewed":
-            rows.sort(key=lambda r: (stats.get(r["id"], {}) or {}).get("views", 0), reverse=True)
+        if query.sort in _COLUMNS:
+            rows = _by_column(rows, _COLUMNS[query.sort], query.descending, stats)
         elif query.sort == "oldest":
             # Undated last: "oldest" must not open on content with no date.
             rows.sort(key=lambda r: (recency(r) == date.min, recency(r)))
-        elif query.sort == "title":
-            rows.sort(key=lambda r: r.get("title", "").lower())
         elif query.sort == "relevance" and query.text:
             # Band first, then newest first (relevance.order_key, 2026-09-30).
             rows.sort(key=lambda r: relevance.order_key(query.text, r.get("title"),
@@ -1457,6 +1476,7 @@ class JsonAssetRepository(AssetRepository):
             has_narrated_audio=record.get("has_narrated_audio"),
             named_customer=record.get("named_customer"),
             uploaded_at=_as_date(record.get("uploaded_at")),
+            date_stated=bool(record.get("date_stated")),
             duration_seconds=record.get("duration_seconds"),
             # A SharePoint picture goes through the Hub (services/thumbnails.py).
             thumbnail_url=thumbnails.public_url(record["id"], record.get("thumbnail_url")),

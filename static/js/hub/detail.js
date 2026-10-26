@@ -6,7 +6,7 @@
  * 2026-10-14; static/js/hub/main.js loads it. */
 
 import {
-  durationLabel, escapeHtml, fullDate, getJSON, LANGUAGE_LABEL, pill, report,
+  dateLabel, durationLabel, escapeHtml, fullDate, getJSON, LANGUAGE_LABEL, pill, report,
   setText
 } from "./util.js";
 import { hubPermissions } from "./permissions.js";
@@ -875,7 +875,9 @@ function renderFactsTable(page, asset) {
     ["Customer-facing", yesNo(asset.customer_facing)],
     ["Narrated audio", yesNo(asset.has_narrated_audio)],
     ["Length", asset.type === "ldk" ? null : durationLabel(asset.duration_seconds)],
-    ["Uploaded", asset.uploaded_at ? fullDate(asset.uploaded_at) : null]
+    // "Published" only for a date someone stated (dateLabel in util.js).
+    [asset.date_stated ? "Published" : "Updated",
+     asset.uploaded_at ? dateLabel(asset).replace(/^\S+ /, "") : null]
   ];
 
   var table = document.createElement("table");

@@ -17,7 +17,7 @@ import { applyPermissions } from "./permissions.js";
 import { buildCard } from "./cards.js";
 import {
   enhanceSearchableSelect, fillPublished, fillSelect, fillSidebarCounts,
-  HIDDEN_SEGMENTS, takeOverControls, wireFilterBar
+  HIDDEN_SEGMENTS, restoreFiltersFromUrl, takeOverControls, wireFilterBar
 } from "./filters.js";
 import { buildHome } from "./home.js";
 import {
@@ -153,6 +153,9 @@ async function load() {
   markNavActive();
   buildSidebarFoot();
   addUploadNav();
+  // A shared link's filters (/?family=Creo&type=video): last, once every
+  // control has its options.
+  restoreFiltersFromUrl();
 
   // Real content is in place: reveal the thread. See the #mainThread rule in
   // index.html for why it also reveals itself on a timer.

@@ -18,6 +18,15 @@ from backend.repositories.base import AssetQuery, AssetRepository
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 
+@router.get("/library", dependencies=[Depends(require_perm(Perm.VIEW_REPORTS))])
+def library(repo: AssetRepository = Depends(get_repo)):
+    """What the Hub holds, for the Dashboard (Serge, 2026-10-23): how much of
+    each kind, by product, segment, language and age, and month by month.
+    Not how complete the metadata is -- that stays on the Admin page."""
+    from backend.services import content_dashboard
+    return content_dashboard.library(repo)
+
+
 @router.get("/activity", dependencies=[Depends(require_perm(Perm.VIEW_REPORTS))])
 def hub_activity(since: str | None = None, until: str | None = None,
                  top: int = Query(10, ge=3, le=25),
@@ -42,6 +51,18 @@ def hub_activity(since: str | None = None, until: str | None = None,
     out["creators_known"] = bool(creators)
     # Only content the Hub still lists, so a link never leads to a 404; with
     # its picture and type for the page's cards.
+    # Usage by asset type (the Dashboard, Serge 2026-10-23): what each kind
+    # of content was used for, so videos and kits can be compared.
+    by_type: dict[str, dict] = {}
+    for aid, c in out.pop("used").items():
+        if aid not in listed:
+            continue
+        kind = getattr(listed[aid].type, "value", listed[aid].type)
+        row = by_type.setdefault(kind, {"type": kind, "views": 0, "downloads": 0, "demos": 0})
+        row["views"] += c["views"]
+        row["downloads"] += c["downloads"]
+        row["demos"] += 1
+    out["by_type"] = sorted(by_type.values(), key=lambda r: -(r["views"] + r["downloads"]))
     out["content"] = [{**c, "thumbnail_url": listed[c["asset_id"]].thumbnail_url,
                        "type": listed[c["asset_id"]].type,
                        "products": listed[c["asset_id"]].products,

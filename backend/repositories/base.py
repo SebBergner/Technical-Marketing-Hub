@@ -18,7 +18,8 @@ from backend.models import (
 
 #: "relevance" degrades to "recent" when there is no search text, so it is one
 #: concept rather than two and can safely be the default.
-SortKey = Literal["relevance", "recent", "oldest", "most_viewed", "title"]
+SortKey = Literal["relevance", "recent", "oldest", "most_viewed", "title",
+                  "type", "product", "segment", "language"]
 
 
 @dataclass
@@ -60,6 +61,10 @@ class AssetQuery:
     #: uploader and reviewers reach them, by id or in the review lists.
     include_pending: bool = False
     sort: SortKey = "relevance"
+    #: The table view's column sorts (Serge, 2026-10-23) go both ways; rows
+    #: with nothing in that column stay last either way. Ignored by
+    #: relevance, recent and oldest, which say their own direction.
+    descending: bool = False
     limit: int = 50
     offset: int = 0
 

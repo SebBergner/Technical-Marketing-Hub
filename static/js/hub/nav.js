@@ -187,7 +187,7 @@ function wireNav(facets) {
       exitOverlays();
       if (!target.control) {
         clearAll();
-        if (target.sort) { navFilter.sort = target.sort; applyFilters(); }
+        if (target.sort) { navFilter.sort = target.sort; navFilter.order = null; applyFilters(); }
       }
       else if (target.page) { openFamily(target.value); }
       else {
@@ -356,6 +356,16 @@ function markNavActive() {
 var FEEDBACK_URL =
   "https://app.smartsheet.com/b/form/019fd30ea3ee75c7aaf4abf2e58a0342";
 
+/* "3 h ago", "2 days ago": how long since, roughly. */
+function agoLabel(when) {
+  var minutes = Math.max(0, Math.round((Date.now() - when.getTime()) / 60000));
+  if (minutes < 60) return minutes <= 1 ? "just now" : minutes + " min ago";
+  var hours = Math.round(minutes / 60);
+  if (hours < 24) return hours + " h ago";
+  var days = Math.round(hours / 24);
+  return days === 1 ? "yesterday" : days + " days ago";
+}
+
 function buildSidebarFoot() {
   var foot = document.querySelector(".orion-side__foot");
   if (!foot || foot.querySelector(".hub-foot__row")) return;
@@ -398,6 +408,30 @@ function buildSidebarFoot() {
   fetch("/api/version")
     .then(function (r) { return r.json(); })
     .then(function (d) { version.textContent = d.version || ""; })
+    .catch(function () {});
+
+  // How fresh the catalogue is (Summit, 2026-10): SharePoint is read twice
+  // a day, so a change made there shows up after the next run.
+  fetch("/api/assets/freshness")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      if (!d || !d.updated_at) return;
+      var when = new Date(d.updated_at.replace(/Z?$/, "Z"));
+      if (isNaN(when)) return;
+      var line = document.createElement("div");
+      line.className = "hub-foot__fresh";
+      line.textContent = "Catalogue updated " + agoLabel(when);
+      var hours = (d.hours_utc || []).map(function (h) {
+        var t = new Date(); t.setUTCHours(h, 0, 0, 0);
+        return t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      });
+      line.title = "Updated " + when.toLocaleString() + ". "
+        + (hours.length ? "Refreshed from SharePoint twice a day, at " + hours.join(" and ")
+                          + " your time; c" : "C")
+        + "hanges made in SharePoint appear after the next refresh. "
+        + "Demos created in the Hub appear at once.";
+      foot.insertBefore(line, row);
+    })
     .catch(function () {});
 
   // Who is signed in, and the way out -- only when the app does its own

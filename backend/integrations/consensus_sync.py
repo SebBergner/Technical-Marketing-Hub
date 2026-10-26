@@ -168,6 +168,7 @@ def build_assets(demos: list[ConsensusDemo]) -> tuple[list[Asset], ConsensusSync
             consensus_uuid=demo.uuid,
             internal_title=(demo.raw or {}).get("internalTitle"),
             uploaded_at=demo.created_at.date() if demo.created_at else None,
+            date_stated=bool(demo.created_at),
             customer_facing=True,
         ))
         result.with_segment += bool(parsed["segment"])
@@ -311,6 +312,7 @@ def build_assets_v2(demos: list[dict],
             consensus_uuid=demo.get("uuid"),
             internal_title=demo.get("internalTitle"),
             uploaded_at=_v2_date(demo.get("creationDate")),
+            date_stated=bool(_v2_date(demo.get("creationDate"))),
             customer_facing=True,
             external_views=int(demo.get("usage") or 0) or None,
         ))

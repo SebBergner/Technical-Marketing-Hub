@@ -42,6 +42,10 @@ class FieldSpec:
     default: object = None
     help: str = ""
     max_length: int | None = None
+    #: Required on the Hub's own form, a warning only through the API (A11,
+    #: Liwei 2026-10-26: product version), so scripts keep working until
+    #: their authors add it.
+    form_required: bool = False
 
 
 @dataclass(frozen=True)
@@ -106,6 +110,11 @@ def _common(*, description_help: str) -> list[FieldSpec]:
                   default="today",
                   help="When the content was made. Drives its age badge; for older material "
                        "being added now, the recording date."),
+        # Every asset (A11, 2026-10-26); "N/A" where none applies, which the
+        # Hub then does not show.
+        FieldSpec("product_version", "Product version", TEXT, column="Product_x0020_Version",
+                  max_length=100, form_required=True,
+                  help="e.g. Creo 12, Windchill 13.1. N/A if it does not apply."),
     ]
 
 
@@ -118,8 +127,6 @@ DEMO_CATALOG = TargetSpec(
                   choices_from="Language", default="English"),
         FieldSpec("owned_by", "Owned by", CHOICE, required=True, column="Owned_x0020_By",
                   choices_from="Owned_x0020_By", default="Technical Demonstration Development"),
-        FieldSpec("product_version", "Product version", TEXT, column="Product_x0020_Version",
-                  max_length=100, help="e.g. Creo 12, Windchill 13.1"),
     ]),
     # Added by Liwei 2026-10-15 (indexed); the sync reads it first.
     publish_date_column="OriginalPublishDate",
@@ -193,11 +200,18 @@ def kind_of(spec: TargetSpec, key: str) -> KindSpec:
     return found
 
 
-def clean_fields(spec: TargetSpec, raw: dict, choices: dict[str, list[str]]) -> dict:
+def clean_fields(spec: TargetSpec, raw: dict, choices: dict[str, list[str]], *,
+                 form: bool = False, partial: bool = False) -> dict:
     """The metadata, checked against the target's spec and the library's live
-    options. Raises UploadInvalid naming every problem at once."""
+    options. Raises UploadInvalid naming every problem at once.
+
+    `form`: from the Hub's own page, where form_required fields are required
+    too. `partial`: an edit of a demo that exists (A1), which says only what
+    changes, so nothing is required -- only checked."""
     out, problems = {}, []
     for f in spec.fields:
+        if partial and f.key not in raw:
+            continue
         value = raw.get(f.key)
         if isinstance(value, str):
             value = value.strip()
@@ -206,8 +220,12 @@ def clean_fields(spec: TargetSpec, raw: dict, choices: dict[str, list[str]]) -> 
             value = list(dict.fromkeys(value))
         empty = value in (None, "", []) or (f.kind == YESNO and value not in (True, False))
         if empty:
-            if f.required:
+            if not partial and (f.required or (form and f.form_required)):
                 problems.append(f"{f.label} is required.")
+            elif partial and f.kind in (TEXT, LONGTEXT) and not f.required:
+                out[f.key] = ""            # cleared on purpose
+            elif partial and f.required:
+                problems.append(f"{f.label} cannot be empty.")
             continue
         if f.kind in (TEXT, LONGTEXT) and f.max_length and len(value) > f.max_length:
             problems.append(f"{f.label}: at most {f.max_length} characters.")
@@ -240,6 +258,12 @@ PREVIEW_COLUMN = "PreviewVideo"
 #: Person column. Written only where the library has it; read by the syncs
 #: as the demo's creator.
 SUBMITTED_COLUMN = "submitted_by"     # as Liwei created it in both libraries
+#: Who to ask about a demo (A4, 2026-10-26): a single line of text holding an
+#: email address, in both libraries. The uploader, on upload.
+OWNER_COLUMN = "DemoOwner"
+#: A picture chosen for the demo's tile (B5, 2026-10-26): a Yes/No column on
+#: files, ticked on the one image the demo's card shows.
+THUMBNAIL_COLUMN = "HubThumbnail"
 
 
 def preview_of(files: list[dict], chosen: str | None) -> str | None:
@@ -300,7 +324,8 @@ def form(spec: TargetSpec, choices: dict[str, list[str]], skipped: tuple = ()) -
         "test_library": spec.key in overrides(),
         "single_video": spec.single_video,
         "kinds": [{"key": k.key, "label": k.label} for k in spec.kinds],
-        "fields": [{"key": f.key, "label": f.label, "kind": f.kind, "required": f.required,
+        "fields": [{"key": f.key, "label": f.label, "kind": f.kind,
+                    "required": f.required or f.form_required,
                     "help": f.help, "max_length": f.max_length,
                     "default": today if f.default == "today" else f.default,
                     "not_stored": bool(f.column and f.column in skipped),

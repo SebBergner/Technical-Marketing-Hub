@@ -252,3 +252,51 @@ def test_a_demo_made_through_the_hub_is_credited_to_its_person(client, sp, tmp_p
         AssetQuery(limit=10, include_pending=True)).items}
     assert creators == {"kit-a": "Jane Doe", "kit-b": "Seb",
                         "kit-c": "Max Mustermann"}, "submitted_by alone is enough"
+
+
+def test_product_version_is_a_warning_through_the_api_and_required_on_the_page(client, sp):
+    """A11 (Liwei, 2026-10-26): the page requires it; the API warns, so
+    scripts keep working until their authors add it."""
+    secret = issue(client).json()["secret"]
+    values = {k: v for k, v in KIT.items() if k != "product_version"}
+    r = client.post("/api/uploads", json={"target": "demo_catalog", "kind": "ldk",
+                                          "values": values, "files": FILES,
+                                          "submitted_by": "ann@ptc.com"}, headers=bearer(secret))
+    assert r.status_code == 201, r.text
+    assert any("product_version is empty" in w for w in r.json()["warnings"])
+    access.create_group("Makers", "", ["view_hub", "upload_content"], ["maker@ptc.com"], "test")
+    r = client.post("/api/uploads", json={"target": "demo_catalog", "kind": "ldk",
+                                          "values": {**values, "title": "Page Kit"},
+                                          "files": FILES},
+                    headers=easyauth_headers("maker@ptc.com"))
+    assert r.status_code == 422 and "Product version is required" in r.json()["detail"]
+    ok = client.post("/api/uploads", json={"target": "demo_catalog", "kind": "ldk",
+                                           "values": {**values, "title": "Page Kit",
+                                                      "product_version": "N/A"},
+                                           "files": FILES},
+                     headers=easyauth_headers("maker@ptc.com"))
+    assert ok.status_code == 201, "N/A is an answer"
+
+
+def test_the_demo_owner_is_the_person_it_counts_as_made_by(client, sp, monkeypatch):
+    """A4 (2026-10-26): DemoOwner gets submitted_by, else the token's owner."""
+    from dataclasses import replace
+    from backend.integrations.graph import upload_writer as uw
+    from backend.services import upload_targets as ut
+    real = uw.resolve
+    monkeypatch.setattr(uw, "resolve", lambda c, spec, fresh=False:
+                        replace(real(c, spec, fresh), has_demo_owner=True))
+    secret = issue(client).json()["secret"]
+    for title, who, owner in (("Kit A", "ann@ptc.com", "ann@ptc.com"),
+                              ("Kit B", None, "seb@ptc.com")):
+        record = client.post("/api/uploads", json={"target": "demo_catalog", "kind": "ldk",
+                                                   "values": {**KIT, "title": title},
+                                                   "files": FILES, "submitted_by": who},
+                             headers=bearer(secret)).json()
+        for i, f in enumerate(record["files"]):
+            sp.items[f"i{i}"] = {"id": f"i{i}", "size": f["size"],
+                                 "name": f["path"].rsplit("/", 1)[-1]}
+            client.post(f"/api/uploads/{record['id']}/files/{i}/done",
+                        json={"item_id": f"i{i}"}, headers=bearer(secret))
+        client.post(f"/api/uploads/{record['id']}/finish", headers=bearer(secret))
+        assert sp.written[-1][1].get(ut.OWNER_COLUMN) == owner

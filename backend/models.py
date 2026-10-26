@@ -423,6 +423,14 @@ class AssetBase(BaseModel):
     #: column (upload_targets.SUBMITTED_COLUMN, 2026-10-21), an email address.
     #: Credited as the creator ahead of the files' creator.
     submitted_by: str | None = None
+    #: Who to ask about the demo (A4, Liwei 2026-10-23): the DemoOwner text
+    #: column, an email address. Filled with the uploader on upload, edited
+    #: on the Details card; empty on demos that came in bulk. Credited as the
+    #: creator ahead of everything else.
+    demo_owner: str | None = None
+    #: The Product Version column (A11, 2026-10-26), as typed; "N/A" when the
+    #: uploader said it does not apply, which the page does not show.
+    product_version: str | None = None
 
     # cross-references — the four ID spaces the Portal exists to correlate
     source_item_id: str | None = None         # SharePoint list item

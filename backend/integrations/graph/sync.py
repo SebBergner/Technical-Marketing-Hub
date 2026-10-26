@@ -45,6 +45,8 @@ COLUMNS = {
     "demo_type": ("Demo_x0020_Type", "DemoType", "Demo Type"),
     # Who submitted a demo made through the Hub (upload_targets.SUBMITTED_COLUMN).
     "submitted_by": ("submitted_by",),
+    # Who to ask (A4, 2026-10-26): text, an email address.
+    "demo_owner": ("DemoOwner",),
     "segment": ("Segment",),
     "language": ("Language", "Language0"),
     "product": ("Product", "Product0"),
@@ -248,6 +250,8 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
                 web_url=item.get("webUrl"),
                 source_item_id=item.get("id"),
                 submitted_by=(m.clean_text(_field(fields, "submitted_by")) or "").lower() or None,
+                demo_owner=(m.clean_text(_field(fields, "demo_owner")) or "").lower() or None,
+                product_version=m.clean_text(_field(fields, "product_version")),
             )
             stated[name] = (m.as_bool(_field(fields, "customer_facing")),
                             m.as_bool(_field(fields, "has_audio")))
@@ -311,7 +315,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
 #: deployment rebuilds its mirror once on the next sync rather than waiting
 #: for something in SharePoint to change (delta reports "unchanged" and the
 #: old rows would stay). 2: kit dates from their files (2026-10-14).
-MAPPING_VERSION = 3          # 3: the demo's creator from its files (2026-10-14)
+MAPPING_VERSION = 4          # 4: Demo Owner, product version, chosen thumbnail (2026-10-26)
 
 
 def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,

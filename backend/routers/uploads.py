@@ -100,6 +100,13 @@ def _view(record: dict, user: CurrentUser | None = None, repo=None,
             "submitted_by is empty: this upload is credited to the token's responsible person"
             + (f" ({record['person']})" if record.get("person") else "")
             + ". Send the PTC email address of the person it is for.")
+    # Required on the page, only a warning through the API so far (A11,
+    # Liwei 2026-10-26).
+    if str(record.get("uploaded_by") or "").startswith("token:"):
+        for f in ut.TARGETS[record["target"]].fields if record.get("target") in ut.TARGETS else ():
+            if f.form_required and not (record.get("values") or {}).get(f.key):
+                out["warnings"].append(f"{f.key} is empty: send it (or \"N/A\" when it does "
+                                       "not apply). It will become required.")
     out["asset_url"] = f"{base}/#/asset/{quote(asset_id, safe='')}" if asset_id else None
     return out
 
@@ -176,7 +183,7 @@ def start(body: UploadIn, repo: AssetRepository = Depends(get_repo),
         spec = ut.target(body.target)
         kind = ut.kind_of(spec, body.kind)
         target = _target(client, spec.key)
-        values = ut.clean_fields(spec, body.values, target.choices)
+        values = ut.clean_fields(spec, body.values, target.choices, form=not user.token_name)
         files = ut.clean_files(spec, [f.model_dump() for f in body.files])
         preview = ut.preview_of(files, body.preview)
     except ut.UploadInvalid as exc:
@@ -276,6 +283,11 @@ def _write_and_submit(repo, record: dict, actor: str, values: dict,
             else record.get("person"))
         if submitter and target.has_submitted_by:
             fields[ut.SUBMITTED_COLUMN] = submitter
+        # Who to ask about it (A4): the person it counts as made by -- the
+        # uploader on the page; through the API submitted_by, else the
+        # token's responsible person. Editable later on the Details card.
+        if record.get("person") and target.has_demo_owner:
+            fields[ut.OWNER_COLUMN] = record["person"]
         uw.write_metadata(client, target, record["folder_id"], fields, note)
         if preview_item:
             uw.mark_preview(client, target, preview_item)
@@ -330,7 +342,8 @@ def resubmit(upload_id: str, body: ResubmitIn, repo: AssetRepository = Depends(g
     client = _client()
     target = _target(client, record["target"])
     try:
-        values = ut.clean_fields(target.spec, body.values, target.choices)
+        values = ut.clean_fields(target.spec, body.values, target.choices,
+                                 form=not user.token_name)
     except ut.UploadInvalid as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     if values.get("title") != record["values"].get("title"):

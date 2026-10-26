@@ -86,7 +86,7 @@ _MIRROR_FIELDS = (
     "external_views",
     # Who made it (sharepoint_mapping.content_creator, 2026-10-14), and who
     # submitted it through the Hub (submitted_by column, 2026-10-21).
-    "creator", "submitted_by",
+    "creator", "submitted_by", "demo_owner", "product_version",
     # VM pages only. Public by construction: credentials are sealed out of it
     # before it is built (backend/integrations/graph/vm_pages.py) and live in
     # PRIVATE_DIR instead.
@@ -414,7 +414,8 @@ class JsonAssetRepository(AssetRepository):
         dates = self._load("publish_dates") or {}
         review = self._load("upload_review") or {}
         made_by = _upload_people(self._load("uploads"))
-        named = _person_names() if made_by or any(r.get("submitted_by") for r in rows) else {}
+        named = _person_names() if made_by or any(r.get("submitted_by") or r.get("demo_owner")
+                                                   for r in rows) else {}
         if dates or review or made_by or named:
             def stamp(r: dict) -> dict:
                 key = r.get("source_item_id")
@@ -425,7 +426,10 @@ class JsonAssetRepository(AssetRepository):
                 # SharePoint names the Hub's app as the files' creator of a
                 # demo made through the Hub: its submitted_by column says who it was
                 # (2026-10-21), else this slot's upload record (2026-10-20).
-                if r.get("submitted_by"):
+                # The Demo Owner column, where someone filled it (A4), first.
+                if r.get("demo_owner"):
+                    r = {**r, "creator": _name_of(r["demo_owner"], named)}
+                elif r.get("submitted_by"):
                     r = {**r, "creator": _name_of(r["submitted_by"], named)}
                 elif key in made_by:
                     r = {**r, "creator": made_by[key]}
@@ -1461,6 +1465,8 @@ class JsonAssetRepository(AssetRepository):
             upload_review=record.get("upload_review"),
             has_main_video=bool(record.get("main_video")),
             creator=record.get("creator"),
+            demo_owner=record.get("demo_owner"),
+            product_version=record.get("product_version"),
             archived_at=record.get("archived_at"),
             products=record.get("products") or [],
             product_families=taxonomy.families_of(record.get("products")),

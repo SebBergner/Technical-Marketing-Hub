@@ -51,6 +51,9 @@ class Target:
     skipped: tuple = ()
     #: The library has submitted_by (optional: written only where it exists).
     has_submitted_by: bool = False
+    #: ...and DemoOwner (A4) and HubThumbnail (B5), likewise.
+    has_demo_owner: bool = False
+    has_thumbnail_flag: bool = False
 
 
 def resolve(client: GraphClient, spec: ut.TargetSpec, *, fresh: bool = False) -> Target:
@@ -141,7 +144,9 @@ def resolve(client: GraphClient, spec: ut.TargetSpec, *, fresh: bool = False) ->
     target = Target(spec=spec, site_id=site_id, drive_id=drive.drive_id, list_id=list_id,
                     demo_content_type_id=demo["id"], product_note_field=note,
                     choices=choices, terms=terms, skipped=skipped,
-                    has_submitted_by=ut.SUBMITTED_COLUMN in columns)
+                    has_submitted_by=ut.SUBMITTED_COLUMN in columns,
+                    has_demo_owner=ut.OWNER_COLUMN in columns,
+                    has_thumbnail_flag=ut.THUMBNAIL_COLUMN in columns)
     with _lock:
         _cache[spec.key] = (now, target)
     return target

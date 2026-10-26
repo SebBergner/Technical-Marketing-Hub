@@ -88,7 +88,8 @@ def client(tmp_path, monkeypatch, sp):
 KIT = {"title": "Creo Sheetmetal Kit", "description": "Sheetmetal design end to end.",
        "products": ["Creo"], "segment": ["CAD"], "customer_facing": True,
        "contains_audio": False, "original_publish_date": "2026-09-01",
-       "language": "English", "owned_by": "Technical Demonstration Development"}
+       "language": "English", "owned_by": "Technical Demonstration Development",
+       "product_version": "Creo 12"}
 FILES = [{"path": "Videos/Overview_CF.mp4", "size": 1000},
          {"path": "Script.docx", "size": 20}]
 

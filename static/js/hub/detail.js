@@ -867,6 +867,9 @@ function renderFactsTable(page, asset) {
     ["Video type", videoTypeOf(asset)],
     ["Products", families.join(", ")],
     ["Product (detailed)", detailed.join(", ")],
+    // "N/A" says no version applies (A11): nothing to show.
+    ["Product version", /^n\/?a$/i.test((asset.product_version || "").trim()) ? null
+                        : asset.product_version],
     ["Segment", asset.segment],
     ["Stage", asset.funnel_stage],
     ["Industry", asset.industry],
@@ -890,6 +893,18 @@ function renderFactsTable(page, asset) {
     tr.appendChild(th);
     tr.insertCell().textContent = r[1];
   });
+  // Who to ask (A4, 2026-10-26): the Demo Owner, as a mail link.
+  if (asset.demo_owner) {
+    var owner = table.insertRow();
+    var oh = document.createElement("th");
+    oh.textContent = "Demo owner";
+    owner.appendChild(oh);
+    var mail = document.createElement("a");
+    mail.href = "mailto:" + asset.demo_owner;
+    mail.textContent = asset.creator || asset.demo_owner;
+    mail.title = asset.demo_owner;
+    owner.insertCell().appendChild(mail);
+  }
 
   var tags = asset.extra_tags || [];
   if (tags.length) {

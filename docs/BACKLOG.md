@@ -12,6 +12,22 @@ SharePoint 里的数据清理（kit 日期、Demo Type、标错的 LDK/VDK、旧
 
 ---
 
+## 开发计划（2026-10-27 起）
+
+2026-10-26 定：按周分批，每批推到 staging 由 Liwei 验证，每周集中 swap 一次（避开周五）。每项开始前先用几句话确认做法。
+
+| 周 | 内容 |
+|---|---|
+| 第 1 周（10/27） | S3 卡片日期、S4 表格视图 + CSV 导出、S2 Dashboard；顺带 A14 同步时间、D12 Zscaler 提示、筛选写进链接（S6 的前提） |
+| 第 2 周（11/3） | A1 在 Details 卡片上编辑元数据（含 A4 Demo Owner、B5 第一步自动视频画面）、S1 邮件订阅、A11 product version 必填 |
+| 第 3 周（11/10） | A8 归档移入 _Archive、A6 复查过期 demo、A2 Report asset（含 Report owners） |
+| 第 4 周（11/17） | A9 View as、A3 我的 Hub（收藏、最近看过、播放列表）、A13 相关推荐、A12 申请表改进 |
+| 随时插入 | S5 Value Roadmap 读取（等 Seb 的样例） |
+
+暂不排期：A5（优化）、A10 和 B6（模板和介绍编辑，未来）、S6 导航（不急）、C 类（等别人）。开放给 Marketing 之前，D1 备份和 D2 关掉共享密码登录由 Liwei 在 Portal 里完成。
+
+---
+
 ## Serge 会议（2026-10-23）：已定要做的
 
 Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TMH Checkpoint 的 5 个话题都有了结论。
@@ -247,6 +263,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   5. Consensus 的 demo 不在 SharePoint，继续只在 Hub 里隐藏。
 - **和 A6 的关系**：A6 的批量归档就是批量移入 `_Archive`，同样要逐个做权限检查。
 - **工作量**：约 2–3 天（移动与恢复、新权限、权限检查、同步识别 `_Archive`、故事页、测试库验证）。
+- **10/26 备注**：两个库都已建好 `_Archive` 文件夹，并移除了 visitor 组的权限。
 
 ### A9. View as：以某个组的身份预览 Hub（Liwei 10/21）
 - **来源**：Liwei 2026-10-21：只有自己的账号，没法测试 partner 和其他权限的人在 Hub 里看到什么。
@@ -262,6 +279,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - **配合：向 IT 申请两个测试账号**：一个 PTC 测试用户，一个外部来宾测试用户（模拟 partner），用于偶尔的
   端到端验证。日常用 View as，重要改动用测试账号。
 - **工作量**：约 1.5–2 天。
+- **10/26 备注**：不向 IT 申请测试账号。
 
 ### A10. Create New Demo 模板（Summit，Liwei）
 - **来源**：Summit：创建 demo 时可以选模板，文件按 Scripts、Presentation deck、Videos、Documents、
@@ -274,6 +292,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - **和 B6 的关系**：B6（在 Hub 里写介绍）是同一件事的另一半：模板定结构，B6 补每节的文字。建议一起设计。
 - **要定**：有哪些模板、每个模板有哪些节（团队定）；子文件夹命名是否统一。
 - **工作量**：2–3 天（不含 B6 的编辑器）。
+- **10/26 备注**：待定，是未来的功能，现阶段不着急做。
 
 ### A11. 元数据必填项补齐（Summit，Liwei）
 - **来源**：Summit：发布前必须填完元数据——标题、描述、产品、segment、customer facing、narrated audio、
@@ -282,6 +301,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   product version 目前选填。
 - **要定**：product version 是否必填，对哪些类型（视频？LDK、VDK？）；不适用时允许填 "N/A" 吗。
 - **工作量**：2 小时。
+- **10/26 备注（已定）**：product version 对所有类型必填；不适用时允许填 N/A；主界面上 N/A 不显示。
 
 ### A12. Request New Asset 改进（Summit）
 - **来源**：Summit：叫 "request" 容易让人以为一定会做。

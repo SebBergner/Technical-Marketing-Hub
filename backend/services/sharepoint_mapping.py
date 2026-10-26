@@ -272,6 +272,10 @@ def build_resource(filename: str, subfolder: str | None = None,
     # Marked by the sync from the PreviewVideo column (preview_item_ids).
     if item.get("hub_preview"):
         row["preview"] = True
+    # ...and from HubThumbnail (B5): the picture the demo's card shows.
+    if item.get("hub_thumbnail"):
+        row["hub_thumbnail"] = True
+        row["web_url"] = item.get("webUrl")
 
     if item.get("createdDateTime"):
         row["created_at"] = as_date(item["createdDateTime"])
@@ -296,6 +300,18 @@ def build_resource(filename: str, subfolder: str | None = None,
             if isinstance(video.get(key), int):
                 row[key] = video[key]
     return row
+
+
+def apply_chosen_thumbnail(asset: dict) -> None:
+    """The picture someone chose for the card (HubThumbnail, B5,
+    2026-10-26) beats every other: a story page's image, a Brightcove
+    poster, the generated cover. thumbnail_chosen tells the demo-page merge
+    not to replace it."""
+    chosen = next((r for r in asset.get("resources") or []
+                   if r.get("hub_thumbnail") and r.get("web_url")), None)
+    if chosen:
+        asset["thumbnail_url"] = chosen["web_url"]
+        asset["thumbnail_chosen"] = True
 
 
 def content_date(asset: dict) -> date | None:

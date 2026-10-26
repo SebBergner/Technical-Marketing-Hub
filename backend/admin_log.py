@@ -66,6 +66,10 @@ ACTIONS: dict[tuple[str, str], str] = {
     ("POST", "/api/uploads/{upload_id}/send-back"): "Sent an upload back",
     ("PUT", "/api/assets/{asset_id}/still-current"): "Set Still current",
     ("PUT", "/api/assets/{asset_id}/archive"): "Archived or restored a demo",
+    ("PUT", "/api/assets/{asset_id}/metadata"): "Edited a demo's metadata",
+    ("PUT", "/api/assets/{asset_id}/preview-video"): "Chose a demo's preview video",
+    ("PUT", "/api/assets/{asset_id}/thumbnail"): "Chose a demo's picture",
+    ("DELETE", "/api/assets/{asset_id}/thumbnail"): "Reset a demo's picture",
     ("POST", "/api/graph/sync"): "Ran the SharePoint sync",
     ("POST", "/api/graph/writeback"): "Wrote metadata back to SharePoint",
     ("POST", "/api/consensus/sync"): "Ran the Consensus sync",
@@ -80,7 +84,8 @@ ACTIONS: dict[tuple[str, str], str] = {
 #: Reads worth a line: about one person, not about the catalogue.
 _LOGGED_READS = {route for (method, route) in ACTIONS if method == "GET"}
 WATCHED = re.compile(r"^/api/(admin|graph|consensus/(sync|oauth)|curation/proposals|migration)/"
-                     r"|^/api/assets/[^/]+/(access|still-current|archive)$"
+                     r"|^/api/assets/[^/]+/(access|still-current|archive"
+                     r"|metadata|preview-video|thumbnail)$"
                      r"|^/api/assets/[^/]+/access-requests(/|$)"
                      r"|^/api/uploads(/|$)")
 
@@ -97,7 +102,8 @@ CATEGORIES: list[tuple[str, re.Pattern]] = [
     ("Sign-in", re.compile(r"^/api/admin/(login|logout)$")),
     ("Home page", re.compile(r"^/api/admin/(promoted|hub-settings)$")),
     ("Sync", re.compile(r"^/api/(graph/sync|consensus/(sync|oauth)|admin/auto-sync)")),
-    ("Metadata", re.compile(r"^/api/(graph/writeback|curation/)")),
+    ("Metadata", re.compile(r"^/api/(graph/writeback|curation/)"
+                            r"|^/api/assets/[^/]+/(metadata|preview-video|thumbnail)$")),
     ("Migration", re.compile(r"^/api/migration/")),
     ("Usage data", re.compile(r"^/api/admin/(activity/person|admin-log)")),
 ]

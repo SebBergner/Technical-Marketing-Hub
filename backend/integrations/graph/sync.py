@@ -301,6 +301,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
         if len(ticked) > 1:
             result.preview_conflicts.append(asset["title"] if asset.get("title") else name)
         m.derive_video_facts(asset)
+        m.apply_chosen_thumbnail(asset)
         m.apply_stated_flags(asset, *stated.get(name, (None, None)))
         if name not in dated:
             # A folder's own dates are the library move, not the content.
@@ -371,8 +372,7 @@ def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
             full = True
 
     page = client.delta(drive.drive_id) if full else page
-    ticked, preview_error = preview_item_ids(client, site.site_id, drive.drive_id)
-    items = mark_previews(page.items, ticked)
+    items, ticked, preview_error = mark_flags(client, site.site_id, drive.drive_id, page.items)
     assets, result = build_assets(_with_fields(client, drive, items))
     result.preview_videos, result.preview_error = len(ticked), preview_error
     result.delta_token = page.delta_token
@@ -385,11 +385,12 @@ def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
     return result
 
 
-def preview_item_ids(client: GraphClient, site_id: str,
-                     drive_id: str) -> tuple[set[str], str | None]:
-    """The files ticked PreviewVideo (a Yes/No column on files, 2026-10-15),
-    as drive item ids, in one filtered query -- delta carries no column
-    values, and reading them file by file would be ~9,000 calls.
+def preview_item_ids(client: GraphClient, site_id: str, drive_id: str,
+                     column: str = "PreviewVideo") -> tuple[set[str], str | None]:
+    """The files ticked PreviewVideo (a Yes/No column on files, 2026-10-15)
+    -- or another such column, HubThumbnail (2026-10-26) -- as drive item
+    ids, in one filtered query: delta carries no column values, and reading
+    them file by file would be ~9,000 calls.
 
     SharePoint filters a list this size only on an INDEXED column; until the
     index exists this returns no ids and says why, and the sync carries on
@@ -401,7 +402,7 @@ def preview_item_ids(client: GraphClient, site_id: str,
             return set(), "the library's list was not found"
         ids: set[str] = set()
         for row in client._paged(f"/sites/{site_id}/lists/{list_id}/items",
-                                 {"$filter": "fields/PreviewVideo eq 1",
+                                 {"$filter": f"fields/{column} eq 1",
                                   "$expand": "driveItem($select=id)",
                                   "$select": "id", "$top": "500"}):
             item_id = (row.get("driveItem") or {}).get("id")
@@ -410,14 +411,26 @@ def preview_item_ids(client: GraphClient, site_id: str,
         return ids, None
     except (GraphError, AttributeError, TypeError) as exc:
         # Never what stops a sync: the name rules still pick main videos.
-        log.warning("PreviewVideo not read: %s", exc)
+        log.warning("%s not read: %s", column, exc)
         return set(), str(exc)[:300]
 
 
-def mark_previews(items: list[dict], ticked: set[str]) -> list[dict]:
+def mark_previews(items: list[dict], ticked: set[str], key: str = "hub_preview") -> list[dict]:
     if not ticked:
         return items
-    return [{**i, "hub_preview": True} if i.get("id") in ticked else i for i in items]
+    return [{**i, key: True} if i.get("id") in ticked else i for i in items]
+
+
+def mark_flags(client: GraphClient, site_id: str, drive_id: str,
+               items: list[dict]) -> tuple[list[dict], set[str], str | None]:
+    """The items with their PreviewVideo and HubThumbnail ticks (B5,
+    2026-10-26). HubThumbnail needs an index on a big library, like
+    PreviewVideo; without one, no picture is chosen and the sync goes on."""
+    from backend.services.upload_targets import THUMBNAIL_COLUMN
+    ticked, preview_error = preview_item_ids(client, site_id, drive_id)
+    pictures, _ = preview_item_ids(client, site_id, drive_id, column=THUMBNAIL_COLUMN)
+    items = mark_previews(mark_previews(items, ticked), pictures, key="hub_thumbnail")
+    return items, ticked, preview_error
 
 
 def _retire_seed(repo) -> int:

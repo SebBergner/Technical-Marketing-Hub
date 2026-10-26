@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel
 
@@ -554,4 +554,179 @@ def set_archived(asset_id: str, body: ArchiveIn, repo: AssetRepository = Depends
         raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
     log.info("archived=%s for %s by %s", body.archived, asset_id, actor)
     return result
+
+
+# ── Editing on the Details card (A1, Liwei 2026-10-26) ─────────────────────
+#: Administrators and TDD Team (the "Edit metadata" permission); no review,
+#: every change in the Admin log (backend/admin_log.py watches these routes).
+EDIT = Depends(require_perm(Perm.EDIT_METADATA))
+
+
+def _editable(repo: AssetRepository, asset_id: str):
+    """(the demo, its library key, a Graph client, the resolved library), or
+    an HTTP error."""
+    from backend.routers.uploads import _client, _target
+    from backend.services import metadata_edit as me
+    asset = repo.get(asset_id)
+    if asset is None:
+        raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
+    try:
+        key = me.target_key(asset.model_dump(mode="json"))
+    except me.NotEditable as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    client = _client()
+    return asset, key, client, _target(client, key)
+
+
+def _videos(asset: Asset) -> list[dict]:
+    return [{"item_id": r.item_id, "name": r.name, "subfolder": r.subfolder}
+            for r in asset.resources if r.kind == "video" and r.item_id]
+
+
+@router.get("/{asset_id}/metadata")
+def edit_form(asset_id: str, repo: AssetRepository = Depends(get_repo), actor: str = EDIT):
+    """The editor: its fields, SharePoint's current values (read now, not
+    from the mirror), the ETag to send back, the videos to preview with."""
+    from backend.services import metadata_edit as me
+    asset, key, client, target = _editable(repo, asset_id)
+    try:
+        item = client.get_list_item(target.drive_id, asset.source_item_id) or {}
+    except GraphError as exc:
+        raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
+    if not item:
+        raise HTTPException(status_code=404,
+                            detail="The demo's folder is no longer in SharePoint.")
+    preview = next((r.item_id for r in asset.resources if r.name == asset.main_video), None)
+    return {"library": target.spec.library, "title": asset.title,
+            "etag": item.get("@odata.etag") or item.get("eTag"),
+            "fields": me.form(target.spec, target),
+            "values": me.values_of(target.spec, item.get("fields") or {}),
+            "videos": _videos(asset), "preview": preview,
+            "thumbnail": {"chosen": bool(asset.thumbnail_chosen),
+                          "can_choose": target.has_thumbnail_flag}}
+
+
+class MetadataIn(BaseModel):
+    values: dict
+    etag: str | None = None
+
+
+@router.put("/{asset_id}/metadata")
+def save_metadata(asset_id: str, body: MetadataIn, repo: AssetRepository = Depends(get_repo),
+                  actor: str = EDIT):
+    """Write what changed to the demo's folder, at once."""
+    from backend.routers.uploads import _sync_soon
+    from backend.services import metadata_edit as me
+    from backend.services import upload_targets as ut
+    asset, key, client, target = _editable(repo, asset_id)
+    try:
+        item = client.get_list_item(target.drive_id, asset.source_item_id) or {}
+        current = me.values_of(target.spec, item.get("fields") or {})
+        changed = me.changes(target.spec, target, body.values, current)
+        if changed:
+            me.write(client, target, asset.source_item_id, changed, body.etag)
+    except ut.UploadInvalid as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except me.EditConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except GraphError as exc:
+        raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
+    if changed:
+        me.remember(repo, asset_id, me.hub_values(key, changed))
+        _sync_soon(repo, actor)
+        log.info("metadata of %s edited by %s: %s", asset_id, actor, sorted(changed))
+    return {"changed": sorted(changed), "asset": repo.get(asset_id)}
+
+
+class PreviewIn(BaseModel):
+    item_id: str
+
+
+@router.put("/{asset_id}/preview-video")
+def set_preview_video(asset_id: str, body: PreviewIn,
+                      repo: AssetRepository = Depends(get_repo), actor: str = EDIT):
+    """The video the demo is previewed with (PreviewVideo): this one ticked,
+    the demo's other videos cleared."""
+    from backend.routers.uploads import _sync_soon
+    from backend.services import metadata_edit as me
+    from backend.services import upload_targets as ut
+    asset, key, client, target = _editable(repo, asset_id)
+    chosen = next((v for v in _videos(asset) if v["item_id"] == body.item_id), None)
+    if chosen is None:
+        raise HTTPException(status_code=422, detail="Choose one of this demo's videos.")
+    try:
+        me.tick(client, target, ut.PREVIEW_COLUMN, chosen["item_id"],
+                [r.item_id for r in asset.resources if r.preview and r.item_id])
+    except GraphError as exc:
+        raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
+    me.remember(repo, asset_id, {"main_video": chosen["name"]})
+    _sync_soon(repo, actor)
+    return {"preview": chosen["item_id"], "asset": repo.get(asset_id)}
+
+
+@router.get("/{asset_id}/files/{item_id}/frame-source")
+def frame_source(asset_id: str, item_id: str, repo: AssetRepository = Depends(get_repo),
+                 actor: str = EDIT):
+    """A short-lived address the editor plays a video from to pick a frame
+    for the card (B5). SharePoint serves it with CORS open (measured
+    2026-10-26), so the page can draw a frame onto a canvas."""
+    asset, key, client, target = _editable(repo, asset_id)
+    if not any(v["item_id"] == item_id for v in _videos(asset)):
+        raise HTTPException(status_code=404, detail="Not one of this demo's videos.")
+    try:
+        url = client.download_url(target.drive_id, item_id)
+    except GraphError as exc:
+        raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
+    if not url:
+        raise HTTPException(status_code=404, detail="SharePoint gave no address for this video.")
+    return {"url": url}
+
+
+@router.put("/{asset_id}/thumbnail")
+async def set_thumbnail(asset_id: str, file: UploadFile = File(...),
+                        repo: AssetRepository = Depends(get_repo), actor: str = EDIT):
+    """The card's picture (B5): an image uploaded, or a frame the page took
+    from a video -- either way a picture saved in the demo's folder and
+    ticked HubThumbnail, any picture ticked before cleared."""
+    from backend.routers.uploads import _sync_soon
+    from backend.services import metadata_edit as me
+    from backend.services import upload_targets as ut
+    asset, key, client, target = _editable(repo, asset_id)
+    if not target.has_thumbnail_flag:
+        raise HTTPException(status_code=422, detail=f"{target.spec.library} has no "
+                            f"{ut.THUMBNAIL_COLUMN} column yet.")
+    content_type = (file.content_type or "").lower()
+    if content_type not in me.IMAGE_TYPES:
+        raise HTTPException(status_code=422, detail="A JPG, PNG or WebP picture, please.")
+    content = await file.read(me.MAX_IMAGE_BYTES + 1)
+    if not content or len(content) > me.MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=422, detail="A picture of at most 5 MB, please.")
+    try:
+        item = me.put_thumbnail(client, target, asset.source_item_id, content, content_type)
+        me.tick(client, target, ut.THUMBNAIL_COLUMN, item["id"],
+                [r.item_id for r in asset.resources if r.hub_thumbnail and r.item_id])
+    except GraphError as exc:
+        raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
+    me.remember(repo, asset_id, {"thumbnail_url": item.get("webUrl"), "thumbnail_chosen": True})
+    _sync_soon(repo, actor)
+    return {"asset": repo.get(asset_id)}
+
+
+@router.delete("/{asset_id}/thumbnail")
+def clear_thumbnail(asset_id: str, repo: AssetRepository = Depends(get_repo),
+                    actor: str = EDIT):
+    """Back to the automatic picture: the chosen one is unticked (the file
+    stays in the folder)."""
+    from backend.routers.uploads import _sync_soon
+    from backend.services import metadata_edit as me
+    from backend.services import upload_targets as ut
+    asset, key, client, target = _editable(repo, asset_id)
+    try:
+        me.tick(client, target, ut.THUMBNAIL_COLUMN, None,
+                [r.item_id for r in asset.resources if r.hub_thumbnail and r.item_id])
+    except GraphError as exc:
+        raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
+    me.remember(repo, asset_id, {"thumbnail_url": None, "thumbnail_chosen": False})
+    _sync_soon(repo, actor)
+    return {"asset": repo.get(asset_id)}
 

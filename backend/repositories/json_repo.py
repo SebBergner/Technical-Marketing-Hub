@@ -80,7 +80,8 @@ _MIRROR_FIELDS = (
     "id", "type", "source", "title", "description", "products", "funnel_stage", "content_depth",
     "language", "segment", "industry", "value_drivers", "tags", "customer_facing",
     "has_narrated_audio", "named_customer", "uploaded_at", "date_stated", "duration_seconds",
-    "thumbnail_url", "web_url", "source_item_id", "brightcove_id", "consensus_uuid",
+    "thumbnail_url", "thumbnail_chosen", "web_url", "source_item_id", "brightcove_id",
+    "consensus_uuid",
     "internal_title",
     "resources", "resource_counts", "resource_count", "video_count", "main_video",
     "external_views",
@@ -247,7 +248,9 @@ def _apply_demo_pages(tagged: list[tuple[str, dict]],
         page = by_target.get(r["id"]) if src == "sharepoint" else None
         if page:
             r = {**r, "page_url": page.get("page_url") if show_page_links else None,
-                 "thumbnail_url": page.get("thumbnail_url") or r.get("thumbnail_url"),
+                 # A picture chosen on the Details card stays (B5).
+                 "thumbnail_url": r.get("thumbnail_url") if r.get("thumbnail_chosen")
+                                  else page.get("thumbnail_url") or r.get("thumbnail_url"),
                  # The author's intro, sections and file order (2026-10-21).
                  "overview": page.get("overview")}
         out.append((src, r))
@@ -435,6 +438,13 @@ class JsonAssetRepository(AssetRepository):
                     r = {**r, "creator": made_by[key]}
                 return r
             rows = [stamp(r) for r in rows]
+        # Edited on the Details card and not synced yet (A1): shown now.
+        edits = self._load("metadata_edits")
+        if edits:
+            from backend.services.metadata_edit import apply_edits
+            rows = apply_edits(rows, edits, {
+                s: (self._load("sync_state").get(s) or {}).get("last_success_at")
+                for s in ("sharepoint", "demo_video")})
         # Hidden from the Hub on the Admin page (owned/hidden.json): out of
         # every read here, at the funnel, like a retired item.
         hidden = self._load("hidden") or {}

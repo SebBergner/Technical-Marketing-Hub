@@ -178,6 +178,13 @@ class AssetResource(BaseModel):
     modified_at: str | None = None
     modified_by: str | None = None
 
+    #: Ticked PreviewVideo in SharePoint: the video the demo is previewed
+    #: with. Changed on the Details card (A1, 2026-10-26).
+    preview: bool = False
+    #: Ticked HubThumbnail: the picture the demo's card shows (B5,
+    #: 2026-10-26). Not listed among the demo's files.
+    hub_thumbnail: bool = False
+
 
 class AssetStats(BaseModel):
     views: int = 0
@@ -374,6 +381,9 @@ class AssetBase(BaseModel):
     has_narrated_audio: bool | None = None    # gates external sharing for video
     named_customer: str | None = None
 
+    #: thumbnail_url is a picture someone chose on the Details card
+    #: (HubThumbnail, B5): no other picture replaces it.
+    thumbnail_chosen: bool = False
     uploaded_at: date | None = None
     #: `uploaded_at` is a date someone stated -- the Original publish date
     #: column, the source platform's own date (Consensus), or the date given

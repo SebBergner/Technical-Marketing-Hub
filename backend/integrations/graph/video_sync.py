@@ -198,6 +198,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], VideoSyncResult]:
 
     for name, asset in assets.items():
         m.derive_video_facts(asset)
+        m.apply_chosen_thumbnail(asset)
         # The columns are what the sheet said, so they beat the filename rule.
         m.apply_stated_flags(asset, *stated.get(name, (None, None)))
 
@@ -251,10 +252,9 @@ def sync_videos(client: GraphClient, repo, site: SiteRef | None = None,
 
     page = client.delta(drive.drive_id)
     # Ticked PreviewVideo files lead, as in the Demo Catalog (sync.py).
-    from backend.integrations.graph.sync import mark_previews, preview_item_ids
-    ticked, _ = preview_item_ids(client, site.site_id, drive.drive_id)
-    assets, result = build_assets(_with_fields(client, drive,
-                                               mark_previews(page.items, ticked)))
+    from backend.integrations.graph.sync import mark_flags
+    items, _, _ = mark_flags(client, site.site_id, drive.drive_id, page.items)
+    assets, result = build_assets(_with_fields(client, drive, items))
     result.library = library
     add_posters(assets, result,
                 brightcove if brightcove is not None else get_brightcove_client())

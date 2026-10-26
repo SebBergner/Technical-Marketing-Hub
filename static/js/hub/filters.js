@@ -584,8 +584,9 @@ function reflectSort() {
   ensureViewToggle();
 }
 
-/* Tiles or a table (Serge, 2026-10-23), beside Sort. In the table the
- * columns sort, so the Sort control steps aside, and Export CSV appears. */
+/* Tiles or a table (Serge, 2026-10-23), at the far right after Sort --
+ * always in the same place (Liwei, 2026-10-26). In the table the columns
+ * sort, so Sort steps aside and Export CSV takes its place, to the left. */
 var COLUMN_ONLY_SORTS = ["type", "product", "segment", "language"];
 
 function ensureViewToggle() {
@@ -629,8 +630,12 @@ function ensureViewToggle() {
       });
       seg.appendChild(b);
     });
-    box.appendChild(seg);
+    // Export, Sort, then the switch: whichever of the first two shows, the
+    // switch stays last.
     head.insertBefore(box, sortPill);
+    sortPill.style.marginLeft = "";
+    box.appendChild(sortPill);
+    box.appendChild(seg);
   }
   var table = tableView();
   box.querySelectorAll("[data-view]").forEach(function (b) {

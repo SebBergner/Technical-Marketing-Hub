@@ -1500,7 +1500,7 @@ a.hub-up__title:hover{text-decoration:underline}
 .hub-story__section .vp-files__list{margin:0 0 12px 20px}
 
 /* ── Results as a table (Serge, 2026-10-23; static/js/hub/table.js) ── */
-.hub-view { display: flex; align-items: center; gap: 8px; margin-left: auto; margin-right: 8px; }
+.hub-view { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .hub-view__seg { display: inline-flex; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); overflow: hidden; }
 .hub-view__seg button { border: none; background: var(--orion-surface); color: var(--orion-text-2); font: inherit; font-size: 13px; padding: 9px 13px; cursor: pointer; }
 .hub-view__seg button + button { border-left: 1px solid var(--orion-border-md); }

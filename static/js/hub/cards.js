@@ -702,7 +702,7 @@ function publishedYear(a) {
 
 function friendlyDate(iso) {
   var d = new Date(iso + "T00:00:00");
-  return isNaN(d) ? iso : d.toLocaleDateString(undefined,
+  return isNaN(d) ? iso : d.toLocaleDateString("en-US",
     { year: "numeric", month: "short", day: "numeric" });
 }
 

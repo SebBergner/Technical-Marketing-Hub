@@ -169,7 +169,8 @@ function loadMine() {
       if (r.asset_id) title.href = "#/asset/" + encodeURIComponent(r.asset_id);
       info.appendChild(title);
       info.appendChild(el("div", "hub-up__muted", (r.folder_name || "") + " · "
-        + new Date(r.created_at).toLocaleDateString()));
+        + new Date(r.created_at).toLocaleDateString("en-US",
+            { month: "short", day: "numeric", year: "numeric" })));
       if (r.status === "sent_back" && r.note) {
         info.appendChild(el("div", "hub-up__note", "Reviewer: " + r.note));
       }

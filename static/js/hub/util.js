@@ -19,7 +19,7 @@ function uploadedLabel(iso) {
   if (isNaN(d)) return "";
   var opts = { day: "numeric", month: "short" };
   if (d.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
-  return d.toLocaleDateString("en-GB", opts);
+  return d.toLocaleDateString("en-US", opts);
 }
 
 function pill(text, kind) {
@@ -34,14 +34,16 @@ function debounce(fn, ms) {
   return function () { clearTimeout(t); t = setTimeout(fn, ms); };
 }
 
+/* Month day, year -- "Mar 12, 2024" -- everywhere in the Hub (Liwei,
+ * 2026-10-26; it was day month year). */
 function fullDate(iso) {
   var d = new Date(iso + "T00:00:00");
   return isNaN(d) ? iso
-    : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    : d.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
 }
 
 /* A demo's date as a tile and a table say it (Serge, 2026-10-23):
- * "Published 12 Mar 2024" when someone stated it (date_stated), else
+ * "Published Mar 12, 2024" when someone stated it (date_stated), else
  * "Updated Dec 2018" -- read off the files, so to the month only, and not
  * passed off as a publication date. "" without a date. */
 function dateLabel(a) {
@@ -49,7 +51,7 @@ function dateLabel(a) {
   if (a.date_stated) return "Published " + fullDate(a.uploaded_at);
   var d = new Date(a.uploaded_at + "T00:00:00");
   return isNaN(d) ? ""
-    : "Updated " + d.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+    : "Updated " + d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 }
 
 function setText(id, text) {

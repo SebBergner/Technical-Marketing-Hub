@@ -23,7 +23,35 @@ import { renderLibrary, usageByTypeCard } from "./dashboard.js";
  * chart is also in a table or a label, so nothing hides behind a hover.
  */
 var ACT_RANGES = [["30", "30 days"], ["90", "90 days"], ["365", "12 months"]];
-var actState = { range: "30", seq: 0, library: null };
+var actState = { range: "30", seq: 0, library: null, tab: savedTab() };
+
+/* Two tabs (Liwei, 2026-10-26): the library, and how the Hub is used. The
+ * period buttons belong to Usage only. The last one opened is remembered
+ * in this browser. */
+var DASH_TAB_KEY = "hub.dashboardTab";
+
+function savedTab() {
+  try { return localStorage.getItem(DASH_TAB_KEY) === "usage" ? "usage" : "library"; }
+  catch (e) { return "library"; }
+}
+
+function showTab(tab) {
+  actState.tab = tab;
+  try { localStorage.setItem(DASH_TAB_KEY, tab); } catch (e) { /* private window */ }
+  var page = document.getElementById("hubActivityPage");
+  if (!page) return;
+  page.querySelectorAll("[data-dash-tab]").forEach(function (b) {
+    var on = b.dataset.dashTab === tab;
+    b.classList.toggle("is-on", on);
+    b.setAttribute("aria-selected", String(on));
+  });
+  var lib = document.getElementById("hubDashLibrary");
+  var use = document.getElementById("hubDashUsage");
+  if (lib) lib.hidden = tab !== "library";
+  if (use) use.hidden = tab !== "usage";
+  var ranges = document.getElementById("hubActRanges");
+  if (ranges) ranges.style.visibility = tab === "usage" ? "" : "hidden";
+}
 
 function actEl(tag, cls, text) {
   var n = document.createElement(tag);
@@ -65,6 +93,9 @@ function buildActivityPage() {
     +   '<div class="orion-subtle">What the Technical Marketing Hub holds, and how PTC uses it: '
     +   'what is opened, downloaded and searched for, and by how many people.</div>'
     + '</div><div class="hub-act__ranges" role="group" aria-label="Period" id="hubActRanges"></div></div>'
+    + '<div class="hub-dash__tabs" role="tablist" aria-label="Dashboard">'
+    +   '<button type="button" role="tab" data-dash-tab="library">Library</button>'
+    +   '<button type="button" role="tab" data-dash-tab="usage">Usage</button></div>'
     + '<div class="hub-act" id="hubAct"></div>';
   var anchor = document.getElementById("videoPreviewPage");
   if (anchor) anchor.parentNode.insertBefore(page, anchor);
@@ -72,6 +103,9 @@ function buildActivityPage() {
   page.querySelector(".vp-back").addEventListener("click", function () {
     history.pushState(null, "", location.pathname + location.search);
     closeActivity();
+  });
+  page.querySelectorAll("[data-dash-tab]").forEach(function (b) {
+    b.addEventListener("click", function () { showTab(b.dataset.dashTab); });
   });
   var ranges = page.querySelector("#hubActRanges");
   ACT_RANGES.forEach(function (r) {
@@ -221,14 +255,18 @@ function namedNote(day) {
 }
 
 function renderActivityPage(d) {
-  var host = document.getElementById("hubAct");
-  host.innerHTML = "";
+  var root = document.getElementById("hubAct");
+  root.innerHTML = "";
+  var library = actEl("div", "hub-act hub-dash__pane");
+  library.id = "hubDashLibrary";
+  if (actState.library) renderLibrary(library, actState.library);
+  var host = actEl("div", "hub-act hub-dash__pane");
+  host.id = "hubDashUsage";
+  root.appendChild(library);
+  root.appendChild(host);
   var t = d.totals, prev = d.previous || {};
   var views = t.view + t.preview;
   var series = d.series || [];
-
-  if (actState.library) renderLibrary(host, actState.library);
-  host.appendChild(actEl("h2", "hub-dash__h", "Usage"));
 
   // ── the headline row
   var top = actEl("div", "hub-act__top");
@@ -306,6 +344,7 @@ function renderActivityPage(d) {
     + " A demo's creator is whoever created its main video in SharePoint"
     + (d.unattributed_uses ? "; " + d.unattributed_uses.toLocaleString()
       + " uses were of demos with no recorded creator (migrated videos, Consensus)." : ".")));
+  showTab(actState.tab);
 }
 
 /* One series (actions per day): a 2px line over a 10% wash, hairline
@@ -359,7 +398,7 @@ function drawDaily(wrap, series) {
   var line = vals.map(function (v, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1); }).join("");
   var area = line + "L" + x(n - 1).toFixed(1) + " " + y(0) + "L" + x(0).toFixed(1) + " " + y(0) + "Z";
   var fmt = function (iso, long) {
-    return new Date(iso + "T00:00:00").toLocaleDateString(undefined,
+    return new Date(iso + "T00:00:00").toLocaleDateString("en-US",
       long ? { weekday: "short", month: "short", day: "numeric" } : { month: "short", day: "numeric" });
   };
   var ticks = [0, Math.floor((n - 1) / 2), n - 1].filter(function (i, k, a) { return a.indexOf(i) === k; });

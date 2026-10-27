@@ -1,12 +1,14 @@
 /* Reports and Get help (A2, Seb 2026-10-07; Liwei 2026-10-23/28).
  *
- * "Report an issue" on a demo's page opens a small form about that demo;
- * "Get help" in the sidebar (#/help) is the same form with no demo, above
- * "My reports": everything this person reported and where it stands. A
- * report goes to the owners of the demo's segment, set on Admin -> Report
- * owners (services/support_reports.py), and is handled in the Hub Tasks
- * list; its status is read back from there. Partners may report too and
- * are recorded only as "partner".
+ * "Report an issue", a quiet link at the top of a demo's page, opens a
+ * small form about that demo, which goes to the owners of its segment (set
+ * on Admin -> Report owners, services/support_reports.py). "Get help", at
+ * the foot of the sidebar beside Share feedback (#/help), is about the Hub
+ * itself -- it will not load, the list is out of date -- and goes to the
+ * Hub team; it has its own categories. Below it, "My reports": everything
+ * this person reported and where it stands. Both are handled in the Hub
+ * Tasks list and their status is read back from there. Partners may report
+ * too and are recorded only as "partner".
  *
  * Part of the Hub page's script; static/js/hub/main.js loads it through
  * nav.js and detail.js. */
@@ -15,7 +17,7 @@ import { fullDate, report as complain } from "./util.js";
 import { hubPermissions } from "./permissions.js";
 import { closeAdvancedSearch } from "./search.js";
 
-var categories = null;          // from /api/support/options, once
+var categories = null;          // {demo: [...], hub: [...]}, from /api/support/options, once
 
 function el(tag, cls, text) {
   var n = document.createElement(tag);
@@ -29,7 +31,7 @@ function options() {
   return fetch("/api/support/options").then(function (r) {
     if (!r.ok) throw new Error("HTTP " + r.status);
     return r.json();
-  }).then(function (d) { categories = d.categories || []; return categories; });
+  }).then(function (d) { categories = d; return categories; });
 }
 
 /* The form, for a demo (asset) or for help (null). onDone(answer) after it
@@ -40,11 +42,12 @@ function reportForm(asset, onDone, onCancel) {
   var host = el("div", "hub-rpt__cats");
   host.setAttribute("role", "radiogroup");
   host.setAttribute("aria-label", "What kind of problem");
-  var label = el("div", "hub-rpt__label", asset ? "What is wrong?" : "What do you need help with?");
+  var label = el("div", "hub-rpt__label", asset ? "What is wrong with this demo?"
+                                                : "What is wrong with the Hub?");
   form.appendChild(label);
   form.appendChild(host);
-  options().then(function (list) {
-    list.forEach(function (c, i) {
+  options().then(function (sets) {
+    (asset ? sets.demo : sets.hub).forEach(function (c) {
       var opt = el("label", "hub-rpt__cat");
       var radio = el("input");
       radio.type = "radio";
@@ -61,14 +64,15 @@ function reportForm(asset, onDone, onCancel) {
   text.maxLength = 2000;
   text.placeholder = asset
     ? "What happened, which file, what you expected. A link or file name helps."
-    : "What you are looking for or what went wrong.";
+    : "What happened, where, and what you expected. For a problem with one demo, use "
+      + "Report an issue on its page.";
   text.setAttribute("aria-label", "Details");
   form.appendChild(el("div", "hub-rpt__label", "Details"));
   form.appendChild(text);
 
   var note = el("div", "hub-rpt__note", asset
     ? "It goes to the team that looks after this demo's segment, not to the person who uploaded it."
-    : "It goes to the Hub team.");
+    : "It goes to the team that runs the Hub.");
   form.appendChild(note);
   var error = el("div", "hub-rpt__error");
   error.setAttribute("role", "alert");
@@ -178,8 +182,9 @@ function buildPage() {
     +   '<use href="#i-chevron-left"/></svg>Back to Technical Marketing Hub</button>'
     + '<div class="vp-head"><div>'
     +   '<div class="vp-title">Get help</div>'
-    +   '<div class="orion-subtle">Ask the team for help, and follow what you have reported. '
-    +   'To report a problem with one demo, use Report an issue on its page.</div>'
+    +   '<div class="orion-subtle">Tell the Hub team when the Hub itself is not working: '
+    +   'it will not load, the demo list is out of date, you cannot sign in or find something. '
+    +   'For a problem with one demo, use Report an issue on its page.</div>'
     + '</div></div>'
     + '<div class="hub-rpt"><section class="hub-rpt__card" id="hubHelpForm"></section>'
     + '<section class="hub-rpt__card"><h2 class="hub-rpt__h">My reports</h2>'
@@ -292,18 +297,24 @@ function loadMine() {
   });
 }
 
-/* ── the sidebar item, under Contribute ───────────────────────────────── */
+/* ── at the foot of the sidebar, beside Share feedback (2026-10-28) ──── */
 function addHelpNav() {
   hubPermissions.then(function (granted) {
     if (granted.indexOf("view_hub") < 0 || document.getElementById("navHelp")) return;
-    var after = document.getElementById("navUpload") || document.getElementById("navRequestAsset");
-    if (!after) return;
-    var item = el("div", "orion-navitem");
+    var feedback = document.querySelector(".orion-side__foot .hub-foot__feedback");
+    if (!feedback) return;
+    var item = el("a", "hub-foot__feedback");
     item.id = "navHelp";
-    item.innerHTML = '<span class="label"><svg class="orion-ico orion-ico--sm">'
-      + '<use href="#i-message-square"/></svg> Get help</span>';
-    item.addEventListener("click", function () { location.hash = "#/help"; });
-    after.insertAdjacentElement("afterend", item);
+    item.href = "#/help";
+    item.title = "When the Hub itself is not working";
+    item.innerHTML =
+        '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">'
+      + '<circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.3"/>'
+      + '<path d="M6.3 6.3a1.8 1.8 0 1 1 2.5 1.6c-.5.2-.8.6-.8 1.1v.4" fill="none"'
+      + ' stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>'
+      + '<circle cx="8" cy="11.4" r=".8" fill="currentColor"/></svg>'
+      + "<span>Get help</span>";
+    feedback.insertAdjacentElement("beforebegin", item);
     if (location.hash === "#/help") markNav(true);
   });
 }
@@ -311,11 +322,9 @@ function addHelpNav() {
 function markNav(on) {
   var item = document.getElementById("navHelp");
   if (!item) return;
-  item.classList.toggle("orion-navitem--active", on);
+  item.classList.toggle("hub-foot__feedback--on", on);
   if (on) document.querySelectorAll(".orion-navitem--active, .orion-navitem.is-active")
-    .forEach(function (n) {
-      if (n !== item) n.classList.remove("orion-navitem--active", "is-active");
-    });
+    .forEach(function (n) { n.classList.remove("orion-navitem--active", "is-active"); });
 }
 
 export { addHelpNav, closeHelp, openHelp, openReportModal };

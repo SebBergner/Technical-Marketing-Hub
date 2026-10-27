@@ -44,7 +44,9 @@ def owners(client, segment, people, who=BOSS):
     return client.put(f"/api/admin/report-owners/{segment}", json={"owners": people}, headers=who)
 
 
-def report(client, who, asset_id=None, category=sr.CATEGORIES[1], details="The UI is from 2019"):
+def report(client, who, asset_id=None, category=None, details="The UI is from 2019"):
+    if category is None:
+        category = sr.DEMO_CATEGORIES[1] if asset_id else sr.HUB_CATEGORIES[1]
     return client.post("/api/support/reports", headers=who,
                        json={"asset_id": asset_id, "category": category, "details": details})
 
@@ -70,26 +72,32 @@ def test_a_report_tells_its_segments_owners_and_falls_back_to_general(client):
         assert report(client, ANN, asset).status_code == 200, asset
     cad, plm, iot, help_ = client.rows
     assert cad["NotifyTo"] == "avi@ptc.com; elio@ptc.com" and cad["Segment"] == "CAD"
-    assert cad["TaskType"] == "Support request" and cad["Category"] == sr.CATEGORIES[1]
+    assert cad["TaskType"] == "Support request" and cad["Category"] == sr.DEMO_CATEGORIES[1]
     assert cad["RequestedBy"] == "ann@ptc.com" and cad["Title"] == "Report: Clip cad"
     assert cad["HubLink"].endswith("/#/asset/cad")
     assert plm["NotifyTo"] == "liwei@ptc.com" and plm["Segment"] == "PLM", \
         "counted under PLM, told to General, as nobody in PLM is notified"
     assert "nobody is notified for PLM" in plm["Details"]
     assert iot["Segment"] == "General" and help_["Segment"] == "General"
-    assert help_["Title"] == f"Help: {sr.CATEGORIES[1]}"
+    assert help_["Title"] == "Help: Demo list is out of date"
     segs = {s["segment"]: s for s in client.get("/api/admin/report-owners", headers=BOSS)
             .json()["segments"]}
     assert (segs["CAD"]["total"], segs["PLM"]["total"], segs["General"]["total"]) == (1, 1, 2)
     assert segs["PLM"]["notified"] is False and segs["CAD"]["notified"] is True
 
 
-def test_the_category_must_be_the_lists_and_details_are_needed(client):
+def test_a_demo_and_the_hub_each_have_their_own_categories(client):
+    """Liwei 2026-10-28: a demo's page asks about the demo, Get help about the Hub."""
     assert report(client, ANN, category="Broken").status_code == 422
     assert report(client, ANN, details="").status_code == 422
     assert report(client, ANN, asset_id="nope").status_code == 404
-    assert "File won\u2019t open or is missing" in client.get(
-        "/api/support/options", headers=ANN).json()["categories"]
+    assert report(client, ANN, "cad", category="Hub won\u2019t load or is slow").status_code == 422
+    assert report(client, ANN, None,
+                  category="File won\u2019t open or is missing").status_code == 422
+    assert report(client, ANN, None, category="Other").status_code == 200
+    opts = client.get("/api/support/options", headers=ANN).json()
+    assert "Details are wrong (product, date, owner)" in opts["demo"]
+    assert "Can\u2019t find content" in opts["hub"] and "Can\u2019t find content" not in opts["demo"]
 
 
 def test_a_partner_reports_anonymously_and_sees_only_their_own(client, monkeypatch):

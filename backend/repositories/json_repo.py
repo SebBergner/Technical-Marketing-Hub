@@ -89,6 +89,8 @@ _MIRROR_FIELDS = (
     # Who made it (sharepoint_mapping.content_creator, 2026-10-14), and who
     # submitted it through the Hub (submitted_by column, 2026-10-21).
     "creator", "submitted_by", "demo_owner", "product_version",
+    # A Demo Video's Video Subtype, for Content to review (2026-10-28).
+    "video_subtype",
     # VM pages only. Public by construction: credentials are sealed out of it
     # before it is built (backend/integrations/graph/vm_pages.py) and live in
     # PRIVATE_DIR instead.
@@ -750,6 +752,13 @@ class JsonAssetRepository(AssetRepository):
         return {"asset_id": asset_id, "archived": on}
 
     # ─────────────────────────────────────────── Still current
+    def listed_records(self) -> dict[str, dict]:
+        """Every listed demo's record, by id, as the lists read it (edits and
+        Hub-stated dates applied): for checks that need fields a summary
+        leaves out (Content to review, 2026-10-28)."""
+        return {r["id"]: r for r in self._rows(AssetQuery(limit=10 ** 6,
+                                                           include_older_vms=True))}
+
     def content_reviews(self) -> dict[str, dict]:
         """{asset id: {by, at, until}}, expired ones included (owned/)."""
         return self._load("content_review") or {}

@@ -1,7 +1,12 @@
 /* Content to review (#/review; A6, Liwei 2026-10-23/28): every demo the Hub
- * lists, least recently used first, with its age, for the team to judge --
- * there is no threshold -- and to archive, or confirm Still current, several
- * at a time. Each step can be undone and is in the Admin log.
+ * lists, with its age, its last use and why it may need a look, for the
+ * team to judge and to archive, or confirm Still current, several at a
+ * time. Each step can be undone and is in the Admin log.
+ *
+ * Why (2026-10-28), worked out by the server: Admin -> Content review's own
+ * rules (collecting dust, little used, Still current running out), and the
+ * columns the Data Clean list counts as empty (Demo owner, Publish date...).
+ * Every demo is listed; those with the most reasons come first.
  *
  * Only for Review content or Archive content (the sidebar item, and the
  * server: /api/reports/content-to-review). Each button needs its own: Archive
@@ -19,8 +24,9 @@ import { closeAdvancedSearch } from "./search.js";
 var state = {
   items: null, usageSince: null, months: 12,
   scope: null,            // "mine" | "all"; Mine first when there are any
-  type: "", age: "", q: "",
-  sort: ["used", "asc"],
+  type: "", age: "", why: "", q: "",
+  sort: ["why", "desc"],
+  missingLabels: {},
   picked: {}, granted: [], busy: false, last: null
 };
 
@@ -57,8 +63,9 @@ function buildPage() {
     +   '<use href="#i-chevron-left"/></svg>Back to Technical Marketing Hub</button>'
     + '<div class="vp-head"><div>'
     +   '<div class="vp-title">Content to review</div>'
-    +   '<div class="orion-subtle">Every demo in the Hub, the longest unused first, with its age. '
-    +   'Archive what is out of date, or confirm it is still current. Both can be undone.</div>'
+    +   '<div class="orion-subtle">Every demo in the Hub, with why it may need a look: old, '
+    +   'little used, Still current running out, or details missing in SharePoint. Archive what '
+    +   'is out of date, or confirm it is still current. Both can be undone.</div>'
     + '</div></div>'
     + '<div class="hub-rvw" id="hubRvw"></div>';
   var anchor = document.getElementById("videoPreviewPage");
@@ -116,6 +123,7 @@ function load() {
     state.items = d.items || [];
     state.usageSince = d.usage_since;
     state.months = d.still_current_months || 12;
+    state.missingLabels = d.missing_labels || {};
     if (!state.scope) {
       state.scope = state.items.some(function (r) { return r.mine; }) ? "mine" : "all";
     }
@@ -133,11 +141,24 @@ function shown() {
     if (state.scope === "mine" && !r.mine) return false;
     if (state.type && r.type !== state.type) return false;
     if (state.age && (r.age_band || "none") !== state.age) return false;
+    if (state.why && !hasWhy(r, state.why)) return false;
     if (q && ((r.title || "") + " " + (r.products || []).join(" ") + " " + (r.owner || ""))
         .toLowerCase().indexOf(q) < 0) return false;
     return true;
   });
   var key = state.sort[0], dir = state.sort[1] === "asc" ? 1 : -1;
+  if (key === "why") {
+    // The most reasons first (a review reason outweighs any number of
+    // missing columns); then the least recently used, the oldest.
+    var weight = function (r) { return r.reasons.length * 100 + r.missing.length; };
+    rows.sort(function (a, b) {
+      var w = (weight(a) - weight(b)) * dir;
+      if (w) return w;
+      if ((a.last_used || "") !== (b.last_used || "")) return (a.last_used || "") < (b.last_used || "") ? -1 : 1;
+      return (a.uploaded_at || "") < (b.uploaded_at || "") ? -1 : 1;
+    });
+    return rows;
+  }
   rows.sort(function (a, b) {
     // Never used reads as the oldest use; no date as the oldest demo.
     var x = key === "used" ? (a.last_used || "") : (a.uploaded_at || "");
@@ -198,6 +219,11 @@ function toolbar() {
     .map(function (t) { return [t, (TYPE_CHIP[t] || [])[1] || t]; }))));
   bar.appendChild(select("Age", "age", [["", "Any age"]].concat(Object.keys(AGE_LABEL)
     .map(function (k) { return [k, AGE_LABEL[k]]; })).concat([["none", "No date"]])));
+  bar.appendChild(select("Why", "why", [["", "With or without a reason"], ["review", "Old, little used or Still current"],
+    ["dust", "Collecting dust"], ["idle", "Little used"], ["still_current", "Still current running out"],
+    ["missing", "Any detail missing"]].concat(Object.keys(state.missingLabels).map(function (k) {
+      return ["m:" + k, "Missing " + state.missingLabels[k]];
+    })).concat([["none", "Nothing to review"]])));
 
   var search = el("input", "hub-rvw__search");
   search.type = "search";
@@ -249,7 +275,8 @@ function head(rows) {
   });
   th0.appendChild(all);
   tr.appendChild(th0);
-  [["title", "Title"], ["type", "Type"], ["owner", "Owner"], ["age", "Age", true],
+  [["title", "Title"], ["why", "Why review", true], ["type", "Type"], ["owner", "Owner"],
+   ["age", "Age", true],
    ["used", "Last used", true], ["current", "Still current"]].forEach(function (c) {
     var th = el("th", "hub-table__th--" + c[0]);
     if (!c[2]) { th.appendChild(el("span", "hub-rvw__th", c[1])); tr.appendChild(th); return; }
@@ -259,8 +286,9 @@ function head(rows) {
     if (on) b.className = "is-sorted is-" + state.sort[1];
     th.setAttribute("aria-sort", on ? (state.sort[1] === "asc" ? "ascending" : "descending") : "none");
     b.addEventListener("click", function () {
-      // Oldest first and least recently used first are where this starts.
-      state.sort = [c[0], on && state.sort[1] === "asc" ? "desc" : "asc"];
+      // Most reasons, oldest and least recently used first are where each starts.
+      var first = c[0] === "why" ? "desc" : "asc";
+      state.sort = [c[0], on && state.sort[1] === first ? (first === "asc" ? "desc" : "asc") : first];
       render();
     });
     th.appendChild(b);
@@ -291,6 +319,7 @@ function row(r) {
   title.appendChild(a);
   if ((r.products || []).length) title.appendChild(el("div", "hub-rvw__sub", r.products.join(", ")));
   tr.appendChild(title);
+  tr.appendChild(whyCell(r));
   tr.appendChild(el("td", "hub-table__td--type", (TYPE_CHIP[r.type] || [])[1] || r.type || ""));
   tr.appendChild(el("td", "hub-rvw__owner", r.owner || ""));
 
@@ -314,6 +343,32 @@ function row(r) {
   tr.appendChild(el("td", "hub-rvw__current",
     r.still_current_until ? "Until " + fullDate(r.still_current_until) : ""));
   return tr;
+}
+
+function hasWhy(r, want) {
+  if (want === "none") return !r.reasons.length && !r.missing.length;
+  if (want === "review") return r.reasons.length > 0;
+  if (want === "missing") return r.missing.length > 0;
+  if (want.indexOf("m:") === 0) return r.missing.indexOf(want.slice(2)) >= 0;
+  return r.reasons.some(function (x) { return x.key === want; });
+}
+
+/* Review reasons as tags; the empty columns as one line under them. */
+function whyCell(r) {
+  var td = el("td", "hub-rvw__why");
+  r.reasons.forEach(function (x) {
+    var tag = el("span", "hub-rvw__tag hub-rvw__tag--" + x.key, x.label);
+    tag.title = x.until ? "Confirmed Still current until " + fullDate(x.until) : (x.why || "");
+    td.appendChild(tag);
+  });
+  if (r.missing.length) {
+    var line = el("div", "hub-rvw__missing", "Missing: " + r.missing.map(function (k) {
+      return state.missingLabels[k] || k;
+    }).join(", "));
+    line.title = "Empty in SharePoint. Fill in with Edit on the demo's Details card.";
+    td.appendChild(line);
+  }
+  return td;
 }
 
 /* A tick changes the bar and the header's box, not 1,300 rows (a full

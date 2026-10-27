@@ -122,8 +122,12 @@ def test_a_leftover_sample_file_never_counts_as_use(client, tmp_path):
 # ─────────────────────────────────────────────── content to review (A6)
 def test_content_to_review_is_for_reviewers_and_archivers_least_used_first(client, tmp_path):
     rows = json.loads((tmp_path / "mirror" / "sharepoint.json").read_text(encoding="utf-8"))
-    rows[0]["demo_owner"] = "Someone@ptc.com"
-    rows[1]["creator"] = "One, Some"
+    rows[0].update(demo_owner="Someone@ptc.com", source="sharepoint", assumed=["language"])
+    rows[1].update(creator="One, Some", source="sharepoint")
+    rows.append({"id": "video-cust", "type": "video", "title": "Customer story",
+                 "source": "sharepoint", "video_subtype": "Customer", "date_stated": True,
+                 "demo_owner": "x@ptc.com", "product_version": "Creo 12",
+                 "uploaded_at": date.today().isoformat()})
     (tmp_path / "mirror" / "sharepoint.json").write_text(json.dumps(rows), encoding="utf-8")
     url = "/api/reports/content-to-review"
     assert client.get(url, headers=STAFF).status_code == 403
@@ -131,9 +135,19 @@ def test_content_to_review_is_for_reviewers_and_archivers_least_used_first(clien
         access.update_group(EMPLOYEES, "a", permissions=["view_hub", perm])
         assert client.get(url, headers=STAFF).status_code == 200, perm
     d = client.get(url, headers=STAFF).json()
-    assert [r["asset_id"] for r in d["items"]] == ["dusty", "idle", "fresh", "used"], \
+    assert [r["asset_id"] for r in d["items"]] == ["dusty", "idle", "fresh", "video-cust",
+                                                   "used"], \
         "never used, oldest first; then by last use"
     assert {r["asset_id"] for r in d["items"] if r["mine"]} == {"fresh"}
     assert "views_12m" not in d["items"][0] and "people_12m" not in d["items"][0]
+    # Why each may need a look (2026-10-28): Admin's rules, and the Data Clean gaps.
+    why = {r["asset_id"]: [x["key"] for x in r["reasons"]] for r in d["items"]}
+    assert why == {"dusty": ["dust"], "idle": ["idle"], "fresh": [], "used": [],
+                   "video-cust": []}
+    missing = {r["asset_id"]: r["missing"] for r in d["items"]}
+    assert missing["fresh"] == ["publish_date", "language"], "it has an owner"
+    assert missing["idle"] == ["demo_owner", "publish_date"]
+    assert missing["video-cust"] == ["named_customer"]
+    assert missing["dusty"] == [], "not a SharePoint demo: nothing to fill in here"
     client.put("/api/assets/dusty/archive", json={"archived": True}, headers=BOSS)
     assert "dusty" not in [r["asset_id"] for r in client.get(url, headers=STAFF).json()["items"]]

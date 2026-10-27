@@ -1,8 +1,9 @@
 """Reports about content, and asking for help (A2, Seb 2026-10-07; Summit;
 Liwei 2026-10-23/28).
 
-"Report an issue" on a demo's page and "Get help" in the sidebar both make
-a report: a category, what is wrong, and the demo when there is one. It is
+"Report an issue" on a demo's page (about that demo) and "Get help" at the
+foot of the sidebar (about the Hub itself) both make a report: a category,
+what is wrong, and the demo when there is one. It is
 kept here (owned/support_reports.json) and copied to the Hub Tasks list as a
 "Support request" row (integrations/graph/hub_tasks.py), where whoever
 handles it changes its status in SharePoint. The Hub reads the status back
@@ -36,9 +37,16 @@ OWNERS = "report_owners.json"
 SEGMENTS = ["CAD", "PLM", "ALM", "SLM", "SCO"]
 GENERAL = "General"
 #: As in the Hub Tasks Category column, apostrophes included (U+2019,
-#: read off the list 2026-10-28): a choice must match exactly.
-CATEGORIES = ["File won’t open or is missing", "Content is outdated or wrong",
-              "Demo environment or VM problem", "Can’t find content", "Other"]
+#: read off the list 2026-10-28): a choice must match exactly. Two sets
+#: (Liwei 2026-10-28): a demo's page asks about that demo; Get help, in the
+#: sidebar, about the Hub itself, and always goes to General.
+DEMO_CATEGORIES = ["File won’t open or is missing", "Content is outdated or wrong",
+                   "Details are wrong (product, date, owner)",
+                   "Demo environment or VM problem", "Other"]
+HUB_CATEGORIES = ["Hub won’t load or is slow", "Demo list is out of date",
+                  "Can’t find content", "Sign-in or access problem",
+                  "Search or filters don’t work", "Other"]
+CATEGORIES = list(dict.fromkeys(DEMO_CATEGORIES + HUB_CATEGORIES))
 DETAILS_MAX = 2000
 OWNERS_MAX = 20
 STATUS_SECONDS = 60
@@ -123,7 +131,7 @@ def route(repo, segment: str | None) -> dict:
 
 # ─────────────────────────────────────────────────────────── reports
 def submit(repo, user, *, category: str, details: str, asset=None) -> dict:
-    if category not in CATEGORIES:
+    if category not in (DEMO_CATEGORIES if asset else HUB_CATEGORIES):
         raise ReportError("Choose one of the categories.")
     details = (details or "").strip()
     if len(details) < 5:

@@ -326,15 +326,18 @@ async function openAssetDetail(id, fileItemId) {
   }
 
   // Something wrong with this demo (A2, 2026-10-28): to its segment's owners.
-  if (actions && !document.getElementById("vpReport")) {
+  // A quiet link at the page's top right, on the Back line -- not a button
+  // among Open and Share, which act on the demo (Liwei, 2026-10-28).
+  var back = page.querySelector(".vp-back");
+  if (back && !document.getElementById("vpReport")) {
     var flag = document.createElement("button");
-    flag.className = "btn-ghost";
+    flag.className = "vp-report";
     flag.id = "vpReport";
     flag.type = "button";
     flag.title = "Tell the team about a problem with this demo";
     flag.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-flag"/></svg>Report an issue';
     flag.addEventListener("click", function () { openReportModal(detailAsset); });
-    actions.appendChild(flag);
+    back.insertAdjacentElement("afterend", flag);
   }
 
   // The player is a still: embedding the Consensus viewer is a separate

@@ -88,6 +88,13 @@ def hub_activity(since: str | None = None, until: str | None = None,
 
 # ──────────────────────────────────────────────────── content to review
 _USE_EVENTS = ("view", "preview", "download")
+#: Columns a SharePoint demo should have filled, as the Data Clean list
+#: counts them (2026-10-28): (key, words). Consensus demos are read-only
+#: here, so they are never asked for these.
+_MISSING = [("demo_owner", "Demo owner"), ("publish_date", "Publish date"),
+            ("customer_facing", "Customer facing"), ("has_narrated_audio", "Narrated audio"),
+            ("language", "Language"), ("product_version", "Product version"),
+            ("named_customer", "Named customer")]
 
 
 async def _reviewer(request: Request) -> CurrentUser:
@@ -117,14 +124,42 @@ def _is_mine(asset, user: CurrentUser) -> bool:
     return user.name.strip().lower() in (as_written, asset.creator.strip().lower())
 
 
+def _missing(record: dict) -> list[str]:
+    """What a SharePoint demo leaves empty (the Data Clean list's checks)."""
+    if record.get("source") != "sharepoint":
+        return []
+    assumed = set(record.get("assumed") or [])
+    video = str(record.get("id") or "").startswith("video-")    # the Demo Video library
+    gaps = {"demo_owner": not record.get("demo_owner"),
+            "publish_date": not record.get("date_stated"),
+            "customer_facing": "customer_facing" in assumed,
+            "has_narrated_audio": "has_narrated_audio" in assumed,
+            "language": "language" in assumed,
+            "product_version": video and not record.get("product_version"),
+            "named_customer": video and record.get("video_subtype") == "Customer"
+                              and not record.get("named_customer")}
+    return [key for key, _ in _MISSING if gaps[key]]
+
+
 @router.get("/content-to-review")
 def content_to_review(user: CurrentUser = Depends(_reviewer),
                       repo: AssetRepository = Depends(get_repo)):
-    """Every demo the Hub lists, least recently used first (A6, Liwei
-    2026-10-23/28): its age and when anyone last opened, previewed or
-    downloaded it -- no threshold, the team decides -- and no figures about
-    who used it. `mine` marks the demos credited to the person asking."""
+    """Every demo the Hub lists (A6, Liwei 2026-10-23/28), with its age, when
+    anyone last opened, previewed or downloaded it -- no figures about who --
+    and why it may need a look (2026-10-28):
+
+    * `reasons`: Admin -> Content review's own rules -- collecting dust,
+      little used, Still current running out -- so the two pages agree;
+    * `missing`: the columns the Data Clean list counts as empty.
+
+    Every demo is listed, with or without a reason; `mine` marks the ones
+    credited to the person asking."""
+    from datetime import date as _date, timedelta as _td
     from backend.repositories.base import AssetQuery as _Q
+    from backend.routers.admin import (REVIEW_EXPIRING_DAYS, REVIEW_IDLE_DAYS,
+                                       REVIEW_MIN_AGE_DAYS)
+    from backend.services import content_age
+
     reader = getattr(repo, "usage_events", None)
     events = reader() if reader else []
     last_used: dict[str, str] = {}
@@ -132,6 +167,30 @@ def content_to_review(user: CurrentUser = Depends(_reviewer),
         aid = e.get("asset_id")
         if aid and e.get("event") in _USE_EVENTS:
             last_used[aid] = max(last_used.get(aid, ""), e.get("at") or "")
+    records = repo.listed_records() if hasattr(repo, "listed_records") else {}
+    today = _date.today()
+    idle_from = (today - _td(days=REVIEW_IDLE_DAYS)).isoformat()
+    soon = (today + _td(days=REVIEW_EXPIRING_DAYS)).isoformat()
+    lately = (today - _td(days=REVIEW_EXPIRING_DAYS)).isoformat()
+
+    def reasons(a) -> list[dict]:
+        out = []
+        until = str(a.still_current_until) if a.still_current_until else None
+        if until and lately <= until <= soon:
+            out.append({"key": "still_current", "until": until,
+                        "label": "Still current " + ("ended" if until < today.isoformat()
+                                                     else "ends soon")})
+        if until:
+            return out
+        if content_age.collecting_dust(a.uploaded_at, today):
+            out.append({"key": "dust", "label": "Collecting dust",
+                        "why": f"{content_age.DUST_YEARS}+ years old, not confirmed Still current"})
+        elif a.uploaded_at and (today - a.uploaded_at).days >= REVIEW_MIN_AGE_DAYS                 and (last_used.get(a.id) or "") < idle_from:
+            out.append({"key": "idle", "label": "Little used",
+                        "why": f"Over a year old; not used in the last "
+                               f"{REVIEW_IDLE_DAYS // 30} months"})
+        return out
+
     rows = []
     for a in repo.list(_Q(limit=10 ** 6, include_older_vms=True)).items:
         rows.append({
@@ -145,8 +204,12 @@ def content_to_review(user: CurrentUser = Depends(_reviewer),
             "mine": _is_mine(a, user),
             "in_sharepoint": a.source == "sharepoint",
             "still_current_until": str(a.still_current_until) if a.still_current_until
-                                   else None})
+                                   else None,
+            "reasons": reasons(a),
+            "missing": _missing(records.get(a.id) or {})})
     # Never used first, then the longest unused; within those, the oldest.
     rows.sort(key=lambda r: (r["last_used"] or "", r["uploaded_at"] or ""))
     return {"items": rows, "usage_since": (events[0].get("at") or "")[:10] if events else None,
-            "still_current_months": settings.still_current_months}
+            "still_current_months": settings.still_current_months,
+            "missing_labels": dict(_MISSING),
+            "idle_days": REVIEW_IDLE_DAYS, "dust_years": content_age.DUST_YEARS}

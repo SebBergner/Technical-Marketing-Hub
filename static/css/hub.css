@@ -185,6 +185,8 @@ a:hover { text-decoration: underline; }
 .hub-foot__feedback { display: flex; align-items: center; gap: 8px; padding: 7px 8px; margin-bottom: 6px; border-radius: 6px; color: inherit; text-decoration: none; font-size: 13px; }
 .hub-foot__feedback:hover { background: var(--orion-surface-3, rgba(0,0,0,.05)); }
 .hub-foot__feedback svg { width: 15px; height: 15px; flex: none; }
+.hub-foot__feedback--on { background: var(--orion-surface-3, rgba(0,0,0,.05)); font-weight: 600; }
+#navHelp { margin-bottom: 0; }
 /* Seb, 2026-09-25: the signed-in name sits above the PTC mark and reads at a
    glance -- the theme's full-strength text colour, so white on the dark
    sidebar and near-black on the light one (white there would vanish). */
@@ -563,6 +565,11 @@ video.hub-inline-player__media { object-fit: contain; }
 .vp-back { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--orion-text-2); cursor: pointer; margin-bottom: 18px; background: none; border: none; padding: 0; font: inherit; }
 .vp-back:hover { color: var(--orion-link); }
 .vp-back svg { width: 15px; height: 15px; }
+/* Report an issue (A2): quiet, on the Back line at the top right (2026-10-28). */
+#videoPreviewPage { position: relative; }
+.vp-report { position: absolute; top: 26px; right: 32px; display: inline-flex; align-items: center; gap: 5px; padding: 0; border: none; background: none; font: inherit; font-size: 12.5px; color: var(--orion-text-3); cursor: pointer; }
+.vp-report:hover { color: var(--orion-text); text-decoration: underline; }
+.vp-report svg { width: 14px; height: 14px; }
 
 .vp-player {
   background: var(--orion-frame); border-radius: var(--orion-radius); aspect-ratio: 16/9; max-height: 440px;
@@ -1552,6 +1559,10 @@ a.hub-up__title:hover{text-decoration:underline}
 .hub-rvw__age b, .hub-rvw__used b { font-weight: 600; color: var(--orion-text); white-space: nowrap; }
 .hub-rvw__age, .hub-rvw__used, .hub-rvw__current { white-space: nowrap; }
 .hub-rvw__never { font-weight: 600; color: var(--orion-text); }
+.hub-rvw__why { min-width: 170px; }
+.hub-rvw__tag { display: inline-block; margin: 0 4px 3px 0; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; color: var(--orion-warn-ink); background: var(--orion-warn-bg); border: 1px solid var(--orion-warn-border); }
+.hub-rvw__tag--still_current { color: var(--orion-text-2); background: var(--orion-surface-2); border-color: var(--orion-border-md); }
+.hub-rvw__missing { font-size: 12px; color: var(--orion-text-3); }
 .hub-rvw__empty, .hub-rvw__note { font-size: 13px; color: var(--orion-text-3); }
 .hub-rvw__empty { padding: 24px; text-align: center; border: 1px dashed var(--orion-border-md); border-radius: var(--orion-radius-sm); }
 

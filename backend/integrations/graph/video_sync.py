@@ -162,6 +162,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], VideoSyncResult]:
             rails=all_segments[1:],
             content_depth=video_type(m.clean_text(_field(fields, "video_type"))),
             named_customer=m.clean_text(_field(fields, "named_customer")),
+            video_subtype=m.clean_text(_field(fields, "video_subtype")),
             brightcove_id=m.clean_text(_field(fields, "brightcove_id")),
             # The video's own publish date, so a migrated back catalogue does
             # not all read as uploaded on migration day (HLR-A8).

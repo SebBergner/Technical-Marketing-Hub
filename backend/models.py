@@ -541,6 +541,9 @@ class Asset(AssetBase):
     assumed: list[str] = Field(default_factory=list)
     #: The demo's folder sits in its library's _Archive folder (A8, 2026-10-28).
     sharepoint_archived: bool = False
+    #: A Demo Video's Video Subtype column, as written (Content to review
+    #: asks for a Named customer on a Customer video, 2026-10-28).
+    video_subtype: str | None = None
     #: Set on the response for a partner on a partner-restricted demo: the
     #: files are listed without the ids that open or download them.
     files_locked: bool = False

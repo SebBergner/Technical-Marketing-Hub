@@ -163,3 +163,22 @@ def test_edits_lie_over_the_mirror_only_until_a_later_sync():
     out = me.apply_edits(rows, edits, {"sharepoint": "2026-10-26T09:00:00",
                                        "demo_video": "2026-10-26T11:00:00"})
     assert [r["description"] for r in out] == ["new", "v"]
+
+
+def test_editing_a_video_applies_the_subtype_rules():
+    """A15: a customer video without its customer must name it on its next
+    edit; a Release video keeps Release; Other stores N/A (2026-10-27)."""
+    spec = ut.DEMO_VIDEO
+    target = uw.Target(spec=spec, site_id="s", drive_id="d", list_id="l",
+                       demo_content_type_id="0x0120", product_note_field=None,
+                       choices={**CHOICES, "VideoType": ["Technical Overview", "Other"],
+                                "VideoSubtype": ["Customer", "Feature", "Release", "N/A"]},
+                       terms=None)
+    current = {"video_type": "Technical Overview", "video_subtype": "Customer",
+               "named_customer": None, "description": "d"}
+    with pytest.raises(ut.UploadInvalid, match="Named customer"):
+        me.changes(spec, target, {"description": "new"}, current)
+    release = {**current, "video_subtype": "Release"}
+    assert me.changes(spec, target, {"description": "new"}, release) == {"description": "new"}
+    assert me.changes(spec, target, {"video_type": "Other"}, release) == \
+        {"video_type": "Other", "video_subtype": "N/A"}

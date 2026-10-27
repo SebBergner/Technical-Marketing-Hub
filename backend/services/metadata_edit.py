@@ -130,6 +130,16 @@ def changes(spec: ut.TargetSpec, target: uw.Target, sent: dict, current: dict) -
         if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", owner) or not _is_internal_address(owner):
             raise ut.UploadInvalid("Demo owner: a PTC email address.")
         cleaned["demo_owner"] = owner
+    # A video's subtype follows its type (A15), judged on the whole video as
+    # it will be; a retired subtype it already has may stay, a customer
+    # video missing its customer must now name it (Liwei, 2026-10-27).
+    if any(f.key == "video_subtype" for f in spec.fields):
+        merged, problems = ut.video_rules({**current, **cleaned}, before=current)
+        if problems:
+            raise ut.UploadInvalid(" ".join(problems))
+        for key in ("video_subtype", "named_customer"):
+            if key in merged and merged.get(key) != current.get(key):
+                cleaned[key] = merged[key]
     out = {}
     for key, value in cleaned.items():
         before = current.get(key)

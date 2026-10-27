@@ -16,6 +16,7 @@
 import { report } from "./util.js";
 import { hubPermissions } from "./permissions.js";
 import { openAssetDetail } from "./detail.js";
+import { refill, videoState } from "./videorules.js";
 
 function mk(tag, cls, text) {
   var n = document.createElement(tag);
@@ -174,6 +175,7 @@ function openEditor(asset) {
       grid.appendChild(row);
     });
     editor.appendChild(grid);
+    if (form.video_rules) followType(grid, form);
 
     if (form.videos.length > 1) editor.appendChild(previewChooser(asset, form));
     if (form.thumbnail.can_choose) editor.appendChild(pictureChooser(asset, form));
@@ -216,6 +218,40 @@ function openEditor(asset) {
     back.addEventListener("click", close);
     editor.appendChild(back);
   });
+}
+
+/* A video's subtype follows its type, and only a customer video names its
+ * customer (A15, 2026-10-27). A retired subtype the video already has
+ * (Release) stays on offer for its own type. */
+function followType(grid, form) {
+  var type = grid.querySelector('[data-key="video_type"]');
+  var sub = grid.querySelector('[data-key="video_subtype"]');
+  var customer = grid.querySelector('[data-key="named_customer"]');
+  if (!type || !sub) return;
+  var keep = { type: form.values.video_type, subtype: form.values.video_subtype };
+  function sync() {
+    var state = videoState(form.video_rules, { video_type: type.value, video_subtype: sub.value }, keep);
+    if (state.subtypes) refill(sub, state.subtypes, "Choose…");
+    else { sub.innerHTML = ""; sub.appendChild(new Option(state.fixed || "", state.fixed || "")); }
+    var subRow = sub.closest(".hub-edit__row");
+    subRow.hidden = !state.subtypes;
+    var note = subRow.querySelector(".hub-edit__missing");
+    if (state.missing.length) {
+      if (!note) { note = mk("span", "hub-edit__help hub-edit__missing"); subRow.appendChild(note); }
+      note.textContent = "Not in SharePoint's Video subtype list yet: " + state.missing.join(", ") + ".";
+    } else if (note) note.remove();
+    state = videoState(form.video_rules, { video_type: type.value, video_subtype: sub.value }, keep);
+    if (customer) {
+      customer.closest(".hub-edit__row").hidden = !state.customer;
+      // Kept aside while hidden, so switching the type back and forth does
+      // not lose the customer's name.
+      if (!state.customer && customer.value) { customer.dataset.kept = customer.value; customer.value = ""; }
+      if (state.customer && !customer.value && customer.dataset.kept) customer.value = customer.dataset.kept;
+    }
+  }
+  type.addEventListener("change", sync);
+  sub.addEventListener("change", sync);
+  sync();
 }
 
 /* Which video the demo is previewed with: saved when chosen. */

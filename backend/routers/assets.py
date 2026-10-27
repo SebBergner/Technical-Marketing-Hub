@@ -588,6 +588,7 @@ def edit_form(asset_id: str, repo: AssetRepository = Depends(get_repo), actor: s
     """The editor: its fields, SharePoint's current values (read now, not
     from the mirror), the ETag to send back, the videos to preview with."""
     from backend.services import metadata_edit as me
+    from backend.services import upload_targets as ut
     asset, key, client, target = _editable(repo, asset_id)
     try:
         item = client.get_list_item(target.drive_id, asset.source_item_id) or {}
@@ -600,6 +601,7 @@ def edit_form(asset_id: str, repo: AssetRepository = Depends(get_repo), actor: s
     return {"library": target.spec.library, "title": asset.title,
             "etag": item.get("@odata.etag") or item.get("eTag"),
             "fields": me.form(target.spec, target),
+            "video_rules": ut.subtype_rules(target.spec, target.choices),
             "values": me.values_of(target.spec, item.get("fields") or {}),
             "videos": _videos(asset), "preview": preview,
             "thumbnail": {"chosen": bool(asset.thumbnail_chosen),

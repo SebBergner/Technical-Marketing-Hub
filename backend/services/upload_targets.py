@@ -252,6 +252,61 @@ def clean_fields(spec: TargetSpec, raw: dict, choices: dict[str, list[str]], *,
     return out
 
 
+#: Which subtypes a video type takes (A15, from Seb via Liwei, 2026-10-27).
+#: The form offers only these; a type with none (Other) hides the subtype and
+#: stores N/A, as the library's older "Other" videos already say.
+VIDEO_SUBTYPES: dict[str, list[str]] = {
+    "Technical Overview": ["Customer", "Feature", "Solution", "Product"],
+    "Technical Teaser": ["Product", "Social"],
+    "Technical Walkthrough": ["Customer", "Solution"],
+    "Experience Asset": ["Attract Loop", "Presenter Support", "XDP Clip"],
+    "Other": [],
+}
+NO_SUBTYPE = "N/A"
+#: Kept on the videos that have them, never offered again (Liwei, 2026-10-27):
+#: Release (3 videos) as a subtype; Presenter Support as a type.
+RETIRED_SUBTYPES = {"Release"}
+RETIRED_VIDEO_TYPES = {"Presenter Support"}
+#: A customer video names its customer: these types, this subtype.
+CUSTOMER_SUBTYPE = "Customer"
+CUSTOMER_TYPES = {"Technical Overview", "Technical Walkthrough"}
+
+
+def video_rules(values: dict, before: dict | None = None) -> tuple[dict, list[str]]:
+    """A video's type, subtype and named customer made consistent (A15):
+    (values to store, problems). `before`: the video as it is, for an edit --
+    a retired subtype it already has may stay. A customer video without its
+    customer is a problem; any other video's named customer is dropped
+    (cleared, when it had one)."""
+    values = dict(values)
+    vtype = values.get("video_type")
+    if not vtype:
+        return values, []
+    before = before or {}
+    problems = []
+    allowed = VIDEO_SUBTYPES.get(vtype)
+    sub = values.get("video_subtype")
+    if allowed is None:
+        if not (vtype == before.get("video_type")):
+            problems.append(f"Video type: choose one of {', '.join(VIDEO_SUBTYPES)}.")
+    elif not allowed:
+        values["video_subtype"] = NO_SUBTYPE
+        sub = NO_SUBTYPE
+    elif not sub or sub == NO_SUBTYPE:
+        problems.append(f"Video subtype is required for {vtype}: {', '.join(allowed)}.")
+    elif sub not in allowed and not (sub in RETIRED_SUBTYPES and sub == before.get("video_subtype")
+                                     and vtype == before.get("video_type")):
+        problems.append(f"Video subtype: {sub} is not one of {vtype}'s ({', '.join(allowed)}).")
+    if sub == CUSTOMER_SUBTYPE and vtype in CUSTOMER_TYPES:
+        if not (values.get("named_customer") or "").strip():
+            problems.append("Named customer is required for a customer video.")
+    elif values.get("named_customer") or before.get("named_customer"):
+        values["named_customer"] = "" if before.get("named_customer") else None
+        if values["named_customer"] is None:
+            values.pop("named_customer")
+    return values, problems
+
+
 PREVIEW_COLUMN = "PreviewVideo"
 #: Who submitted a demo made through the Hub (2026-10-21): a single line of
 #: text on the demo's folder -- an email address, since Graph cannot write a
@@ -315,10 +370,37 @@ def clean_files(spec: TargetSpec, files: list) -> list[dict]:
     return out
 
 
+def offered(f: FieldSpec, choices: dict[str, list[str]]) -> list[str] | None:
+    """A choice field's options as a form offers them: the library's own,
+    minus what is retired (A15)."""
+    if not f.choices_from:
+        return None
+    options = choices.get(f.choices_from) or []
+    if f.key == "video_type":
+        options = [o for o in options if o not in RETIRED_VIDEO_TYPES]
+    if f.key == "video_subtype":
+        options = [o for o in options if o not in RETIRED_SUBTYPES and o != NO_SUBTYPE]
+    return options
+
+
+def subtype_rules(spec: TargetSpec, choices: dict[str, list[str]]) -> dict | None:
+    """What the form needs to make the subtype follow the type (A15): each
+    type's subtypes, which of them the library has as options yet (a new
+    one is added in SharePoint first), and when a customer is named."""
+    if not any(f.key == "video_subtype" for f in spec.fields):
+        return None
+    return {"subtypes": VIDEO_SUBTYPES,
+            "available": [s for s in choices.get("VideoSubtype") or []
+                          if s not in RETIRED_SUBTYPES and s != NO_SUBTYPE],
+            "customer_subtype": CUSTOMER_SUBTYPE, "customer_types": sorted(CUSTOMER_TYPES),
+            "no_subtype": NO_SUBTYPE}
+
+
 def form(spec: TargetSpec, choices: dict[str, list[str]], skipped: tuple = ()) -> dict:
     """The target as the upload form draws it."""
     today = date.today().isoformat()
     return {
+        "video_rules": subtype_rules(spec, choices),
         "key": spec.key, "library": spec.library, "label": spec.label,
         "platform": spec.platform,
         "test_library": spec.key in overrides(),
@@ -329,6 +411,6 @@ def form(spec: TargetSpec, choices: dict[str, list[str]], skipped: tuple = ()) -
                     "help": f.help, "max_length": f.max_length,
                     "default": today if f.default == "today" else f.default,
                     "not_stored": bool(f.column and f.column in skipped),
-                    "choices": choices.get(f.choices_from) if f.choices_from else None}
+                    "choices": offered(f, choices)}
                    for f in spec.fields],
     }

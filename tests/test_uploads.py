@@ -138,7 +138,7 @@ def test_only_upload_content_starts_one_and_never_a_partner(client, sp):
 
 def test_a_video_upload_is_exactly_one_video(client, sp):
     video = {k: v for k, v in KIT.items() if k not in ("language", "owned_by")}
-    video.update(title="Creo Teaser", video_type="Technical Overview")
+    video.update(title="Creo Teaser", video_type="Technical Overview", video_subtype="Feature")
     r = start(client, values=video, target="demo_video", kind="video", files=FILES)
     assert r.status_code == 422 and "exactly one video" in r.json()["detail"]
     r = start(client, values=video, target="demo_video", kind="video",
@@ -345,3 +345,40 @@ def test_every_answer_says_where_the_demo_is(client, sp, tmp_path, monkeypatch):
     assert link.headers["location"] == "/#/asset/creo-sheetmetal-kit"
     assert client.get("/demo/upload/nope", headers=MAKER,
                       follow_redirects=False).headers["location"] == "/"
+
+
+
+# ── A15: a video's subtype follows its type (Seb via Liwei, 2026-10-27) ──────
+def test_the_subtype_follows_the_type():
+    rules = ut.video_rules
+    assert rules({"video_type": "Technical Teaser", "video_subtype": "Social"})[1] == []
+    assert "not one of" in rules({"video_type": "Technical Teaser",
+                                  "video_subtype": "Feature"})[1][0]
+    assert "required" in rules({"video_type": "Experience Asset"})[1][0]
+    other, problems = rules({"video_type": "Other", "video_subtype": "Feature",
+                             "named_customer": "ACME"})
+    assert problems == [] and other["video_subtype"] == "N/A" and "named_customer" not in other
+
+
+def test_a_customer_video_names_its_customer_and_no_other_does():
+    rules = ut.video_rules
+    assert "Named customer" in rules({"video_type": "Technical Walkthrough",
+                                      "video_subtype": "Customer"})[1][0]
+    ok, problems = rules({"video_type": "Technical Overview", "video_subtype": "Customer",
+                          "named_customer": "Bobcat"})
+    assert problems == [] and ok["named_customer"] == "Bobcat"
+    moved, _ = rules({"video_type": "Technical Overview", "video_subtype": "Feature",
+                      "named_customer": "Bobcat"}, before={"named_customer": "Bobcat"})
+    assert moved["named_customer"] == "", "cleared when it stops being a customer video"
+
+
+def test_release_stays_on_the_videos_that_have_it_and_is_not_offered():
+    before = {"video_type": "Technical Overview", "video_subtype": "Release"}
+    assert ut.video_rules(dict(before), before=before)[1] == []
+    assert ut.video_rules(dict(before))[1], "not for a new video"
+    sub = next(f for f in ut.DEMO_VIDEO.fields if f.key == "video_subtype")
+    vtype = next(f for f in ut.DEMO_VIDEO.fields if f.key == "video_type")
+    choices = {"VideoSubtype": ["Feature", "Release", "N/A"],
+               "VideoType": ["Technical Overview", "Presenter Support", "Experience Asset"]}
+    assert ut.offered(sub, choices) == ["Feature"]
+    assert ut.offered(vtype, choices) == ["Technical Overview", "Experience Asset"]

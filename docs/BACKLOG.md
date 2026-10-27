@@ -352,6 +352,9 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   3. Release（3 个视频）不在新规则里：保留给已有视频、不再提供，还是改成别的子类型？
   4. 已有的 6 个 "Customer 但没有客户名" 的视频：保持原样，等下次编辑时再补（编辑时会要求填）？
 - **工作量**：约 1 天。
+- **10/27 已定并已做（本地，待推送）**：你在 SharePoint 加 Experience Asset 类型，删掉 Presenter Support 类型（改作
+  Experience Asset 的子类型）；子类型加 Product、Social、Attract Loop、Presenter Support、XDP Clip。Release 保留给那 3 个视频，
+  新建时不再提供。缺客户名的 6 个视频保持原样，下次编辑时要求补填。SharePoint 还没有的子类型，表单会注明缺哪些。
 
 ---
 
@@ -468,6 +471,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
      注意 Customer facing 和 Internal only 可以同时成立（能给客户看，但 partner 不能下载），合并时要说清楚。
   3. 对已有内容的影响：现在 Admin 的 "Hidden" 已能把 demo 从 Hub 移除；Unindexed 是否就是它的一个对外版本。
 - **工作量**：定下来后 1–2 天。
+- **10/27 备注**：先记录，等 Liwei 和 Seb 开会，由 Seb 说明具体要什么。
 
 ---
 

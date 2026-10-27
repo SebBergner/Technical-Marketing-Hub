@@ -107,6 +107,8 @@ def _view(record: dict, user: CurrentUser | None = None, repo=None,
             if f.form_required and not (record.get("values") or {}).get(f.key):
                 out["warnings"].append(f"{f.key} is empty: send it (or \"N/A\" when it does "
                                        "not apply). It will become required.")
+        out["warnings"] += [p + " This will be refused later."
+                            for p in ut.video_rules(record.get("values") or {})[1]]
     out["asset_url"] = f"{base}/#/asset/{quote(asset_id, safe='')}" if asset_id else None
     return out
 
@@ -184,6 +186,11 @@ def start(body: UploadIn, repo: AssetRepository = Depends(get_repo),
         kind = ut.kind_of(spec, body.kind)
         target = _target(client, spec.key)
         values = ut.clean_fields(spec, body.values, target.choices, form=not user.token_name)
+        # A video's subtype follows its type (A15): refused on the page, a
+        # warning through the API for now (_view).
+        values, problems = ut.video_rules(values)
+        if problems and not user.token_name:
+            raise ut.UploadInvalid(" ".join(problems))
         files = ut.clean_files(spec, [f.model_dump() for f in body.files])
         preview = ut.preview_of(files, body.preview)
     except ut.UploadInvalid as exc:
@@ -344,6 +351,9 @@ def resubmit(upload_id: str, body: ResubmitIn, repo: AssetRepository = Depends(g
     try:
         values = ut.clean_fields(target.spec, body.values, target.choices,
                                  form=not user.token_name)
+        values, problems = ut.video_rules(values)
+        if problems and not user.token_name:
+            raise ut.UploadInvalid(" ".join(problems))
     except ut.UploadInvalid as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     if values.get("title") != record["values"].get("title"):

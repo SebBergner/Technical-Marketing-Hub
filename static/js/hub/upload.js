@@ -15,6 +15,7 @@
  *
  * Part of the Hub page's script; static/js/hub/main.js loads it. */
 
+import { refill, videoState } from "./videorules.js";
 import { report } from "./util.js";
 import { hubPermissions } from "./permissions.js";
 import { closeActivity } from "./activity.js";
@@ -285,9 +286,32 @@ function fieldValue(f) {
   return f.default != null ? f.default : (f.kind === "multi" ? [] : "");
 }
 
+/* Subtypes the rules name but SharePoint has no option for yet: said under
+   the field, so nobody wonders why one is missing (A15). */
+function missingNote(row, missing, cls) {
+  var note = row.querySelector(".hub-up__missing");
+  if (!missing || !missing.length) { if (note) note.remove(); return; }
+  if (!note) { note = el("span", "hub-up__help hub-up__missing"); row.appendChild(note); }
+  note.textContent = "Not in SharePoint's Video subtype list yet: " + missing.join(", ")
+    + ". Ask an administrator to add them.";
+}
+
+/* Required now: the field says so, or the video rules do (A15) -- a
+   subtype when the type takes one, a named customer for a customer video. */
+function requiredNow(target, values, f) {
+  if (f.required) return true;
+  var state = videoState(target.video_rules, values);
+  if (!state) return false;
+  if (f.key === "video_subtype") return !!state.subtypes;
+  if (f.key === "named_customer") return state.customer;
+  return false;
+}
+
 function missingFields() {
+  var values = {};
+  up.target.fields.forEach(function (f) { values[f.key] = fieldValue(f); });
   return up.target.fields.filter(function (f) {
-    if (!f.required) return false;
+    if (!requiredNow(up.target, values, f)) return false;
     var v = fieldValue(f);
     if (f.kind === "yesno") return v !== true && v !== false;
     return v == null || v === "" || (Array.isArray(v) && !v.length);
@@ -299,6 +323,8 @@ function missingFields() {
 function metadataForm(target, values, opts) {
   opts = opts || {};
   var form = el("div", "hub-up__form");
+  var rows = {}, selects = {}, marks = {};
+  var changed = function () { syncVideo(); opts.onChange(); };
   target.fields.forEach(function (f) {
     var v = values[f.key] !== undefined ? values[f.key]
       : (f.default != null ? f.default : (f.kind === "multi" ? [] : ""));
@@ -306,6 +332,8 @@ function metadataForm(target, values, opts) {
     var row = el("label", "hub-up__field");
     var label = el("span", "hub-up__label", f.label);
     if (f.required) label.appendChild(el("i", "hub-up__req", " *"));
+    marks[f.key] = el("i", "hub-up__req", " *");
+    rows[f.key] = row;
     row.appendChild(label);
     var input;
     if (f.kind === "text" || f.kind === "date") {
@@ -315,19 +343,20 @@ function metadataForm(target, values, opts) {
       if (f.max_length) input.maxLength = f.max_length;
       input.value = v || "";
       if (f.key === "title" && opts.lockTitle) input.disabled = true;
-      input.addEventListener("input", function () { values[f.key] = input.value; opts.onChange(); });
+      input.addEventListener("input", function () { values[f.key] = input.value; changed(); });
     } else if (f.kind === "longtext") {
       input = el("textarea");
       input.rows = f.key === "long_description" ? 4 : 3;
       if (f.max_length) input.maxLength = f.max_length;
       input.value = v || "";
-      input.addEventListener("input", function () { values[f.key] = input.value; opts.onChange(); });
+      input.addEventListener("input", function () { values[f.key] = input.value; changed(); });
     } else if (f.kind === "choice") {
       input = el("select");
       input.appendChild(new Option(f.required ? "Choose…" : "—", ""));
       (f.choices || []).forEach(function (c) { input.appendChild(new Option(c, c)); });
       input.value = v || "";
-      input.addEventListener("change", function () { values[f.key] = input.value; opts.onChange(); });
+      selects[f.key] = input;
+      input.addEventListener("change", function () { values[f.key] = input.value; changed(); });
     } else if (f.kind === "yesno") {
       input = el("span", "hub-up__yesno");
       [["Yes", true], ["No", false]].forEach(function (o) {
@@ -338,7 +367,7 @@ function metadataForm(target, values, opts) {
           values[f.key] = o[1];
           input.querySelectorAll("button").forEach(function (x) { x.classList.remove("on"); });
           b.classList.add("on");
-          opts.onChange();
+          changed();
         });
         input.appendChild(b);
       });
@@ -357,7 +386,7 @@ function metadataForm(target, values, opts) {
           if (at >= 0) list.splice(at, 1); else list.push(c);
           values[f.key] = list;
           b.classList.toggle("on", at < 0);
-          opts.onChange();
+          changed();
         });
         input.appendChild(b);
       });
@@ -367,6 +396,35 @@ function metadataForm(target, values, opts) {
     if (f.not_stored) row.appendChild(el("span", "hub-up__err", "Not stored in the test library."));
     form.appendChild(row);
   });
+
+  /* A video's subtype follows its type, and only a customer video names
+     its customer (A15, 2026-10-27): rows shown, options and values kept
+     in step whenever either changes. */
+  function syncVideo() {
+    var state = videoState(target.video_rules, values);
+    if (!state || !rows.video_subtype) return;
+    if (state.subtypes) {
+      values.video_subtype = refill(selects.video_subtype, state.subtypes, "Choose…");
+    } else {
+      values.video_subtype = state.fixed || "";
+    }
+    rows.video_subtype.hidden = !state.subtypes;
+    missingNote(rows.video_subtype, state.missing, ".hub-up__help");
+    var label = rows.video_subtype.querySelector(".hub-up__label");
+    if (label && !label.querySelector(".hub-up__req")) label.appendChild(marks.video_subtype);
+    state = videoState(target.video_rules, values);
+    if (rows.named_customer) {
+      rows.named_customer.hidden = !state.customer;
+      var cl = rows.named_customer.querySelector(".hub-up__label");
+      if (cl && !cl.querySelector(".hub-up__req")) cl.appendChild(marks.named_customer);
+      if (!state.customer) {
+        values.named_customer = "";
+        var input = rows.named_customer.querySelector("input");
+        if (input) input.value = "";
+      }
+    }
+  }
+  syncVideo();
   return form;
 }
 
@@ -858,7 +916,7 @@ function resubmitForm(record) {
   var refresh = function () {
     send.disabled = target.fields.some(function (f) {
       var v = values[f.key];
-      return f.required && (f.kind === "yesno" ? (v !== true && v !== false)
+      return requiredNow(target, values, f) && (f.kind === "yesno" ? (v !== true && v !== false)
         : (v == null || v === "" || (Array.isArray(v) && !v.length)));
     });
   };

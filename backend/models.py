@@ -56,6 +56,10 @@ class VideoType(str, Enum):
     TECHNICAL_OVERVIEW = "Technical Overview"
     TECHNICAL_WALKTHROUGH = "Technical Walkthrough"
     TECHNICAL_TEASER = "Technical Teaser"
+    #: Experience assets (2026-10-27): attract loops, presenter support, XDP clips.
+    EXPERIENCE_ASSET = "Experience Asset"
+    #: Retired as a type 2026-10-27 -- it is an Experience Asset's subtype now;
+    #: kept so anything still carrying it reads.
     PRESENTER_SUPPORT = "Presenter Support"
     OTHER = "Other"
 

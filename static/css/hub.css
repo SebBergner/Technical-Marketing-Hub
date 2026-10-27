@@ -1647,3 +1647,7 @@ textarea.hub-edit__input{resize:vertical}
 @media (max-width:700px){.hub-edit__dialog .hub-edit__grid{grid-template-columns:1fr}}
 .hub-edit__frame{z-index:1001}
 .hub-edit__video{width:100%;max-height:60vh;background:#000;border-radius:var(--orion-radius-sm)}
+
+/* Rows the video rules hide (A15): `hidden` must win over the rows' own
+   display, or a hidden Subtype / Named customer still shows. */
+.hub-up__field[hidden], .hub-edit__row[hidden] { display: none; }

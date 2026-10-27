@@ -153,6 +153,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - **依赖**：无。
 
 ### A2. Report asset：报告内容问题（用 Hub Tasks 接收）
+- **进度（10/28 本地完成，待推送 staging）**：demo 页 "Report an issue"、侧边栏 "Get help"（含 My reports，状态从 Hub Tasks 读回）、Admin → Report owners（CAD/PLM/ALM/SLM/SCO/General，Notify 开关、计数、无人通知标红）。写 Hub Tasks：TaskType Support request、Category、Segment、NotifyTo（"; " 分隔）。Partner 可提交，只记 "partner"。第一版没有附件。剩下：在 Report owners 填人；Power Automate 流程（你来配）。
 - **来源**：Seb，10/07 会议 —— 和 "Share feedback"（对应用的反馈）、"Request New Asset"
   （申请新 demo）分开，专门处理已有内容的问题和求助。**Summit 确认**：用 "Report asset" 代替开放评论和点赞
   （见 B1）；报告存进 SharePoint 中央列表，**按产品或 segment 分派给负责团队，不发给上传者本人**；
@@ -219,6 +220,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - **工作量**：1 天。
 
 ### A6. 协助团员归档过期 demo（Liwei 10/21，含原"团队用的内容复查清单"）
+- **进度（10/28 本地完成，待推送 staging）**：侧边栏 "Content to review"（Review content 或 Archive content 可见），全部 demo 按最近使用从旧到新、显示年龄和最近使用日期，Mine / All、按类型和年龄筛选；勾选后批量 Archive（一个理由、一次确认）或 Still current，逐个执行、被拒的说明原因，可 Undo。不做清理行动（Liwei 10/28）。
 - **来源**：Liwei 2026-10-21：团员需要在 Hub 里把过期的 demo 归档。归档标准来自 10/07 会议
   （Elio：约 1 年；Seb：还要看使用量）和 Serge 的年龄方案。
 - **现状**：归档功能已有，只在 Hub 里隐藏、SharePoint 不动、可以 Restore。TDD Team 有 Review content，
@@ -245,6 +247,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 ### A7. 订阅新 demo 通知 —— 已并入 S1（Serge 10/23 定为个人邮件订阅）
 
 ### A8. 归档改为移入 SharePoint 的 _Archive 文件夹（Liwei 10/21 定，Summit 确认，开始做时再建文件夹）
+- **进度（10/28 本地完成，待推送 staging）**：新权限 Archive content（Administrators、TDD Team）；SharePoint demo 的文件夹移入 `_Archive`，移动前后各比对一次权限，不一致就移回并拒绝；Restore 移回库根目录、同名时拒绝；同步把 `_Archive` 里的 demo 当作原 demo 读。Admin → Content review 标出以前只在 Hub 里归档的 demo（推送后列进 Data Clean 清单，手动处理）。推送后用一个最老、从没人用过的 demo 做第一次真实归档。
 - **来源**：Liwei 2026-10-21。现在的 Archive 只在 Hub 里隐藏，partner 和其他内部人员在 SharePoint 里
   仍能打开。改为把 demo 文件夹移进一个只有团队（TDD Team）能看的文件夹，partner 和团队外的内部人员
   都看不到（Liwei 10/23）。

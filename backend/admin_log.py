@@ -66,6 +66,7 @@ ACTIONS: dict[tuple[str, str], str] = {
     ("POST", "/api/uploads/{upload_id}/send-back"): "Sent an upload back",
     ("PUT", "/api/assets/{asset_id}/still-current"): "Set Still current",
     ("PUT", "/api/assets/{asset_id}/archive"): "Archived or restored a demo",
+    ("PUT", "/api/admin/report-owners/{segment}"): "Changed a segment's report owners",
     ("PUT", "/api/assets/{asset_id}/metadata"): "Edited a demo's metadata",
     ("PUT", "/api/assets/{asset_id}/preview-video"): "Chose a demo's preview video",
     ("PUT", "/api/assets/{asset_id}/thumbnail"): "Chose a demo's picture",
@@ -105,6 +106,7 @@ CATEGORIES: list[tuple[str, re.Pattern]] = [
     ("Metadata", re.compile(r"^/api/(graph/writeback|curation/)"
                             r"|^/api/assets/[^/]+/(metadata|preview-video|thumbnail)$")),
     ("Migration", re.compile(r"^/api/migration/")),
+    ("Reports", re.compile(r"^/api/admin/report-owners")),
     ("Usage data", re.compile(r"^/api/admin/(activity/person|admin-log)")),
 ]
 

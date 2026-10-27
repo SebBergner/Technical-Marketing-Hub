@@ -1555,6 +1555,35 @@ a.hub-up__title:hover{text-decoration:underline}
 .hub-rvw__empty, .hub-rvw__note { font-size: 13px; color: var(--orion-text-3); }
 .hub-rvw__empty { padding: 24px; text-align: center; border: 1px dashed var(--orion-border-md); border-radius: var(--orion-radius-sm); }
 
+/* ── Report an issue and Get help (A2, 2026-10-28; static/js/hub/report.js) ── */
+.hub-rpt { display: flex; flex-direction: column; gap: 16px; max-width: 920px; }
+.hub-rpt__card { padding: 18px 20px; border: 1px solid var(--orion-border); border-radius: var(--orion-radius); background: var(--orion-surface); }
+.hub-rpt__h { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
+.hub-rpt__form { display: flex; flex-direction: column; gap: 8px; }
+.hub-rpt__label { font-size: 12px; font-weight: 600; color: var(--orion-text-2); margin-top: 4px; }
+.hub-rpt__cats { display: flex; flex-direction: column; gap: 2px; }
+.hub-rpt__cat { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: var(--orion-radius-sm); font-size: 13px; color: var(--orion-text); cursor: pointer; }
+.hub-rpt__cat:hover { background: var(--orion-surface-2); }
+.hub-rpt__cat input { margin: 0; accent-color: var(--orion-indigo); }
+.hub-rpt__details { font: inherit; font-size: 13px; padding: 9px 11px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); background: var(--orion-surface); color: var(--orion-text); resize: vertical; min-height: 96px; }
+.hub-rpt__note { font-size: 12px; color: var(--orion-text-3); }
+.hub-rpt__error { font-size: 12.5px; color: var(--orion-warn-ink); min-height: 0; }
+.hub-rpt__error:empty { display: none; }
+.hub-rpt__foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.hub-rpt .btn-ghost, .hub-rpt .btn-primary-sm, .hub-rpt__foot .btn-ghost, .hub-rpt__foot .btn-primary-sm, .hub-rpt__done { flex: none; padding: 8px 16px; }
+.hub-rpt__done { align-self: flex-end; }
+.hub-rpt__about { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--orion-text-3); }
+.hub-rpt__about b { font-size: 13.5px; color: var(--orion-text); }
+.hub-rpt__sent { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13.5px; color: var(--orion-text); }
+.hub-rpt__sent svg { color: var(--orion-indigo); }
+.hub-rpt__sent a { color: var(--orion-link); }
+.hub-rpt__empty { font-size: 13px; color: var(--orion-text-3); }
+.hub-rpt__when { white-space: nowrap; }
+.hub-rpt__text { max-width: 420px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.hub-rpt__status { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; border: 1px solid var(--orion-border-md); color: var(--orion-text-2); background: var(--orion-surface-2); }
+.hub-rpt__status--open { color: var(--orion-warn-ink); background: var(--orion-warn-bg); border-color: var(--orion-warn-border); }
+.hub-rpt__status--done { color: var(--orion-green-ink); background: var(--orion-green-soft); border-color: var(--orion-green); }
+
 /* ── Dashboard: Library and Usage tabs (Serge 2026-10-23, Liwei 2026-10-26; dashboard.js) ──
  * Series colours: the dataviz reference palette's categorical slots 1-5
  * (types; segments in their own donut) and its blue stepped as an ordinal

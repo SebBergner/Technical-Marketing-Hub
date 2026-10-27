@@ -279,6 +279,25 @@
   /* content review */
   .rv-card{margin-bottom:14px}
   .rv-note{margin:-4px 0 10px;font-size:12.5px}
+  /* Report owners (A2) */
+  .ro-card{display:flex;flex-direction:column;gap:10px}
+  .ro-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .ro-head h2{margin:0;font-size:16px}
+  .ro-nums{display:flex;gap:6px;flex-wrap:wrap}
+  .ro-num{padding:3px 9px;font-size:12px;color:var(--muted)}
+  .ro-num b{color:var(--ink);font-size:13px}
+  .ro-what{margin:0;font-size:12.5px}
+  .ro-alert{padding:8px 10px;border-radius:8px;background:var(--red-soft);color:var(--red);
+    font-size:12.5px;font-weight:600}
+  .ro-list{display:flex;flex-direction:column}
+  .ro-row{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;
+    padding:8px 0;border-top:1px solid var(--border)}
+  .ro-name{font-weight:600;font-size:13.5px}
+  .ro-mail{font-size:12.5px;color:var(--muted);word-break:break-all}
+  .ro-none{padding:6px 0;font-size:13px}
+  .ro-add{display:flex;gap:6px;flex-wrap:wrap}
+  .ro-add input{flex:1 1 140px;min-width:0;font:inherit;font-size:13px;padding:6px 10px;
+    border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink)}
   .rv-table{max-height:420px;overflow:auto}
   .rv-table th{position:sticky;top:0;background:var(--surface);z-index:1}
   .rv-tag{margin-left:6px;font-size:10px;padding:1px 6px}
@@ -413,6 +432,7 @@
     <button type="button" class="tab" role="tab" data-tab="home" aria-selected="false">Home page</button>
     <button type="button" class="tab" role="tab" data-tab="content" aria-selected="false">Content dashboard</button>
     <button type="button" class="tab" role="tab" data-tab="review" aria-selected="false">Content review</button>
+    <button type="button" class="tab" role="tab" data-tab="reports" aria-selected="false">Report owners</button>
     <button type="button" class="tab" role="tab" data-tab="internal" aria-selected="false">Content access</button>
     <button type="button" class="tab" role="tab" data-tab="usage" aria-selected="false">Hub usage</button>
     <button type="button" class="tab" role="tab" data-tab="access" aria-selected="false">Users &amp; groups</button>
@@ -464,8 +484,9 @@
     <section>
       <div class="section-head"><h2>Content review</h2></div>
       <p class="muted" style="margin:-6px 0 6px">Demos worth another look. Still current
-        confirms the interface shown matches today's release; Archive takes a demo out of the
-        Hub's lists. Both are kept in the Hub only &mdash; SharePoint is never changed.</p>
+        confirms the interface shown matches today's release, in the Hub only. Archive takes a
+        demo out of the Hub's lists and moves its SharePoint folder into _Archive, which only
+        the team can open; Restore moves it back.</p>
       <p class="faint" id="rvIntro" style="margin:0 0 14px;font-size:12.5px"></p>
       <div class="card" id="rvUploads" style="margin-bottom:12px"></div>
       <div id="rvBody"></div>
@@ -473,6 +494,23 @@
     <section>
       <div class="section-head"><h2>Recent changes</h2></div>
       <div class="card tablewrap" id="rvChanges"></div>
+    </section>
+  </div>
+
+  <!-- Who hears about reports on each segment's demos (A2, 2026-10-28). -->
+  <div id="tabReports" role="tabpanel" hidden>
+    <section>
+      <div class="section-head"><h2>Report owners</h2></div>
+      <p class="muted" style="margin:-6px 0 6px">Report an issue and Get help land in the Hub
+        Tasks list. The owners of the demo's segment who have Notify on are written into the
+        row's NotifyTo column, which the Power Automate flow mails &mdash; never the person who
+        uploaded the demo. Click a count to list that segment's reports.</p>
+      <p class="faint" id="roIntro" style="margin:0 0 14px;font-size:12.5px"></p>
+      <div class="grid grid--2" id="roBody"></div>
+    </section>
+    <section>
+      <div class="section-head"><h2>Recent changes</h2></div>
+      <div class="card tablewrap" id="roChanges"></div>
     </section>
   </div>
 

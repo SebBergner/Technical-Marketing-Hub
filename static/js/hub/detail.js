@@ -20,6 +20,7 @@ import { renderVmCards, TYPE_LONG } from "./vm.js";
 import { closeActivity, openActivity } from "./activity.js";
 import { closeUpload, openUpload } from "./upload.js";
 import { closeReview, openReview } from "./review.js";
+import { closeHelp, openHelp, openReportModal } from "./report.js";
 import {
   advancedHash, advState, closeAdvancedSearch, fileTotalsText,
   openAdvancedSearch
@@ -322,6 +323,18 @@ async function openAssetDetail(id, fileItemId) {
         '<svg class="orion-ico--sm orion-ico"><use href="#i-file-text"/></svg>Share Internally'; }, 1500);
     });
     actions.appendChild(copy);
+  }
+
+  // Something wrong with this demo (A2, 2026-10-28): to its segment's owners.
+  if (actions && !document.getElementById("vpReport")) {
+    var flag = document.createElement("button");
+    flag.className = "btn-ghost";
+    flag.id = "vpReport";
+    flag.type = "button";
+    flag.title = "Tell the team about a problem with this demo";
+    flag.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-flag"/></svg>Report an issue';
+    flag.addEventListener("click", function () { openReportModal(detailAsset); });
+    actions.appendChild(flag);
   }
 
   // The player is a still: embedding the Consensus viewer is a separate
@@ -1336,6 +1349,16 @@ function routeFromHash() {
       && typeof window.closeRequestView === "function") {
     window.closeRequestView();
   }
+  if (hash === "#/help") {
+    closeFilePreview(false);
+    closeAssetDetail();
+    closeUpload();
+    closeActivity();
+    closeReview();
+    openHelp();
+    return;
+  }
+  closeHelp();
   if (hash === "#/review") {
     closeFilePreview(false);
     closeAssetDetail();

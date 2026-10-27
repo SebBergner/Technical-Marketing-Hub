@@ -11,9 +11,10 @@ import { act } from "./signins.js";
 /* ── Content review (2026-10-14) ──────────────────────────────────────
  * What to look at again: collecting dust (Serge: 7+ years, not confirmed
  * Still current), little used (Elio: a year old; Seb: and not used
- * lately), Still current running out, and what is archived. Every action
- * is Hub-only: Still current lasts a year, Archive takes a demo out of the
- * Hub's lists, Restore puts it back. SharePoint is never changed. */
+ * lately), Still current running out, and what is archived. Still current
+ * is Hub-only and lasts a year; Archive takes a demo out of the Hub's lists
+ * and, since A8 (2026-10-28), moves its SharePoint folder into _Archive;
+ * Restore puts it back. */
 function canReviewContent() {
   return (session.permissions || []).indexOf("review_content") >= 0;
 }

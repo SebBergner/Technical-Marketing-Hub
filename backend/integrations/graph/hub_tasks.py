@@ -20,6 +20,15 @@ Columns, checked against the real list on 2026-10-15 (one test row, #1):
     TaskStatus   choice: Open / Done / Rejected / Withdrawn / Cancelled
     DecidedAt    date only
 
+Added for reports (A2), checked against the list on 2026-10-28:
+
+    Category     choice: services/support_reports.CATEGORIES
+    Segment      single line   the segment the report counts under
+    NotifyTo     multiple lines   addresses for the Power Automate flow, "; "
+
+A report's status is changed in SharePoint by whoever handles it, so for
+reports alone the Hub reads the list back (read_statuses).
+
 Clearing a field (a resubmitted demo is Open again): Graph ignores null
 without a word; a text column clears with "", a date column cannot be
 cleared at all (400) -- so DecidedAt keeps the last decision's date until
@@ -152,7 +161,31 @@ def access_fields(request: dict) -> dict | None:
             "DecidedAt": _date(request.get("decided_at")) if decided else None}
 
 
+def report_fields(record: dict) -> dict:
+    """A report or a request for help (services/support_reports.py)."""
+    about = record.get("title")
+    lines = [record.get("details") or ""]
+    if about:
+        lines.append(f"Demo: {about}")
+    if record.get("fell_back"):
+        lines.append(f"Sent to {record.get('segment')}: nobody is notified for "
+                     f"{record.get('demo_segment')}.")
+    link = (f"{_base()}/#/asset/{quote(record['asset_id'], safe='')}" if record.get("asset_id")
+            else f"{_base()}/admin#reports")
+    return {"Title": (f"Report: {about}" if about else f"Help: {record.get('category')}")[:255],
+            "TaskType": "Support request", "TaskStatus": "Open",
+            "Category": record.get("category"),
+            "Segment": record.get("segment"),
+            "NotifyTo": "; ".join(record.get("notify_to") or []),
+            "RequestedBy": record.get("reported_by") or "partner",
+            "HubLink": link, "Details": "\n".join(lines)}
+
+
 # ─────────────────────────────────────────────────────── recording
+def note_report(repo, record: dict) -> None:
+    _note(repo, f"report:{record['id']}", report_fields(record))
+
+
 def note_upload(repo, record: dict) -> None:
     _note(repo, f"upload:{record['id']}", upload_fields(record))
 
@@ -250,6 +283,27 @@ def _flush_once(repo, client, out: dict) -> bool:
     # next sync rather than spinning here.
     with _lock:
         return progressed and any(_diff(e) and not e.get("error") for e in _load(repo).values())
+
+
+def read_statuses(prefix: str, client=None) -> dict[str, str] | None:
+    """{id after the prefix: TaskStatus} for every row whose HubId starts
+    with `prefix`; None when the list cannot be read. The list holds a few
+    hundred rows, so it is read whole rather than filtered."""
+    if not enabled():
+        return None
+    if client is None:
+        from backend.integrations.graph.client import get_graph_client
+        client = get_graph_client()
+        if client is None:
+            return None
+    out = {}
+    for item in client._paged(_items_url(client), {
+            "$expand": "fields($select=HubId,TaskStatus)", "$select": "id", "$top": "500"}):
+        f = item.get("fields") or {}
+        hub_id = f.get("HubId") or ""
+        if hub_id.startswith(prefix):
+            out[hub_id[len(prefix):]] = f.get("TaskStatus") or "Open"
+    return out
 
 
 def _items_url(client) -> str:

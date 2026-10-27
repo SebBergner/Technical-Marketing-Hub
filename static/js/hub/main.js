@@ -3,7 +3,8 @@
  * Loaded by index.html as a module, after static/js/hub-ui.js (the page's
  * own controls: request form, modals, the data-action dispatcher). Each file
  * in static/js/hub/ is one part of the page -- util, permissions, cards,
- * filters, home, nav, detail, vm, activity, search, request, share -- and
+ * filters, home, nav, detail, vm, activity, search, request, share, review,
+ * report -- and
  * imports what it uses from the others; until 2026-10-14 they were one
  * 6,000-line static/hub-api.js.
  *
@@ -31,6 +32,7 @@ import {
 } from "./request.js";
 import { wireShareModal } from "./share.js";
 import { addUploadNav } from "./upload.js";
+import { addHelpNav } from "./report.js";
 
 /* ── when the session runs out with the page open ─────────────────────
  *
@@ -153,6 +155,7 @@ async function load() {
   markNavActive();
   buildSidebarFoot();
   addUploadNav();
+  addHelpNav();
   // A shared link's filters (/?family=Creo&type=video): last, once every
   // control has its options.
   restoreFiltersFromUrl();

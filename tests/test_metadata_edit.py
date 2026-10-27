@@ -196,11 +196,14 @@ def test_what_the_hub_assumes_is_said_not_filled_in(client, fake, tmp_path):
     assert form["hub_shows"]["customer_facing"]["value"] == "Yes"
     assert "file names" in form["hub_shows"]["customer_facing"]["why"]
     assert "description" not in form["hub_shows"], "SharePoint has one"
-    assert client.get("/api/assets/kit", headers=ANN).json()["assumed"] == ["customer_facing"]
+    assert client.get("/api/assets/kit", headers=EDITOR).json()["assumed"] == ["customer_facing"]
+    # Not for visitors or partners (Liwei, 2026-10-28).
+    assert client.get("/api/assets/kit", headers=ANN).json()["assumed"] == []
+    assert "assumed" not in client.get("/api/assets", headers=EDITOR).json()["items"][0]
     r = client.put("/api/assets/kit/metadata", headers=EDITOR,
                    json={"values": {"customer_facing": False}})
     assert r.status_code == 200, r.text
-    shown = client.get("/api/assets/kit", headers=ANN).json()
+    shown = client.get("/api/assets/kit", headers=EDITOR).json()
     assert shown["customer_facing"] is False and shown["assumed"] == []
 
 

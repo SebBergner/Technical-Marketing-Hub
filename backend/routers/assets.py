@@ -192,6 +192,10 @@ def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo),
     if _locked_for(user, asset):
         asset = asset.model_copy(update={"resources": _without_file_ids(asset.resources),
                                          "files_locked": True})
+    # Which values are only the Hub's inference: for the people who can fix
+    # them (Edit metadata), not for visitors or partners (2026-10-28).
+    if asset.assumed and not user.can(Perm.EDIT_METADATA):
+        asset = asset.model_copy(update={"assumed": []})
     return asset
 
 

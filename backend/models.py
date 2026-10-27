@@ -385,10 +385,6 @@ class AssetBase(BaseModel):
     has_narrated_audio: bool | None = None    # gates external sharing for video
     named_customer: str | None = None
 
-    #: Values the Hub inferred rather than read from a filled column
-    #: (sharepoint_mapping.mark_assumed): customer_facing, has_narrated_audio,
-    #: language. Shown as "assumed"; the date has date_stated for the same.
-    assumed: list[str] = Field(default_factory=list)
     #: thumbnail_url is a picture someone chose on the Details card
     #: (HubThumbnail, B5): no other picture replaces it.
     thumbnail_chosen: bool = False
@@ -537,6 +533,12 @@ class Asset(AssetBase):
     #: [{kind, text}], "sections": [{title, text, files}]}, carried to the
     #: demo of the folder it describes; the demo page draws it.
     overview: dict | None = None
+    #: Values the Hub inferred rather than read from a filled column
+    #: (sharepoint_mapping.mark_assumed): customer_facing, has_narrated_audio,
+    #: language. Shown as "assumed" -- to people who may edit metadata only
+    #: (Liwei, 2026-10-28: not to visitors or partners); the date has
+    #: date_stated for the same.
+    assumed: list[str] = Field(default_factory=list)
     #: Set on the response for a partner on a partner-restricted demo: the
     #: files are listed without the ids that open or download them.
     files_locked: bool = False

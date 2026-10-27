@@ -858,6 +858,7 @@ class JsonAssetRepository(AssetRepository):
             main_video=record.get("main_video"),
             long_description=record.get("long_description"),
             overview=record.get("overview"),
+            assumed=record.get("assumed") or [],
             rails=own.get("rails") or [],
             is_editor_pick=bool(own.get("is_editor_pick")),
             value_roadmap=self._to_roadmap(roadmap),
@@ -1494,7 +1495,6 @@ class JsonAssetRepository(AssetRepository):
             named_customer=record.get("named_customer"),
             uploaded_at=_as_date(record.get("uploaded_at")),
             date_stated=bool(record.get("date_stated")),
-            assumed=record.get("assumed") or [],
             duration_seconds=record.get("duration_seconds"),
             # A SharePoint picture goes through the Hub (services/thumbnails.py).
             thumbnail_url=thumbnails.public_url(record["id"], record.get("thumbnail_url")),

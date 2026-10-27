@@ -332,6 +332,27 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   上传完成页说明"新 demo 立即可见，SharePoint 里的改动会在下次同步后出现"；写进用户文档。
 - **工作量**：2 小时。
 
+### A15. Create New Demo：视频的子类型随类型变化（Liwei 10/27 转来，A1 之后做）
+- **需求**：Video type 选定后，Video subtype 只列出该类型的子类型：
+  - Technical Overview → Customer、Feature、Solution、Product
+  - Technical Teaser → Product、Social
+  - Technical Walkthrough → Customer、Solution
+  - Experience Asset → Attract Loop、Presenter Support、XDP Clip
+  - Other → 隐藏 Subtype
+  只有子类型是 Customer（Technical Overview / Walkthrough）时才显示 Named customer，并且必填。
+- **现状（10/27 只读核对 Demo Video 库）**：VideoType 选项是 Technical Overview、Technical Walkthrough、Technical Teaser、
+  Presenter Support、Other（还没有 Experience Asset；Presenter Support 作为类型目前没有视频在用）。VideoSubtype 选项是
+  Feature、Solution、Customer、Release、N/A（还没有 Product、Social、Attract Loop、Presenter Support、XDP Clip；
+  Release 有 3 个视频在用）。6 个视频的子类型是 Customer 但没填 Named customer。
+- **做法**：类型与子类型的对应关系放在一处（upload_targets），服务器也按它校验，网页表单和 A1 的编辑对话框共用；
+  API 先只给提醒（同 A11）。Hub 的 Video Type 筛选要加上 Experience Asset。
+- **要先定 / 你来做**：
+  1. 在 VideoType 加 "Experience Asset"；"Presenter Support" 这个类型要删掉吗（0 个视频）？
+  2. 在 VideoSubtype 加 Product、Social、Attract Loop、Presenter Support、XDP Clip（原文 "Sovial" 应为 Social？）。
+  3. Release（3 个视频）不在新规则里：保留给已有视频、不再提供，还是改成别的子类型？
+  4. 已有的 6 个 "Customer 但没有客户名" 的视频：保持原样，等下次编辑时再补（编辑时会要求填）？
+- **工作量**：约 1 天。
+
 ---
 
 ## B. 要先定方向
@@ -436,6 +457,17 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   2. 视频：用 AMP 的字幕（S5 的索引文件里已有）；或 SharePoint / Stream 自动生成的字幕（要先确认能否读取）。
 - **要定**：值不值得做、先覆盖哪些内容；和 S5 的索引文件一起设计最省事。
 - **工作量**：调研半天；文档文字 2 天；字幕看来源。
+
+### B8. Internal only、Customer facing 和 Unindexed 的关系（Liwei 10/27 转来，待讨论）
+- **来源**：创建视频表单的讨论中提出（截图里的 "Internal only — files open only for people with access to internal content"）。
+- **现状**：两个独立的设置。Customer facing（是/否，SharePoint 列）表示能否直接给客户看；Internal only（Hub 的 Open/Internal）
+  表示文件只有能看内部内容的人能打开，partner 永远不能。还没有 "Unindexed"。
+- **要讨论的**：
+  1. "Unindexed" 指什么：不出现在 Hub 的列表和搜索里、只能通过链接打开？还是不进 Consensus / 搜索引擎？
+  2. 三者是否合成一个 "可见性" 选项（如 Customer facing / Internal only / Unindexed 三选一），还是保持独立的勾选？
+     注意 Customer facing 和 Internal only 可以同时成立（能给客户看，但 partner 不能下载），合并时要说清楚。
+  3. 对已有内容的影响：现在 Admin 的 "Hidden" 已能把 demo 从 Hub 移除；Unindexed 是否就是它的一个对外版本。
+- **工作量**：定下来后 1–2 天。
 
 ---
 

@@ -150,6 +150,9 @@ def run_sync(client: GraphClient, repo: AssetRepository, actor: str,
     # SharePoint-hosted pictures fetched ahead of the first viewer.
     from backend.services import thumbnails
     thumbnails.warm_soon(repo)
+    # And Create New Demo's options, ahead of the next person opening it.
+    from backend.integrations.graph import upload_writer
+    upload_writer.warm_soon()
     return result
 
 

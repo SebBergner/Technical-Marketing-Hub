@@ -96,6 +96,11 @@ async def lifespan(app: FastAPI):
     if settings.migration_runner_enabled:
         from backend.services import migration_jobs
         migration_jobs.auto_resume()
+    # Create New Demo's options, read ahead so the first person to open it
+    # after a restart (a swap) does not wait for them (2026-10-27).
+    if settings.auto_sync_scheduler:
+        from backend.integrations.graph import upload_writer
+        upload_writer.warm_soon()
     yield
     if task:
         task.cancel()

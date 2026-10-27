@@ -382,3 +382,17 @@ def test_release_stays_on_the_videos_that_have_it_and_is_not_offered():
                "VideoType": ["Technical Overview", "Presenter Support", "Experience Asset"]}
     assert ut.offered(sub, choices) == ["Feature"]
     assert ut.offered(vtype, choices) == ["Technical Overview", "Experience Asset"]
+
+
+def test_the_product_terms_a_sync_saw_are_kept_for_the_form(tmp_path, monkeypatch):
+    """2026-10-27: reading them from ~770 folders took 10-14 s per cold form."""
+    monkeypatch.setattr(settings, "data_dir", str(tmp_path))
+    assert uw.saved_terms() is None
+    items = [{"folder": {}, "listItem": {"fields": {"Product": [
+        {"Label": "Creo Parametric", "TermGuid": "g1"}, {"Label": "Windchill", "TermGuid": "g2"}]}}},
+        {"folder": {}, "listItem": {"fields": {"Product": [{"Label": "Creo Parametric",
+                                                           "TermGuid": "g1"}]}}}]
+    uw.save_terms(uw.terms_from_items(items))
+    terms = uw.saved_terms()
+    assert sorted(terms.labels()) == ["Creo Parametric", "Windchill"]
+    assert terms.get("creo parametric") == ("Creo Parametric", "g1")

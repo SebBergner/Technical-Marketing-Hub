@@ -15,6 +15,9 @@ the pre-authorised upload-session URL this hands out (CORS verified
 """
 from __future__ import annotations
 
+import json
+import logging
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -25,8 +28,17 @@ from backend.integrations.graph import migration_writer as w
 from backend.integrations.graph.client import GraphClient, GraphError
 from backend.services import upload_targets as ut
 
+log = logging.getLogger(__name__)
+
 #: Options and ids change rarely; a form opened a hundred times reads them once.
-CACHE_SECONDS = 15 * 60
+#: Read again after every sync (warm_soon) -- the daily runs, a "Sync now",
+#: an upload's own -- and at start-up (Liwei, 2026-10-27: the product list
+#: hardly changes; once a day is enough). The form's "fresh" asks sooner.
+CACHE_SECONDS = 24 * 60 * 60
+#: The Demo Catalog's product terms as the last sync saw them (2026-10-27):
+#: harvesting them from ~770 folders took 10-14 s each time the form's
+#: options were read cold, and the sync reads those same folders anyway.
+TERMS_FILE = ("mirror", "private", "product_terms.json")
 _cache: dict[str, tuple[float, "Target"]] = {}
 _lock = threading.Lock()
 
@@ -124,10 +136,11 @@ def resolve(client: GraphClient, spec: ut.TargetSpec, *, fresh: bool = False) ->
     if spec.product_terms:
         # The term store is closed to this app (Sites.Selected: 404, measured
         # 2026-10-15), so the products on offer are the terms the library's
-        # demos already carry, each with its GUID.
+        # demos already carry, each with its GUID -- as the last sync saved
+        # them, else read from the folders now.
         terms = w.TermIndex.load(client, site_id, settings.migration_product_term_set)
         if not len(terms):
-            terms = harvest_terms(client, drive.drive_id)
+            terms = saved_terms() or harvest_terms(client, drive.drive_id)
         choices["products"] = terms.labels()
     else:
         # The library's own list, or -- a test library with an empty column --
@@ -167,20 +180,82 @@ def _hub_products(client: GraphClient, site_id: str) -> list[str]:
     return []
 
 
-def harvest_terms(client: GraphClient, drive_id: str) -> w.TermIndex:
+def terms_from_items(items) -> dict[str, tuple[str, str]]:
     """Product label -> (label, TermGuid) from the managed-metadata values on
-    the library's top-level folders -- one read of ~750 folders."""
+    the folders given (driveItems with their listItem fields)."""
     found: dict[str, tuple[str, str]] = {}
-    for item in client._paged(f"/drives/{drive_id}/root/children",
-                              {"$select": "id,name,folder",
-                               "$expand": "listItem($expand=fields($select=Product))",
-                               "$top": "200"}):
+    for item in items:
         values = ((item.get("listItem") or {}).get("fields") or {}).get("Product") or []
         for v in values if isinstance(values, list) else []:
             label, guid = v.get("Label"), v.get("TermGuid")
             if label and guid:
                 found.setdefault(w.TermIndex.key(label), (label, guid))
+    return found
+
+
+def _terms_path() -> str:
+    return os.path.join(settings.data_dir, *TERMS_FILE)
+
+
+def save_terms(found: dict[str, tuple[str, str]]) -> None:
+    """Keep the terms for the next cold read of the form's options. Never
+    what stops a sync."""
+    if not found:
+        return
+    path = _terms_path()
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump({k: list(v) for k, v in found.items()}, fh, ensure_ascii=False)
+        os.replace(tmp, path)
+    except OSError as exc:
+        log.warning("product terms not saved: %s", exc)
+
+
+def saved_terms() -> w.TermIndex | None:
+    try:
+        with open(_terms_path(), encoding="utf-8") as fh:
+            data = json.load(fh) or {}
+    except (OSError, ValueError):
+        return None
+    terms = {k: tuple(v) for k, v in data.items() if isinstance(v, list) and len(v) == 2}
+    return w.TermIndex(terms) if terms else None
+
+
+def harvest_terms(client: GraphClient, drive_id: str) -> w.TermIndex:
+    """The terms read from the library's top-level folders -- one read of
+    ~770 folders, 10-14 s (measured 2026-10-27) -- and kept for next time."""
+    found = terms_from_items(client._paged(
+        f"/drives/{drive_id}/root/children",
+        {"$select": "id,name,folder",
+         "$expand": "listItem($expand=fields($select=Product))", "$top": "200"}))
+    save_terms(found)
     return w.TermIndex(found)
+
+
+_warming = threading.Lock()
+
+
+def warm_soon() -> None:
+    """Read every target's options in the background, so the next person
+    opening Create New Demo finds them ready (after each sync)."""
+    def run():
+        if not _warming.acquire(blocking=False):
+            return
+        try:
+            from backend.integrations.graph.client import get_graph_client
+            client = get_graph_client()
+            if client is None:
+                return
+            for key in ut.TARGETS:
+                try:
+                    resolve(client, ut.target(key), fresh=True)
+                except Exception as exc:                       # noqa: BLE001
+                    log.info("upload options for %s not warmed: %s", key, exc)
+        finally:
+            _warming.release()
+    threading.Thread(target=run, name="upload-options", daemon=True).start()
 
 
 def name_taken(client: GraphClient, target: Target, name: str) -> bool:

@@ -373,7 +373,13 @@ def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
 
     page = client.delta(drive.drive_id) if full else page
     items, ticked, preview_error = mark_flags(client, site.site_id, drive.drive_id, page.items)
-    assets, result = build_assets(_with_fields(client, drive, items))
+    items = _with_fields(client, drive, items)
+    # The Product terms the folders carry, for the upload form (2026-10-27):
+    # read here anyway, so the form need not read ~770 folders again.
+    from backend.integrations.graph import upload_writer
+    upload_writer.save_terms(upload_writer.terms_from_items(
+        i for i in items if "folder" in i and not _relative_path(i)))
+    assets, result = build_assets(items)
     result.preview_videos, result.preview_error = len(ticked), preview_error
     result.delta_token = page.delta_token
     result.full_resync = full

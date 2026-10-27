@@ -29,6 +29,9 @@ def no_thumbnail_warming(monkeypatch):
     (services/thumbnails.py) -- with the developer's real Graph client."""
     from backend.services import thumbnails
     monkeypatch.setattr(thumbnails, "warm_soon", lambda repo: None)
+    # ...and reads Create New Demo's options ahead (upload_writer.warm_soon).
+    from backend.integrations.graph import upload_writer
+    monkeypatch.setattr(upload_writer, "warm_soon", lambda: None)
 
 
 @pytest.fixture(autouse=True)

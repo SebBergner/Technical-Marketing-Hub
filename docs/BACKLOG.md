@@ -511,6 +511,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 ---
 
 ## 团队负责（SharePoint 数据，不改代码）
+完整清单和 2026-10-28 的实测数量见 Data Clean 清单：https://claude.ai/artifact/8NJPgQ1hrbtEicmrkgYUcb
 - Kit 日期显示为批量上传日（2018–19）：在 SharePoint 补 **Original publish date**。
 - 没有 Demo Type 的文件夹不会出现在 Hub：补 Demo Type。
 - LDK / VDK 标错的文件夹：在 SharePoint 改正 Demo Type（以后由 PM 在上传时标好）。

@@ -598,11 +598,14 @@ def edit_form(asset_id: str, repo: AssetRepository = Depends(get_repo), actor: s
         raise HTTPException(status_code=404,
                             detail="The demo's folder is no longer in SharePoint.")
     preview = next((r.item_id for r in asset.resources if r.name == asset.main_video), None)
+    values = me.values_of(target.spec, item.get("fields") or {})
     return {"library": target.spec.library, "title": asset.title,
             "etag": item.get("@odata.etag") or item.get("eTag"),
             "fields": me.form(target.spec, target),
             "video_rules": ut.subtype_rules(target.spec, target.choices),
-            "values": me.values_of(target.spec, item.get("fields") or {}),
+            "values": values,
+            # Empty in SharePoint, shown by the Hub anyway: said, not filled in.
+            "hub_shows": me.hub_shows(asset, values),
             "videos": _videos(asset), "preview": preview,
             "thumbnail": {"chosen": bool(asset.thumbnail_chosen),
                           "can_choose": target.has_thumbnail_flag}}
@@ -634,7 +637,11 @@ def save_metadata(asset_id: str, body: MetadataIn, repo: AssetRepository = Depen
     except GraphError as exc:
         raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
     if changed:
-        me.remember(repo, asset_id, me.hub_values(key, changed))
+        values = me.hub_values(key, changed)
+        # A value someone has now set is no longer the Hub's assumption.
+        values["assumed"] = [a for a in asset.assumed
+                             if a not in {me.STATES[k] for k in changed if k in me.STATES}]
+        me.remember(repo, asset_id, values)
         _sync_soon(repo, actor)
         log.info("metadata of %s edited by %s: %s", asset_id, actor, sorted(changed))
     return {"changed": sorted(changed), "asset": repo.get(asset_id)}

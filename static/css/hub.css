@@ -1651,3 +1651,8 @@ textarea.hub-edit__input{resize:vertical}
 /* Rows the video rules hide (A15): `hidden` must win over the rows' own
    display, or a hidden Subtype / Named customer still shows. */
 .hub-up__field[hidden], .hub-edit__row[hidden] { display: none; }
+
+/* Values the Hub assumed, not filled in SharePoint (2026-10-28). */
+.hub-facts__assumed{margin-left:6px;font-size:11px;color:var(--orion-text-3);border:1px dashed var(--orion-border-md);border-radius:var(--orion-radius-pill);padding:0 6px;cursor:help}
+.hub-edit__assumed{font-size:11.5px;color:var(--orion-warn-ink);background:var(--orion-warn-bg);border-radius:var(--orion-radius-sm);padding:3px 7px}
+.hub-edit__assumed b{font-weight:600}

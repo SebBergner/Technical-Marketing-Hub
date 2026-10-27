@@ -146,6 +146,9 @@ def changes(spec: ut.TargetSpec, target: uw.Target, sent: dict, current: dict) -
         if isinstance(value, list) and isinstance(before, list):
             if sorted(value) == sorted(before):
                 continue
+        elif isinstance(value, bool) or isinstance(before, bool):
+            if value is before:            # No (False) is a value, not empty
+                continue
         elif (value or None) == (before or None):
             continue
         out[key] = value
@@ -200,6 +203,49 @@ def put_thumbnail(client: GraphClient, target: uw.Target, folder_id: str,
     if not item or "id" not in item:
         raise GraphError("SharePoint did not store the picture.")
     return item
+
+
+#: Why the Hub shows a value SharePoint does not hold (Liwei, 2026-10-28:
+#: the editor leaves such a field blank and says so).
+WHY = {
+    "customer_facing": "worked out from the file names; a demo whose names say nothing "
+                       "counts as customer-facing",
+    "contains_audio": "worked out from the file names",
+    "language": "English is assumed when none is set",
+    "original_publish_date": "the date of its files, not a publication date",
+    "segment": "from another SharePoint source (the demo's page)",
+    "products": "from another SharePoint source (the demo's page)",
+    "description": "from another SharePoint source (the demo's page)",
+}
+
+
+def hub_shows(asset, values: dict) -> dict:
+    """Fields SharePoint leaves empty but the Hub shows a value for: what it
+    shows and why, so the editor can say so without filling it in."""
+    shown = {
+        "customer_facing": None if asset.customer_facing is None
+                           else ("Yes" if asset.customer_facing else "No"),
+        "contains_audio": None if asset.has_narrated_audio is None
+                          else ("Yes" if asset.has_narrated_audio else "No"),
+        "language": "English" if (asset.language or "en") == "en" else asset.language,
+        "original_publish_date": None if asset.date_stated or not asset.uploaded_at
+                                 else asset.uploaded_at.isoformat(),
+        "segment": ", ".join([s for s in [asset.segment, *(getattr(asset, "rails", None) or [])] if s]),
+        "products": ", ".join(asset.products or []),
+        "description": asset.description,
+    }
+    out = {}
+    for key, value in shown.items():
+        if not value or key not in values:
+            continue
+        if values.get(key) in (None, "", []):
+            out[key] = {"value": value, "why": WHY[key]}
+    return out
+
+
+#: Hub fields an edit makes stated, so no longer "assumed".
+STATES = {"customer_facing": "customer_facing", "contains_audio": "has_narrated_audio",
+          "language": "language"}
 
 
 # ─────────────────────────────────────────────── seeing the change at once

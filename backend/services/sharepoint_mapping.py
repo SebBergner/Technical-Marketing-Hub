@@ -442,6 +442,22 @@ def apply_stated_flags(asset: dict, customer_facing: bool | None,
         asset["has_narrated_audio"] = has_audio
 
 
+def mark_assumed(asset: dict, customer_facing: bool | None, has_audio: bool | None,
+                 language_stated: bool) -> None:
+    """Which of the values shown are the Hub's own inference, not a column
+    someone filled (Liwei, 2026-10-28): Customer facing and Narrated audio
+    from the file names (or the customer-facing default), Language as
+    English. The Details card says "assumed"; the editor leaves them blank."""
+    assumed = []
+    if customer_facing is None and asset.get("customer_facing") is not None:
+        assumed.append("customer_facing")
+    if has_audio is None and asset.get("has_narrated_audio") is not None:
+        assumed.append("has_narrated_audio")
+    if not language_stated:
+        assumed.append("language")
+    asset["assumed"] = assumed
+
+
 def blank_asset(asset_id: str, title: str, asset_type: str = "ldk") -> dict:
     return {
         "id": asset_id, "type": asset_type, "title": display_title(title),

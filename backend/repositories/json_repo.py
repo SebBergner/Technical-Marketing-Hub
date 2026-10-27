@@ -79,7 +79,8 @@ def _by_column(rows: list[dict], key, descending: bool, stats: dict) -> list[dic
 _MIRROR_FIELDS = (
     "id", "type", "source", "title", "description", "products", "funnel_stage", "content_depth",
     "language", "segment", "industry", "value_drivers", "tags", "customer_facing",
-    "has_narrated_audio", "named_customer", "uploaded_at", "date_stated", "duration_seconds",
+    "has_narrated_audio", "named_customer", "uploaded_at", "date_stated", "assumed",
+    "duration_seconds",
     "thumbnail_url", "thumbnail_chosen", "web_url", "source_item_id", "brightcove_id",
     "consensus_uuid",
     "internal_title",
@@ -1493,6 +1494,7 @@ class JsonAssetRepository(AssetRepository):
             named_customer=record.get("named_customer"),
             uploaded_at=_as_date(record.get("uploaded_at")),
             date_stated=bool(record.get("date_stated")),
+            assumed=record.get("assumed") or [],
             duration_seconds=record.get("duration_seconds"),
             # A SharePoint picture goes through the Hub (services/thumbnails.py).
             thumbnail_url=thumbnails.public_url(record["id"], record.get("thumbnail_url")),

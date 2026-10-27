@@ -878,9 +878,10 @@ function renderFactsTable(page, asset) {
     ["Stage", asset.funnel_stage],
     ["Industry", asset.industry],
     ["Customer", asset.named_customer],
-    ["Language", asset.language ? (LANGUAGE_LABEL[asset.language] || asset.language.toUpperCase()) : null],
-    ["Customer-facing", yesNo(asset.customer_facing)],
-    ["Narrated audio", yesNo(asset.has_narrated_audio)],
+    ["Language", asset.language ? (LANGUAGE_LABEL[asset.language] || asset.language.toUpperCase()) : null,
+     "language"],
+    ["Customer-facing", yesNo(asset.customer_facing), "customer_facing"],
+    ["Narrated audio", yesNo(asset.has_narrated_audio), "has_narrated_audio"],
     ["Length", asset.type === "ldk" ? null : durationLabel(asset.duration_seconds)],
     // "Published" only for a date someone stated (dateLabel in util.js).
     [asset.date_stated ? "Published" : "Updated",
@@ -895,7 +896,18 @@ function renderFactsTable(page, asset) {
     var th = document.createElement("th");
     th.textContent = r[0];
     tr.appendChild(th);
-    tr.insertCell().textContent = r[1];
+    var cell = tr.insertCell();
+    cell.textContent = r[1];
+    // Inferred, not filled in SharePoint (sharepoint_mapping.mark_assumed).
+    if (r[2] && (asset.assumed || []).indexOf(r[2]) >= 0) {
+      var mark = document.createElement("span");
+      mark.className = "hub-facts__assumed";
+      mark.textContent = "assumed";
+      mark.title = "Not filled in SharePoint: the Hub worked this out "
+        + (r[2] === "language" ? "(English when none is set)" : "from the file names")
+        + ". Edit sets it for good.";
+      cell.appendChild(mark);
+    }
   });
   // Who to ask (A4, 2026-10-26): the Demo Owner, as a mail link.
   if (asset.demo_owner) {

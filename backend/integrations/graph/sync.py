@@ -254,7 +254,8 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
                 product_version=m.clean_text(_field(fields, "product_version")),
             )
             stated[name] = (m.as_bool(_field(fields, "customer_facing")),
-                            m.as_bool(_field(fields, "has_audio")))
+                            m.as_bool(_field(fields, "has_audio")),
+                            bool(_field(fields, "language")))
             if m.as_date(_field(fields, "original_publish_date")):
                 dated.add(name)
                 asset["date_stated"] = True
@@ -302,7 +303,8 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
             result.preview_conflicts.append(asset["title"] if asset.get("title") else name)
         m.derive_video_facts(asset)
         m.apply_chosen_thumbnail(asset)
-        m.apply_stated_flags(asset, *stated.get(name, (None, None)))
+        m.apply_stated_flags(asset, *stated.get(name, (None, None, False))[:2])
+        m.mark_assumed(asset, *stated.get(name, (None, None, False)))
         if name not in dated:
             # A folder's own dates are the library move, not the content.
             asset["uploaded_at"] = m.content_date(asset) or asset.get("uploaded_at")
@@ -316,7 +318,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
 #: deployment rebuilds its mirror once on the next sync rather than waiting
 #: for something in SharePoint to change (delta reports "unchanged" and the
 #: old rows would stay). 2: kit dates from their files (2026-10-14).
-MAPPING_VERSION = 4          # 4: Demo Owner, product version, chosen thumbnail (2026-10-26)
+MAPPING_VERSION = 5          # 5: which values are assumed (2026-10-28); 4: Demo Owner, product version, thumbnail
 
 
 def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,

@@ -172,6 +172,16 @@ function openEditor(asset) {
       var c = control(f, form.values[f.key]);
       row.appendChild(c);
       if (f.help) row.appendChild(mk("span", "hub-edit__help", f.help));
+      // Empty in SharePoint though the Hub shows something (Liwei,
+      // 2026-10-28): left blank, and what the Hub shows said beside it.
+      var shown = (form.hub_shows || {})[f.key];
+      if (shown) {
+        var hint = mk("span", "hub-edit__assumed");
+        hint.appendChild(document.createTextNode("Not filled in SharePoint. The Hub shows "));
+        hint.appendChild(mk("b", null, shown.value));
+        hint.appendChild(document.createTextNode(" — " + shown.why + "."));
+        row.appendChild(hint);
+      }
       grid.appendChild(row);
     });
     editor.appendChild(grid);

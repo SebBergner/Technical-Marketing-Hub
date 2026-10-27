@@ -182,3 +182,31 @@ def test_editing_a_video_applies_the_subtype_rules():
     assert me.changes(spec, target, {"description": "new"}, release) == {"description": "new"}
     assert me.changes(spec, target, {"video_type": "Other"}, release) == \
         {"video_type": "Other", "video_subtype": "N/A"}
+
+
+def test_what_the_hub_assumes_is_said_not_filled_in(client, fake, tmp_path):
+    """Liwei, 2026-10-28: Bobcat showed Customer facing Yes while SharePoint
+    had nothing -- the editor leaves it blank and says what the Hub shows."""
+    fake.fields.pop("Customer_x0020_Facing")
+    rows = json.loads((tmp_path / "mirror" / "sharepoint.json").read_text(encoding="utf-8"))
+    rows[0].update(customer_facing=True, assumed=["customer_facing"])
+    (tmp_path / "mirror" / "sharepoint.json").write_text(json.dumps(rows), encoding="utf-8")
+    form = client.get("/api/assets/kit/metadata", headers=EDITOR).json()
+    assert form["values"]["customer_facing"] is None
+    assert form["hub_shows"]["customer_facing"]["value"] == "Yes"
+    assert "file names" in form["hub_shows"]["customer_facing"]["why"]
+    assert "description" not in form["hub_shows"], "SharePoint has one"
+    assert client.get("/api/assets/kit", headers=ANN).json()["assumed"] == ["customer_facing"]
+    r = client.put("/api/assets/kit/metadata", headers=EDITOR,
+                   json={"values": {"customer_facing": False}})
+    assert r.status_code == 200, r.text
+    shown = client.get("/api/assets/kit", headers=ANN).json()
+    assert shown["customer_facing"] is False and shown["assumed"] == []
+
+
+def test_no_is_a_change_from_yes_and_from_empty(client, fake):
+    """A Yes/No set to No was once judged 'unchanged' (False read as empty)."""
+    r = client.put("/api/assets/kit/metadata", headers=EDITOR,
+                   json={"values": {"customer_facing": False, "contains_audio": False}})
+    assert r.json()["changed"] == ["customer_facing"], "audio was already No"
+    assert fake.writes[-1][1] == {"Customer_x0020_Facing": False}

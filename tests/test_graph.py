@@ -761,3 +761,14 @@ def test_submitted_by_is_read_from_the_folder():
     by_title = {a.title: a for a in build_assets(items)[0]}
     assert by_title["Hub Kit"].submitted_by == "jane.doe@ptc.com"
     assert by_title["Old Kit"].submitted_by is None
+
+
+
+def test_values_the_hub_infers_are_marked_assumed():
+    """2026-10-28: Customer facing and Narrated audio from the file names,
+    Language as English, unless the folder's columns say."""
+    inferred = build_assets([folder("Kit v.1", Language="")])[0][0]
+    assert set(inferred.assumed) >= {"customer_facing", "language"}
+    stated = build_assets([folder("Kit v.1", Customer_x0020_Facing=False, Language="English")])[0][0]
+    assert "customer_facing" not in stated.assumed and "language" not in stated.assumed
+    assert stated.customer_facing is False

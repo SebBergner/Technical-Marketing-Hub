@@ -178,7 +178,8 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], VideoSyncResult]:
             product_version=m.clean_text(_field(fields, "product_version")),
         )
         stated[name] = (m.as_bool(_field(fields, "customer_facing")),
-                        m.as_bool(_field(fields, "has_audio")))
+                        m.as_bool(_field(fields, "has_audio")),
+                        bool(_field(fields, "language")))
         assets[name] = asset
 
     for item in items:
@@ -200,7 +201,8 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], VideoSyncResult]:
         m.derive_video_facts(asset)
         m.apply_chosen_thumbnail(asset)
         # The columns are what the sheet said, so they beat the filename rule.
-        m.apply_stated_flags(asset, *stated.get(name, (None, None)))
+        m.apply_stated_flags(asset, *stated.get(name, (None, None, False))[:2])
+        m.mark_assumed(asset, *stated.get(name, (None, None, False)))
 
     result.assets = len(assets)
     return [Asset.model_validate(a) for a in assets.values()], result

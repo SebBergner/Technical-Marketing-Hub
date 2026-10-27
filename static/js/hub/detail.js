@@ -19,6 +19,7 @@ import { familyDisplayName, openTag } from "./nav.js";
 import { renderVmCards, TYPE_LONG } from "./vm.js";
 import { closeActivity, openActivity } from "./activity.js";
 import { closeUpload, openUpload } from "./upload.js";
+import { closeReview, openReview } from "./review.js";
 import {
   advancedHash, advState, closeAdvancedSearch, fileTotalsText,
   openAdvancedSearch
@@ -86,9 +87,14 @@ async function openAssetDetail(id, fileItemId) {
   var adv = document.getElementById("hubAdvancedPage");
   if (adv && adv.classList.contains("active")) {
     detailReturnHash = advancedHash(advState.q);
+  } else if (window.hubDetailReturn) {
+    // Content to review (review.js) closes as the hash changes, so it says
+    // where it was rather than being found open.
+    detailReturnHash = window.hubDetailReturn;
   } else if (!(page0 && page0.classList.contains("active"))) {
     detailReturnHash = null;
   }
+  window.hubDetailReturn = null;
   var asset;
   try {
     asset = await getJSON("/api/assets/" + encodeURIComponent(id));
@@ -399,7 +405,7 @@ async function openAssetDetail(id, fileItemId) {
 }
 
 //: Where the details page's Back button goes when it was opened from
-//: Advanced Search; null means the catalogue, as before.
+//: Advanced Search or Content to review; null means the catalogue, as before.
 var detailReturnHash = null;
 
 function tabOf(asset, itemId) {
@@ -1330,6 +1336,15 @@ function routeFromHash() {
       && typeof window.closeRequestView === "function") {
     window.closeRequestView();
   }
+  if (hash === "#/review") {
+    closeFilePreview(false);
+    closeAssetDetail();
+    closeUpload();
+    closeActivity();
+    openReview();
+    return;
+  }
+  closeReview();
   if (hash === "#/activity") {
     closeFilePreview(false);
     closeAssetDetail();
@@ -1388,10 +1403,12 @@ function wireDetailPage() {
   // Elio's Back button clears the view; the hash has to follow, or the page
   // reappears on the next refresh.
   var back = document.querySelector("#videoPreviewPage .vp-back");
-  if (back) back.addEventListener("click", function () {
+  if (back) back.addEventListener("click", function (e) {
     if (detailReturnHash) {
-      // Synchronously, not via hashchange: Elio's inline onclick has just
-      // put the catalogue back, and a frame of it would flash otherwise.
+      // Synchronously, not via hashchange, so no frame of the catalogue
+      // flashes. And no further: hub-ui.js's "close-detail", on document,
+      // would put the catalogue back under the view returned to (2026-10-28).
+      e.stopPropagation();
       history.pushState(null, "", detailReturnHash);
       detailReturnHash = null;
       routeFromHash();

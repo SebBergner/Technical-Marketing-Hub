@@ -1524,6 +1524,37 @@ a.hub-up__title:hover{text-decoration:underline}
 .hub-table__td--date, .hub-table__td--type, .hub-table__td--language { white-space: nowrap; }
 .hub-table__td--views, .hub-table__th--views button { text-align: right; }
 
+/* ── Content to review (A6, 2026-10-28; static/js/hub/review.js) ── */
+.hub-rvw { display: flex; flex-direction: column; gap: 12px; }
+.hub-rvw__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.hub-rvw__scope { display: inline-flex; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); overflow: hidden; }
+.hub-rvw__scope button { border: none; background: var(--orion-surface); color: var(--orion-text-2); font: inherit; font-size: 13px; padding: 8px 13px; cursor: pointer; }
+.hub-rvw__scope button + button { border-left: 1px solid var(--orion-border-md); }
+.hub-rvw__scope button[aria-pressed="true"] { background: var(--orion-surface-3); color: var(--orion-text); font-weight: 600; }
+.hub-rvw__select, .hub-rvw__search, .hub-rvw__reason { font: inherit; font-size: 13px; padding: 7px 10px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); background: var(--orion-surface); color: var(--orion-text); }
+.hub-rvw__search { flex: 1 1 220px; min-width: 0; }
+.hub-rvw__reason { flex: 1 1 240px; min-width: 0; }
+.hub-rvw__bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 36px; padding: 6px 12px; border: 1px solid var(--orion-border); border-radius: var(--orion-radius-sm); background: var(--orion-surface-2); font-size: 13px; color: var(--orion-text-2); }
+.hub-rvw__count { font-weight: 600; color: var(--orion-text); margin-right: auto; }
+.hub-rvw .btn-ghost, .hub-rvw .btn-primary-sm { flex: none; padding: 7px 14px; }
+.hub-rvw__lead { flex-basis: 100%; order: 1; }
+.hub-rvw__bulk .hub-rvw__reason, .hub-rvw__bulk .hub-rvw__reason ~ button { order: 2; }
+.hub-rvw__result { padding: 10px 12px; border: 1px solid var(--orion-border); border-radius: var(--orion-radius-sm); font-size: 13px; color: var(--orion-text); background: var(--orion-surface); }
+.hub-rvw__result > div:first-child { display: flex; align-items: center; gap: 10px; }
+.hub-rvw__result--warn { border-color: var(--orion-warn-border); background: var(--orion-warn-bg); }
+.hub-rvw__result ul { margin: 6px 0 0 18px; padding: 0; color: var(--orion-text-2); }
+.hub-rvw__dismiss { margin-left: auto; border: none; background: none; font-size: 18px; line-height: 1; color: var(--orion-text-3); cursor: pointer; }
+.hub-table-wrap { overflow-x: auto; }
+.hub-rvw__table th .hub-rvw__th { display: block; padding: 10px 12px; font-weight: 600; color: var(--orion-text-2); white-space: nowrap; }
+.hub-rvw__pick { width: 36px; text-align: center; vertical-align: middle; }
+.hub-rvw__table th.hub-rvw__pick { padding: 0 12px; }
+.hub-rvw__sub { font-size: 12px; color: var(--orion-text-3); margin-top: 2px; }
+.hub-rvw__age b, .hub-rvw__used b { font-weight: 600; color: var(--orion-text); white-space: nowrap; }
+.hub-rvw__age, .hub-rvw__used, .hub-rvw__current { white-space: nowrap; }
+.hub-rvw__never { font-weight: 600; color: var(--orion-text); }
+.hub-rvw__empty, .hub-rvw__note { font-size: 13px; color: var(--orion-text-3); }
+.hub-rvw__empty { padding: 24px; text-align: center; border: 1px dashed var(--orion-border-md); border-radius: var(--orion-radius-sm); }
+
 /* ── Dashboard: Library and Usage tabs (Serge 2026-10-23, Liwei 2026-10-26; dashboard.js) ──
  * Series colours: the dataviz reference palette's categorical slots 1-5
  * (types; segments in their own donut) and its blue stepped as an ordinal

@@ -117,3 +117,23 @@ def test_a_leftover_sample_file_never_counts_as_use(client, tmp_path):
     review = client.get("/api/admin/content-review", headers=BOSS).json()
     assert "idle" in [r["asset_id"] for r in review["idle"]]
     assert review["usage_since"] > long_ago
+
+
+# ─────────────────────────────────────────────── content to review (A6)
+def test_content_to_review_is_for_reviewers_and_archivers_least_used_first(client, tmp_path):
+    rows = json.loads((tmp_path / "mirror" / "sharepoint.json").read_text(encoding="utf-8"))
+    rows[0]["demo_owner"] = "Someone@ptc.com"
+    rows[1]["creator"] = "One, Some"
+    (tmp_path / "mirror" / "sharepoint.json").write_text(json.dumps(rows), encoding="utf-8")
+    url = "/api/reports/content-to-review"
+    assert client.get(url, headers=STAFF).status_code == 403
+    for perm in ("review_content", "archive_content"):
+        access.update_group(EMPLOYEES, "a", permissions=["view_hub", perm])
+        assert client.get(url, headers=STAFF).status_code == 200, perm
+    d = client.get(url, headers=STAFF).json()
+    assert [r["asset_id"] for r in d["items"]] == ["dusty", "idle", "fresh", "used"], \
+        "never used, oldest first; then by last use"
+    assert {r["asset_id"] for r in d["items"] if r["mine"]} == {"fresh"}
+    assert "views_12m" not in d["items"][0] and "people_12m" not in d["items"][0]
+    client.put("/api/assets/dusty/archive", json={"archived": True}, headers=BOSS)
+    assert "dusty" not in [r["asset_id"] for r in client.get(url, headers=STAFF).json()["items"]]

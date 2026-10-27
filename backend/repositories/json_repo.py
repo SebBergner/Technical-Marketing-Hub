@@ -99,6 +99,8 @@ _MIRROR_FIELDS = (
     "long_description",
     # Demo pages (backend/integrations/graph/demo_pages.py).
     "page_url", "page_folder", "page_modified", "overview",
+    # In the library's _Archive folder (A8, 2026-10-28).
+    "sharepoint_archived",
 )
 
 #: Under mirror/, and never read as catalogue data: _load_mirror only reads
@@ -460,10 +462,13 @@ class JsonAssetRepository(AssetRepository):
         # only "Access internal content" opens its files.
         # Archived (2026-10-14): marked here, filtered in _rows, so that
         # whoever may see archived content can still reach it by id.
+        # A folder in SharePoint's _Archive is archived whoever moved it there
+        # (A8, 2026-10-28).
         archive = self._load("archived") or {}
-        if archive:
-            rows = [{**r, "archived": True, "archived_at": archive[r["id"]].get("at")}
-                    if r["id"] in archive else r for r in rows]
+        if archive or any(r.get("sharepoint_archived") for r in rows):
+            rows = [{**r, "archived": True,
+                     "archived_at": (archive.get(r["id"]) or {}).get("at")}
+                    if r["id"] in archive or r.get("sharepoint_archived") else r for r in rows]
         # Still current (2026-10-14): a reviewer's confirmation, while it lasts.
         reviews = self._load("content_review") or {}
         if reviews:
@@ -698,15 +703,36 @@ class JsonAssetRepository(AssetRepository):
 
     # ─────────────────────────────────────────── Archived
     def archived(self) -> list[dict]:
-        """Archived demos, most recent first, with who archived them and why."""
+        """Archived demos, most recent first, with who archived them and why,
+        and `where` (A8, 2026-10-28): "sharepoint", the folder is in _Archive;
+        "hub_only", a SharePoint folder archived in the Hub before _Archive
+        existed, still where it was; "hub", not a SharePoint folder. A folder
+        moved into _Archive in SharePoint itself is listed too."""
+        from backend.services.metadata_edit import NotEditable, target_key
         state = self._load("archived") or {}
-        items = [{"asset_id": k, **v} for k, v in state.items()]
+        records = {r["id"]: r for r in self._load_mirror()}
+
+        def where(asset_id: str) -> str:
+            r = records.get(asset_id) or {}
+            if r.get("sharepoint_archived"):
+                return "sharepoint"
+            try:
+                target_key(r) if r else None
+            except NotEditable:
+                return "hub"
+            return "hub_only" if r else "hub"
+        items = [{"asset_id": k, **v, "where": where(k)} for k, v in state.items()]
+        items += [{"asset_id": r["id"], "title": r.get("title"), "type": r.get("type"),
+                   "by": None, "at": None, "reason": None, "where": "sharepoint"}
+                  for r in records.values() if r.get("sharepoint_archived") and r["id"] not in state]
         return sorted(items, key=lambda i: i.get("at") or "", reverse=True)
 
     def set_archived(self, asset_id: str, on: bool, actor: str,
-                     reason: str | None = None) -> dict:
-        """Archive a demo in the Hub, or restore it. SharePoint and Consensus
-        are never touched: this only decides what the Hub lists."""
+                     reason: str | None = None, in_sharepoint: bool | None = None) -> dict:
+        """Record a demo archived, or restored. `in_sharepoint`: its folder was
+        moved into _Archive (True), or it is a SharePoint demo archived before
+        that existed (None on a SharePoint demo means Hub-only, 2026-10-28);
+        the move itself is the route's (services/archive.py)."""
         asset = self.get(asset_id)
         if asset is None:
             raise KeyError(asset_id)
@@ -716,7 +742,8 @@ class JsonAssetRepository(AssetRepository):
                 state[asset_id] = {"title": asset.title,
                                    "type": getattr(asset.type, "value", asset.type),
                                    "by": actor, "at": utcnow().isoformat(timespec="seconds"),
-                                   "reason": (reason or "").strip()[:300] or None}
+                                   "reason": (reason or "").strip()[:300] or None,
+                                   "in_sharepoint": in_sharepoint}
             else:
                 state.pop(asset_id, None)
             self._save("archived", state)
@@ -859,6 +886,7 @@ class JsonAssetRepository(AssetRepository):
             long_description=record.get("long_description"),
             overview=record.get("overview"),
             assumed=record.get("assumed") or [],
+            sharepoint_archived=bool(record.get("sharepoint_archived")),
             rails=own.get("rails") or [],
             is_editor_pick=bool(own.get("is_editor_pick")),
             value_roadmap=self._to_roadmap(roadmap),

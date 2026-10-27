@@ -174,6 +174,33 @@ def _relative_path(item: dict, drive_root_marker: str = "/root:") -> str:
     return raw.strip("/")
 
 
+#: The library folder archived demos are moved into (A8, services/archive.py).
+ARCHIVE_FOLDER = "_Archive"
+
+
+def lift_archive(items: list[dict]) -> tuple[list[dict], str | None]:
+    """Read the demos in _Archive as if they were at the top of the library,
+    marked `hub_archived` (A8, 2026-10-28): an archived demo stays the same
+    demo -- same id, same links, its usage kept -- and is listed as archived.
+    _Archive itself is not a demo. Returns the items and _Archive's id."""
+    out, archive_id = [], None
+    marker = "/root:"
+    for item in items:
+        rel = _relative_path(item)
+        if (not rel and "folder" in item and item.get("name") == ARCHIVE_FOLDER
+                and (item.get("parentReference") or {}).get("path") is not None):
+            archive_id = item.get("id")
+            continue
+        if rel == ARCHIVE_FOLDER or rel.startswith(ARCHIVE_FOLDER + "/"):
+            parent = dict(item.get("parentReference") or {})
+            head, _, _ = (parent.get("path") or "").partition(marker)
+            below = rel[len(ARCHIVE_FOLDER):].strip("/")
+            parent["path"] = head + marker + ("/" + below if below else "")
+            item = {**item, "parentReference": parent, "hub_archived": True}
+        out.append(item)
+    return out, archive_id
+
+
 def _latest_per_item(items: list[dict]) -> list[dict]:
     """One entry per item id, keeping the last — delta repeats things.
 
@@ -279,6 +306,8 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
             result.skipped_no_demo_type += 1
             continue
 
+        if item.get("hub_archived"):
+            asset["sharepoint_archived"] = True     # in _Archive (lift_archive)
         assets[name] = asset
 
     # Pass 2 — every file belongs to its first path segment.
@@ -375,7 +404,8 @@ def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
 
     page = client.delta(drive.drive_id) if full else page
     items, ticked, preview_error = mark_flags(client, site.site_id, drive.drive_id, page.items)
-    items = _with_fields(client, drive, items)
+    items, archive_id = lift_archive(items)
+    items = _with_fields(client, drive, items, archive_id)
     # The Product terms the folders carry, for the upload form (2026-10-27):
     # read here anyway, so the form need not read ~770 folders again.
     from backend.integrations.graph import upload_writer
@@ -468,7 +498,8 @@ def _retire_seed(repo) -> int:
     return before
 
 
-def _with_fields(client: GraphClient, drive: DriveRef, items: list[dict]) -> list[dict]:
+def _with_fields(client: GraphClient, drive: DriveRef, items: list[dict],
+                 archive_id: str | None = None) -> list[dict]:
     """Attach SharePoint columns to top-level folders.
 
     Drive delta does not expand `listItem`, so the columns that decide what is
@@ -482,6 +513,9 @@ def _with_fields(client: GraphClient, drive: DriveRef, items: list[dict]) -> lis
         return items
 
     expanded = {c["id"]: c for c in client.list_children(drive.drive_id, "root")}
+    if archive_id:
+        # The archived demos' own columns (lift_archive).
+        expanded.update({c["id"]: c for c in client.list_children(drive.drive_id, archive_id)})
     for item in items:
         if item["id"] in top_level and item["id"] in expanded:
             item["listItem"] = expanded[item["id"]].get("listItem", {})

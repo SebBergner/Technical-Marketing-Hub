@@ -539,6 +539,8 @@ class Asset(AssetBase):
     #: (Liwei, 2026-10-28: not to visitors or partners); the date has
     #: date_stated for the same.
     assumed: list[str] = Field(default_factory=list)
+    #: The demo's folder sits in its library's _Archive folder (A8, 2026-10-28).
+    sharepoint_archived: bool = False
     #: Set on the response for a partner on a partner-restricted demo: the
     #: files are listed without the ids that open or download them.
     files_locked: bool = False

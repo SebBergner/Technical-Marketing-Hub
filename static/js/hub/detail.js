@@ -1669,29 +1669,51 @@ function stillCurrentRow(asset) {
   return r.row;
 }
 
+/* Archive (A8, 2026-10-28): a SharePoint demo's folder moves into its
+   library's _Archive, which only the team can open; anything else leaves
+   the Hub's lists only. "Archive content" decides who may. */
+function inSharePoint(asset) {
+  return (asset.source || "sharepoint") === "sharepoint" && asset.id.indexOf("page-") !== 0
+    && ["video", "ldk", "vdk"].indexOf(asset.type) >= 0;
+}
+
 function archiveRow(asset) {
   var r = manageRow("Archive");
+  var moves = inSharePoint(asset);
   setState(r.state, asset.archived ? "Archived" : "Listed", asset.archived
     ? "Out of the Hub's lists and search" + (asset.archived_at ? " since " + onDay(asset.archived_at) : "")
-      + ". SharePoint is unchanged."
+      + (asset.sharepoint_archived ? ". Its folder is in SharePoint's _Archive."
+         : moves ? ". Its folder is still where it was in SharePoint (archived before _Archive)."
+         : ".")
     : "In the Hub's lists and search.");
   var url = "/api/assets/" + encodeURIComponent(asset.id) + "/archive";
   var apply = function (on, reason) {
     return send("PUT", url, { archived: on, reason: reason || null }).then(function (d) {
       asset.archived = d.archived;
       asset.archived_at = d.archived ? new Date().toISOString() : null;
+      if (moves) asset.sharepoint_archived = d.archived;
       refreshMarks(asset);
+      renderManage(asset);
     });
   };
   var b = manageButton(asset.archived ? "Restore" : "Archive");
   b.addEventListener("click", function () {
     if (asset.archived) {
       b.disabled = true;
-      apply(false).catch(function (e) { b.disabled = false; report(e.message, true); });
+      b.textContent = moves && asset.sharepoint_archived ? "Moving back…" : "Restoring…";
+      apply(false).catch(function (e) {
+        b.disabled = false;
+        b.textContent = "Restore";
+        report(e.message, true);
+      });
       return;
     }
     confirmStep(r.row, {
-      lead: "It leaves the Hub's lists and search; SharePoint is not changed. Restore any time.",
+      lead: moves
+        ? "Its folder moves into SharePoint's _Archive, which only the team can open, and it "
+          + "leaves the Hub's lists and search. Checking permissions first can take a moment. "
+          + "Restore moves it back."
+        : "It leaves the Hub's lists and search; nothing is moved. Restore any time.",
       placeholder: "Reason (optional, kept in the log)",
       confirm: "Archive",
       submit: function (reason) { return apply(true, reason); }
@@ -1807,8 +1829,11 @@ function renderManage(asset) {
     granted = granted || [];
     var may = { manage: granted.indexOf("manage_content_access") >= 0,
                 ask: granted.indexOf("request_content_access") >= 0,
-                review: granted.indexOf("review_content") >= 0 };
-    if (detailAsset !== asset || (!may.manage && !may.ask && !may.review)) return null;
+                review: granted.indexOf("review_content") >= 0,
+                archive: granted.indexOf("archive_content") >= 0 };
+    if (detailAsset !== asset || (!may.manage && !may.ask && !may.review && !may.archive)) {
+      return null;
+    }
     var requests = (may.manage || may.ask)
       ? fetch("/api/assets/" + encodeURIComponent(asset.id) + "/access-requests")
           .then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
@@ -1830,7 +1855,7 @@ function renderManage(asset) {
       if (may.review && (asset.uploaded_at || asset.still_current_until)) {
         pane.appendChild(stillCurrentRow(asset));
       }
-      if (may.review) pane.appendChild(archiveRow(asset));
+      if (may.archive) pane.appendChild(archiveRow(asset));
       var tab = card.querySelector('.hub-sidetabs__tab[data-pane="manage"]');
       var waiting = !!(view && view.pending && may.manage)
         || !!(uploadRecord && uploadRecord.status === "pending");

@@ -63,10 +63,12 @@ def test_see_archived_content_opens_it_and_lists_it_on_request(client):
         "asking is not enough without the permission"
 
 
-def test_archiving_needs_review_content_and_restores(client):
+def test_archiving_needs_archive_content_and_restores(client):
+    """Its own permission since 2026-10-28; Review content no longer archives."""
+    access.update_group(EMPLOYEES, "a", permissions=["view_hub", "review_content"])
     assert client.put("/api/assets/dusty/archive", json={"archived": True},
                       headers=STAFF).status_code == 403
-    access.update_group(EMPLOYEES, "a", permissions=["view_hub", "review_content"])
+    access.update_group(EMPLOYEES, "a", permissions=["view_hub", "archive_content"])
     assert client.put("/api/assets/dusty/archive", json={"archived": True},
                       headers=STAFF).status_code == 200
     client.put("/api/assets/dusty/archive", json={"archived": False}, headers=STAFF)

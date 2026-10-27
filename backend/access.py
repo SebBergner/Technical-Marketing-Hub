@@ -73,6 +73,7 @@ class Perm(str, Enum):
     MANAGE_ACCESS = "manage_content_access"
     REQUEST_ACCESS = "request_content_access"
     REVIEW_CONTENT = "review_content"
+    ARCHIVE = "archive_content"
     VIEW_ARCHIVED = "view_archived"
     VIEW_REPORTS = "view_reports"
     RUN_SYNC = "run_sync"
@@ -103,8 +104,12 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
     (Perm.MANAGE_HOME, "Manage the Home page",
      "Choose Featured demos and switch the Hub's display options."),
     (Perm.REVIEW_CONTENT, "Review content",
-     "Mark demos Still current (the interface shown matches today's release), "
-     "archive or restore them, and work through the content-review list."),
+     "Mark demos Still current (the interface shown matches today's release) "
+     "and work through the content-review list."),
+    (Perm.ARCHIVE, "Archive content",
+     "Archive a demo or restore it. A SharePoint demo's folder moves into its "
+     "library's _Archive folder, which only the team can open. Never given to "
+     "partner (guest) accounts."),
     (Perm.VIEW_REPORTS, "View Hub activity",
      "See the Hub activity page: the most used content, the most active PTC "
      "people and team totals. Never partners' names."),
@@ -137,7 +142,12 @@ _ADMIN_ONLY = frozenset({Perm.VIEW_ADMIN.value, Perm.MANAGE_USERS.value})
 #: Internal or upload into PTC's libraries (2026-10-15). Their other
 #: permissions are unaffected.
 PARTNER_NEVER = _ADMIN_ONLY | {Perm.REQUEST_ACCESS.value, Perm.UPLOAD.value,
-                               Perm.PUBLISH_DIRECT.value}
+                               Perm.PUBLISH_DIRECT.value, Perm.ARCHIVE.value}
+
+#: A permission new to a saved access.json goes, once, to these Hub groups by
+#: name as well as to Administrators (Liwei, 2026-10-28: Archive content for
+#: TDD Team). Removed afterwards, it stays removed (`catalogue`).
+INTRODUCED_FOR = {Perm.ARCHIVE.value: {"tdd team"}}
 
 _EMPLOYEE_DEFAULT = [Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD, Perm.INTERNAL,
                      Perm.CREATE_DEMO, Perm.VIEW_REPORTS, Perm.REQUEST_ACCESS]
@@ -219,6 +229,9 @@ def _normalise(state: dict) -> dict:
     for g in groups:
         if g["id"] in by_id:
             g.update(builtin=False, auto=None)
+            name = (g.get("name") or "").strip().lower()
+            g["permissions"] = list(g.get("permissions") or []) + [
+                p for p, names in INTRODUCED_FOR.items() if p not in known and name in names]
             out.append(g)
     for g in out:
         g["permissions"] = _clean_perms(g.get("permissions"))

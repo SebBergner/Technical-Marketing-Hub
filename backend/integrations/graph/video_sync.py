@@ -180,6 +180,8 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], VideoSyncResult]:
         stated[name] = (m.as_bool(_field(fields, "customer_facing")),
                         m.as_bool(_field(fields, "has_audio")),
                         bool(_field(fields, "language")))
+        if item.get("hub_archived"):
+            asset["sharepoint_archived"] = True     # in _Archive (sync.lift_archive)
         assets[name] = asset
 
     for item in items:
@@ -256,7 +258,9 @@ def sync_videos(client: GraphClient, repo, site: SiteRef | None = None,
     # Ticked PreviewVideo files lead, as in the Demo Catalog (sync.py).
     from backend.integrations.graph.sync import mark_flags
     items, _, _ = mark_flags(client, site.site_id, drive.drive_id, page.items)
-    assets, result = build_assets(_with_fields(client, drive, items))
+    from backend.integrations.graph.sync import lift_archive
+    items, archive_id = lift_archive(items)
+    assets, result = build_assets(_with_fields(client, drive, items, archive_id))
     result.library = library
     add_posters(assets, result,
                 brightcove if brightcove is not None else get_brightcove_client())

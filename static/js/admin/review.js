@@ -18,6 +18,18 @@ function canReviewContent() {
   return (session.permissions || []).indexOf("review_content") >= 0;
 }
 
+/* Archive and Restore are "Archive content" since 2026-10-28 (A8). */
+function canArchive() {
+  return (session.permissions || []).indexOf("archive_content") >= 0;
+}
+
+/* Where an archived demo is (A8): moved into SharePoint's _Archive, kept
+   where it was (archived in the Hub before _Archive existed -- to move by
+   hand), or not a SharePoint folder at all. */
+var WHERE = { sharepoint: "folder in _Archive",
+              hub_only: "only hidden in the Hub — folder not moved yet",
+              hub: "hidden in the Hub (not a SharePoint folder)" };
+
 /* Uploads through the Hub waiting for review (2026-10-15): listed nowhere
  * else until published. Opening the demo shows its files; Publish and Send
  * back are here and on the demo's Manage tab. */
@@ -206,7 +218,8 @@ function reviewTable(rows, status, opts) {
       act.appendChild(keep);
       var arch = el("button", "btn-small", "Archive");
       arch.type = "button";
-      arch.title = "Take it out of the Hub's lists. SharePoint is not changed.";
+      arch.hidden = !canArchive();
+      arch.title = "Out of the Hub's lists; a SharePoint demo's folder moves into _Archive.";
       arch.addEventListener("click", function () {
         // Asked in place, with an optional reason (window.prompt is
         // suppressed in some browsers, as window.confirm was).
@@ -283,12 +296,14 @@ function renderReview(d) {
       info.appendChild(demoLink(a.asset_id, a.title));
       info.appendChild(el("div", "promo-row__meta",
         [TYPE_WORD[a.type] || a.type,
-         "archived " + new Date(a.at).toLocaleDateString()
-           + (a.by ? " by " + a.by.replace(/^(user|dev):/, "") : ""),
+         a.at ? "archived " + new Date(a.at).toLocaleDateString()
+           + (a.by ? " by " + a.by.replace(/^(user|dev):/, "") : "") : "moved in SharePoint",
+         WHERE[a.where] || "",
          a.reason ? "“" + a.reason + "”" : ""].filter(Boolean).join(" · ")));
+      if (a.where === "hub_only") r.classList.add("rv-hub-only");
       r.appendChild(info);
       var acts = el("div", "promo-row__actions");
-      if (canReviewContent()) {
+      if (canArchive()) {
         var restore = el("button", null, "Restore");
         restore.type = "button";
         restore.addEventListener("click", function () {
@@ -301,9 +316,13 @@ function renderReview(d) {
       arch.appendChild(r);
     });
   }
+  var hubOnly = d.archived.filter(function (a) { return a.where === "hub_only"; }).length;
   reviewSection(host, "Archived", d.archived.length,
-    "Out of every list and search in the Hub; still in SharePoint and Consensus. "
-    + "People with “See archived content” can still open them.", arch);
+    "Out of every list and search in the Hub. A SharePoint demo archived since 2026-10-28 has "
+    + "its folder in the library's _Archive, which only the team can open"
+    + (hubOnly ? "; " + hubOnly + " archived before that still have their folder where it was "
+       + "(to move by hand: Restore, then Archive)" : "")
+    + ". People with “See archived content” can still open them.", arch);
   host.appendChild(status);
   if (!canReviewContent()) {
     host.appendChild(el("p", "faint", "Viewing only: acting on these needs the "

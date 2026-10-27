@@ -547,11 +547,43 @@ class ArchiveIn(BaseModel):
 
 @router.put("/{asset_id}/archive")
 def set_archived(asset_id: str, body: ArchiveIn, repo: AssetRepository = Depends(get_repo),
-                 actor: str = Depends(require_perm(Perm.REVIEW_CONTENT))):
-    """Archive a demo in the Hub, or restore it (2026-10-14). Hub-only:
-    nothing is deleted or moved in SharePoint or Consensus."""
+                 actor: str = Depends(require_perm(Perm.ARCHIVE))):
+    """Archive a demo or restore it ("Archive content", 2026-10-28).
+
+    A demo kit or video in SharePoint: its folder moves into the library's
+    _Archive folder, or back (services/archive.py) -- refused when part of it
+    has permissions of its own. Anything else (Consensus, a page-only demo):
+    in the Hub only, as before. Nothing is deleted anywhere."""
+    from backend.services import archive as ar
+    from backend.services import metadata_edit as me
+    asset = repo.get(asset_id)
+    if asset is None:
+        raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
     try:
-        result = repo.set_archived(asset_id, body.archived, actor, body.reason)
+        key = me.target_key(asset.model_dump(mode="json"))
+    except me.NotEditable:
+        key = None
+    moved = None
+    if key and body.archived != asset.sharepoint_archived:
+        from backend.routers.uploads import _client, _target, _sync_soon
+        client = _client()
+        target = _target(client, key)
+        try:
+            if body.archived:
+                ar.archive(client, target.drive_id, asset.source_item_id)
+            else:
+                ar.restore(client, target.drive_id, asset.source_item_id)
+        except ar.ArchiveRefused as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        except GraphError as exc:
+            raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
+        moved = body.archived
+        # Seen at once; the sync this starts confirms it.
+        me.remember(repo, asset_id, {"sharepoint_archived": body.archived})
+        _sync_soon(repo, actor)
+    try:
+        result = repo.set_archived(asset_id, body.archived, actor, body.reason,
+                                   in_sharepoint=moved if key else None)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
     except NotImplementedError:

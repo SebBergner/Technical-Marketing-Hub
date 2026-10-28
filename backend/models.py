@@ -495,6 +495,12 @@ class AssetSummary(AssetBase):
     """What list endpoints return — no Value Roadmap, which is large."""
 
 
+class RelatedDemo(AssetSummary):
+    """One of a demo's related demos (A13). `picked`: chosen by someone with
+    Edit metadata rather than found by the scorer -- shown first, unmarked."""
+    picked: bool = False
+
+
 class Asset(AssetBase):
     """Full detail, including the derived index."""
     value_roadmap: ValueRoadmap | None = None

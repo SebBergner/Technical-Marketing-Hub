@@ -332,18 +332,73 @@ def _asset_drive(client: GraphClient, asset_id: str):
     return drive
 
 
-@router.get("/{asset_id}/related", response_model=list[AssetSummary])
+@router.get("/{asset_id}/related")
 def related(asset_id: str, limit: int = Query(default=6, ge=1, le=24),
-            repo: AssetRepository = Depends(get_repo)):
+            repo: AssetRepository = Depends(get_repo),
+            user: CurrentUser = Depends(get_current_user)):
     """"You may also need" under a demo's page (A13, Summit; six, Liwei
-    2026-10-28). The same demos anyone can list, so nothing to lock."""
+    2026-10-28). The same demos anyone can list, so nothing to lock.
+
+    `items`: picked by hand first (`picked`), then found. `not_related`:
+    what was marked Not related on this page, so it can be let back -- only
+    for someone with Edit metadata, who alone may change either."""
     try:
         items = repo.related(asset_id, limit)
+        if items is None:
+            raise HTTPException(status_code=404, detail="Asset not found")
+        hidden = []
+        if user.can(Perm.EDIT_METADATA):
+            for other_id, mark in repo.not_related(asset_id).items():
+                other = repo.get(other_id)
+                if other is not None:
+                    hidden.append({"id": other_id, "title": other.title, **mark})
     except NotImplementedError:
         raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
-    if items is None:
-        raise HTTPException(status_code=404, detail="Asset not found")
-    return items
+    return {"items": [i.model_dump(mode="json") for i in items], "not_related": hidden}
+
+
+# Picked by hand on a demo's page (Liwei, 2026-10-28): Edit metadata, no
+# review, in the Admin log. A pick shows on both demos' pages; Not related
+# keeps the scorer from offering a demo on this page only.
+@router.put("/{asset_id}/related/{other_id}")
+def add_related(asset_id: str, other_id: str, repo: AssetRepository = Depends(get_repo),
+                actor: str = Depends(require_perm(Perm.EDIT_METADATA))):
+    try:
+        return {"picked": repo.add_related_pick(asset_id, other_id, actor)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"no asset with id '{exc.args[0]}'")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+
+
+@router.delete("/{asset_id}/related/{other_id}")
+def remove_related(asset_id: str, other_id: str, repo: AssetRepository = Depends(get_repo),
+                   actor: str = Depends(require_perm(Perm.EDIT_METADATA))):
+    try:
+        return {"picked": repo.remove_related_pick(asset_id, other_id)}
+    except KeyError:
+        raise HTTPException(status_code=404, detail="That demo was not picked here.")
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+
+
+class NotRelatedIn(BaseModel):
+    not_related: bool
+
+
+@router.put("/{asset_id}/not-related/{other_id}")
+def mark_not_related(asset_id: str, other_id: str, body: NotRelatedIn,
+                     repo: AssetRepository = Depends(get_repo),
+                     actor: str = Depends(require_perm(Perm.EDIT_METADATA))):
+    try:
+        return {"not_related": sorted(repo.set_not_related(asset_id, other_id,
+                                                           body.not_related, actor))}
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
 
 
 @router.get("/{asset_id}/thumbnail")

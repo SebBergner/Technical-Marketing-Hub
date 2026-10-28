@@ -13,7 +13,7 @@ from typing import Literal
 
 from backend.models import (
     AdvancedSearchHit, Asset, AssetRequest, AssetSummary, Facets, MetadataProposal, Page,
-    ProposalSummary,
+    ProposalSummary, RelatedDemo,
 )
 
 #: "relevance" degrades to "recent" when there is no search text, so it is one
@@ -144,9 +144,25 @@ class AssetRepository(ABC):
         """
         raise NotImplementedError
 
-    def related(self, asset_id: str, limit: int = 6) -> list[AssetSummary] | None:
-        """Demos like this one, for its page (A13, Summit). None when the
-        demo is unknown. Only the file-backed repository implements it."""
+    def related(self, asset_id: str, limit: int = 6) -> list[RelatedDemo] | None:
+        """Demos like this one, for its page (A13, Summit): picked by hand
+        first, then found. None when the demo is unknown. Only the
+        file-backed repository implements this and the picks below."""
+        raise NotImplementedError
+
+    def related_picks(self, asset_id: str) -> list[str]:
+        raise NotImplementedError
+
+    def not_related(self, asset_id: str) -> dict[str, dict]:
+        raise NotImplementedError
+
+    def add_related_pick(self, asset_id: str, other_id: str, actor: str) -> list[str]:
+        raise NotImplementedError
+
+    def remove_related_pick(self, asset_id: str, other_id: str) -> list[str]:
+        raise NotImplementedError
+
+    def set_not_related(self, asset_id: str, other_id: str, on: bool, actor: str) -> dict:
         raise NotImplementedError
 
     @abstractmethod

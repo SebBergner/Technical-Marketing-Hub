@@ -71,6 +71,9 @@ ACTIONS: dict[tuple[str, str], str] = {
     ("PUT", "/api/assets/{asset_id}/preview-video"): "Chose a demo's preview video",
     ("PUT", "/api/assets/{asset_id}/thumbnail"): "Chose a demo's picture",
     ("DELETE", "/api/assets/{asset_id}/thumbnail"): "Reset a demo's picture",
+    ("PUT", "/api/assets/{asset_id}/related/{other_id}"): "Picked a related demo",
+    ("DELETE", "/api/assets/{asset_id}/related/{other_id}"): "Removed a picked related demo",
+    ("PUT", "/api/assets/{asset_id}/not-related/{other_id}"): "Marked or unmarked a demo Not related",
     ("POST", "/api/graph/sync"): "Ran the SharePoint sync",
     ("POST", "/api/graph/writeback"): "Wrote metadata back to SharePoint",
     ("POST", "/api/consensus/sync"): "Ran the Consensus sync",
@@ -87,6 +90,7 @@ _LOGGED_READS = {route for (method, route) in ACTIONS if method == "GET"}
 WATCHED = re.compile(r"^/api/(admin|graph|consensus/(sync|oauth)|curation/proposals|migration)/"
                      r"|^/api/assets/[^/]+/(access|still-current|archive"
                      r"|metadata|preview-video|thumbnail)$"
+                     r"|^/api/assets/[^/]+/(related|not-related)/[^/]+$"
                      r"|^/api/assets/[^/]+/access-requests(/|$)"
                      r"|^/api/uploads(/|$)")
 
@@ -104,7 +108,8 @@ CATEGORIES: list[tuple[str, re.Pattern]] = [
     ("Home page", re.compile(r"^/api/admin/(promoted|hub-settings)$")),
     ("Sync", re.compile(r"^/api/(graph/sync|consensus/(sync|oauth)|admin/auto-sync)")),
     ("Metadata", re.compile(r"^/api/(graph/writeback|curation/)"
-                            r"|^/api/assets/[^/]+/(metadata|preview-video|thumbnail)$")),
+                            r"|^/api/assets/[^/]+/(metadata|preview-video|thumbnail)$"
+                            r"|^/api/assets/[^/]+/(related|not-related)/[^/]+$")),
     ("Migration", re.compile(r"^/api/migration/")),
     ("Reports", re.compile(r"^/api/admin/report-owners")),
     ("Usage data", re.compile(r"^/api/admin/(activity/person|admin-log)")),

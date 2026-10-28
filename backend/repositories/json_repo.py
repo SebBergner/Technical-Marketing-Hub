@@ -42,7 +42,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from backend.models import (
     AdvancedSearchHit, Asset, AssetRequest, AssetStats, AssetSummary, AssetType, Capability, Facets, FacetValue, MetadataProposal,
-    Page, ProposalState, ProposalSummary, ValueRoadmap, video_type,
+    Page, ProposalState, ProposalSummary, RelatedDemo, ValueRoadmap, video_type,
 )
 from backend.repositories.base import AssetQuery, AssetRepository
 from backend.services import content_age, listing, relevance, taxonomy, thumbnails
@@ -60,6 +60,8 @@ _FALLBACK_SOURCE = "seed"
 #: shared family alone outranks segment + type, and each further family shared
 #: adds one. Ties go to the same language, then views, then recency.
 RELATED_WEIGHTS = {"family": 4, "segment": 2, "type": 1}
+#: Picked by hand on one page, at most: the six places the section shows.
+RELATED_PICKS_MAX = 6
 
 #: The table view's sortable columns (Serge, 2026-10-23): what each sorts by.
 #: None for a row with nothing there, which _by_column keeps last.
@@ -879,13 +881,18 @@ class JsonAssetRepository(AssetRepository):
             total=len(hits), limit=query.limit, offset=query.offset,
         )
 
-    def related(self, asset_id: str, limit: int = 6) -> list[AssetSummary] | None:
-        """Demos like this one (A13, Summit): sharing product families (the
-        more the better), a segment, a type -- in that order of weight --
-        then, among equals, the same language, the most viewed, the newest.
-        Through `_rows()`, so nothing archived, hidden,
-        divested or superseded is offered. A demo sharing neither a product
-        family nor a segment is not related, however similar its type."""
+    def related(self, asset_id: str, limit: int = 6) -> list[RelatedDemo] | None:
+        """Demos like this one (A13, Summit).
+
+        First the ones picked by hand (Liwei, 2026-10-28), in the order they
+        were added -- all of them, even past `limit`. Then the scorer's,
+        filling up to `limit`: sharing product families (the more the
+        better), a segment, a type -- in that order of weight -- then, among
+        equals, the same language, the most viewed, the newest. A demo
+        sharing neither a product family nor a segment is not related,
+        however similar its type; one marked Not related on this page is
+        never offered here. Through `_rows()`, so nothing archived, hidden,
+        divested or superseded is offered, picked or not."""
         base = next((r for r in self._load_mirror() if r["id"] == asset_id), None)
         if base is None:
             return None
@@ -893,10 +900,13 @@ class JsonAssetRepository(AssetRepository):
         segment, kind = base.get("segment"), base.get("type")
         language = base.get("language") or "en"
         stats = self._load("stats")
+        listed = {r["id"]: r for r in self._rows(AssetQuery())}
+        picked = [listed[i] for i in self.related_picks(asset_id) if i in listed]
+        skip = {asset_id} | {r["id"] for r in picked} | set(self.not_related(asset_id))
 
         scored = []
-        for record in self._rows(AssetQuery()):
-            if record["id"] == asset_id:
+        for record in listed.values():
+            if record["id"] in skip:
                 continue
             score = 0
             shared = len(families & set(taxonomy.families_of(record.get("products"))))
@@ -918,9 +928,84 @@ class JsonAssetRepository(AssetRepository):
                             _as_date(record.get("uploaded_at")) or date.min), record))
 
         scored.sort(key=lambda s: s[0], reverse=True)
+        found = [r for _, r in scored[:max(0, limit - len(picked))]]
         indexed = set(self._load("roadmap"))
-        return [AssetSummary(**self._common(r, stats), has_roadmap=r["id"] in indexed)
-                for _, r in scored[:limit]]
+        return [RelatedDemo(**self._common(r, stats), has_roadmap=r["id"] in indexed,
+                            picked=i < len(picked))
+                for i, r in enumerate(picked + found)]
+
+    # ─────────────────────────────────────────── related demos by hand
+    # owned/related_picks.json (Liwei, 2026-10-28):
+    #   {"pairs": [{"ids": [a, b], "by": ..., "at": ...}, ...],   both ways
+    #    "not_related": {page id: {other id: {"by": ..., "at": ...}}}}  one page
+    def _related_state(self) -> dict:
+        state = self._load("related_picks") or {}
+        state.setdefault("pairs", [])
+        state.setdefault("not_related", {})
+        return state
+
+    def related_picks(self, asset_id: str) -> list[str]:
+        """The demos picked as related to this one, oldest pick first. A
+        pick shows on both demos' pages."""
+        return [next(i for i in p["ids"] if i != asset_id)
+                for p in self._related_state()["pairs"] if asset_id in p["ids"]]
+
+    def not_related(self, asset_id: str) -> dict[str, dict]:
+        """{other id: who and when} marked Not related on this demo's page."""
+        return dict(self._related_state()["not_related"].get(asset_id) or {})
+
+    def add_related_pick(self, asset_id: str, other_id: str, actor: str) -> list[str]:
+        """Pick `other_id` as related to `asset_id`, and so the reverse.
+        KeyError for an unknown demo; ValueError for the demo itself, a
+        pair already there, or a page that already has RELATED_PICKS_MAX."""
+        if asset_id == other_id:
+            raise ValueError("A demo cannot be related to itself.")
+        for i in (asset_id, other_id):
+            if self.get(i) is None:
+                raise KeyError(i)
+        with self._lock:
+            state = self._related_state()
+            mine = [p for p in state["pairs"] if asset_id in p["ids"]]
+            if any(other_id in p["ids"] for p in mine):
+                raise ValueError("That demo is already recommended here.")
+            if len(mine) >= RELATED_PICKS_MAX:
+                raise ValueError(f"This demo already has {RELATED_PICKS_MAX} picked; "
+                                 "remove one first.")
+            state["pairs"].append({"ids": [asset_id, other_id], "by": actor,
+                                   "at": utcnow().isoformat(timespec="seconds")})
+            # A pick overrides an earlier Not related, on either page.
+            for page, other in ((asset_id, other_id), (other_id, asset_id)):
+                (state["not_related"].get(page) or {}).pop(other, None)
+            self._save("related_picks", state)
+        return self.related_picks(asset_id)
+
+    def remove_related_pick(self, asset_id: str, other_id: str) -> list[str]:
+        """Undo a pick, from both pages. KeyError if there was none."""
+        with self._lock:
+            state = self._related_state()
+            kept = [p for p in state["pairs"] if set(p["ids"]) != {asset_id, other_id}]
+            if len(kept) == len(state["pairs"]):
+                raise KeyError(other_id)
+            state["pairs"] = kept
+            self._save("related_picks", state)
+        return self.related_picks(asset_id)
+
+    def set_not_related(self, asset_id: str, other_id: str, on: bool, actor: str) -> dict:
+        """Keep the scorer from offering `other_id` on `asset_id`'s page --
+        that page only -- or let it again."""
+        if self.get(asset_id) is None:
+            raise KeyError(asset_id)
+        with self._lock:
+            state = self._related_state()
+            page = state["not_related"].setdefault(asset_id, {})
+            if on:
+                page[other_id] = {"by": actor, "at": utcnow().isoformat(timespec="seconds")}
+            else:
+                page.pop(other_id, None)
+            if not page:
+                state["not_related"].pop(asset_id, None)
+            self._save("related_picks", state)
+        return self.not_related(asset_id)
 
     def thumbnail_source(self, asset_id: str) -> str | None:
         """The asset's own thumbnail address, before public_url() rewrites a

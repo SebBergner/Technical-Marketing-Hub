@@ -336,6 +336,10 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - **进度（10/28 本地完成，待推送 staging）**：demo 页底部 "Related demos"，`/api/assets/{id}/related`。打分：共有产品族 4 分（每多共有一个族再加 1）、
   同 segment 2 分、同类型 1 分；既不同族也不同 segment 的不算相关。同分时同语言优先（否则同一视频的日语、意大利语版会占位置），
   再按浏览量、发布日期。归档、隐藏、旧版 VM 不会出现。
+- **手动推荐（Liwei 10/28 加，本地完成，待推送）**：有 Edit metadata 权限的人在 Related demos 右上角点 "Add"，按名字搜索后添加；
+  手动挑的排在最前面、不加标签，剩下的位置由自动推荐补满 6 个。双向：A 推荐了 B，B 的页面也显示 A。每页最多手动挑 6 个。
+  手动挑的卡片底部有 "Remove"（两边同时去掉）；自动推荐的有 "Not related"（只对这一页，下方列出可 Undo）。
+  存在 Hub 自己的数据（owned/related_picks.json），每次改动记进 Admin log（Metadata）。
 
 ### A14. 显示数据更新时间（Summit，Liwei）
 - **来源**：Summit：Hub 每天从 SharePoint 同步两次，SharePoint 的改动最多约 12 小时后才出现；要说明清楚，

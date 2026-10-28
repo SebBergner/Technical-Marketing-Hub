@@ -1727,3 +1727,21 @@ textarea.hub-edit__input{resize:vertical}
 .hub-facts__assumed{margin-left:6px;font-size:11px;color:var(--orion-text-3);border:1px dashed var(--orion-border-md);border-radius:var(--orion-radius-pill);padding:0 6px;cursor:help}
 .hub-edit__assumed{font-size:11.5px;color:var(--orion-warn-ink);background:var(--orion-warn-bg);border-radius:var(--orion-radius-sm);padding:3px 7px}
 .hub-edit__assumed b{font-weight:600}
+
+/* Related demos (A13) and picking them by hand (2026-10-28). */
+.hub-related .section-head{align-items:center}
+.hub-related__add{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:12.5px;font-weight:600;color:var(--orion-text-2);background:var(--orion-surface);border:1px solid var(--orion-border-md);border-radius:var(--orion-radius-sm);padding:5px 10px;cursor:pointer}
+.hub-related__add:hover{background:var(--orion-surface-2);color:var(--orion-text)}
+.hub-related__pick{margin:0 0 14px;max-width:520px;display:grid;gap:6px}
+.hub-related__pick[hidden],.hub-related__marked[hidden]{display:none}
+.hub-related__q{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--orion-border-md);border-radius:var(--orion-radius-sm);background:var(--orion-surface);color:var(--orion-text)}
+.hub-related__hits{display:grid;gap:2px}
+.hub-related__hit{display:flex;justify-content:space-between;gap:12px;text-align:left;font:inherit;font-size:13px;color:var(--orion-text);background:none;border:none;border-radius:var(--orion-radius-sm);padding:6px 10px;cursor:pointer}
+.hub-related__hit:hover{background:var(--orion-surface-2)}
+.hub-related__hit small{color:var(--orion-text-3);white-space:nowrap}
+.hub-related__none{font-size:12.5px;color:var(--orion-text-3);padding:4px 10px}
+.hub-related__ctl{margin:0 12px 12px;align-self:flex-start;font:inherit;font-size:12px;color:var(--orion-text-3);background:none;border:none;padding:0;cursor:pointer}
+.hub-related__ctl:hover{color:var(--orion-text);text-decoration:underline}
+.hub-related__marked{margin-top:12px;font-size:12.5px;color:var(--orion-text-3)}
+.hub-related__undo{font:inherit;font-size:12.5px;color:var(--orion-indigo);background:none;border:none;padding:0;cursor:pointer}
+.hub-related__undo:hover{text-decoration:underline}

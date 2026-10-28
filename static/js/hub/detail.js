@@ -6,8 +6,8 @@
  * 2026-10-14; static/js/hub/main.js loads it. */
 
 import {
-  dateLabel, durationLabel, escapeHtml, fullDate, getJSON, LANGUAGE_LABEL, pill, report,
-  setText
+  dateLabel, debounce, durationLabel, escapeHtml, fullDate, getJSON, LANGUAGE_LABEL, pill,
+  report, setText
 } from "./util.js";
 import { hubPermissions } from "./permissions.js";
 import { editButton } from "./edit.js";
@@ -424,8 +424,14 @@ async function openAssetDetail(id, fileItemId) {
 /* "You may also need" at the foot of the page (A13, Summit): six demos
  * sharing this one's product family, segment or type -- the server ranks
  * them (JsonAssetRepository.related). Ordinary cards, so a click opens that
- * demo's page here. Absent when nothing is related; loaded after the page
- * shows, and dropped if the person has moved on to another demo by then. */
+ * demo's page here. Loaded after the page shows, and dropped if the person
+ * has moved on to another demo by then.
+ *
+ * Someone with Edit metadata may also pick demos by hand (Liwei,
+ * 2026-10-28): "Add" finds one by name; a pick shows first, unmarked, on
+ * both demos' pages and has Remove; a found one has Not related, which
+ * keeps it off this page only, and is listed under the cards to undo. For
+ * everyone else the section is absent when nothing is related. */
 function renderRelated(page, asset) {
   var section = document.getElementById("vpRelated");
   if (!section) {
@@ -437,19 +443,146 @@ function renderRelated(page, asset) {
       +   '<svg class="orion-ico ico-green"><use href="#i-layers"/></svg> Related demos'
       +   ' <span class="section-head__sub">same product, segment or type</span>'
       + '</div></div>'
-      + '<div class="asset-grid"></div>';
+      + '<div class="hub-related__pick" hidden></div>'
+      + '<div class="asset-grid"></div>'
+      + '<div class="hub-related__marked" hidden></div>';
     page.appendChild(section);
   }
   var grid = section.querySelector(".asset-grid");
   grid.innerHTML = "";
   section.style.display = "none";
-  getJSON("/api/assets/" + encodeURIComponent(asset.id) + "/related").then(function (items) {
-    if (!detailAsset || detailAsset.id !== asset.id || !items.length) return;
-    items.forEach(function (a) { grid.appendChild(buildCard(a)); });
-    section.style.display = "";
+  var head = section.querySelector(".section-head");
+  var oldAdd = head.querySelector(".hub-related__add");
+  if (oldAdd) oldAdd.remove();
+  section.querySelector(".hub-related__pick").hidden = true;
+  section.querySelector(".hub-related__marked").hidden = true;
+
+  var url = "/api/assets/" + encodeURIComponent(asset.id) + "/related";
+  Promise.all([getJSON(url), hubPermissions]).then(function (got) {
+    if (!detailAsset || detailAsset.id !== asset.id) return;
+    var data = got[0];
+    var editor = got[1].indexOf("edit_metadata") >= 0;
+    data.items.forEach(function (a) {
+      var card = buildCard(a);
+      if (editor) card.appendChild(relatedControl(asset, a, page));
+      grid.appendChild(card);
+    });
+    if (editor) {
+      head.appendChild(relatedAddButton(section, asset, data.items, page));
+      renderNotRelated(section, asset, data.not_related, page);
+    }
+    section.style.display = data.items.length || editor ? "" : "none";
   }).catch(function (err) {
     console.warn("[hub-api] related demos not loaded", err);
   });
+}
+
+/* Remove (a pick) or Not related (a found one), at the card's foot. */
+function relatedControl(asset, a, page) {
+  var b = document.createElement("button");
+  b.type = "button";
+  b.className = "hub-related__ctl";
+  b.textContent = a.picked ? "Remove" : "Not related";
+  b.title = a.picked
+    ? "Take this pick off both demos' pages"
+    : "Stop suggesting this demo here (this page only)";
+  b.addEventListener("click", function () {
+    b.disabled = true;
+    var base = "/api/assets/" + encodeURIComponent(asset.id);
+    var done = a.picked
+      ? send("DELETE", base + "/related/" + encodeURIComponent(a.id))
+      : send("PUT", base + "/not-related/" + encodeURIComponent(a.id), { not_related: true });
+    done.then(function () {
+      report(a.picked ? "Removed from related demos." : "Marked Not related on this page.");
+      renderRelated(page, asset);
+    }).catch(function (err) {
+      b.disabled = false;
+      report(err.message, true);
+    });
+  });
+  return b;
+}
+
+/* "Add": a name box; up to eight matching demos to pick from. */
+function relatedAddButton(section, asset, items, page) {
+  var add = document.createElement("button");
+  add.type = "button";
+  add.className = "hub-related__add";
+  add.innerHTML = '<svg class="orion-ico orion-ico--sm"><use href="#i-plus"/></svg>Add';
+  var box = section.querySelector(".hub-related__pick");
+  add.addEventListener("click", function () {
+    if (!box.hidden) { box.hidden = true; return; }
+    box.innerHTML = '<input type="search" class="hub-related__q" '
+      + 'placeholder="Find a demo by name" aria-label="Find a demo by name">'
+      + '<div class="hub-related__hits"></div>';
+    box.hidden = false;
+    var input = box.querySelector("input");
+    var hits = box.querySelector(".hub-related__hits");
+    var shown = {};
+    shown[asset.id] = true;
+    items.forEach(function (a) { if (a.picked) shown[a.id] = true; });
+    input.addEventListener("input", debounce(function () {
+      var q = input.value.trim();
+      hits.innerHTML = "";
+      if (q.length < 2) return;
+      getJSON("/api/assets?limit=8&q=" + encodeURIComponent(q)).then(function (page1) {
+        if (input.value.trim() !== q) return;
+        var found = page1.items.filter(function (a) { return !shown[a.id]; });
+        if (!found.length) {
+          hits.innerHTML = '<div class="hub-related__none">No other demo matches.</div>';
+          return;
+        }
+        found.forEach(function (a) {
+          var row = document.createElement("button");
+          row.type = "button";
+          row.className = "hub-related__hit";
+          row.innerHTML = '<span>' + escapeHtml(a.title) + '</span><small>'
+            + escapeHtml((TYPE_CHIP[a.type] || [])[1] || a.type || "") + '</small>';
+          row.addEventListener("click", function () {
+            row.disabled = true;
+            send("PUT", "/api/assets/" + encodeURIComponent(asset.id) + "/related/"
+                        + encodeURIComponent(a.id))
+              .then(function () {
+                report("Added to related demos, here and on its own page.");
+                renderRelated(page, asset);
+              })
+              .catch(function (err) { row.disabled = false; report(err.message, true); });
+          });
+          hits.appendChild(row);
+        });
+      }).catch(function (err) { report(err.message, true); });
+    }, 250));
+    input.focus();
+  });
+  return add;
+}
+
+/* What was marked Not related here, each with Undo. */
+function renderNotRelated(section, asset, marked, page) {
+  var box = section.querySelector(".hub-related__marked");
+  box.innerHTML = "";
+  if (!marked.length) return;
+  box.appendChild(document.createTextNode("Not related here: "));
+  marked.forEach(function (m, i) {
+    if (i) box.appendChild(document.createTextNode(" · "));
+    var name = document.createElement("span");
+    name.textContent = m.title + " ";
+    var undo = document.createElement("button");
+    undo.type = "button";
+    undo.className = "hub-related__undo";
+    undo.textContent = "Undo";
+    undo.title = "Marked by " + whoName(m.by) + (m.at ? " on " + onDay(m.at) : "");
+    undo.addEventListener("click", function () {
+      undo.disabled = true;
+      send("PUT", "/api/assets/" + encodeURIComponent(asset.id) + "/not-related/"
+                  + encodeURIComponent(m.id), { not_related: false })
+        .then(function () { renderRelated(page, asset); })
+        .catch(function (err) { undo.disabled = false; report(err.message, true); });
+    });
+    name.appendChild(undo);
+    box.appendChild(name);
+  });
+  box.hidden = false;
 }
 
 //: Where the details page's Back button goes when it was opened from

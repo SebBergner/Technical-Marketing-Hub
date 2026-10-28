@@ -1,6 +1,6 @@
 # Technical Marketing Hub — 待办清单
 
-更新于 2026-10-23（staging v2026.3.140）。来源：9/2–10/7 的会议笔记、管理层 10/02 的六项要求、
+更新于 2026-10-28（staging v2026.3.155；第 1–3 周已完成，第 3 周和"去掉审核"在本地、待推送）。来源：9/2–10/7 的会议笔记、管理层 10/02 的六项要求、
 Serge / Seb / Elio 的意见、2026-10-16 的全面代码扫描、FY27 Summit 的 Hub 讨论（10/20 那周）、
 Serge 10/23 的会议，以及常见内部内容门户的做法。
 
@@ -21,7 +21,7 @@ SharePoint 里的数据清理（kit 日期、Demo Type、标错的 LDK/VDK、旧
 | 第 1 周（10/27） | S3 卡片日期、S4 表格视图 + CSV 导出、S2 Dashboard；顺带 A14 同步时间、D12 Zscaler 提示、筛选写进链接（S6 的前提） |
 | 第 2 周（11/3） | A1 在 Details 卡片上编辑元数据（含 A4 Demo Owner、B5 第一步自动视频画面）、S1 邮件订阅、A11 product version 必填 |
 | 第 3 周（11/10） | A8 归档移入 _Archive、A6 复查过期 demo、A2 Report asset（含 Report owners） |
-| 第 4 周（11/17） | A9 View as、A3 我的 Hub（收藏、最近看过、播放列表）、A13 相关推荐、A12 申请表改进 |
+| 第 4 周（原定 11/17，10/28 起提前开始） | A13 相关推荐 → A12 申请表改进 → A3 我的 Hub（收藏、最近看过、播放列表）→ A9 View as（10/28 定的顺序：A9 最后做，用来检查 partner 看到的 My Hub） |
 | 随时插入 | S5 Value Roadmap 读取（等 Seb 的样例） |
 
 暂不排期：A5（优化）、A10 和 B6（模板和介绍编辑，未来）、S6 导航（不急）、C 类（等别人）。开放给 Marketing 之前，D1 备份和 D2 关掉共享密码登录由 Liwei 在 Portal 里完成。
@@ -193,6 +193,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   - **partner 的匿名**：按 Entra 对象 ID 存，不进任何报表；partner 建的列表分享出去时不显示创建者姓名。
 - **已定**（Liwei 10/23）：partner 也有我的 Hub：收藏、最近看过、播放列表和分享。
 - **要先定的事**：Partner 也要有吗？有的话按 Entra 对象 ID 存，不在任何报表里出现。
+- **已定**（Liwei 10/28）：星标放在卡片和 demo 页两处（表格视图加一列）；"最近看过" 保留 20 条。
 - **工作量**：2.5–3 天（收藏和最近看过 1–1.5 天；播放列表和分享约 1.5 天）。
 - **依赖**：无。
 
@@ -289,6 +290,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   端到端验证。日常用 View as，重要改动用测试账号。
 - **工作量**：约 1.5–2 天。
 - **10/26 备注**：不向 IT 申请测试账号。
+- **已定**（Liwei 10/28）：所有组都可以预览（Users & groups 里每个组都有这个按钮，以后新建的组也有）。
 
 ### A10. Create New Demo 模板（Summit，Liwei）
 - **来源**：Summit：创建 demo 时可以选模板，文件按 Scripts、Presentation deck、Videos、Documents、
@@ -320,6 +322,9 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
      以后可以用 AMP 做语义匹配。
   3. 提交权限已经由 Create demos 权限控制（不必新做）。
 - **团队定**：措辞和免责说明；排优先级的后台流程；定期汇总申请，看出反复出现的需求。
+- **已定**（Liwei 10/28）：改名为 "New asset inquiry"；表单顶部写 "Your inquiry goes into the team's queue. We review
+  inquiries regularly, but can't promise every asset will be made."；查重只提示：列出最多 5 个相似的 demo
+  （"这些是否已经满足需要？"），下面是 "No, submit anyway"，不强制确认。
 - **工作量**：改名和说明 1 小时；查重 1 天。
 
 ### A13. 相关推荐（Summit）
@@ -327,6 +332,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - **做法**：demo 页底部 "Related demos"：同产品、同 segment、同类型的 demo，按相似度和使用量排；
   有了 Value Roadmap 数据后加上"同一能力"。
 - **工作量**：1 天。可直接做。
+- **已定**（Liwei 10/28）：显示 6 个。
 
 ### A14. 显示数据更新时间（Summit，Liwei）
 - **来源**：Summit：Hub 每天从 SharePoint 同步两次，SharePoint 的改动最多约 12 小时后才出现；要说明清楚，

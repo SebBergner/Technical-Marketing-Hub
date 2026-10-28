@@ -12,7 +12,7 @@ import {
 import { hubPermissions } from "./permissions.js";
 import { editButton } from "./edit.js";
 import {
-  consensusUrl, embedInlinePlayer, paintCoverInto, previewUrl, renderAgeMark,
+  buildCard, consensusUrl, embedInlinePlayer, paintCoverInto, previewUrl, renderAgeMark,
   stopInlinePlayer, TYPE_CHIP, videoTypeOf
 } from "./cards.js";
 import { familyDisplayName, openTag } from "./nav.js";
@@ -171,6 +171,7 @@ async function openAssetDetail(id, fileItemId) {
   renderFileList(page, asset, fileItemId && tabOf(asset, fileItemId));
   renderVmCards(page, asset);
   settleSectionTabs(asset);
+  renderRelated(page, asset);
 
   var drivers = document.getElementById("vpValueDrivers");
   if (drivers) {
@@ -418,6 +419,37 @@ async function openAssetDetail(id, fileItemId) {
   var here = fileItemId ? fileHash(id, fileItemId) : "#/asset/" + encodeURIComponent(id);
   if (location.hash !== here) history.pushState(null, "", here);
   if (fileItemId) openFileById(asset, fileItemId);
+}
+
+/* "You may also need" at the foot of the page (A13, Summit): six demos
+ * sharing this one's product family, segment or type -- the server ranks
+ * them (JsonAssetRepository.related). Ordinary cards, so a click opens that
+ * demo's page here. Absent when nothing is related; loaded after the page
+ * shows, and dropped if the person has moved on to another demo by then. */
+function renderRelated(page, asset) {
+  var section = document.getElementById("vpRelated");
+  if (!section) {
+    section = document.createElement("div");
+    section.className = "section hub-related";
+    section.id = "vpRelated";
+    section.innerHTML =
+        '<div class="section-head"><div class="section-head__title">'
+      +   '<svg class="orion-ico ico-green"><use href="#i-layers"/></svg> Related demos'
+      +   ' <span class="section-head__sub">same product, segment or type</span>'
+      + '</div></div>'
+      + '<div class="asset-grid"></div>';
+    page.appendChild(section);
+  }
+  var grid = section.querySelector(".asset-grid");
+  grid.innerHTML = "";
+  section.style.display = "none";
+  getJSON("/api/assets/" + encodeURIComponent(asset.id) + "/related").then(function (items) {
+    if (!detailAsset || detailAsset.id !== asset.id || !items.length) return;
+    items.forEach(function (a) { grid.appendChild(buildCard(a)); });
+    section.style.display = "";
+  }).catch(function (err) {
+    console.warn("[hub-api] related demos not loaded", err);
+  });
 }
 
 //: Where the details page's Back button goes when it was opened from

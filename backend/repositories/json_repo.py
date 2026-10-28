@@ -55,6 +55,12 @@ log = logging.getLogger(__name__)
 #: beats it -- see _dedupe_by_id.
 _FALLBACK_SOURCE = "seed"
 
+#: What makes another demo related (A13): the product family matters most --
+#: someone on a Creo demo wants Creo -- then the segment, then the type: a
+#: shared family alone outranks segment + type, and each further family shared
+#: adds one. Ties go to the same language, then views, then recency.
+RELATED_WEIGHTS = {"family": 4, "segment": 2, "type": 1}
+
 #: The table view's sortable columns (Serge, 2026-10-23): what each sorts by.
 #: None for a row with nothing there, which _by_column keeps last.
 _COLUMNS = {
@@ -872,6 +878,49 @@ class JsonAssetRepository(AssetRepository):
                    for _, r, m, f in window],
             total=len(hits), limit=query.limit, offset=query.offset,
         )
+
+    def related(self, asset_id: str, limit: int = 6) -> list[AssetSummary] | None:
+        """Demos like this one (A13, Summit): sharing product families (the
+        more the better), a segment, a type -- in that order of weight --
+        then, among equals, the same language, the most viewed, the newest.
+        Through `_rows()`, so nothing archived, hidden,
+        divested or superseded is offered. A demo sharing neither a product
+        family nor a segment is not related, however similar its type."""
+        base = next((r for r in self._load_mirror() if r["id"] == asset_id), None)
+        if base is None:
+            return None
+        families = set(taxonomy.families_of(base.get("products")))
+        segment, kind = base.get("segment"), base.get("type")
+        language = base.get("language") or "en"
+        stats = self._load("stats")
+
+        scored = []
+        for record in self._rows(AssetQuery()):
+            if record["id"] == asset_id:
+                continue
+            score = 0
+            shared = len(families & set(taxonomy.families_of(record.get("products"))))
+            if shared:
+                # Bobcat's Engineering video shares Creo, Windchill and
+                # Codebeamer with E&HT's ADAS; a Windchill-only one, one.
+                score += RELATED_WEIGHTS["family"] + shared - 1
+            if segment and record.get("segment") == segment:
+                score += RELATED_WEIGHTS["segment"]
+            if not score:
+                continue
+            if kind and record.get("type") == kind:
+                score += RELATED_WEIGHTS["type"]
+            # Same language first among equals: otherwise the Japanese and
+            # Italian cuts of one spotlight take two of the six places.
+            same_language = (record.get("language") or "en") == language
+            views = (stats.get(record["id"]) or {}).get("views", 0)
+            scored.append(((score, same_language, views,
+                            _as_date(record.get("uploaded_at")) or date.min), record))
+
+        scored.sort(key=lambda s: s[0], reverse=True)
+        indexed = set(self._load("roadmap"))
+        return [AssetSummary(**self._common(r, stats), has_roadmap=r["id"] in indexed)
+                for _, r in scored[:limit]]
 
     def thumbnail_source(self, asset_id: str) -> str | None:
         """The asset's own thumbnail address, before public_url() rewrites a

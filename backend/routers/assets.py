@@ -332,6 +332,20 @@ def _asset_drive(client: GraphClient, asset_id: str):
     return drive
 
 
+@router.get("/{asset_id}/related", response_model=list[AssetSummary])
+def related(asset_id: str, limit: int = Query(default=6, ge=1, le=24),
+            repo: AssetRepository = Depends(get_repo)):
+    """"You may also need" under a demo's page (A13, Summit; six, Liwei
+    2026-10-28). The same demos anyone can list, so nothing to lock."""
+    try:
+        items = repo.related(asset_id, limit)
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+    if items is None:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return items
+
+
 @router.get("/{asset_id}/thumbnail")
 def asset_thumbnail(asset_id: str, repo: AssetRepository = Depends(get_repo),
                     user: CurrentUser = Depends(get_current_user)):

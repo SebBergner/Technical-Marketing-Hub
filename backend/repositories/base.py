@@ -144,6 +144,11 @@ class AssetRepository(ABC):
         """
         raise NotImplementedError
 
+    def related(self, asset_id: str, limit: int = 6) -> list[AssetSummary] | None:
+        """Demos like this one, for its page (A13, Summit). None when the
+        demo is unknown. Only the file-backed repository implements it."""
+        raise NotImplementedError
+
     @abstractmethod
     def save_request(self, request: "AssetRequest") -> None:
         """Append one intake submission.

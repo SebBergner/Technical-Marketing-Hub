@@ -333,6 +333,9 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   有了 Value Roadmap 数据后加上"同一能力"。
 - **工作量**：1 天。可直接做。
 - **已定**（Liwei 10/28）：显示 6 个。
+- **进度（10/28 本地完成，待推送 staging）**：demo 页底部 "Related demos"，`/api/assets/{id}/related`。打分：共有产品族 4 分（每多共有一个族再加 1）、
+  同 segment 2 分、同类型 1 分；既不同族也不同 segment 的不算相关。同分时同语言优先（否则同一视频的日语、意大利语版会占位置），
+  再按浏览量、发布日期。归档、隐藏、旧版 VM 不会出现。
 
 ### A14. 显示数据更新时间（Summit，Liwei）
 - **来源**：Summit：Hub 每天从 SharePoint 同步两次，SharePoint 的改动最多约 12 小时后才出现；要说明清楚，

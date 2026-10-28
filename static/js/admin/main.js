@@ -67,7 +67,14 @@ function showTab(name) {
     var on = t.dataset.tab === name;
     t.classList.toggle("tab--on", on);
     t.setAttribute("aria-selected", on ? "true" : "false");
+    // The page's title is the tab open (the menu is down the left, 2026-10-28).
+    if (on) $("pageTitle").textContent = t.textContent.trim();
   });
+  // A panel's first heading that only repeats the title goes; what sits
+  // beside it (Hub usage's period buttons) stays.
+  var first = $(PANELS[name]).querySelector("section .section-head h2");
+  if (first && first.textContent.trim().toLowerCase()
+      === $("pageTitle").textContent.toLowerCase()) first.hidden = true;
   if (name === "content" && !contentState.loaded) loadContent();
   if (name === "access") { loadAccess(); loadTokens(); }
   if (name === "internal") loadContentAccess();

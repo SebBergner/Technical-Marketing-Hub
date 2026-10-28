@@ -8,10 +8,10 @@
  *
  * The browser sends each file straight to SharePoint, in chunks, to an
  * upload URL the Hub opens for it; the Hub never handles the bytes. Then the
- * Hub writes the metadata and the demo waits for review: it is listed once
- * someone with Review content publishes it. "My uploads" shows where each
- * of the person's uploads stands, what a reviewer sent back, and continues
- * an interrupted one.
+ * Hub writes the metadata and the demo is published: there is no review
+ * (Liwei, 2026-10-28). "My uploads" shows where each of the person's uploads
+ * stands and continues an interrupted one; one sent back before review was
+ * removed can still be fixed, and is then published.
  *
  * Part of the Hub page's script; static/js/hub/main.js loads it. */
 
@@ -23,7 +23,7 @@ import { closeAdvancedSearch } from "./search.js";
 
 //: 32 x 320 KiB: Graph wants chunks in multiples of 320 KiB, under 60 MiB.
 var CHUNK = 32 * 320 * 1024;
-var STATUS_WORD = { uploading: "Uploading", pending: "Waiting for review",
+var STATUS_WORD = { uploading: "Uploading", pending: "Waiting (from before review was removed)",
                     sent_back: "Sent back", published: "Published", cancelled: "Cancelled" };
 
 var up = { platforms: null, targets: null, platform: null, target: null, kind: null,
@@ -90,7 +90,7 @@ function buildUploadPage() {
     + '<div class="vp-head"><div>'
     +   '<div class="vp-title">Create New Demo</div>'
     +   '<div class="orion-subtle">A video or a demo kit, with its metadata. '
-    +   'It appears in the Hub once a reviewer publishes it.</div>'
+    +   'It is published as soon as it is created.</div>'
     + '</div></div>'
     + '<div class="hub-up" id="hubUp"></div>';
   var anchor = document.getElementById("videoPreviewPage");
@@ -186,7 +186,7 @@ function loadMine() {
         right.appendChild(cont);
       }
       if (r.status === "sent_back") {
-        var fix = button("Fix and resubmit");
+        var fix = button("Fix and publish");
         fix.addEventListener("click", function () { resubmitForm(r); });
         right.appendChild(fix);
       }
@@ -749,11 +749,10 @@ function stepUpload(box) {
       var done = document.getElementById("hubUpWizard");
       done.innerHTML = "";
       var live = record.status === "published";
-      done.appendChild(el("h3", "hub-up__h", live ? "Created and published"
-                                                  : "Created — waiting for review"));
+      done.appendChild(el("h3", "hub-up__h", live ? "Created and published" : "Created"));
       done.appendChild(el("p", null, "“" + record.title + "” has been created. " + (live
         ? "It is published; it appears in the Hub within a minute or two."
-        : "It appears in the Hub once a reviewer publishes it; My demos shows where it stands.")));
+        : "My demos shows where it stands.")));
       // A14: what happens to edits made afterwards straight in SharePoint.
       done.appendChild(el("p", "hub-up__muted", "Changes made later directly in SharePoint "
         + "show up in the Hub after its next refresh from SharePoint (twice a day)."));
@@ -890,7 +889,7 @@ function continueUpload(record) {
     var progress = el("div", "hub-up__progress");
     box.appendChild(progress);
     sendAll(record, picked, progress).then(function () {
-      box.appendChild(el("p", null, "Done — waiting for review."));
+      box.appendChild(el("p", null, "Done — published."));
       loadMine();
     }).catch(function (e) {
       box.appendChild(el("p", "hub-up__err", e.message));
@@ -900,17 +899,18 @@ function continueUpload(record) {
   input.click();
 }
 
-/* Sent back: the same form, filled in, title fixed (it is the folder). */
+/* Sent back before review was removed (2026-10-28): the same form, filled
+ * in, title fixed (it is the folder); sending it publishes the demo. */
 function resubmitForm(record) {
   var target = (up.targets || []).filter(function (t) { return t.key === record.target; })[0];
   var box = document.getElementById("hubUpWizard");
   if (!target) { report("Upload options not loaded yet; try again.", true); return; }
   box.innerHTML = "";
-  box.appendChild(el("h3", "hub-up__h", "Fix and resubmit “" + record.title + "”"));
+  box.appendChild(el("h3", "hub-up__h", "Fix and publish “" + record.title + "”"));
   if (record.note) box.appendChild(el("div", "hub-up__note", "Reviewer: " + record.note));
   var values = JSON.parse(JSON.stringify(record.values || {}));
   var bar = el("div", "hub-up__bar");
-  var send = button("Resubmit for review", true);
+  var send = button("Save and publish", true);
   var cancel = button("Cancel");
   var msg = el("span", "hub-up__err");
   var refresh = function () {

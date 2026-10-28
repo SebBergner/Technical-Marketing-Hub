@@ -457,64 +457,21 @@ def set_access(asset_id: str, body: AccessIn, repo: AssetRepository = Depends(ge
     return result
 
 
-class AccessRequestIn(BaseModel):
-    level: str
-    reason: str
-
-
 def _requests_view(repo, asset_id: str, user) -> dict:
     from backend.services import access_requests
-    pending = access_requests.pending_for(repo, asset_id)
-    me = f"{'dev' if user.is_dev_principal else 'user'}:{user.email}"
-    return {"pending": pending,
+    return {"pending": access_requests.pending_for(repo, asset_id),
             "history": access_requests.listing(repo, asset_id=asset_id, limit=20),
-            "may_request": user.can(Perm.REQUEST_ACCESS),
-            "may_decide": user.can(Perm.MANAGE_ACCESS),
-            # Only whoever asked may withdraw (the same actor require_perm gives).
-            "may_withdraw": bool(pending) and pending["requested_by"] == me}
+            "may_decide": user.can(Perm.MANAGE_ACCESS)}
 
 
 @router.get("/{asset_id}/access-requests")
 def get_access_requests(asset_id: str, repo: AssetRepository = Depends(get_repo),
+                        actor: str = Depends(require_perm(Perm.MANAGE_ACCESS)),
                         user: CurrentUser = Depends(get_current_user)):
-    """A demo's requests to change its access, for its page (2026-10-15):
-    the one waiting, if any, and the last decided ones."""
-    if not (user.can(Perm.REQUEST_ACCESS) or user.can(Perm.MANAGE_ACCESS)):
-        raise HTTPException(status_code=403, detail="Not available for your account.")
-    return _requests_view(repo, asset_id, user)
-
-
-@router.post("/{asset_id}/access-requests", status_code=201)
-def request_access_change(asset_id: str, body: AccessRequestIn,
-                          repo: AssetRepository = Depends(get_repo),
-                          actor: str = Depends(require_perm(Perm.REQUEST_ACCESS)),
-                          user: CurrentUser = Depends(get_current_user)):
-    """Ask for a demo to be made Internal, or Open again, with a reason
-    (services/access_requests.py)."""
-    from backend.services import access_requests
-    asset = repo.get(asset_id)
-    if asset is None:
-        raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
-    try:
-        access_requests.create(repo, asset, body.level, body.reason, actor)
-    except access_requests.RequestError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    log.info("access change to %s requested for %s by %s", body.level, asset_id, actor)
-    return _requests_view(repo, asset_id, user)
-
-
-@router.post("/{asset_id}/access-requests/{request_id}/withdraw")
-def withdraw_access_request(asset_id: str, request_id: str,
-                            repo: AssetRepository = Depends(get_repo),
-                            actor: str = Depends(require_perm(Perm.REQUEST_ACCESS)),
-                            user: CurrentUser = Depends(get_current_user)):
-    from backend.services import access_requests
-    try:
-        access_requests.withdraw(repo, request_id, actor)
-    except LookupError:
-        raise HTTPException(status_code=404, detail="no such request")
-    except access_requests.RequestError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+    """A demo's requests to change its access (2026-10-15). Nobody asks this
+    way any more (Liwei, 2026-10-28: Report an issue instead); one left
+    waiting from before is decided on the demo's page or on Admin ->
+    Content access."""
     return _requests_view(repo, asset_id, user)
 
 

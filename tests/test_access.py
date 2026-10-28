@@ -31,8 +31,7 @@ def no_named_admins_or_curators(monkeypatch):
 def test_staff_partners_and_nobody_by_default():
     staff = person("someone@ptc.com").permissions
     assert {Perm(p) for p in staff} == {Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD,
-                                        Perm.INTERNAL, Perm.CREATE_DEMO, Perm.VIEW_REPORTS,
-                                        Perm.REQUEST_ACCESS}
+                                        Perm.INTERNAL, Perm.CREATE_DEMO, Perm.VIEW_REPORTS}
     partner = person("p@partner.it").permissions
     assert {Perm(p) for p in partner} == {Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD}
     assert ANONYMOUS.permissions == frozenset()
@@ -272,3 +271,21 @@ def test_a_new_default_reaches_groups_saved_before_it_but_not_a_removed_one(tmp_
     access._cache.clear()
     assert person("someone@ptc.com").permissions == frozenset({"view_hub"})
 
+
+
+def test_tdd_team_is_given_manage_content_access_once(tmp_path, monkeypatch):
+    """Liwei, 2026-10-28: with review removed, TDD Team marks demos Internal
+    or Open itself. Given once to a saved file's TDD Team; removed later, it
+    stays removed; other groups never get it."""
+    monkeypatch.setattr(access, "_owned", lambda name: str(tmp_path / name))
+    (tmp_path / "access.json").write_text(json.dumps({"catalogue": sorted(access.ALL), "groups": [
+        {"id": "tdd-team", "name": "TDD Team", "permissions": ["view_hub", "edit_metadata"],
+         "members": ["tdd@ptc.com"]},
+        {"id": "pm", "name": "Product managers", "permissions": ["view_hub"],
+         "members": ["pm@ptc.com"]}]}), encoding="utf-8")
+    access._cache.clear()
+    assert "manage_content_access" in person("tdd@ptc.com").permissions
+    assert "manage_content_access" not in person("pm@ptc.com").permissions
+    access.update_group("tdd-team", "a", permissions=["view_hub", "edit_metadata"])
+    access._cache.clear()
+    assert "manage_content_access" not in person("tdd@ptc.com").permissions

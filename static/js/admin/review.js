@@ -40,19 +40,20 @@ function loadUploads() {
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (items) {
       host.innerHTML = "";
-      if (!items) { host.hidden = true; return; }
+      // No review since 2026-10-28 (Liwei): what is listed here was waiting
+      // before, to publish by hand. Nothing left, nothing shown.
+      if (!items || !items.length) { host.hidden = true; return; }
       host.hidden = false;
       var pending = items.filter(function (u) { return u.status === "pending"; });
       var head = el("div", "card-head");
-      head.appendChild(el("h2", null, "New uploads"));
-      head.appendChild(el("span", "faint num", pending.length + " waiting"
+      head.appendChild(el("h2", null, "Uploads left from before review was removed"));
+      head.appendChild(el("span", "faint num", pending.length + " not published"
         + (items.length > pending.length ? " · " + (items.length - pending.length)
            + " sent back" : "")));
       host.appendChild(head);
-      if (!items.length) {
-        host.appendChild(el("div", "faint", "Nothing uploaded is waiting for review."));
-        return;
-      }
+      host.appendChild(el("p", "faint", "New demos are published as they are created. "
+        + "Publish these, or leave a sent-back one to its uploader: Fix and publish, "
+        + "under Create New Demo."));
       items.forEach(function (u) {
         var row = el("div", "req-row");
         var info = el("div");
@@ -105,7 +106,7 @@ function loadUploads() {
           var note = el("div", "req-row__note");
           var input = el("input");
           input.type = "text";
-          input.placeholder = "Note (required to send back)";
+          input.placeholder = "Note (optional)";
           input.maxLength = 1000;
           note.appendChild(input);
           var status = el("span", "promo-status faint");
@@ -130,11 +131,7 @@ function loadUploads() {
           var pub = el("button", "btn-primary", "Publish");
           pub.type = "button";
           pub.addEventListener("click", function () { act("publish"); });
-          var back = el("button", null, "Send back");
-          back.type = "button";
-          back.addEventListener("click", function () { act("send-back"); });
           acts.appendChild(pub);
-          acts.appendChild(back);
           row.appendChild(acts);
           row.appendChild(note);
         } else {

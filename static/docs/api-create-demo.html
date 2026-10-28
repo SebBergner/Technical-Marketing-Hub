@@ -27,14 +27,13 @@
 <main>
 <h1>Create a demo through the API</h1>
 <p class="lead">For programs — a pipeline, a script — that create demos in the Technical
-Marketing Hub the way <b>Create New Demo</b> does on the page: metadata first, files, then
-review. Written 2026-10-15; SharePoint and Hub URLs in every answer since 2026-10-16; fields and their values listed 2026-10-20.</p>
+Marketing Hub the way <b>Create New Demo</b> does on the page: metadata first, then files;
+the demo is published when it is finished (no review since 2026-10-28). Written 2026-10-15; SharePoint and Hub URLs in every answer since 2026-10-16; fields and their values listed 2026-10-20.</p>
 
 <h2>1. Get a token</h2>
 <p>An administrator issues it on <b>Admin → Users &amp; groups → API tokens</b>: a name for
 what uses it, the person responsible, the permissions (<b>Create new demo</b> for this, plus
-<b>View the Hub</b>), how long it lasts, and whether what it creates is published without
-review. The token is shown once; keep it in a secret store, not in code.</p>
+<b>View the Hub</b>) and how long it lasts. The token is shown once; keep it in a secret store, not in code.</p>
 <p>Send it on every call:</p>
 <pre><code>Authorization: Bearer tmh_xxxxxxxx_…</code></pre>
 <p>A token reaches <code>/api/</code> only, acts as <code>token:&lt;name&gt;</code> in the
@@ -82,13 +81,14 @@ in full; on success the demo's folder is created and an upload record returned
 the destination (no token on this call — the URL carries its own authorisation).</td></tr>
 <tr><td>5</td><td><code>POST /api/uploads/{id}/files/{n}/done</code></td><td>The created item's
 id; the Hub checks name and size.</td></tr>
-<tr><td>6</td><td><code>POST /api/uploads/{id}/finish</code></td><td>Writes the metadata; the
-demo waits for review (or is published, if the token says so).</td></tr>
+<tr><td>6</td><td><code>POST /api/uploads/{id}/finish</code></td><td>Writes the metadata and
+publishes the demo.</td></tr>
 <tr><td>—</td><td><code>GET /api/uploads?mine=true</code></td><td>This token's uploads and where
-each stands (<code>uploading</code>, <code>pending</code>, <code>sent_back</code> with the
-reviewer's <code>note</code>, <code>published</code>).</td></tr>
-<tr><td>—</td><td><code>POST /api/uploads/{id}/resubmit</code></td><td>After a send-back:
-<code>{"values": {...}}</code> with the metadata corrected (the title stays).</td></tr>
+each stands (<code>uploading</code>, <code>published</code>; an upload from before
+2026-10-28 may still be <code>pending</code> or <code>sent_back</code> with a <code>note</code>).</td></tr>
+<tr><td>—</td><td><code>POST /api/uploads/{id}/resubmit</code></td><td>For one sent back
+before 2026-10-28: <code>{"values": {...}}</code> with the metadata corrected (the title
+stays); it is then published.</td></tr>
 </table>
 
 <h3>Where the demo is</h3>
@@ -123,7 +123,7 @@ Hub, once it has been read; <code>null</code> before. Poll
 <li>A video demo is exactly one video file.</li>
 <li><code>submitted_by</code> (optional, since 2026-10-20): the PTC email address of the
 person this upload is for -- for a tool several people use through one token. It is written to
-the demo's <code>submitted_by</code> column in SharePoint, shown to reviewers, and credited as
+the demo's <code>submitted_by</code> column in SharePoint and credited as
 the demo's creator in Hub activity. A non-PTC address is refused (422). Without it the upload
 still goes ahead, credited to the token's responsible person, and every answer about it
 carries a <code>warnings</code> entry saying so.</li>

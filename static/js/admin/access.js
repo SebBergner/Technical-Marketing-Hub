@@ -40,14 +40,17 @@ function renderRequests(items) {
   var host = $("caRequests");
   host.innerHTML = "";
   var pending = items.filter(function (i) { return i.status === "pending"; });
+  // Nobody asks this way since 2026-10-28 (Report an issue instead): the
+  // card stays only while requests from before are waiting or recent.
+  host.hidden = !items.length;
   var done = items.filter(function (i) { return i.status !== "pending"; }).slice(0, 8);
   var head = el("div", "card-head");
   head.appendChild(el("h2", null, "Requests"));
   head.appendChild(el("span", "faint num", pending.length + " waiting"));
   host.appendChild(head);
-  host.appendChild(el("p", "muted", "People with Request content access change ask, with a "
-    + "reason, from a demo's page. Approving applies the change; both answers are kept "
-    + "with the request and in the Admin log."));
+  host.appendChild(el("p", "muted", "Requests made before 2026-10-28; people now ask with "
+    + "Report an issue (Other) on a demo's page. Approving applies the change; both answers "
+    + "are kept with the request and in the Admin log."));
   if (!pending.length) host.appendChild(el("div", "faint", "Nothing is waiting."));
   var manage = canManageAccess();
   pending.forEach(function (q) {

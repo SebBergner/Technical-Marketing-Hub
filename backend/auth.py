@@ -109,11 +109,9 @@ class CurrentUser:
     #: tell "a real curator" from "nobody, and nothing is enforced".
     is_dev_principal: bool = False
     #: A program using an API token (backend/api_tokens.py, 2026-10-15): its
-    #: name, the permissions the token carries, and whether what it creates
-    #: is published without review.
+    #: name and the permissions the token carries.
     token_name: str | None = None
     token_permissions: frozenset | None = None
-    token_skip_review: bool = False
     #: The token's responsible person: credited for an upload that names no
     #: `submitted_by` (2026-10-20).
     token_owner: str | None = None
@@ -320,7 +318,6 @@ def _principal_from_token(request: Request) -> CurrentUser | None:
     return CurrentUser(name=record["name"], provider="api-token", is_authenticated=True,
                        token_name=record["name"],
                        token_permissions=frozenset(record["permissions"]),
-                       token_skip_review=bool(record.get("skip_review")),
                        token_owner=record.get("owner"))
 
 

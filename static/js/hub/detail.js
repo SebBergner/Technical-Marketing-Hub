@@ -144,10 +144,10 @@ async function openAssetDetail(id, fileItemId) {
     renderAccessMark(meta, asset);
     renderAgeMark(meta, asset);
     if (asset.upload_review) {
-      var wait = pill(asset.upload_review === "sent_back" ? "Sent back" : "Waiting for review",
+      var wait = pill(asset.upload_review === "sent_back" ? "Sent back" : "Not published",
                       "upload");
-      wait.title = "Uploaded through the Hub and not published yet: only its uploader and "
-        + "reviewers can see it.";
+      wait.title = "Uploaded through the Hub before review was removed, and not published "
+        + "yet: only its uploader and the team can see it.";
       meta.insertBefore(wait, meta.firstChild);
     }
   }
@@ -1613,23 +1613,6 @@ function accessRow(asset, may, view) {
       });
     });
     r.actions.appendChild(direct);
-  } else if (!locked && !pending && may.ask) {
-    var ask = manageButton("Request " + word);
-    ask.addEventListener("click", function () {
-      confirmStep(r.row, {
-        lead: "Someone with Manage content access will decide.",
-        placeholder: target === "internal"
-          ? "Why should it be Internal? (customer data, unreleased features...)"
-          : "Why can it be Open again?",
-        confirm: "Send request",
-        required: true,
-        submit: function (reason) {
-          return send("POST", url + "/access-requests", { level: target, reason: reason })
-            .then(function () { renderManage(asset); });
-        }
-      });
-    });
-    r.actions.appendChild(ask);
   }
 
   if (pending) {
@@ -1663,16 +1646,6 @@ function accessRow(asset, may, view) {
       reject.addEventListener("click", function () { decide(false); });
       bar.appendChild(approve);
       bar.appendChild(reject);
-    }
-    if (view.may_withdraw) {
-      var withdraw = manageButton("Withdraw");
-      withdraw.addEventListener("click", function () {
-        withdraw.disabled = true;
-        send("POST", url + "/access-requests/" + encodeURIComponent(pending.id) + "/withdraw")
-          .then(function () { renderManage(asset); })
-          .catch(function (e) { withdraw.disabled = false; report(e.message, true); });
-      });
-      bar.appendChild(withdraw);
     }
     if (!bar.children.length) bar.appendChild(mk("span", "hub-manage__note", "Waiting for a decision."));
     box.appendChild(bar);
@@ -1819,7 +1792,8 @@ function showSideTab(card) {
 function uploadRow(asset, record) {
   var r = manageRow("Upload");
   var by = whoName(record.uploaded_by);
-  setState(r.state, asset.upload_review === "sent_back" ? "Sent back" : "Waiting for review",
+  // Left from before review was removed (2026-10-28): published by hand.
+  setState(r.state, asset.upload_review === "sent_back" ? "Sent back" : "Not published",
            "Uploaded by " + by + " · " + onDay(record.submitted_at || record.created_at)
            + (record.internal ? " · asked to be Internal" : ""));
   if (record.status === "pending") {
@@ -1843,22 +1817,7 @@ function uploadRow(asset, record) {
         }
       });
     });
-    var back = manageButton("Send back");
-    back.addEventListener("click", function () {
-      confirmStep(r.row, {
-        lead: "The uploader sees your note and can correct the metadata.",
-        placeholder: "What needs changing?",
-        confirm: "Send back",
-        required: true,
-        submit: function (note) {
-          return send("POST", "/api/uploads/" + encodeURIComponent(record.id) + "/send-back",
-                      { note: note })
-            .then(function () { asset.upload_review = "sent_back"; renderManage(asset); });
-        }
-      });
-    });
     r.actions.appendChild(publish);
-    r.actions.appendChild(back);
   } else if (record.note) {
     r.row.appendChild(mk("p", "hub-manage__note", "Note: " + record.note));
   }
@@ -1871,13 +1830,12 @@ function renderManage(asset) {
   hubPermissions.then(function (granted) {
     granted = granted || [];
     var may = { manage: granted.indexOf("manage_content_access") >= 0,
-                ask: granted.indexOf("request_content_access") >= 0,
                 review: granted.indexOf("review_content") >= 0,
                 archive: granted.indexOf("archive_content") >= 0 };
-    if (detailAsset !== asset || (!may.manage && !may.ask && !may.review && !may.archive)) {
+    if (detailAsset !== asset || (!may.manage && !may.review && !may.archive)) {
       return null;
     }
-    var requests = (may.manage || may.ask)
+    var requests = may.manage
       ? fetch("/api/assets/" + encodeURIComponent(asset.id) + "/access-requests")
           .then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
       : Promise.resolve(null);
@@ -1894,7 +1852,7 @@ function renderManage(asset) {
       var pane = document.getElementById("vpManage");
       pane.innerHTML = "";
       if (uploadRecord) pane.appendChild(uploadRow(asset, uploadRecord));
-      if (may.manage || may.ask) pane.appendChild(accessRow(asset, may, view));
+      if (may.manage) pane.appendChild(accessRow(asset, may, view));
       if (may.review && (asset.uploaded_at || asset.still_current_until)) {
         pane.appendChild(stillCurrentRow(asset));
       }

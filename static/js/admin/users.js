@@ -64,7 +64,7 @@ function renderTokens() {
       name.appendChild(el("div", "faint", x.hint));
       tr.insertCell().textContent = x.owner;
       tr.insertCell().textContent = x.permissions.map(function (p) { return label[p] || p; })
-        .join(", ") + (x.skip_review ? " · publishes without review" : "");
+        .join(", ");
       tr.insertCell().textContent = new Date(x.expires_at).toLocaleDateString();
       tr.insertCell().textContent = x.last_used_at ? new Date(x.last_used_at).toLocaleString() : "never";
       var st = tr.insertCell();
@@ -126,15 +126,6 @@ function renderTokens() {
   });
   form.appendChild(perms);
   form.appendChild(lab("Expires after", days));
-  var skipLabel = el("label");
-  var skip = el("input");
-  skip.type = "checkbox";
-  skipLabel.style.flexDirection = "row";
-  skipLabel.style.alignItems = "center";
-  skipLabel.style.gap = "6px";
-  skipLabel.appendChild(skip);
-  skipLabel.appendChild(document.createTextNode("Publish what it creates without review"));
-  form.appendChild(skipLabel);
   var bar = el("div", "tk-wide");
   var go = el("button", "btn-primary", "Create token");
   go.type = "button";
@@ -146,7 +137,6 @@ function renderTokens() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: name.value, owner: owner.value, days: Number(days.value),
-        skip_review: skip.checked,
         permissions: Object.keys(ticks).filter(function (k) { return ticks[k].checked; })
       }),
     }).then(function (r) {

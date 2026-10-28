@@ -8,14 +8,16 @@ The flow, as the upload page drives it:
     POST /api/uploads/{id}/files/{n}/session   a pre-authorised URL the browser
                                        sends file n to, in chunks
     POST /api/uploads/{id}/files/{n}/done      the file is in (checked here)
-    POST /api/uploads/{id}/finish      metadata written; waiting for review
-    POST /api/uploads/{id}/publish     a reviewer lists it in the Hub
-    POST /api/uploads/{id}/send-back   ... or asks for changes
-    POST /api/uploads/{id}/resubmit    the uploader, with corrected metadata
+    POST /api/uploads/{id}/finish      metadata written; listed in the Hub at once
     POST /api/uploads/{id}/cancel      the uploader stops it
 
-"Upload content" uploads; "Review content" publishes and sends back. Metadata
-is required before anything is created (services/upload_targets.py).
+There is no review (Liwei, 2026-10-28): "Create new demo" publishes. Two
+routes remain for uploads left from before, handled by hand:
+
+    POST /api/uploads/{id}/publish     "Review content" lists one still waiting
+    POST /api/uploads/{id}/resubmit    the uploader corrects one sent back; published
+
+Metadata is required before anything is created (services/upload_targets.py).
 """
 from __future__ import annotations
 
@@ -301,17 +303,11 @@ def _write_and_submit(repo, record: dict, actor: str, values: dict,
     except GraphError as exc:
         uploads.failed(repo, record["id"], str(exc))
         raise HTTPException(status_code=502, detail=f"SharePoint: {exc}. Try Finish again.")
-    # Trusted as much as a reviewer: a token set so (api_tokens), or a
-    # person with "Create without review" (2026-10-15).
-    direct = user is not None and (user.token_skip_review or (
-        not user.token_name and user.can(Perm.PUBLISH_DIRECT)))
+    # No review (Liwei, 2026-10-28): whoever may create a demo publishes it,
+    # people and API tokens alike, and no Hub Tasks row is made for it.
     try:
-        done = uploads.submit(repo, record["id"], actor, values, task=not direct)
-        if direct:
-            done = uploads.publish(repo, record["id"], actor,
-                                   "Published on submission: "
-                                   + ("API token without review" if user.token_name
-                                      else "Create without review"))
+        done = uploads.submit(repo, record["id"], actor, values, task=False)
+        done = uploads.publish(repo, record["id"], actor, "Published on creation")
     except uploads.UploadStateError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     _sync_soon(repo, actor)
@@ -321,8 +317,8 @@ def _write_and_submit(repo, record: dict, actor: str, values: dict,
 @router.post("/{upload_id}/finish")
 def finish(upload_id: str, repo: AssetRepository = Depends(get_repo),
            actor: str = Depends(UPLOAD), user: CurrentUser = Depends(get_current_user)):
-    """Every file in: write the metadata (last, as the migration does) and wait
-    for review. Internal, if asked for, is marked when the demo appears."""
+    """Every file in: write the metadata (last, as the migration does) and
+    publish. Internal, if asked for, is marked when the demo appears."""
     record = _get(repo, upload_id)
     if record["uploaded_by"] != actor:
         raise HTTPException(status_code=403, detail="Not your upload.")
@@ -340,7 +336,8 @@ class ResubmitIn(BaseModel):
 @router.post("/{upload_id}/resubmit")
 def resubmit(upload_id: str, body: ResubmitIn, repo: AssetRepository = Depends(get_repo),
              actor: str = Depends(UPLOAD), user: CurrentUser = Depends(get_current_user)):
-    """After Send back: corrected metadata, written to the same folder."""
+    """An upload sent back before review was removed (2026-10-28): corrected
+    metadata, written to the same folder, and published."""
     record = _get(repo, upload_id)
     if record["uploaded_by"] != actor:
         raise HTTPException(status_code=403, detail="Not your upload.")
@@ -366,6 +363,8 @@ class NoteIn(BaseModel):
     note: str | None = None
 
 
+# Left from before review was removed (2026-10-28): uploads still waiting
+# are published, or cancelled, by hand from Admin -> Content review.
 @router.post("/{upload_id}/publish")
 def publish(upload_id: str, body: NoteIn, repo: AssetRepository = Depends(get_repo),
             actor: str = Depends(REVIEW), user: CurrentUser = Depends(get_current_user)):
@@ -380,16 +379,6 @@ def publish(upload_id: str, body: NoteIn, repo: AssetRepository = Depends(get_re
     # Internal, if asked for, was marked by folder when it was submitted
     # (services/uploads.submit), so it holds whether or not a sync has run.
     return _view(done, user, repo)
-
-
-@router.post("/{upload_id}/send-back")
-def send_back(upload_id: str, body: NoteIn, repo: AssetRepository = Depends(get_repo),
-              actor: str = Depends(REVIEW), user: CurrentUser = Depends(get_current_user)):
-    _get(repo, upload_id)
-    try:
-        return _view(uploads.send_back(repo, upload_id, actor, body.note or ""), user, repo)
-    except uploads.UploadStateError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.post("/{upload_id}/index")

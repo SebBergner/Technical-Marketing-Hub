@@ -522,6 +522,16 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 
 ---
 
+## 去掉审核（Liwei 10/28，本地完成，待推送 staging）
+
+- **决定**：有修改权限的人直接完成修改、更新、上传，不再审核；没有权限的人用 Report an issue 提要求（改 Internal / Open 选 Other，自己写明）。
+- **Create New Demo**：有 Create new demo 权限的人（API token 也一样）完成即发布；去掉 "Create without review" 权限、token 的 "skip review" 选项、Send back，
+  也不再为新 demo 写 Hub Tasks 行。
+- **Internal / Open**：去掉 "Request content access change" 权限和申请、撤回流程；Manage content access 一次性加给 TDD Team（以后去掉不会再加回）。
+- **遗留**：推送前还在等审核或被退回的上传、还没决定的访问申请，都不自动处理：Admin → Content review 列出 "Uploads left from before review was removed"
+  （只有 Publish），被退回的由上传人在 My demos 里 "Fix and publish"；Admin → Content access 的 Requests 照旧可批准或拒绝。推送后把清单列给 Liwei。
+- **不变**：Edit metadata、Archive 本来就不审核；Request New Asset（申请新 demo）和 Still current 不是审核，保留。
+
 ## 已完成（核对过代码，2026-10-19）
 9/2–10/07 笔记里的其余要求均已实现，包括：可搜索的筛选下拉、API 与上传、视频命名和类型、
 Demo Video 库、sales 预览链接、Share Internally、SharePoint 文件内嵌播放、隐藏 Servigistics、

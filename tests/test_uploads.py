@@ -146,7 +146,8 @@ def test_a_video_upload_is_exactly_one_video(client, sp):
     assert r.status_code == 201 and sp.created == [("Demo Video", "Creo Teaser")]
 
 
-def test_the_whole_flow_hidden_until_published(client, sp, tmp_path):
+def test_the_whole_flow_publishes_at_once(client, sp, tmp_path):
+    """No review (Liwei, 2026-10-28): finishing publishes the demo."""
     r = start(client)
     assert r.status_code == 201, r.text
     record = r.json()
@@ -157,44 +158,58 @@ def test_the_whole_flow_hidden_until_published(client, sp, tmp_path):
     assert sp.sessions[0] == ("folder-Creo-Sheetmetal-Kit/Videos", "Overview_CF.mp4"), \
         "sub-folders kept"
     done = client.post(f"/api/uploads/{record['id']}/finish", headers=MAKER).json()
-    assert done["status"] == "pending"
+    assert done["status"] == "published"
     folder, fields = sp.written[0]
     assert fields["Demo_x0020_Type"] == "Live Demo Kit" and fields["Segment"] == ["CAD"]
     assert fields["DocumentSetDescription"] == KIT["description"]
-    assert fields["OriginalPublishDate"] == "2026-09-01T00:00:00Z",         "the Demo Catalog's own column since 2026-10-15; the sync reads it"
+    assert fields["OriginalPublishDate"] == "2026-09-01T00:00:00Z", \
+        "the Demo Catalog's own column since 2026-10-15; the sync reads it"
     assert not (tmp_path / "owned" / "publish_dates.json").exists()
 
-    # Indexed by a sync, it stays out of every list until published.
+    # Indexed by a sync, it is in everyone's lists.
     (tmp_path / "mirror" / "sharepoint.json").write_text(json.dumps([
         {"id": "creo-sheetmetal-kit", "type": "ldk", "title": "Creo Sheetmetal Kit",
          "products": ["Creo"], "source_item_id": folder, "uploaded_at": "2026-09-01"}]),
         encoding="utf-8")
-    ids = lambda who: [a["id"] for a in client.get("/api/assets", headers=who).json()["items"]]
-    assert ids(BOSS) == [] and ids(ANN) == []
-    assert client.get("/api/assets/creo-sheetmetal-kit", headers=ANN).status_code == 404
-    page = client.get("/api/assets/creo-sheetmetal-kit", headers=BOSS).json()
-    assert page["upload_review"] == "pending" and page["uploaded_at"] == "2026-09-01"
-
-    published = client.post(f"/api/uploads/{record['id']}/publish", json={}, headers=BOSS)
-    assert published.json()["status"] == "published"
-    assert ids(ANN) == ["creo-sheetmetal-kit"]
+    ids = [a["id"] for a in client.get("/api/assets", headers=ANN).json()["items"]]
+    assert ids == ["creo-sheetmetal-kit"]
+    assert client.post(f"/api/uploads/{record['id']}/send-back", json={"note": "x"},
+                       headers=BOSS).status_code in (404, 405), "no send-back any more"
 
 
-def test_send_back_then_resubmit_with_corrected_metadata(client, sp):
+def _left_from_before(client, sp, sent_back=False):
+    """An upload finished before review was removed: waiting, or sent back."""
+    from backend.deps import get_repo
+    from backend.services import uploads
     record = start(client).json()
     upload_all(client, sp, record)
-    client.post(f"/api/uploads/{record['id']}/finish", headers=MAKER)
-    assert client.post(f"/api/uploads/{record['id']}/send-back", json={"note": ""},
-                       headers=BOSS).status_code == 422, "say what needs changing"
-    back = client.post(f"/api/uploads/{record['id']}/send-back",
-                       json={"note": "Segment should be PLM"}, headers=BOSS).json()
-    assert (back["status"], back["note"]) == ("sent_back", "Segment should be PLM")
+    repo = get_repo()
+    uploads.submit(repo, record["id"], "user:maker@ptc.com", task=False)
+    if sent_back:
+        uploads.send_back(repo, record["id"], "user:boss@ptc.com", "Segment should be PLM")
+    return record
+
+
+def test_an_upload_left_waiting_is_published_by_hand(client, sp, tmp_path):
+    record = _left_from_before(client, sp)
+    (tmp_path / "mirror" / "sharepoint.json").write_text(json.dumps([
+        {"id": "creo-sheetmetal-kit", "type": "ldk", "title": "Creo Sheetmetal Kit",
+         "products": ["Creo"], "source_item_id": sp.written[0][0] if sp.written else
+         "folder-Creo-Sheetmetal-Kit", "uploaded_at": "2026-09-01"}]), encoding="utf-8")
+    assert client.post(f"/api/uploads/{record['id']}/publish", json={},
+                       headers=MAKER).status_code == 403, "Review content publishes it"
+    published = client.post(f"/api/uploads/{record['id']}/publish", json={}, headers=BOSS)
+    assert published.json()["status"] == "published"
+
+
+def test_an_upload_left_sent_back_is_corrected_and_published(client, sp):
+    record = _left_from_before(client, sp, sent_back=True)
     renamed = client.post(f"/api/uploads/{record['id']}/resubmit",
                           json={"values": {**KIT, "title": "New Name"}}, headers=MAKER)
     assert renamed.status_code == 422, "the title is the folder name"
     again = client.post(f"/api/uploads/{record['id']}/resubmit",
                         json={"values": {**KIT, "segment": ["PLM"]}}, headers=MAKER).json()
-    assert again["status"] == "pending" and sp.written[-1][1]["Segment"] == ["PLM"]
+    assert again["status"] == "published" and sp.written[-1][1]["Segment"] == ["PLM"]
 
 
 def test_a_file_that_did_not_arrive_whole_is_refused(client, sp):
@@ -292,9 +307,7 @@ def test_retired_segments_are_not_offered():
 
 
 def test_publishing_a_demo_the_hub_has_not_read_yet_asks_for_a_sync(client, sp):
-    record = start(client).json()
-    upload_all(client, sp, record)
-    client.post(f"/api/uploads/{record['id']}/finish", headers=MAKER)
+    record = _left_from_before(client, sp)
     asked = len(sp.syncs)
     client.post(f"/api/uploads/{record['id']}/publish", json={}, headers=BOSS)
     assert len(sp.syncs) == asked + 1, "not indexed yet: publishing asks again"
@@ -306,18 +319,9 @@ def test_index_now_is_for_the_reviewer_or_the_uploader(client, sp):
     assert client.post(f"/api/uploads/{record['id']}/index", headers=BOSS).json() == {"queued": True}
 
 
-def test_create_without_review_publishes_at_once(client, sp):
-    """2026-10-15: for the team that maintains the catalogue, as an API token can."""
-    access.create_group("TDD", "", ["view_hub", "upload_content", "publish_without_review"],
-                        ["tdd@ptc.com"], "test")
-    tdd = easyauth_headers("tdd@ptc.com")
-    record = start(client, who=tdd).json()
-    upload_all(client, sp, record, who=tdd)
-    done = client.post(f"/api/uploads/{record['id']}/finish", headers=tdd).json()
-    assert done["status"] == "published"
-    other = start(client, values={**KIT, "title": "Another Kit"}).json()   # MAKER: no such right
-    upload_all(client, sp, other)
-    assert client.post(f"/api/uploads/{other['id']}/finish", headers=MAKER).json()["status"] == "pending"
+def test_there_is_no_create_without_review_permission_any_more():
+    """2026-10-28: every upload publishes, so the permission went."""
+    assert "publish_without_review" not in access.ALL
 
 
 def test_every_answer_says_where_the_demo_is(client, sp, tmp_path, monkeypatch):

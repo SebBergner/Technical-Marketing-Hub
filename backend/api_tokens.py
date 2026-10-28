@@ -8,8 +8,8 @@ page (Users & groups -> API tokens):
 * carrying only the permissions it needs, from TOKEN_PERMISSIONS -- never
   an administrative one;
 * expiring (90 days unless chosen otherwise), revocable at any time;
-* optionally publishing what it creates without review (`skip_review`),
-  for a pipeline that is trusted as much as a reviewer;
+* what it creates is published at once, as everyone's is (no review since
+  2026-10-28; tokens made before then may still carry `skip_review`, unread);
 * shown once, when created; only its SHA-256 is kept.
 
 A request presents it as `Authorization: Bearer tmh_<id>_<secret>`. It acts
@@ -82,7 +82,7 @@ def listing() -> list[dict]:
 
 
 def create(*, name: str, owner: str, permissions: list[str], days: int | None,
-           skip_review: bool, actor: str) -> tuple[dict, str]:
+           actor: str) -> tuple[dict, str]:
     """(the token's record, the secret to show once)."""
     name = (name or "").strip()
     owner = (owner or "").strip().lower()
@@ -94,8 +94,6 @@ def create(*, name: str, owner: str, permissions: list[str], days: int | None,
     bad = [p for p in perms if p not in TOKEN_PERMISSIONS]
     if bad or not perms:
         raise TokenError("A token may carry only: " + ", ".join(TOKEN_PERMISSIONS) + ".")
-    if skip_review and "upload_content" not in perms:
-        raise TokenError("Publishing without review only applies to Create new demo.")
     days = days or DEFAULT_DAYS
     if not 1 <= days <= MAX_DAYS:
         raise TokenError(f"A token lasts between 1 and {MAX_DAYS} days.")
@@ -106,7 +104,7 @@ def create(*, name: str, owner: str, permissions: list[str], days: int | None,
         token_id = secrets.token_hex(4)
         secret = f"{PREFIX}{token_id}_{secrets.token_urlsafe(32)}"
         record = {"id": token_id, "name": name, "owner": owner, "permissions": perms,
-                  "skip_review": bool(skip_review), "created_by": actor,
+                  "created_by": actor,
                   "created_at": _now().isoformat(timespec="seconds"),
                   "expires_at": (_now() + timedelta(days=days)).isoformat(timespec="seconds"),
                   "last_used_at": None, "revoked_at": None, "revoked_by": None,

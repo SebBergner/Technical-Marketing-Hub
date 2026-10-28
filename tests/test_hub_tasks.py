@@ -59,50 +59,33 @@ def _rows(fake):
     return list(fake.rows.values())
 
 
-def test_an_upload_waiting_for_review_is_a_row_closed_when_published(upload_client, sp, sp_list):
+def test_a_new_demo_is_never_a_to_do(upload_client, sp, sp_list):
+    """No review since 2026-10-28: creating a demo publishes it, no row."""
     record = start(upload_client).json()
     upload_all(upload_client, sp, record)
-    upload_client.post(f"/api/uploads/{record['id']}/finish", headers=MAKER)
+    done = upload_client.post(f"/api/uploads/{record['id']}/finish", headers=MAKER).json()
+    assert done["status"] == "published"
+    assert _rows(sp_list) == [] and sp_list.calls == []
+
+
+def test_an_upload_left_waiting_closes_its_row_when_published(upload_client, sp, sp_list):
+    """One waiting from before review was removed: its row closes when it is
+    published by hand."""
+    from backend.services import uploads
+    record = start(upload_client).json()
+    upload_all(upload_client, sp, record)
+    uploads.submit(_repo(), record["id"], "user:maker@ptc.com")          # as it was then
     [row] = _rows(sp_list)
     assert row["Title"] == "Review: Creo Sheetmetal Kit"
     assert (row["TaskType"], row["TaskStatus"]) == ("Upload review", "Open")
     assert row["RequestedBy"] == "maker@ptc.com" and row["HubId"] == f"upload:{record['id']}"
     assert row["HubLink"] == "https://dev-tmh.ptcxc.com/admin#review"
     assert "DecidedBy" not in row, "nothing empty is written to a new row"
-
     upload_client.post(f"/api/uploads/{record['id']}/publish", json={}, headers=BOSS)
     [row] = _rows(sp_list)
     assert (row["TaskStatus"], row["DecidedBy"]) == ("Done", "boss@ptc.com")
     assert len(row["DecidedAt"]) == 10, "a date"
     assert [m for m, _ in sp_list.calls].count("POST") == 1, "the same row, updated"
-
-
-def test_send_back_and_resubmit_reopen_the_same_row(upload_client, sp, sp_list):
-    record = start(upload_client).json()
-    upload_all(upload_client, sp, record)
-    upload_client.post(f"/api/uploads/{record['id']}/finish", headers=MAKER)
-    _rows(sp_list)
-    upload_client.post(f"/api/uploads/{record['id']}/send-back",
-                       json={"note": "Segment should be PLM"}, headers=BOSS)
-    [row] = _rows(sp_list)
-    assert row["TaskStatus"] == "Rejected" and "Sent back: Segment should be PLM" in row["Details"]
-    upload_client.post(f"/api/uploads/{record['id']}/resubmit",
-                       json={"values": {"title": "Creo Sheetmetal Kit",
-                                        **{k: v for k, v in json.loads(json.dumps(
-                                            record["values"])).items() if k != "title"},
-                                        "segment": ["PLM"]}}, headers=MAKER)
-    [row] = _rows(sp_list)
-    assert (row["TaskStatus"], row["DecidedBy"]) == ("Open", ""), "text clears with ''"
-    assert len(row["DecidedAt"]) == 10, "a date cannot be cleared through Graph; it stays"
-    assert row["Details"].endswith("Resubmitted after being sent back.")
-
-
-def test_published_on_submission_is_never_a_to_do(upload_client, sp, sp_list):
-    record = start(upload_client, who=BOSS).json()           # Create without review
-    upload_all(upload_client, sp, record, who=BOSS)
-    done = upload_client.post(f"/api/uploads/{record['id']}/finish", headers=BOSS).json()
-    assert done["status"] == "published"
-    assert _rows(sp_list) == [] and sp_list.calls == []
 
 
 def test_an_access_request_is_a_row_closed_by_the_decision(access_client, sp_list):
@@ -116,14 +99,6 @@ def test_an_access_request_is_a_row_closed_by_the_decision(access_client, sp_lis
     [row] = _rows(sp_list)
     assert (row["TaskStatus"], row["DecidedBy"]) == ("Rejected", "boss@ptc.com")
     assert row["Details"].endswith("Decision note: Not customer data")
-
-
-def test_withdrawn_by_the_requester(access_client, sp_list):
-    pending = ask(access_client).json()["pending"]
-    _rows(sp_list)
-    access_client.post(f"/api/assets/bobcat/access-requests/{pending['id']}/withdraw", headers=ANN)
-    [row] = _rows(sp_list)
-    assert row["TaskStatus"] == "Withdrawn"
 
 
 def test_graph_down_never_stops_the_hub_and_the_row_goes_later(access_client, sp_list):

@@ -67,11 +67,9 @@ class Perm(str, Enum):
     INTERNAL = "access_internal"
     CREATE_DEMO = "create_demo"
     UPLOAD = "upload_content"
-    PUBLISH_DIRECT = "publish_without_review"
     EDIT_METADATA = "edit_metadata"
     MANAGE_HOME = "manage_home"
     MANAGE_ACCESS = "manage_content_access"
-    REQUEST_ACCESS = "request_content_access"
     REVIEW_CONTENT = "review_content"
     ARCHIVE = "archive_content"
     VIEW_ARCHIVED = "view_archived"
@@ -93,14 +91,11 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
     (Perm.CREATE_DEMO, "Request new asset", "Submit a request for a new demo or asset."),
     (Perm.UPLOAD, "Create new demo",
      "Create a demo -- a video or a demo kit, with its metadata -- on a "
-     "destination platform. It is listed once someone with Review content "
-     "publishes it."),
-    (Perm.PUBLISH_DIRECT, "Create without review",
-     "What this person creates with Create new demo -- or corrects after a send-back "
-     "-- is listed at once, without waiting for review. For the team that maintains "
-     "the catalogue."),
+     "destination platform. It is listed in the Hub at once: there is no review "
+     "(Liwei, 2026-10-28)."),
     (Perm.EDIT_METADATA, "Edit metadata",
-     "Review metadata proposals and write them back to SharePoint."),
+     "Edit a demo's metadata, thumbnail and preview video on its Details card; "
+     "saved to SharePoint at once."),
     (Perm.MANAGE_HOME, "Manage the Home page",
      "Choose Featured demos and switch the Hub's display options."),
     (Perm.REVIEW_CONTENT, "Review content",
@@ -115,12 +110,9 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
      "people and team totals. Never partners' names."),
     (Perm.VIEW_ARCHIVED, "See archived content",
      "Open archived demos, and show them in lists with 'Show archived'."),
-    (Perm.REQUEST_ACCESS, "Request content access change",
-     "Ask, with a reason, for a demo to be made Internal or Open again; someone "
-     "with Manage content access decides."),
     (Perm.MANAGE_ACCESS, "Manage content access",
      "Mark demos Internal or Open (on the Admin page and on a demo's page), "
-     "and hide demos from the Hub."),
+     "and hide demos from the Hub. Anyone else asks with Report an issue."),
     (Perm.RUN_SYNC, "Run sync", "Sync SharePoint and Consensus, and set the daily sync."),
     (Perm.RUN_MIGRATION, "Run Brightcove migration",
      "Use the migration page, which uploads videos to SharePoint."),
@@ -138,19 +130,23 @@ _ADMIN_ONLY = frozenset({Perm.VIEW_ADMIN.value, Perm.MANAGE_USERS.value})
 
 #: Never a partner's, whatever group they are in or HUB_ADMIN_EMAILS says
 #: (Liwei, 2026-10-14): administering the Hub stays with PTC accounts, the
-#: usual rule for guests in a tenant; nor do they ask for demos to be made
-#: Internal or upload into PTC's libraries (2026-10-15). Their other
-#: permissions are unaffected.
-PARTNER_NEVER = _ADMIN_ONLY | {Perm.REQUEST_ACCESS.value, Perm.UPLOAD.value,
-                               Perm.PUBLISH_DIRECT.value, Perm.ARCHIVE.value}
+#: usual rule for guests in a tenant; nor do they upload into PTC's libraries
+#: (2026-10-15) or archive. Their other permissions are unaffected.
+PARTNER_NEVER = _ADMIN_ONLY | {Perm.UPLOAD.value, Perm.ARCHIVE.value}
 
 #: A permission new to a saved access.json goes, once, to these Hub groups by
 #: name as well as to Administrators (Liwei, 2026-10-28: Archive content for
 #: TDD Team). Removed afterwards, it stays removed (`catalogue`).
 INTRODUCED_FOR = {Perm.ARCHIVE.value: {"tdd team"}}
 
+#: A permission that already existed, given once to Hub groups by name
+#: (Liwei, 2026-10-28: with review removed, TDD Team marks demos Internal or
+#: Open itself). Applied the first time a saved access.json is read after
+#: this; `grants` records it, so a later removal stays removed.
+GRANTED_ONCE = {"2026-10-28 manage content access": (Perm.MANAGE_ACCESS.value, {"tdd team"})}
+
 _EMPLOYEE_DEFAULT = [Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD, Perm.INTERNAL,
-                     Perm.CREATE_DEMO, Perm.VIEW_REPORTS, Perm.REQUEST_ACCESS]
+                     Perm.CREATE_DEMO, Perm.VIEW_REPORTS]
 _PARTNER_DEFAULT = [Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD]
 
 BUILTIN = {
@@ -214,6 +210,7 @@ def _normalise(state: dict) -> dict:
     groups = [g for g in state.get("groups") or [] if isinstance(g, dict) and g.get("id")]
     by_id = {g["id"]: g for g in groups}
     known = set(state.get("catalogue") or _CATALOGUE_BEFORE_TRACKING)
+    granted = set(state.get("grants") or [])
     out = []
     for gid, spec in BUILTIN.items():
         g = by_id.pop(gid, None) or dict(id=gid, members=[], permissions=spec["permissions"])
@@ -232,12 +229,15 @@ def _normalise(state: dict) -> dict:
             name = (g.get("name") or "").strip().lower()
             g["permissions"] = list(g.get("permissions") or []) + [
                 p for p, names in INTRODUCED_FOR.items() if p not in known and name in names]
+            g["permissions"] += [p for key, (p, names) in GRANTED_ONCE.items()
+                                 if key not in granted and name in names]
             out.append(g)
     for g in out:
         g["permissions"] = _clean_perms(g.get("permissions"))
         g["members"] = sorted({_norm_email(m) for m in g.get("members") or [] if _norm_email(m)})
         g.setdefault("description", "")
-    return {**state, "groups": out, "catalogue": sorted(ALL)}
+    return {**state, "groups": out, "catalogue": sorted(ALL),
+            "grants": sorted(set(GRANTED_ONCE) | granted)}
 
 
 def load_state() -> dict:

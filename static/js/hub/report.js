@@ -71,7 +71,10 @@ function reportForm(asset, onDone, onCancel) {
   form.appendChild(text);
 
   var note = el("div", "hub-rpt__note", asset
-    ? "It goes to the team that looks after this demo's segment, not to the person who uploaded it."
+    // Asking for a demo to be made Internal or Open is "Other" (Liwei,
+    // 2026-10-28: rare, no category of its own; the request flow is gone).
+    ? "It goes to the team that looks after this demo's segment, not to the person who uploaded "
+      + "it. To ask for it to be made Internal or Open, choose Other and say why."
     : "It goes to the team that runs the Hub.");
   form.appendChild(note);
   var error = el("div", "hub-rpt__error");

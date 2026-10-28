@@ -81,17 +81,19 @@ def test_a_token_never_carries_an_administrative_permission(client):
         assert issue(client, name=perm, permissions=["view_hub", perm]).status_code == 422
 
 
-def test_a_token_creates_a_demo_that_waits_for_review(client, sp):
+def test_a_token_creates_a_demo_that_is_published_at_once(client, sp):
+    """No review for anyone, tokens included (Liwei, 2026-10-28)."""
     secret = issue(client).json()["secret"]
     done = create_demo(client, sp, secret)
-    assert done["status"] == "pending" and done["uploaded_by"] == "token:AMP pipeline"
+    assert done["status"] == "published" and done["uploaded_by"] == "token:AMP pipeline"
     log = client.get("/api/admin/admin-log?category=Uploads", headers=BOSS).json()["items"]
     assert {e["actor"] for e in log} == {"token:AMP pipeline"}
 
 
-def test_a_token_without_review_publishes_on_submission(client, sp):
-    secret = issue(client, skip_review=True).json()["secret"]
-    assert create_demo(client, sp, secret)["status"] == "published"
+def test_an_old_skip_review_flag_is_simply_ignored(client, sp):
+    r = issue(client, skip_review=True)
+    assert r.status_code == 201 and "skip_review" not in r.json()["token"]
+    assert create_demo(client, sp, r.json()["secret"])["status"] == "published"
 
 
 def test_what_a_token_cannot_do(client, sp):
@@ -129,8 +131,8 @@ def test_internal_asked_for_at_creation_holds_before_and_after_indexing(client, 
                                  "name": f["path"].rsplit("/", 1)[-1]}
         client.post(f"/api/uploads/{record['id']}/files/{i}/done", json={"item_id": f"item-{i}"},
                     headers=maker)
-    client.post(f"/api/uploads/{record['id']}/finish", headers=maker)
-    client.post(f"/api/uploads/{record['id']}/publish", json={}, headers=BOSS)
+    assert client.post(f"/api/uploads/{record['id']}/finish",
+                       headers=maker).json()["status"] == "published"
     # Indexed only now, after publishing: still Internal.
     (tmp_path / "mirror" / "sharepoint.json").write_text(json.dumps([
         {"id": "creo-sheetmetal-kit", "type": "ldk", "title": "Creo Sheetmetal Kit",
@@ -147,10 +149,9 @@ def test_under_sign_in_a_token_reaches_the_api_and_nothing_else(tmp_path, monkey
     (tmp_path / "mirror").mkdir()
     (tmp_path / "mirror" / "sharepoint.json").write_text("[]", encoding="utf-8")
     _, secret = api_tokens.create(name="Reader", owner="seb@ptc.com", permissions=["view_hub"],
-                                  days=30, skip_review=False, actor="test")
+                                  days=30, actor="test")
     _, no_hub = api_tokens.create(name="Downloads only", owner="seb@ptc.com",
-                                  permissions=["download"], days=30, skip_review=False,
-                                  actor="test")
+                                  permissions=["download"], days=30, actor="test")
     c = TestClient(app, base_url="http://localhost", follow_redirects=False)
     assert c.get("/api/assets", headers=bearer(secret)).status_code == 200
     assert c.get("/", headers=bearer(secret)).status_code == 403, "pages are not for tokens"

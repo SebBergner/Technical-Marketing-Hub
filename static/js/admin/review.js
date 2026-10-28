@@ -52,8 +52,9 @@ function loadUploads() {
            + " sent back" : "")));
       host.appendChild(head);
       host.appendChild(el("p", "faint", "New demos are published as they are created. "
-        + "Publish these, or leave a sent-back one to its uploader: Fix and publish, "
-        + "under Create New Demo."));
+        + "Publish these, or Cancel one that should never be listed (a test, say); a "
+        + "sent-back one can also be left to its uploader: Fix and publish, under Create "
+        + "New Demo. This card goes once none is left."));
       items.forEach(function (u) {
         var row = el("div", "req-row");
         var info = el("div");
@@ -102,21 +103,15 @@ function loadUploads() {
         }
         row.appendChild(info);
         var acts = el("div", "req-row__acts");
-        if (u.status === "pending" && session.permissions.indexOf("review_content") >= 0) {
-          var note = el("div", "req-row__note");
-          var input = el("input");
-          input.type = "text";
-          input.placeholder = "Note (optional)";
-          input.maxLength = 1000;
-          note.appendChild(input);
+        if (session.permissions.indexOf("review_content") >= 0) {
           var status = el("span", "promo-status faint");
-          note.appendChild(status);
           var act = function (path) {
             status.textContent = "Saving…";
+            status.className = "promo-status faint";
             fetch("/api/uploads/" + encodeURIComponent(u.id) + "/" + path, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ note: input.value.trim() || null }),
+              body: JSON.stringify({ note: null }),
             }).then(function (r) {
               if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
                 throw new Error(b.detail || ("HTTP " + r.status));
@@ -128,15 +123,30 @@ function loadUploads() {
               status.className = "promo-status err";
             });
           };
-          var pub = el("button", "btn-primary", "Publish");
-          pub.type = "button";
-          pub.addEventListener("click", function () { act("publish"); });
-          acts.appendChild(pub);
-          row.appendChild(acts);
-          row.appendChild(note);
-        } else {
-          row.appendChild(acts);
+          if (u.status === "pending") {
+            var pub = el("button", "btn-primary", "Publish");
+            pub.type = "button";
+            pub.addEventListener("click", function () { act("publish"); });
+            acts.appendChild(pub);
+          }
+          // A test or an abandoned upload (2026-10-28): out of the Hub for
+          // good; its folder stays in SharePoint for a person to delete.
+          var stop = el("button", "btn-danger", "Cancel");
+          stop.type = "button";
+          stop.title = "Never list it. Its folder stays in SharePoint; delete it there if it "
+            + "should go.";
+          stop.addEventListener("click", function () {
+            if (stop.dataset.armed !== "1") {
+              stop.dataset.armed = "1";
+              stop.textContent = "Cancel it?";
+              return;
+            }
+            act("cancel");
+          });
+          acts.appendChild(stop);
+          acts.appendChild(status);
         }
+        row.appendChild(acts);
         host.appendChild(row);
       });
     });

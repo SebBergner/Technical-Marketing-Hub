@@ -404,11 +404,20 @@ def indexing(user: CurrentUser = Depends(get_current_user)):
 
 
 @router.post("/{upload_id}/cancel")
-def cancel(upload_id: str, repo: AssetRepository = Depends(get_repo),
-           actor: str = Depends(UPLOAD), user: CurrentUser = Depends(get_current_user)):
+def cancel(upload_id: str, request: Request, repo: AssetRepository = Depends(get_repo),
+           user: CurrentUser = Depends(get_current_user)):
+    """Its uploader stops it; someone with Review content may cancel any one
+    left from before review was removed (Admin -> Content review). The
+    folder stays in SharePoint, for a person to delete there."""
+    from backend.admin_auth import _actor
     _get(repo, upload_id)
+    reviewer = _actor(request, user, Perm.REVIEW_CONTENT.value)
+    actor = _actor(request, user, Perm.UPLOAD.value) or reviewer
+    if actor is None:
+        raise HTTPException(status_code=403, detail="Not available for your account.")
+    request.state.hub_actor = actor           # for the Admin log
     try:
-        return _view(uploads.cancel(repo, upload_id, actor), user, repo)
+        return _view(uploads.cancel(repo, upload_id, actor, anyones=bool(reviewer)), user, repo)
     except uploads.UploadStateError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 

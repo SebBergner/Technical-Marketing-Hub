@@ -222,11 +222,14 @@ def send_back(repo, upload_id: str, actor: str, note: str) -> dict:
     return record
 
 
-def cancel(repo, upload_id: str, actor: str) -> dict:
+def cancel(repo, upload_id: str, actor: str, anyones: bool = False) -> dict:
+    """Stop an upload. `anyones`: someone with Review content, clearing one
+    left from before review was removed (2026-10-28) -- its uploader may be
+    an API token nobody will use again."""
     def change(r):
-        if r["status"] not in OPEN + ("sent_back",):
+        if r["status"] not in OPEN + ("pending", "sent_back"):
             raise UploadStateError(f"This upload is {r['status']}.")
-        if r["uploaded_by"] != actor:
+        if r["uploaded_by"] != actor and not anyones:
             raise UploadStateError("Only the person who started it can cancel an upload.")
         r.update(status="cancelled")
         r["history"].append({"at": _now(), "by": actor, "what": "cancelled"})

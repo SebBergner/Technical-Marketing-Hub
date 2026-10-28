@@ -400,3 +400,17 @@ def test_the_product_terms_a_sync_saw_are_kept_for_the_form(tmp_path, monkeypatc
     terms = uw.saved_terms()
     assert sorted(terms.labels()) == ["Creo Parametric", "Windchill"]
     assert terms.get("creo parametric") == ("Creo Parametric", "g1")
+
+
+def test_one_left_from_before_can_be_cancelled_by_a_reviewer(client, sp):
+    """2026-10-28: a test kit left waiting by an API token nobody uses again
+    -- someone with Review content clears it; nobody else can."""
+    record = _left_from_before(client, sp)
+    other = easyauth_headers("other@ptc.com")
+    access.create_group("Makers too", "", ["view_hub", "upload_content"], ["other@ptc.com"], "t")
+    assert client.post(f"/api/uploads/{record['id']}/cancel", headers=other).status_code == 422
+    assert client.post(f"/api/uploads/{record['id']}/cancel", headers=ANN).status_code == 403
+    done = client.post(f"/api/uploads/{record['id']}/cancel", headers=BOSS).json()
+    assert done["status"] == "cancelled"
+    waiting = client.get("/api/uploads?status=pending,sent_back", headers=BOSS).json()
+    assert waiting == [], "nothing left: the Admin card goes"

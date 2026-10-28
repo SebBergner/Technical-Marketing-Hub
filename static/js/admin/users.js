@@ -4,7 +4,7 @@
  * Part of the Admin page's script, split out of static/admin.js on
  * 2026-10-15; static/js/admin/main.js loads it. */
 
-import { $, el, row, session, when } from "./util.js";
+import { $, actorWord, el, row, session, when } from "./util.js";
 import { act } from "./signins.js";
 
 /* ── Users & groups (backend/access.py, 2026-10-06) ───────────────────
@@ -156,6 +156,93 @@ function renderTokens() {
   bar.appendChild(status);
   form.appendChild(bar);
   host.appendChild(form);
+}
+
+/* ── Consensus licences (backend/consensus_licenses.py, 2026-10-28) ────
+ * Who sees Create DemoBoard: the latest upload of Consensus's own user
+ * report, replaced whole each time. */
+var cl = { data: null, filter: "" };
+
+function loadLicences() {
+  return fetch("/api/admin/consensus-licenses")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { if (d) { cl.data = d; renderLicences(); } });
+}
+
+function renderLicences(message, isError) {
+  var host = $("clBody");
+  host.innerHTML = "";
+  var d = cl.data;
+  host.appendChild(el("p", null, d.count
+    ? d.count + " people, " + d.partners + " of them partners. From "
+      + (d.file_name || "an upload") + ", " + when(d.at) + " by " + actorWord(d.uploaded_by) + "."
+      + (d.skipped ? " " + d.skipped + " rows had no email address and were left out." : "")
+    : "No list uploaded yet: nobody sees Create DemoBoard."));
+  if (canManageUsers()) {
+    var bar = el("div", "cl-bar");
+    var input = el("input");
+    input.type = "file";
+    input.accept = ".csv,text/csv";
+    input.hidden = true;
+    var pick = el("button", "btn-small", d.count ? "Upload a new list" : "Upload the list");
+    pick.type = "button";
+    pick.addEventListener("click", function () { input.click(); });
+    var status = el("span", isError ? "err" : "faint", message || "");
+    input.addEventListener("change", function () {
+      var file = input.files[0];
+      if (!file) return;
+      if (d.count && !confirm("Replace the " + d.count + " people on the list with the "
+                              + "people in " + file.name + "?")) return;
+      var form = new FormData();
+      form.append("file", file);
+      pick.disabled = true;
+      status.className = "faint";
+      status.textContent = "Uploading…";
+      fetch("/api/admin/consensus-licenses", { method: "POST", body: form })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (b) {
+            if (!r.ok) throw new Error(b.detail || ("HTTP " + r.status));
+            return b;
+          });
+        })
+        .then(function (b) { cl.data = b; renderLicences("Saved: " + b.count + " people."); })
+        .catch(function (e) { renderLicences(e.message, true); });
+    });
+    bar.appendChild(pick);
+    bar.appendChild(input);
+    bar.appendChild(status);
+    host.appendChild(bar);
+  }
+  if (!d.count) return;
+  var find = el("input");
+  find.type = "search";
+  find.placeholder = "Find a name or email…";
+  find.value = cl.filter;
+  find.setAttribute("aria-label", "Find someone on the list");
+  host.appendChild(find);
+  var list = el("div", "tablewrap");
+  host.appendChild(list);
+  var draw = function () {
+    var q = cl.filter.trim().toLowerCase();
+    var hits = d.people.filter(function (p) {
+      return !q || (p.email + " " + p.name).toLowerCase().indexOf(q) >= 0; });
+    list.innerHTML = "";
+    var t = el("table");
+    var head = el("tr");
+    ["Name", "Email", "Consensus role", "Group"].forEach(function (h) {
+      head.appendChild(el("th", null, h)); });
+    t.appendChild(head);
+    hits.slice(0, 50).forEach(function (p) {
+      var tr = el("tr");
+      [p.name, p.email, p.role, p.group].forEach(function (v) { tr.appendChild(el("td", null, v)); });
+      t.appendChild(tr);
+    });
+    list.appendChild(t);
+    if (hits.length > 50) list.appendChild(el("p", "faint", "Showing 50 of " + hits.length
+                                              + ". Type to narrow the list."));
+  };
+  find.addEventListener("input", function () { cl.filter = find.value; draw(); });
+  draw();
 }
 
 function canManageUsers() {
@@ -672,5 +759,5 @@ function renderAudit(entries) {
 }
 
 export {
-  groupNames, loadAccess, loadTokens, ug
+  groupNames, loadAccess, loadLicences, loadTokens, ug
 };

@@ -17,8 +17,11 @@ def me(user: CurrentUser = Depends(get_current_user)):
     weaker than it looks — most importantly when this is running on App Service
     with AUTH_MODE unset, which makes every caller a curator.
     """
+    from backend import consensus_licenses
     return {
         "user": user.as_dict(),
+        # On Elio's Consensus licence list: shown "Create DemoBoard" (2026-10-28).
+        "consensus_licensed": consensus_licenses.is_licensed(user.email),
         "mode": settings.auth_mode,
         "enforcing": settings.auth_mode in ENFORCING_MODES,
         "curator_groups_configured": bool(settings.auth_curator_groups),

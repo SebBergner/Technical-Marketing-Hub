@@ -565,10 +565,11 @@ video.hub-inline-player__media { object-fit: contain; }
 .vp-back { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--orion-text-2); cursor: pointer; margin-bottom: 18px; background: none; border: none; padding: 0; font: inherit; }
 .vp-back:hover { color: var(--orion-link); }
 .vp-back svg { width: 15px; height: 15px; }
-/* Report an issue (A2): quiet, on the Back line at the top right (2026-10-28). */
+/* Share feedback (A2): a link at the end of a demo's actions row (2026-10-28). */
 #videoPreviewPage { position: relative; }
-.vp-report { position: absolute; top: 26px; right: 32px; display: inline-flex; align-items: center; gap: 5px; padding: 0; border: none; background: none; font: inherit; font-size: 12.5px; color: var(--orion-text-3); cursor: pointer; }
-.vp-report:hover { color: var(--orion-text); text-decoration: underline; }
+/* The link colour, so it is seen without looking like a third button. */
+.vp-report { align-self: center; margin-left: 4px; display: inline-flex; align-items: center; gap: 5px; padding: 0 4px; border: none; background: none; font: inherit; font-size: 13px; color: var(--orion-link); white-space: nowrap; cursor: pointer; }
+.vp-report:hover { text-decoration: underline; }
 .vp-report svg { width: 14px; height: 14px; }
 
 .vp-player {
@@ -1745,3 +1746,15 @@ textarea.hub-edit__input{resize:vertical}
 .hub-related__marked{margin-top:12px;font-size:12.5px;color:var(--orion-text-3)}
 .hub-related__undo{font:inherit;font-size:12.5px;color:var(--orion-indigo);background:none;border:none;padding:0;cursor:pointer}
 .hub-related__undo:hover{text-decoration:underline}
+
+/* Hidden for the first release (2026-10-28): the request form. */
+#navContribute[hidden],#navRequestAsset[hidden]{display:none}
+
+/* Usage: a creator picked shows their most used content (2026-10-28). */
+.hub-act__pick{cursor:pointer}
+.hub-act__pick:focus-visible{outline:2px solid var(--orion-link);outline-offset:1px}
+.hub-act__lb li.is-on{background:var(--orion-surface-2);box-shadow:inset 3px 0 0 var(--orion-link)}
+.hub-act__card-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hub-act__card-head h3{margin:0 0 2px}
+.hub-act__chip{flex:none;border:1px solid var(--orion-border);background:var(--orion-surface-2);color:var(--orion-text);border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;cursor:pointer}
+.hub-act__chip:hover{border-color:var(--orion-link);color:var(--orion-link)}

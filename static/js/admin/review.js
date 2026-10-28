@@ -195,7 +195,7 @@ function reviewTable(rows, status, opts) {
     var tr = tb.insertRow();
     var name = tr.insertCell();
     name.appendChild(demoLink(r.asset_id, r.title));
-    if (r.internal) name.appendChild(el("span", "pill pill--off rv-tag", "Internal"));
+    if (r.internal) name.appendChild(el("span", "pill pill--off rv-tag", "PTC Only"));
     tr.insertCell().textContent = TYPE_WORD[r.type] || r.type;
     var pub = tr.insertCell();
     pub.className = "num";

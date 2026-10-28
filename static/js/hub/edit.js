@@ -171,7 +171,12 @@ function openEditor(asset) {
       row.appendChild(name);
       var c = control(f, form.values[f.key]);
       row.appendChild(c);
-      if (f.help) row.appendChild(mk("span", "hub-edit__help", f.help));
+      // PTC Only is never customer facing (2026-10-28): shown, not changed.
+      var locked = (form.locked || {})[f.key];
+      if (locked) {
+        c.disabled = true;
+        row.appendChild(mk("span", "hub-edit__help", locked));
+      } else if (f.help) row.appendChild(mk("span", "hub-edit__help", f.help));
       // Empty in SharePoint though the Hub shows something (Liwei,
       // 2026-10-28): left blank, and what the Hub shows said beside it.
       var shown = (form.hub_shows || {})[f.key];

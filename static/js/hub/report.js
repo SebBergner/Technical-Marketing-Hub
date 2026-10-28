@@ -1,9 +1,10 @@
 /* Reports and Get help (A2, Seb 2026-10-07; Liwei 2026-10-23/28).
  *
- * "Report an issue", a quiet link at the top of a demo's page, opens a
+ * "Share feedback" (was "Report an issue" until 2026-10-28), a link among a
+ * demo's actions, opens a
  * small form about that demo, which goes to the owners of its segment (set
  * on Admin -> Report owners, services/support_reports.py). "Get help", at
- * the foot of the sidebar beside Share feedback (#/help), is about the Hub
+ * the foot of the sidebar (#/help), is about the Hub
  * itself -- it will not load, the list is out of date -- and goes to the
  * Hub team; it has its own categories. Below it, "My reports": everything
  * this person reported and where it stands. Both are handled in the Hub
@@ -65,7 +66,7 @@ function reportForm(asset, onDone, onCancel) {
   text.placeholder = asset
     ? "What happened, which file, what you expected. A link or file name helps."
     : "What happened, where, and what you expected. For a problem with one demo, use "
-      + "Report an issue on its page.";
+      + "Share feedback on its page.";
   text.setAttribute("aria-label", "Details");
   form.appendChild(el("div", "hub-rpt__label", "Details"));
   form.appendChild(text);
@@ -130,7 +131,7 @@ function sentNote(answer) {
   return box;
 }
 
-/* ── Report an issue, on a demo's page ────────────────────────────────── */
+/* ── Share feedback, on a demo's page ─────────────────────────────────── */
 function openReportModal(asset) {
   var back = document.getElementById("hubReportBackdrop");
   if (back) back.remove();
@@ -141,7 +142,7 @@ function openReportModal(asset) {
   modal.setAttribute("aria-modal", "true");
   modal.setAttribute("aria-labelledby", "hubReportTitle");
   modal.innerHTML = '<div class="modal__head"><div class="modal__head-title" id="hubReportTitle">'
-    + '<svg class="orion-ico ico-indigo"><use href="#i-flag"/></svg> Report an issue</div>'
+    + '<svg class="orion-ico ico-indigo"><use href="#i-message-square"/></svg> Share feedback</div>'
     + '<button class="modal__close" type="button" aria-label="Close"><svg class="orion-ico">'
     + '<use href="#i-x"/></svg></button></div>';
   var body = el("div", "modal__body");
@@ -187,7 +188,7 @@ function buildPage() {
     +   '<div class="vp-title">Get help</div>'
     +   '<div class="orion-subtle">Tell the Hub team when the Hub itself is not working: '
     +   'it will not load, the demo list is out of date, you cannot sign in or find something. '
-    +   'For a problem with one demo, use Report an issue on its page.</div>'
+    +   'For a problem with one demo, use Share feedback on its page.</div>'
     + '</div></div>'
     + '<div class="hub-rpt"><section class="hub-rpt__card" id="hubHelpForm"></section>'
     + '<section class="hub-rpt__card"><h2 class="hub-rpt__h">My reports</h2>'
@@ -300,12 +301,12 @@ function loadMine() {
   });
 }
 
-/* ── at the foot of the sidebar, beside Share feedback (2026-10-28) ──── */
+/* ── at the top of the sidebar's foot (2026-10-28) ───────────────────── */
 function addHelpNav() {
   hubPermissions.then(function (granted) {
     if (granted.indexOf("view_hub") < 0 || document.getElementById("navHelp")) return;
-    var feedback = document.querySelector(".orion-side__foot .hub-foot__feedback");
-    if (!feedback) return;
+    var foot = document.querySelector(".orion-side__foot");
+    if (!foot) return;
     var item = el("a", "hub-foot__feedback");
     item.id = "navHelp";
     item.href = "#/help";
@@ -317,7 +318,7 @@ function addHelpNav() {
       + ' stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>'
       + '<circle cx="8" cy="11.4" r=".8" fill="currentColor"/></svg>'
       + "<span>Get help</span>";
-    feedback.insertAdjacentElement("beforebegin", item);
+    foot.insertBefore(item, foot.firstChild);
     if (location.hash === "#/help") markNav(true);
   });
 }

@@ -193,6 +193,8 @@ def start(body: UploadIn, repo: AssetRepository = Depends(get_repo),
         values, problems = ut.video_rules(values)
         if problems and not user.token_name:
             raise ut.UploadInvalid(" ".join(problems))
+        if body.internal and "customer_facing" in values:
+            values["customer_facing"] = False      # PTC Only (2026-10-28)
         files = ut.clean_files(spec, [f.model_dump() for f in body.files])
         preview = ut.preview_of(files, body.preview)
     except ut.UploadInvalid as exc:

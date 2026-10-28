@@ -349,6 +349,8 @@
   input{font:inherit;padding:9px 11px;border-radius:8px;border:1px solid var(--border);
     background:var(--bg);color:var(--ink)}
   .err{color:var(--red);font-size:13px;min-height:18px}
+  .cl-bar{display:flex;align-items:center;gap:12px;margin:10px 0}
+  #clBody input[type=search]{margin:6px 0 10px;width:min(320px,100%)}
   [hidden]{display:none !important}
 
   /* usage -------------------------------------------------------------- */
@@ -565,7 +567,7 @@
   <div id="tabReports" role="tabpanel" hidden>
     <section>
       <div class="section-head"><h2>Report owners</h2></div>
-      <p class="muted" style="margin:-6px 0 6px">Report an issue and Get help land in the Hub
+      <p class="muted" style="margin:-6px 0 6px">Share feedback and Get help land in the Hub
         Tasks list. The owners of the demo's segment who have Notify on are written into the
         row's NotifyTo column, which the Power Automate flow mails &mdash; never the person who
         uploaded the demo. Click a count to list that segment's reports.</p>
@@ -611,11 +613,13 @@
   <div id="tabInternal" role="tabpanel" hidden>
     <section>
       <div class="section-head"><h2>Content access</h2></div>
-      <p class="muted" style="margin:-6px 0 14px">An <b>Internal</b> demo shows its card,
-        description and details to everyone, but its files open only for people whose groups
-        have <b>Access internal content</b> (PTC employees by default, not Partners). A demo is
-        Internal when its SharePoint folder is closed to partners, or when it is marked here or
-        on its own page. Marks are kept in the Hub only; SharePoint is never changed.</p>
+      <p class="muted" style="margin:-6px 0 14px">A <b>PTC Only</b> demo (called Internal
+        until 2026-10-28) shows its card, description and details to everyone, but its files
+        open only for people whose groups have <b>Access internal content</b> (PTC employees by
+        default, not Partners). A demo is PTC Only when its SharePoint folder is closed to
+        partners, or when it is marked here or on its own page. The mark is kept in the Hub;
+        marking a SharePoint demo also sets its Customer facing column to No, since a PTC Only
+        demo is never customer facing.</p>
       <div class="card" id="caRequests" style="margin-bottom:12px"></div>
       <div class="card" id="caList"></div>
       <div class="card" id="hiddenDemos" style="margin-top:12px"></div>
@@ -712,6 +716,15 @@
         list their members here. Kept in the Hub only &mdash; nothing is written to
         SharePoint or Entra.</p>
       <div class="ug" id="ugGroups"></div>
+    </section>
+    <!-- Who is shown Create DemoBoard (backend/consensus_licenses.py, 2026-10-28). -->
+    <section>
+      <div class="section-head"><h2>Consensus licences</h2></div>
+      <p class="muted" style="margin:-6px 0 14px">Only the people on this list see
+        <b>Create DemoBoard</b> on a demo's page. Upload Consensus's Manage users report
+        (CSV) as Elio exports it; each upload replaces the whole list. A stopgap until the
+        Hub can ask Consensus itself.</p>
+      <div class="card" id="clBody"></div>
     </section>
     <!-- Programs using the API (backend/api_tokens.py, 2026-10-15). -->
     <section>

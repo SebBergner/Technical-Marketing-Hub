@@ -127,6 +127,25 @@ def test_creators_are_ranked_by_how_much_their_demos_were_used_in_the_window():
         "unused in the window: not ranked at all"
 
 
+def test_each_creator_brings_their_most_used_demos():
+    """Picking a creator on the page shows their most used content (Seb, 2026-10-28)."""
+    events = [ev("view", "a@ptc.com", asset="kit1"), ev("view", "b@ptc.com", asset="kit3"),
+              ev("download", "b@ptc.com", asset="kit3"), ev("view", "a@ptc.com", asset="kit2")]
+    out = activity.leaderboard(events, since=(NOW - timedelta(days=30)).isoformat(), top=3,
+                               titles={"kit3": "Kit three"},
+                               creators={"kit1": "Hughes, Paul", "kit3": "Hughes, Paul",
+                                         "kit2": "Wall, Eric"})
+    paul, eric = out["creators"]
+    assert [(c["asset_id"], c["title"], c["views"], c["downloads"]) for c in paul["content"]]         == [("kit3", "Kit three", 1, 1), ("kit1", "kit1", 1, 0)]
+    assert [c["asset_id"] for c in eric["content"]] == ["kit2"]
+
+
+def test_a_creators_demos_come_with_their_cards(client):
+    body = client.get("/api/reports/activity", headers=easyauth_headers("someone@ptc.com")).json()
+    for row in body["creators"]:
+        assert all("type" in c and "thumbnail_url" in c for c in row["content"])
+
+
 def test_the_hub_page_is_revalidated_and_carries_no_inline_handlers(client):
     """2026-10-14: index.html is markup only; behaviour lives in
     static/js/hub-ui.js, and the page must not be served stale after a deploy."""

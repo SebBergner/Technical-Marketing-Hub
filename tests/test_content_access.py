@@ -42,6 +42,9 @@ def client(repo, monkeypatch):
     monkeypatch.setattr(settings, "hub_admin_emails", ADMIN)
     # Refused before Graph is reached; CI has no Graph credentials.
     app.dependency_overrides[require_client] = lambda: object()
+    # Customer facing written No in SharePoint: tests/test_ptc_only.py.
+    import backend.routers.assets as assets_router
+    monkeypatch.setattr(assets_router, "_not_customer_facing", lambda repo, asset_id: None)
     yield TestClient(app, base_url="http://localhost")
     app.dependency_overrides.clear()
 

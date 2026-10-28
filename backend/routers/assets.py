@@ -516,6 +516,8 @@ def set_access(asset_id: str, body: AccessIn, repo: AssetRepository = Depends(ge
     Internal until the folder is opened there."""
     if body.level not in ("open", "internal"):
         raise HTTPException(status_code=422, detail="level must be 'open' or 'internal'")
+    if body.level == "internal":
+        _not_customer_facing(repo, asset_id)
     try:
         result = repo.set_access(asset_id, body.level, actor, body.reason)
     except KeyError:
@@ -524,6 +526,36 @@ def set_access(asset_id: str, body: AccessIn, repo: AssetRepository = Depends(ge
         raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
     log.info("access of %s set to %s by %s", asset_id, body.level, actor)
     return result
+
+
+def _not_customer_facing(repo: AssetRepository, asset_id: str) -> None:
+    """PTC Only is never customer facing (Seb, 2026-10-28): before a demo is
+    made PTC Only, its CustomerFacing column is written No. Not changed back
+    when it is opened again. A demo the Hub does not write (Consensus, a page)
+    only shows No (json_repo); SharePoint failing refuses the change."""
+    from backend.services import metadata_edit as me
+    asset = repo.get(asset_id)
+    if asset is None:
+        raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
+    try:
+        key = me.target_key(asset.model_dump(mode="json"))
+    except me.NotEditable:
+        return
+    from backend.routers.uploads import _client, _target
+    client = _client()
+    target = _target(client, key)
+    if not any(f.key == "customer_facing" for f in me.edit_fields(target.spec)):
+        return
+    try:
+        item = client.get_list_item(target.drive_id, asset.source_item_id) or {}
+        if me.values_of(target.spec, item.get("fields") or {}).get("customer_facing") is False:
+            return
+        me.write(client, target, asset.source_item_id, {"customer_facing": False}, None)
+    except GraphError as exc:
+        raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
+    values = me.hub_values(key, {"customer_facing": False})
+    values["assumed"] = [a for a in asset.assumed if a != "customer_facing"]
+    me.remember(repo, asset_id, values)
 
 
 def _requests_view(repo, asset_id: str, user) -> dict:
@@ -661,7 +693,15 @@ def edit_form(asset_id: str, repo: AssetRepository = Depends(get_repo), actor: s
                             detail="The demo's folder is no longer in SharePoint.")
     preview = next((r.item_id for r in asset.resources if r.name == asset.main_video), None)
     values = me.values_of(target.spec, item.get("fields") or {})
+    # PTC Only is never customer facing (2026-10-28): shown No and locked,
+    # so saving writes No where SharePoint still says otherwise.
+    locked = {}
+    if asset.internal and "customer_facing" in values:
+        values["customer_facing"] = False
+        locked["customer_facing"] = ("A PTC Only demo is never customer facing. "
+                                     "Make it Open first to change this.")
     return {"library": target.spec.library, "title": asset.title,
+            "locked": locked,
             "etag": item.get("@odata.etag") or item.get("eTag"),
             "fields": me.form(target.spec, target),
             "video_rules": ut.subtype_rules(target.spec, target.choices),
@@ -689,7 +729,10 @@ def save_metadata(asset_id: str, body: MetadataIn, repo: AssetRepository = Depen
     try:
         item = client.get_list_item(target.drive_id, asset.source_item_id) or {}
         current = me.values_of(target.spec, item.get("fields") or {})
-        changed = me.changes(target.spec, target, body.values, current)
+        sent = dict(body.values)
+        if asset.internal and "customer_facing" in current:
+            sent["customer_facing"] = False          # PTC Only (2026-10-28)
+        changed = me.changes(target.spec, target, sent, current)
         if changed:
             me.write(client, target, asset.source_item_id, changed, body.etag)
     except ut.UploadInvalid as exc:

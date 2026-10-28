@@ -65,11 +65,15 @@ def hub_activity(since: str | None = None, until: str | None = None,
         row["downloads"] += c["downloads"]
         row["demos"] += 1
     out["by_type"] = sorted(by_type.values(), key=lambda r: -(r["views"] + r["downloads"]))
-    out["content"] = [{**c, "thumbnail_url": listed[c["asset_id"]].thumbnail_url,
-                       "type": listed[c["asset_id"]].type,
-                       "products": listed[c["asset_id"]].products,
-                       "age_band": listed[c["asset_id"]].age_band}
-                      for c in out["content"] if c["asset_id"] in listed]
+    def with_cards(items):
+        return [{**c, "thumbnail_url": listed[c["asset_id"]].thumbnail_url,
+                 "type": listed[c["asset_id"]].type,
+                 "products": listed[c["asset_id"]].products,
+                 "age_band": listed[c["asset_id"]].age_band}
+                for c in items if c["asset_id"] in listed]
+    out["content"] = with_cards(out["content"])
+    for row in out["creators"]:
+        row["content"] = with_cards(row["content"])
     # When PTC people were first counted by name (2026-10-16): production's log
     # before that day names nobody, so a period reaching further back shows
     # fewer people than used the Hub, and the page says from when it counts.
@@ -132,7 +136,8 @@ def _missing(record: dict) -> list[str]:
     video = str(record.get("id") or "").startswith("video-")    # the Demo Video library
     gaps = {"demo_owner": not record.get("demo_owner"),
             "publish_date": not record.get("date_stated"),
-            "customer_facing": "customer_facing" in assumed,
+            "customer_facing": "customer_facing" in assumed
+                               or bool(record.get("customer_facing_stated_yes")),
             "has_narrated_audio": "has_narrated_audio" in assumed,
             "language": "language" in assumed,
             "product_version": video and not record.get("product_version"),

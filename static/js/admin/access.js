@@ -49,7 +49,7 @@ function renderRequests(items) {
   head.appendChild(el("span", "faint num", pending.length + " waiting"));
   host.appendChild(head);
   host.appendChild(el("p", "muted", "Requests made before 2026-10-28; people now ask with "
-    + "Report an issue (Other) on a demo's page. Approving applies the change; both answers "
+    + "Share feedback (Other) on a demo's page. Approving applies the change; both answers "
     + "are kept with the request and in the Admin log."));
   if (!pending.length) host.appendChild(el("div", "faint", "Nothing is waiting."));
   var manage = canManageAccess();
@@ -62,7 +62,7 @@ function renderRequests(items) {
     title.rel = "noopener";
     info.appendChild(title);
     info.appendChild(el("div", "promo-row__meta", "Make " + (q.level === "internal"
-      ? "Internal" : "Open") + " · asked by " + actorWord(q.requested_by) + " · "
+      ? "PTC Only" : "Open") + " · asked by " + actorWord(q.requested_by) + " · "
       + new Date(q.requested_at).toLocaleString()));
     info.appendChild(el("p", "req-row__reason", "“" + q.reason + "”"));
     row.appendChild(info);
@@ -112,7 +112,7 @@ function renderRequests(items) {
       .style.cssText = "margin:12px 0 4px;font-size:12px;font-weight:600";
     done.forEach(function (q) {
       var line = el("div", "promo-row__meta",
-        (q.title || q.asset_id) + " · Make " + (q.level === "internal" ? "Internal" : "Open")
+        (q.title || q.asset_id) + " · Make " + (q.level === "internal" ? "PTC Only" : "Open")
         + " · " + q.status + (q.decided_by ? " by " + actorWord(q.decided_by) : "")
         + (q.decided_at ? " · " + new Date(q.decided_at).toLocaleDateString() : "")
         + (q.note ? " — " + q.note : ""));
@@ -256,7 +256,7 @@ function renderContentAccess(items) {
               info.appendChild(el("div", "promo-row__title", a.title));
               info.appendChild(el("div", "promo-row__meta", promoMeta(a)));
               r.appendChild(info);
-              var mark = el("button", null, "Make Internal");
+              var mark = el("button", null, "Make PTC Only");
               mark.type = "button";
               mark.addEventListener("click", function () {
                 setAccess(a.id, "internal", status);

@@ -21,7 +21,7 @@ import logging
 import os
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile
 from pydantic import BaseModel, Field
 
 from backend import access
@@ -983,6 +983,28 @@ def export_admin_log(since: str | None = None, until: str | None = None, q: str 
     return _Response("﻿" + admin_log.to_csv(rows), media_type="text/csv; charset=utf-8",
                      headers={"Content-Disposition":
                               f'attachment; filename="hub-admin-log-{stamp}.csv"'})
+
+
+# ───────────────────────────────────── Consensus licences (2026-10-28)
+@router.get("/consensus-licenses", dependencies=[VIEW_ADMIN])
+def get_consensus_licenses():
+    """Who is on the latest Consensus user list (backend/consensus_licenses.py)."""
+    from backend import consensus_licenses
+    return consensus_licenses.summary(consensus_licenses.load())
+
+
+@router.post("/consensus-licenses", dependencies=[VIEW_ADMIN])
+async def upload_consensus_licenses(file: UploadFile = File(...),
+                                    actor: str = Depends(require_perm(Perm.MANAGE_USERS))):
+    """Replace the list with Consensus's Manage users report, as exported."""
+    from backend import consensus_licenses
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="The file is over 5 MB.")
+    try:
+        return consensus_licenses.replace(content, file.filename, actor)
+    except consensus_licenses.LicenceFileInvalid as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.get("/api-tokens", dependencies=[VIEW_ADMIN])

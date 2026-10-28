@@ -496,8 +496,15 @@ class JsonAssetRepository(AssetRepository):
                 if r.get("source_item_id") in by_folder:
                     marked.setdefault(r["id"], by_folder[r["source_item_id"]])
         if closed or marked:
+            # PTC Only is never customer facing (Seb, 2026-10-28). Making a
+            # demo PTC Only writes No to SharePoint (routers/assets.py); one
+            # whose column still says Yes -- a folder closed in SharePoint, a
+            # Consensus demo -- shows No, and `customer_facing_stated_yes`
+            # puts a SharePoint one on the Data Clean list.
             rows = [{**r, "internal": True,
-                     "internal_source": "sharepoint" if r.get("partner_restricted") else "hub"}
+                     "internal_source": "sharepoint" if r.get("partner_restricted") else "hub",
+                     "customer_facing": False,
+                     "customer_facing_stated_yes": r.get("customer_facing", True) is not False}
                     if r.get("partner_restricted") or r["id"] in marked else r
                     for r in rows]
         return rows

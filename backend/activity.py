@@ -496,12 +496,15 @@ def leaderboard(events: list[dict], *, since: str | None = None, until: str | No
     titles = titles or {}
     top_content = sorted(content.items(), key=lambda kv: (kv[1]["views"] + kv[1]["downloads"],
                                                           len(kv[1]["people"])), reverse=True)
+
+    def listed(rows):
+        return [{"asset_id": aid, "title": titles.get(aid) or aid, "views": c["views"],
+                 "downloads": c["downloads"], "people": len(c["people"])}
+                for aid, c in rows[:top]]
     return {
         "people": top_people,
         "teams": team_rows,
-        "content": [{"asset_id": aid, "title": titles.get(aid) or aid, "views": c["views"],
-                     "downloads": c["downloads"], "people": len(c["people"])}
-                    for aid, c in top_content[:top]],
+        "content": listed(top_content),
         # The tiles count everyone's actions, like the daily line beside them
         # (2026-10-16): counting only people known by name showed 0 views on
         # production, whose log before the swap names nobody. Only
@@ -512,7 +515,10 @@ def leaderboard(events: list[dict], *, since: str | None = None, until: str | No
                                     and not e.get("user"))},
         "creators": [{"rank": i + 1, "creator": who, "demos": len(k["demos"]),
                       "views": k["views"], "downloads": k["downloads"],
-                      "people": len(k["people"]), "total": k["views"] + k["downloads"]}
+                      "people": len(k["people"]), "total": k["views"] + k["downloads"],
+                      # Their most used demos, shown when the creator is
+                      # picked on the page (Seb, 2026-10-28).
+                      "content": listed([kv for kv in top_content if kv[0] in k["demos"]])}
                      for i, (who, k) in enumerate(creator_rows[:top])],
         "unattributed_uses": unattributed,
         # Every demo PTC people used in the window, for the Dashboard's

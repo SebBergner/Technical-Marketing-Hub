@@ -35,6 +35,15 @@ def no_thumbnail_warming(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def never_reach_sharepoint(monkeypatch):
+    """A developer's .env names the real Graph app, and get_graph_client()
+    builds a live client from it. On 2026-10-28 making a demo PTC Only began
+    reading its folder in SharePoint, and test_content_access reached the
+    real tenant. Tests that need Graph pass a fake client in themselves."""
+    monkeypatch.setattr(settings, "graph_client_secret", "")
+
+
+@pytest.fixture(autouse=True)
 def no_hub_tasks_list(monkeypatch):
     """The Hub Tasks list is real and the team watches it
     (integrations/graph/hub_tasks.py); tests that want it switch it on with

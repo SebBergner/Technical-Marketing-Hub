@@ -112,7 +112,7 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
      "Open archived demos, and show them in lists with 'Show archived'."),
     (Perm.MANAGE_ACCESS, "Manage content access",
      "Mark demos Internal or Open (on the Admin page and on a demo's page), "
-     "and hide demos from the Hub. Anyone else asks with Report an issue."),
+     "and hide demos from the Hub. Anyone else asks with Share feedback."),
     (Perm.RUN_SYNC, "Run sync", "Sync SharePoint and Consensus, and set the daily sync."),
     (Perm.RUN_MIGRATION, "Run Brightcove migration",
      "Use the migration page, which uploads videos to SharePoint."),

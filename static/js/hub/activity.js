@@ -23,7 +23,8 @@ import { renderLibrary, usageByTypeCard } from "./dashboard.js";
  * chart is also in a table or a label, so nothing hides behind a hover.
  */
 var ACT_RANGES = [["30", "30 days"], ["90", "90 days"], ["365", "12 months"]];
-var actState = { range: "30", seq: 0, library: null, tab: savedTab() };
+// `creator`: the one picked in "Whose demos were used most" (2026-10-28).
+var actState = { range: "30", seq: 0, library: null, tab: savedTab(), creator: null };
 
 /* Two tabs (Liwei, 2026-10-26): the library, and how the Hub is used. The
  * period buttons belong to Usage only. The last one opened is remembered
@@ -313,17 +314,45 @@ function renderActivityPage(d) {
   teamCard.appendChild(teams(d.teams));
 
   var contentCard = actEl("div", "hub-act__card");
-  contentCard.appendChild(actEl("h3", null, "Most used content"));
-  contentCard.appendChild(actEl("div", "hub-act__sub", "Opened and downloaded most, last "
-    + periodWord()));
-  contentCard.appendChild(topContent(d.content));
-
   var creatorCard = actEl("div", "hub-act__card");
   creatorCard.appendChild(actEl("h3", null, "Whose demos were used most"));
   creatorCard.appendChild(actEl("div", "hub-act__sub", "Creators ranked by how much their "
     + "demos were opened and downloaded, last " + periodWord() + ". Only demos used in "
-    + "this period count."));
-  creatorCard.appendChild(creatorBoard(d.creators || [], d.creators_known !== false));
+    + "this period count. Pick one to see their most used content."));
+  var board = creatorBoard(d.creators || [], d.creators_known !== false, function (name) {
+    actState.creator = actState.creator === name ? null : name;
+    showContent();
+  });
+  creatorCard.appendChild(board);
+
+  /* Everyone's most used content, or the picked creator's (Seb, 2026-10-28).
+   * The pick is kept when the period changes, while that creator is ranked. */
+  function showContent() {
+    var picked = (d.creators || []).filter(function (c) {
+      return c.creator === actState.creator; })[0];
+    if (!picked) actState.creator = null;
+    contentCard.innerHTML = "";
+    var head = actEl("div", "hub-act__card-head");
+    head.appendChild(actEl("h3", null, picked
+      ? "Most used content by " + personName(picked.creator) : "Most used content"));
+    if (picked) {
+      var clear = actEl("button", "hub-act__chip", personName(picked.creator) + " ×");
+      clear.type = "button";
+      clear.title = "Show everyone's most used content";
+      clear.addEventListener("click", function () { actState.creator = null; showContent(); });
+      head.appendChild(clear);
+    }
+    contentCard.appendChild(head);
+    contentCard.appendChild(actEl("div", "hub-act__sub", "Opened and downloaded most, last "
+      + periodWord() + (picked ? ", of the demos they created" : "")));
+    contentCard.appendChild(topContent(picked ? picked.content || [] : d.content));
+    board.querySelectorAll("[data-creator]").forEach(function (li) {
+      var on = li.dataset.creator === actState.creator;
+      li.classList.toggle("is-on", on);
+      li.setAttribute("aria-pressed", String(on));
+    });
+  }
+  showContent();
 
   var bottom = actEl("div", "hub-act__mid");
   bottom.appendChild(contentCard);
@@ -545,7 +574,7 @@ function personName(raw) {
   return m ? m[2] + " " + m[1] : (raw || "");
 }
 
-function creatorBoard(list, known) {
+function creatorBoard(list, known, onPick) {
   if (!known) return actEl("div", "hub-act__empty",
     "No demo has a creator yet. Creators are read from SharePoint by a full sync "
     + "(Admin, Sync); this fills in after the next one.");
@@ -554,7 +583,14 @@ function creatorBoard(list, known) {
   var max = list[0].total || 1;
   var ol = actEl("ol", "hub-act__lb");
   list.forEach(function (c) {
-    var li = actEl("li");
+    var li = actEl("li", "hub-act__pick");
+    li.dataset.creator = c.creator;
+    li.tabIndex = 0;
+    li.setAttribute("role", "button");
+    li.addEventListener("click", function () { onPick(c.creator); });
+    li.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(c.creator); }
+    });
     li.appendChild(actEl("span", "hub-act__rank" + (c.rank <= 3 ? " hub-act__rank--" + c.rank : ""), c.rank));
     var name = personName(c.creator);
     li.appendChild(actEl("span", "hub-act__avatar", initials(name)));

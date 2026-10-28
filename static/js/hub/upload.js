@@ -543,10 +543,17 @@ function stepMetadata(box) {
   var tick = el("input");
   tick.type = "checkbox";
   tick.checked = up.internal;
-  tick.addEventListener("change", function () { up.internal = tick.checked; });
+  // PTC Only is never customer facing (2026-10-28); the server holds it too.
+  tick.addEventListener("change", function () {
+    up.internal = tick.checked;
+    if (tick.checked && up.values.customer_facing !== false) {
+      up.values.customer_facing = false;
+      drawWizard();
+    }
+  });
   internal.appendChild(tick);
-  internal.appendChild(document.createTextNode(" Internal only — files open only for people "
-    + "with access to internal content (never partners)"));
+  internal.appendChild(document.createTextNode(" PTC Only — partners cannot open its files, "
+    + "and it is not customer facing"));
   box.appendChild(internal);
   back.addEventListener("click", function () { up.step = 1; drawWizard(); });
   next.addEventListener("click", function () { up.step = 3; drawWizard(); });
@@ -711,7 +718,7 @@ function summary(box) {
   add("Destination", platformLabel() + " · " + up.target.library);
   up.target.fields.forEach(function (f) { add(f.label, fieldValue(f)); });
   add("Preview video", previewChoice());
-  add("Internal only", up.internal);
+  add("PTC Only", up.internal);
   add("Files", up.files.length + " (" + size(up.files.reduce(function (s, f) {
     return s + f.size; }, 0)) + ")");
   box.appendChild(dl);
@@ -947,6 +954,8 @@ function addUploadNav() {
       + '<use href="#i-upload"/></svg> Create New Demo</span>';
     item.addEventListener("click", function () { location.hash = "#/upload"; });
     request.insertAdjacentElement("afterend", item);
+    var group = document.getElementById("navContribute");
+    if (group) group.hidden = false;
     if (location.hash === "#/upload") markNav(true);
   });
 }

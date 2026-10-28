@@ -12,7 +12,50 @@ SharePoint 里的数据清理（kit 日期、Demo Type、标错的 LDK/VDK、旧
 
 ---
 
-## 开发计划（2026-10-27 起）
+## 发布前（2026-10-28 与 Elio、Seb 开会定，取代下面的周计划）
+
+High 的 8 项做完、测试、上线 production 后发布，目标是下周一（11/2）之前。上线后通知 Elio、Seb、Serge，Serge 发公告。
+Low 的项目都放到发布之后。
+
+| High（发布前） | 现状 | 要做的 |
+|---|---|---|
+| Usage dashboard：选择创建者 | Hub activity 有 "Whose demos were used most"，但点了没反应 | 点一个创建者，显示他的 demo 里最常用的内容 |
+| Report an issue 改名为 Share feedback | demo 页右上角的 "Report an issue" 链接 | 改名，移到 demo 的操作按钮旁边；保持链接样式，不做成按钮。Admin 里要能看到提交的问题；第一版不发邮件 |
+| 去掉侧边栏的 Share feedback | 侧边栏底部的 PTC 反馈表链接 | 去掉 |
+| 测试归档 | A8 已完成，没在 staging 上真正归档过 | 推送后和 Liwei 一起：归档一个 demo，检查 SharePoint 里的 `_Archive`，再恢复 |
+| PTC Only 与 Customer facing | "Internal" 标签和开关；Customer facing 来自 SharePoint 列 | "Internal" 改名为 "PTC Only"；PTC Only 的 demo 一律不是 customer facing（B8 的一部分） |
+| 隐藏申请表 | 侧边栏的 Request New Asset（A12 暂停） | 隐藏入口和页面 |
+| 隐藏 Value Roadmap 标签页 | demo 页的 Files / Value Roadmap 标签页 | 隐藏 |
+| Consensus 用户名单 | 有 Consensus demo 的页面都显示 "Create DemoBoard" | 只给 Elio 名单上有 Consensus 许可证的人显示；名单是临时做法，名单变了 Elio 再发 |
+
+**已定（Liwei 10/28）**：
+- 选择创建者：点一个创建者后，"Most used content" 只显示他的 demo，上方有一个可清除的标签，切换期间时保持选择。
+- Consensus 名单：在 Admin 上传 Elio 的 CSV（Consensus 的 ManageUsersReport：First Name、Last Name、Email、Role、Group…），
+  每次上传替换整个名单。名单上的所有人都能看到 Create DemoBoard，不按 Role 筛（10 月版 263 人，19 个 partner）。
+- PTC Only：标成 PTC Only 时把 SharePoint 的 CustomerFacing 写成 No，编辑器里这一项锁定；取消 PTC Only 时不自动改回。
+- A13 相关推荐照常随这次推送上线。
+
+**进度（10/28 本地完成，待推送 staging）**：High 里除"测试归档"外的 7 项都已完成。
+- Usage：可以点创建者。
+- Share feedback：已移到操作栏，侧边栏的链接已去掉；Admin 里看问题用现有的 Admin → Report owners（点计数列出该 segment 的报告）。
+- PTC Only：已改名，写 CustomerFacing No 并锁定。
+- 申请表、Value Roadmap 标签页：已隐藏。
+- Consensus 名单：在 Admin → Users & groups → Consensus licences 上传。
+
+推送后要做：
+- 上传 Elio 的 CSV（Highlevel 文件夹里的 October 2026 版）。
+- 和 Liwei 一起测试归档和恢复。
+
+Low（发布后）：Not indexed 状态（B8）、S1 邮件订阅、S5 Value Roadmap 索引（通过 API 推送）、A3 个人播放列表和收藏、
+多个关键词用 OR 搜索、A13 相关推荐（已在本地完成）、C1 Consensus 视频迁移、C3 Consensus 视频分享（公开链接）、
+在 SharePoint 里创建 demo 页、搜索文档内容和字幕。
+
+会议里的其他事项（不在 Seb 的 High 里）：去掉 segment 的 SCO 选项；按 segment 指定负责人来分派问题（以后做，不阻塞发布）；
+数据清理，补上发布日期和元数据；11/2 周一和 Myles 开会，催 Consensus 迁移的信息。
+
+---
+
+## 开发计划（2026-10-27 起；10/28 起由上面的发布前清单取代）
 
 2026-10-26 定：按周分批，每批推到 staging 由 Liwei 验证，每周集中 swap 一次（避开周五）。每项开始前先用几句话确认做法。
 

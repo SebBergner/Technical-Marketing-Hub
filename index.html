@@ -117,9 +117,14 @@
       <svg class="orion-ico ico-muted"><use href="#i-panel"/></svg>
     </div>
     <div class="orion-side__body">
+      <!-- Request New Asset is hidden for the first release (Elio, Seb,
+           2026-10-28; REQUEST_FORM_HIDDEN in detail.js), so the group shows
+           only once Create New Demo is added to it (upload.js). -->
+      <div id="navContribute" hidden>
       <div class="orion-group">Contribute</div>
-      <div class="orion-navitem" id="navRequestAsset" data-action="open-request"><span class="label"><svg class="orion-ico orion-ico--sm ico-indigo"><use href="#i-plus"/></svg> Request New Asset</span></div>
+      <div class="orion-navitem" id="navRequestAsset" data-action="open-request" hidden><span class="label"><svg class="orion-ico orion-ico--sm ico-indigo"><use href="#i-plus"/></svg> Request New Asset</span></div>
       <div class="orion-divider"></div>
+      </div>
 
       <div class="orion-group">Discover</div>
       <div class="orion-navitem orion-navitem--active" id="navHome" data-action="close-request"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-grid"/></svg> Home</span></div>

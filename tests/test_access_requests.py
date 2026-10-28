@@ -123,7 +123,7 @@ def test_the_admin_log_filters_by_result_and_exports_csv(client):
     assert "attachment" in r.headers["content-disposition"]
     assert r.text.startswith("\ufeff"), "so Excel reads it as UTF-8"
     rows = list(csv.DictReader(io.StringIO(r.text.lstrip("\ufeff"))))
-    assert {row["action"] for row in rows} == {"Set a demo Open or Internal"}
+    assert {row["action"] for row in rows} == {"Set a demo Open or PTC Only"}
     assert {row["result"] for row in rows} == {"done", "refused"}
     exported = client.get("/api/admin/admin-log?category=Usage data", headers=BOSS).json()
     assert exported["items"][0]["action"] == "Exported the Admin log", "an export is logged"

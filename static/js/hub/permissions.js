@@ -23,6 +23,11 @@ function applyPermissions() {
     .then(function (d) {
       var granted = d && d.user && d.user.permissions;
       if (!granted) return [];
+      // Not a permission: being on Elio's Consensus licence list
+      // (backend/consensus_licenses.py, 2026-10-28), which shows Create
+      // DemoBoard. Carried here so the page asks in one place.
+      granted = granted.slice();
+      if (d.consensus_licensed) granted.push("consensus_licensed");
       ["download", "preview", "create_demo"].forEach(function (p) {
         document.documentElement.classList.toggle("hub-no-" + p, granted.indexOf(p) < 0);
       });

@@ -272,15 +272,26 @@ async function openAssetDetail(id, fileItemId) {
         actions.firstChild);
     }
 
-    // Only where a DemoBoard is possible: it needs a Consensus demo behind it.
+    // Only where a DemoBoard is possible: it needs a Consensus demo behind
+    // it, and the person a Consensus licence -- on Elio's list, for now
+    // (Elio, Seb, 2026-10-28; backend/consensus_licenses.py). Placed after
+    // Open, before Share Internally and Share feedback.
     if (asset.consensus_uuid) {
-      actions.appendChild(linkButton(
-        "btn-ghost vp-platform", "Create DemoBoard",
-        "https://app.goconsensus.com/link/custom/create?demo="
-          + encodeURIComponent(asset.consensus_uuid),
-        "i-send",
-        "Opens Consensus's own DemoBoard page for this demo. You will be "
-        + "signed in as yourself, so the board is yours."));
+      var shownFor = asset.id;
+      hubPermissions.then(function (granted) {
+        if (granted.indexOf("consensus_licensed") < 0) return;
+        if (!detailAsset || detailAsset.id !== shownFor) return;
+        if (actions.querySelector(".vp-demoboard")) return;
+        var board = linkButton(
+          "btn-ghost vp-platform vp-demoboard", "Create DemoBoard",
+          "https://app.goconsensus.com/link/custom/create?demo="
+            + encodeURIComponent(asset.consensus_uuid),
+          "i-send",
+          "Opens Consensus's own DemoBoard page for this demo. You will be "
+          + "signed in as yourself, so the board is yours.");
+        var open = actions.querySelector(".vp-platform:not(.vp-demoboard)");
+        actions.insertBefore(board, open ? open.nextSibling : actions.firstChild);
+      });
     }
   }
 
@@ -326,19 +337,21 @@ async function openAssetDetail(id, fileItemId) {
     actions.appendChild(copy);
   }
 
-  // Something wrong with this demo (A2, 2026-10-28): to its segment's owners.
-  // A quiet link at the page's top right, on the Back line -- not a button
-  // among Open and Share, which act on the demo (Liwei, 2026-10-28).
-  var back = page.querySelector(".vp-back");
-  if (back && !document.getElementById("vpReport")) {
+  // Feedback on this demo (A2, 2026-10-28): to its segment's owners.
+  // "Share feedback", at the end of the actions row and styled as a link,
+  // not a button: on the Back line it was easy to miss, and it must not
+  // compete with Open and Share (Elio, Seb, 2026-10-28; was "Report an
+  // issue"). It replaces the sidebar's Share feedback, which did not say
+  // what the feedback was about.
+  if (actions && !document.getElementById("vpReport")) {
     var flag = document.createElement("button");
     flag.className = "vp-report";
     flag.id = "vpReport";
     flag.type = "button";
-    flag.title = "Tell the team about a problem with this demo";
-    flag.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-flag"/></svg>Report an issue';
+    flag.title = "Tell the team about this demo: something wrong, missing or out of date";
+    flag.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-message-square"/></svg>Share feedback';
     flag.addEventListener("click", function () { openReportModal(detailAsset); });
-    back.insertAdjacentElement("afterend", flag);
+    actions.appendChild(flag);
   }
 
   // The player is a still: embedding the Consensus viewer is a separate
@@ -941,6 +954,7 @@ function previewSiblings(asset, f) {
  * Built once by moving Elio's own elements -- his .vp-player and his
  * Value Roadmap card -- into wrappers, so index.html is untouched and the
  * page is reused for every asset as before. */
+var ROADMAP_SHOWN = false;
 var SECTIONS = [{ key: "files", label: "Files", icon: "i-file-text", pane: "vpPaneFiles" },
                 { key: "roadmap", label: "Value Roadmap", icon: "i-target", pane: "vpPaneRoadmap" }];
 
@@ -1016,7 +1030,9 @@ function settleSectionTabs(asset) {
   var sections = document.getElementById("vpSections");
   if (!sections) return;
   var hasFiles = !!document.querySelector("#vpPaneFiles .vp-files");
-  var hasRoadmap = asset.type !== "vm";
+  // Hidden until the indexing is ready (Seb, 2026-10-28: nothing is
+  // indexed for the first release). Back: asset.type !== "vm".
+  var hasRoadmap = ROADMAP_SHOWN && asset.type !== "vm";
   var counts = asset.resource_counts || {};
   var fileTotal = Object.keys(counts).reduce(function (n, k) { return n + (counts[k] || 0); }, 0)
                   || (asset.resources || []).length;
@@ -1026,6 +1042,7 @@ function settleSectionTabs(asset) {
       t.querySelector("span").textContent = "Files" + (hasFiles ? " (" + fileTotal + ")" : "");
     } else {
       t.disabled = !hasRoadmap;
+      t.style.display = ROADMAP_SHOWN ? "" : "none";
     }
   });
   sections.style.display = hasFiles || hasRoadmap ? "" : "none";
@@ -1502,8 +1519,16 @@ function linkButton(className, label, href, icon, title) {
 
 /* Arriving on a link someone shared, and the back button, are the same
  * thing: read the hash and show whatever it names. */
+var REQUEST_FORM_HIDDEN = true;
+
 function routeFromHash() {
   var hash = location.hash || "";
+  // The request form is hidden for the first release (Elio, Seb,
+  // 2026-10-28); an old link to it lands on Home.
+  if (hash === "#/request" && REQUEST_FORM_HIDDEN) {
+    history.replaceState(null, "", location.pathname + location.search);
+    hash = "";
+  }
   if (hash === "#/request") {
     closeFilePreview(false);
     closeAssetDetail();
@@ -1615,7 +1640,9 @@ function wireDetailPage() {
 
 /* ── Open / Internal on a demo's page (2026-10-07) ─────────────────────
  *
- * Everyone sees an "Internal" tag, so nobody shares such a demo outside
+ * Everyone sees a "PTC Only" tag (called Internal until Elio and Seb
+ * renamed it, 2026-10-28: partners cannot open it, every PTC person can),
+ * so nobody shares such a demo outside
  * PTC by mistake. People with "Manage content access" also get a small
  * switch beside it. A demo closed to partners in SharePoint is Internal
  * there and opened only there, so it gets the tag and no switch.
@@ -1624,10 +1651,10 @@ function renderAccessMark(meta, asset) {
   // State only; changing it is the Manage card's job (renderManage).
   meta.querySelectorAll(".hub-pill--internal").forEach(function (n) { n.remove(); });
   if (!asset.internal) return;
-  var tag = pill("Internal", "internal");
-  tag.title = asset.internal_source === "sharepoint"
-    ? "Closed to partners in SharePoint. Files open only for people with access to internal content."
-    : "Marked Internal on the Hub. Files open only for people with access to internal content.";
+  var tag = pill("PTC Only", "internal");
+  tag.title = (asset.internal_source === "sharepoint"
+    ? "Closed to partners in SharePoint. " : "Marked PTC Only on the Hub. ")
+    + "Partners cannot open its files, and it is not customer facing.";
   meta.appendChild(tag);
 }
 
@@ -1746,14 +1773,13 @@ function accessRow(asset, may, view) {
   var r = manageRow("Access");
   var url = "/api/assets/" + encodeURIComponent(asset.id);
   var target = asset.internal ? "open" : "internal";
-  var word = asset.internal ? "Open" : "Internal";
+  var word = asset.internal ? "Open" : "PTC Only";
   if (!asset.internal) {
     setState(r.state, "Open", "Everyone who may preview and download opens its files.");
   } else if (asset.internal_source === "sharepoint") {
-    setState(r.state, "Internal", "Closed to partners in SharePoint; it can be opened only there.");
+    setState(r.state, "PTC Only", "Closed to partners in SharePoint; it can be opened only there.");
   } else {
-    setState(r.state, "Internal", "Marked on the Hub. Files open only for people with access "
-      + "to internal content.");
+    setState(r.state, "PTC Only", "Marked on the Hub. Partners cannot open its files.");
   }
   var locked = asset.internal && asset.internal_source === "sharepoint";
   var pending = view && view.pending;
@@ -1763,7 +1789,8 @@ function accessRow(asset, may, view) {
     direct.addEventListener("click", function () {
       confirmStep(r.row, {
         lead: target === "internal"
-          ? "Only people with access to internal content will open its files."
+          ? "Partners will not open its files, and it will no longer be customer facing "
+            + "(Customer facing is set to No in SharePoint)."
           : "Everyone who may preview and download will open its files.",
         placeholder: "Reason (optional, kept in the log)",
         confirm: "Make " + word,
@@ -1772,6 +1799,7 @@ function accessRow(asset, may, view) {
             .then(function (d) {
               asset.internal = d.internal;
               asset.internal_source = d.internal_source;
+              if (d.internal) asset.customer_facing = false;
               refreshMarks(asset);
             });
         }
@@ -1784,7 +1812,7 @@ function accessRow(asset, may, view) {
     var box = mk("div", "hub-manage__request");
     box.appendChild(mk("div", "hub-manage__request-head",
       whoName(pending.requested_by) + " asked to make it "
-      + (pending.level === "internal" ? "Internal" : "Open") + " · " + onDay(pending.requested_at)));
+      + (pending.level === "internal" ? "PTC Only" : "Open") + " · " + onDay(pending.requested_at)));
     box.appendChild(mk("q", "hub-manage__reason", pending.reason));
     var bar = mk("div", "hub-manage__formbar");
     if (may.manage) {

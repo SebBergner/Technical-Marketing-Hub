@@ -357,8 +357,6 @@ function markNavActive() {
  * Elio's, and the integration contract is one script tag and no edits. The
  * foot already exists and holds the PTC mark; this appends to it.
  */
-var FEEDBACK_URL =
-  "https://app.smartsheet.com/b/form/019fd30ea3ee75c7aaf4abf2e58a0342";
 
 /* "3 h ago", "2 days ago": how long since, roughly. */
 function agoLabel(when) {
@@ -374,25 +372,9 @@ function buildSidebarFoot() {
   var foot = document.querySelector(".orion-side__foot");
   if (!foot || foot.querySelector(".hub-foot__row")) return;
 
-  var link = document.createElement("a");
-  link.className = "hub-foot__feedback";
-  link.href = FEEDBACK_URL;
-  // A new tab, not a navigation: somebody writing feedback has the thing
-  // they are describing on screen, and taking the page away from them to
-  // show a form is how half-written feedback gets lost.
-  link.target = "_blank";
-  link.rel = "noopener noreferrer";
-  link.innerHTML =
-    '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">'
-    + '<path d="M2 3.2A1.2 1.2 0 0 1 3.2 2h9.6A1.2 1.2 0 0 1 14 3.2v7.1'
-    + 'a1.2 1.2 0 0 1-1.2 1.2H6.3L3.2 14v-2.5A1.2 1.2 0 0 1 2 10.3z"'
-    + ' fill="none" stroke="currentColor" stroke-width="1.3"'
-    + ' stroke-linejoin="round"/></svg>'
-    + "<span>Share feedback</span>";
-  // The shared form covers more than this Hub, so say where it goes rather
-  // than let the click be a surprise.
-  link.title = "Opens PTC's feedback form in a new tab";
-
+  // No Share feedback link here any more (Elio, Seb, 2026-10-28): it was
+  // easy to miss and did not say what the feedback was about. Feedback is
+  // given on a demo's page; Get help (report.js) stays.
   var row = document.createElement("div");
   row.className = "hub-foot__row";
   var mark = foot.querySelector(".orion-logo");
@@ -402,7 +384,6 @@ function buildSidebarFoot() {
   version.textContent = "";
   row.appendChild(version);
 
-  foot.insertBefore(link, foot.firstChild);
   foot.appendChild(row);
 
   addActivityNav();
@@ -442,7 +423,7 @@ function buildSidebarFoot() {
   // Who is signed in, and the way out -- only when the app does its own
   // sign-in (AUTH_MODE=oidc). Under Easy Auth the platform owns sign-out,
   // and locally there is nobody to sign out, so nothing is shown.
-  // Seb, 2026-09-25: between Share feedback and the PTC mark rather than
+  // Seb, 2026-09-25: above the PTC mark rather than
   // under the mark, and the name easy to read -- it was muted 11.5px.
   fetch("/api/auth/me")
     .then(function (r) { return r.ok ? r.json() : null; })

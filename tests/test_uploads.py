@@ -303,7 +303,7 @@ def test_a_product_no_longer_sold_is_refused_with_the_reason(client, sp):
 
 def test_retired_segments_are_not_offered():
     from backend.services import taxonomy
-    assert {"IoT", "AR"} <= taxonomy.RETIRED_SEGMENTS
+    assert {"IoT", "AR", "SCO"} <= taxonomy.RETIRED_SEGMENTS
 
 
 def test_publishing_a_demo_the_hub_has_not_read_yet_asks_for_a_sync(client, sp):

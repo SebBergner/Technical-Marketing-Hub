@@ -28,8 +28,8 @@ import { renderSuggestions } from "./search.js";
  * that it should not be in the Hub at all, the fix belongs in
  * backend/services/taxonomy.py, where one change reaches search, filters,
  * pages and counts together. */
-//: The divested lines' segments (taxonomy.RETIRED_SEGMENTS): IoT, AR.
-var HIDDEN_SEGMENTS = ["IoT", "AR"];
+//: The retired segments (taxonomy.RETIRED_SEGMENTS): IoT, AR, SCO.
+var HIDDEN_SEGMENTS = ["IoT", "AR", "SCO"];
 
 /* Fill a <select> from a facet, keeping whatever "all" option is already
  * there as the first entry. Counts come along because "Creo (319)" tells you

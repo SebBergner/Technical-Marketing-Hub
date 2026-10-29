@@ -33,8 +33,9 @@ from backend.access import _is_internal_address, _norm_email
 
 REPORTS = "support_reports.json"
 OWNERS = "report_owners.json"
-#: Liwei 2026-10-28; General takes everything the others do not.
-SEGMENTS = ["CAD", "PLM", "ALM", "SLM", "SCO"]
+#: Liwei 2026-10-28; General takes everything the others do not. SCO is
+#: retired (taxonomy.RETIRED_SEGMENTS), so its one demo reports to General.
+SEGMENTS = ["CAD", "PLM", "ALM", "SLM"]
 GENERAL = "General"
 #: As in the Hub Tasks Category column, apostrophes included (U+2019,
 #: read off the list 2026-10-28): a choice must match exactly. Two sets

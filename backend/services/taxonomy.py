@@ -338,10 +338,11 @@ DIVESTED_PRODUCTS = frozenset({
 })
 
 
-#: Segments of the divested lines (IoT: ThingWorx, Kepware; AR: Vuforia).
+#: Segments of the divested lines (IoT: ThingWorx, Kepware; AR: Vuforia),
+#: and SCO, obsolete (Elio, Seb, 2026-10-28; one demo carries it).
 #: Not offered for new demos, not offered as a filter (Liwei, 2026-10-15);
 #: still SharePoint choices, so existing values read as they are.
-RETIRED_SEGMENTS = frozenset({"IoT", "AR"})
+RETIRED_SEGMENTS = frozenset({"IoT", "AR", "SCO"})
 
 
 def is_excluded(products: list[str] | None) -> bool:

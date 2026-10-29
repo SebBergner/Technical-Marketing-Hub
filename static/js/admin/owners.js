@@ -1,7 +1,7 @@
 /* The Report owners tab (A2, Liwei 2026-10-23/28): who is told about the
  * reports on each segment's demos, and how many each segment has had.
  *
- * One card per segment (CAD, PLM, ALM, SLM, SCO, General). Owners have a
+ * One card per segment (CAD, PLM, ALM, SLM, General). Owners have a
  * name, a PTC address and a Notify switch; the addresses of those with
  * Notify on are written into each report's Hub Tasks row (NotifyTo), which
  * the Power Automate flow mails. A segment with nobody notified hands its

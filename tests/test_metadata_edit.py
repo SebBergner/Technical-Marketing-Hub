@@ -166,8 +166,9 @@ def test_edits_lie_over_the_mirror_only_until_a_later_sync():
 
 
 def test_editing_a_video_applies_the_subtype_rules():
-    """A15: a customer video without its customer must name it on its next
-    edit; a Release video keeps Release; Other stores N/A (2026-10-27)."""
+    """A15: a customer video names its customer when its type, subtype or
+    customer is edited -- not on any edit (Liwei, 2026-10-29); a Release
+    video keeps Release; Other stores N/A (2026-10-27)."""
     spec = ut.DEMO_VIDEO
     target = uw.Target(spec=spec, site_id="s", drive_id="d", list_id="l",
                        demo_content_type_id="0x0120", product_note_field=None,
@@ -176,12 +177,30 @@ def test_editing_a_video_applies_the_subtype_rules():
                        terms=None)
     current = {"video_type": "Technical Overview", "video_subtype": "Customer",
                "named_customer": None, "description": "d"}
+    assert me.changes(spec, target, {"description": "new"}, current) == {"description": "new"}
     with pytest.raises(ut.UploadInvalid, match="Named customer"):
-        me.changes(spec, target, {"description": "new"}, current)
+        me.changes(spec, target, {"video_type": "Technical Overview",
+                                  "video_subtype": "Customer", "named_customer": ""},
+                   {**current, "video_subtype": "Feature"})
     release = {**current, "video_subtype": "Release"}
     assert me.changes(spec, target, {"description": "new"}, release) == {"description": "new"}
     assert me.changes(spec, target, {"video_type": "Other"}, release) == \
         {"video_type": "Other", "video_subtype": "N/A"}
+
+
+def test_one_confirmed_value_saves_while_required_ones_are_still_empty():
+    """Liwei, 2026-10-29: the editor sends every field; what did not change
+    is not checked, so an empty Language does not block a new description.
+    A required value that is there still cannot be emptied."""
+    spec = ut.DEMO_VIDEO
+    target = uw.Target(spec=spec, site_id="s", drive_id="d", list_id="l",
+                       demo_content_type_id="0x0120", product_note_field=None,
+                       choices=CHOICES, terms=None)
+    current = {"description": "old", "language": None, "segment": [], "customer_facing": None}
+    sent = {"description": "new", "language": "", "segment": [], "customer_facing": None}
+    assert me.changes(spec, target, sent, current) == {"description": "new"}
+    with pytest.raises(ut.UploadInvalid, match="cannot be empty"):
+        me.changes(spec, target, {"description": ""}, current)
 
 
 def test_what_the_hub_assumes_is_said_not_filled_in(client, fake, tmp_path):

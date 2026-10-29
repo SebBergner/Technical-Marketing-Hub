@@ -118,10 +118,28 @@ def form(spec: ut.TargetSpec, target: uw.Target) -> list[dict]:
 
 
 # ─────────────────────────────────────────────────────────────── writing
+def _same(value, before) -> bool:
+    """Whether a sent value is what SharePoint already has."""
+    if isinstance(value, str):
+        value = value.strip()
+    if isinstance(value, list):
+        value = [v.strip() for v in value if isinstance(v, str) and v.strip()]
+        return sorted(value) == sorted(before or [])
+    if isinstance(value, bool) or isinstance(before, bool):
+        return value is before             # No (False) is a value, not empty
+    return (value or None) == (before or None)
+
+
 def changes(spec: ut.TargetSpec, target: uw.Target, sent: dict, current: dict) -> dict:
     """The values that differ from SharePoint's, checked. Raises
-    ut.UploadInvalid naming every problem."""
-    sent = {k: v for k, v in (sent or {}).items() if k in {f.key for f in edit_fields(spec)}}
+    ut.UploadInvalid naming every problem.
+
+    Only what changed is checked (Liwei, 2026-10-29): a demo with empty
+    required columns can still have one confirmed value saved, and the
+    video rules apply only when its type, subtype or customer changes."""
+    keys = {f.key for f in edit_fields(spec)}
+    sent = {k: v for k, v in (sent or {}).items()
+            if k in keys and not _same(v, current.get(k))}
     cleaned = ut.clean_fields(_spec_with_owner(spec), sent, target.choices, partial=True)
     owner = cleaned.get("demo_owner")
     if owner:
@@ -133,7 +151,8 @@ def changes(spec: ut.TargetSpec, target: uw.Target, sent: dict, current: dict) -
     # A video's subtype follows its type (A15), judged on the whole video as
     # it will be; a retired subtype it already has may stay, a customer
     # video missing its customer must now name it (Liwei, 2026-10-27).
-    if any(f.key == "video_subtype" for f in spec.fields):
+    if (any(f.key == "video_subtype" for f in spec.fields)
+            and {"video_type", "video_subtype", "named_customer"} & cleaned.keys()):
         merged, problems = ut.video_rules({**current, **cleaned}, before=current)
         if problems:
             raise ut.UploadInvalid(" ".join(problems))

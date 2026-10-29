@@ -31,6 +31,33 @@ function render(d) {
   $("roIntro").textContent = canManage() ? ""
     : "You can see the owners; changing them needs Manage users & groups.";
   d.segments.forEach(function (s) { host.appendChild(segmentCard(s, d.general)); });
+  tasksLine(d.hub_tasks);
+}
+
+/* Whether feedback reaches the Hub Tasks list from here (2026-10-29): it
+ * is switched off on staging after a swap, and a row that failed is only
+ * in the server log otherwise. */
+function tasksLine(t) {
+  var p = $("roTasks");
+  if (!p || !t) return;
+  p.className = "";
+  p.style.color = "";
+  if (!t.on) {
+    p.className = "faint";
+    p.textContent = "Hub Tasks is off on this site (HUB_TASKS_LIST is empty): feedback is kept "
+      + "here and shown under My feedback, but no row is written to SharePoint.";
+    return;
+  }
+  var text = "Feedback is written to the SharePoint list “" + t.list + "”.";
+  if (t.unsent) {
+    text += " " + t.unsent + (t.unsent === 1 ? " row is" : " rows are")
+      + " not sent yet; they are tried again after each sync."
+      + (t.error ? " Last error: " + t.error : "");
+    p.style.color = "var(--red)";
+  } else {
+    p.className = "faint";
+  }
+  p.textContent = text;
 }
 
 function segmentCard(s, general) {

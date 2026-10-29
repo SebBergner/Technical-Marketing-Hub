@@ -28,6 +28,8 @@ function applyPermissions() {
       // DemoBoard. Carried here so the page asks in one place.
       granted = granted.slice();
       if (d.consensus_licensed) granted.push("consensus_licensed");
+      // Nor is being a partner, which renames Share Internally (2026-10-29).
+      if (d.user.is_partner) granted.push("is_partner");
       ["download", "preview", "create_demo"].forEach(function (p) {
         document.documentElement.classList.toggle("hub-no-" + p, granted.indexOf(p) < 0);
       });

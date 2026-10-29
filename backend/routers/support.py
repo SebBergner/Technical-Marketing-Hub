@@ -76,9 +76,10 @@ class OwnersIn(BaseModel):
 @admin_router.get("", dependencies=[VIEW_ADMIN])
 def report_owners(repo: AssetRepository = Depends(get_repo)):
     lists, counts = sr.owners(repo), sr.counts(repo)
+    from backend.integrations.graph import hub_tasks
     return {"segments": [{"segment": s, "owners": lists[s], **counts[s]}
                          for s in sr.SEGMENTS + [sr.GENERAL]],
-            "general": sr.GENERAL}
+            "general": sr.GENERAL, "hub_tasks": hub_tasks.status(repo)}
 
 
 @admin_router.put("/{segment}")

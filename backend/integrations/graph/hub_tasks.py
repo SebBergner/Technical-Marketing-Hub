@@ -224,6 +224,16 @@ def unsent(repo) -> int:
     return sum(1 for e in _load(repo).values() if _diff(e))
 
 
+def status(repo) -> dict:
+    """For Admin -> Report owners (2026-10-29): whether this slot writes the
+    list at all (HUB_TASKS_LIST is empty on staging after a swap), and what
+    is still to send, with the last error."""
+    waiting = [e for e in _load(repo).values() if _diff(e)]
+    errors = sorted((e for e in waiting if e.get("error")), key=lambda e: e.get("at") or "")
+    return {"on": enabled(), "list": (settings.hub_tasks_list or "").strip(),
+            "unsent": len(waiting), "error": errors[-1]["error"] if errors else None}
+
+
 def _diff(entry: dict) -> dict:
     sent = entry.get("sent") or {}
     return {k: v for k, v in (entry.get("want") or {}).items() if sent.get(k) != v}

@@ -16,6 +16,7 @@ from backend.auth import CurrentUser, principal_from_request
 from backend.config import settings
 from backend.deps import get_repo
 from backend.repositories.base import AssetQuery, AssetRepository
+from backend.services import support_reports as sr
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
@@ -112,15 +113,19 @@ async def _reviewer(request: Request) -> CurrentUser:
     raise HTTPException(status_code=401, detail="Sign-in required.")
 
 
-def _is_mine(asset, user: CurrentUser) -> bool:
+def _is_mine(asset, user: CurrentUser, my_segments: frozenset = frozenset()) -> bool:
     """Who made it, as the Hub credits it (A4): the DemoOwner column, the
     person a Hub upload was submitted for, else the files' creator, which
-    SharePoint writes "Last, First"."""
+    SharePoint writes "Last, First". With no owner, also the owners of its
+    segment on Admin -> Report owners (`my_segments`; Liwei, 2026-10-29),
+    the segment counted as a report about it would be."""
     mine = {e for e in (user.email, user.username) if e}
     mine = {e.lower() for e in mine}
     owner = asset.demo_owner or asset.submitted_by
     if owner:
         return owner.lower() in mine
+    if my_segments and sr.route_segment(asset.segment) in my_segments:
+        return True
     if not asset.creator or not user.name:
         return False
     last, _, first = asset.creator.partition(",")
@@ -174,6 +179,9 @@ def content_to_review(user: CurrentUser = Depends(_reviewer),
             last_used[aid] = max(last_used.get(aid, ""), e.get("at") or "")
     records = repo.listed_records() if hasattr(repo, "listed_records") else {}
     today = _date.today()
+    me = {e.lower() for e in (user.email, user.username) if e}
+    my_segments = frozenset(s for s, people in sr.owners(repo).items()
+                            if any((p.get("email") or "").lower() in me for p in people))
     idle_from = (today - _td(days=REVIEW_IDLE_DAYS)).isoformat()
     soon = (today + _td(days=REVIEW_EXPIRING_DAYS)).isoformat()
     lately = (today - _td(days=REVIEW_EXPIRING_DAYS)).isoformat()
@@ -206,7 +214,7 @@ def content_to_review(user: CurrentUser = Depends(_reviewer),
             "age_band": a.age_band,
             "last_used": (last_used.get(a.id) or "")[:10] or None,
             "owner": a.demo_owner or a.submitted_by or a.creator,
-            "mine": _is_mine(a, user),
+            "mine": _is_mine(a, user, my_segments),
             "in_sharepoint": a.source == "sharepoint",
             "still_current_until": str(a.still_current_until) if a.still_current_until
                                    else None,

@@ -167,7 +167,9 @@ function openEditor(asset) {
     var grid = mk("div", "hub-edit__grid");
     form.fields.forEach(function (f) {
       var row = mk("label", "hub-edit__row");
-      var name = mk("span", "hub-edit__label", f.label + (f.required ? " *" : ""));
+      // No asterisks: an edit saves what changed, so nothing must be filled
+      // first (Liwei, 2026-10-29); a filled required field cannot be emptied.
+      var name = mk("span", "hub-edit__label", f.label);
       row.appendChild(name);
       var c = control(f, form.values[f.key]);
       row.appendChild(c);

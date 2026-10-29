@@ -322,17 +322,29 @@ async function openAssetDetail(id, fileItemId) {
     actions.appendChild(pageLink);
   }
 
+  // A partner sees "Copy link" (Liwei, 2026-10-29): "Internally" means
+  // PTC to them, and the link is for their colleagues on the Hub too.
   if (actions && !document.getElementById("vpCopyLink")) {
     var copy = document.createElement("button");
+    var copyLabel = "Share Internally";
+    var drawCopy = function () {
+      copy.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-file-text"/></svg>';
+      copy.appendChild(document.createTextNode(copyLabel));
+    };
     copy.className = "btn-ghost";
     copy.id = "vpCopyLink";
     copy.title = "This opens the Hub itself -- for colleagues, not customers.";
-    copy.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-file-text"/></svg>Share Internally';
+    drawCopy();
+    hubPermissions.then(function (granted) {
+      if (granted.indexOf("is_partner") < 0) return;
+      copyLabel = "Copy link";
+      copy.title = "A link to this page on the Hub, for colleagues who use it -- not for customers.";
+      drawCopy();
+    });
     copy.addEventListener("click", function () {
       navigator.clipboard.writeText(assetUrl(detailAsset.id));
       copy.textContent = "Copied";
-      setTimeout(function () { copy.innerHTML =
-        '<svg class="orion-ico--sm orion-ico"><use href="#i-file-text"/></svg>Share Internally'; }, 1500);
+      setTimeout(drawCopy, 1500);
     });
     actions.appendChild(copy);
   }
@@ -1062,18 +1074,13 @@ function renderFactsTable(page, asset) {
   }
   card.innerHTML = "";
 
+  // Products by family only: the detailed names repeated them (Liwei, 2026-10-29).
   var families = (asset.product_families || []).map(familyDisplayName);
-  // The raw product names, when any says more than its family does
-  // ("Creo Parametric" under Creo); all of them, so the row reads whole.
-  var products = asset.products || [];
-  var detailed = products.some(function (p) { return families.indexOf(p) < 0; })
-    ? products : [];
   var yesNo = function (v) { return v === true ? "Yes" : v === false ? "No" : null; };
   var rows = [
     ["Asset type", TYPE_LONG[asset.type] || asset.type],
     ["Video type", videoTypeOf(asset)],
     ["Products", families.join(", ")],
-    ["Product (detailed)", detailed.join(", ")],
     // "N/A" says no version applies (A11): nothing to show.
     ["Product version", /^n\/?a$/i.test((asset.product_version || "").trim()) ? null
                         : asset.product_version],

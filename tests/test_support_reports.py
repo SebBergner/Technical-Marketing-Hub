@@ -138,3 +138,14 @@ def test_statuses_are_read_back_by_hub_id(monkeypatch):
             return [{"id": "1", "fields": {"HubId": "report:abc", "TaskStatus": "Done"}},
                     {"id": "2", "fields": {"HubId": "upload:x", "TaskStatus": "Open"}}]
     assert hub_tasks.read_statuses("report:", client=Fake()) == {"abc": "Done"}
+
+
+def test_report_owners_says_whether_feedback_reaches_hub_tasks(client, monkeypatch):
+    """2026-10-29: Get help on staging wrote no row -- HUB_TASKS_LIST is empty
+    there after a swap. Admin now says so."""
+    url = "/api/admin/report-owners"
+    monkeypatch.setattr(settings, "hub_tasks_list", "")
+    assert client.get(url, headers=BOSS).json()["hub_tasks"] == {
+        "on": False, "list": "", "unsent": 0, "error": None}
+    monkeypatch.setattr(settings, "hub_tasks_list", "Hub Tasks")
+    assert client.get(url, headers=BOSS).json()["hub_tasks"]["on"] is True

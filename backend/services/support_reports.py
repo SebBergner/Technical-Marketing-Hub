@@ -125,10 +125,15 @@ def set_owners(repo, segment: str, people: list[dict]) -> list[dict]:
     return clean
 
 
+def route_segment(segment: str | None) -> str:
+    """The segment a demo's reports count under: its own, else General."""
+    return segment if segment in SEGMENTS else GENERAL
+
+
 def route(repo, segment: str | None) -> dict:
     """Which segment a report counts under, and whom to tell."""
     lists = owners(repo)
-    seg = segment if segment in SEGMENTS else GENERAL
+    seg = route_segment(segment)
     told = [o["email"] for o in lists[seg] if o.get("notify")]
     fell_back = False
     if not told and seg != GENERAL:

@@ -151,3 +151,24 @@ def test_content_to_review_is_for_reviewers_and_archivers_least_used_first(clien
     assert missing["dusty"] == [], "not a SharePoint demo: nothing to fill in here"
     client.put("/api/assets/dusty/archive", json={"archived": True}, headers=BOSS)
     assert "dusty" not in [r["asset_id"] for r in client.get(url, headers=STAFF).json()["items"]]
+
+
+def test_a_demo_with_no_owner_is_mine_when_i_own_its_segment(client, tmp_path):
+    """Liwei, 2026-10-29: with no Demo owner, a demo counts under its
+    segment's owners on Admin -> Report owners; an owned one does not."""
+    from backend.repositories.json_repo import JsonAssetRepository
+    from backend.services import support_reports as sr
+    rows = json.loads((tmp_path / "mirror" / "sharepoint.json").read_text(encoding="utf-8"))
+    for r in rows:
+        r["segment"] = {"dusty": "CAD", "idle": "CAD", "used": "SCO"}.get(r["id"])
+    rows[1]["demo_owner"] = "other@ptc.com"
+    (tmp_path / "mirror" / "sharepoint.json").write_text(json.dumps(rows), encoding="utf-8")
+    repo = JsonAssetRepository(settings.data_dir)
+    sr.set_owners(repo, "CAD", [{"email": "someone@ptc.com"}])
+    access.update_group(EMPLOYEES, "a", permissions=["view_hub", "review_content"])
+    d = client.get("/api/reports/content-to-review", headers=STAFF).json()
+    assert {r["asset_id"] for r in d["items"] if r["mine"]} == {"dusty"}
+    sr.set_owners(repo, "General", [{"email": "someone@ptc.com"}])
+    d = client.get("/api/reports/content-to-review", headers=STAFF).json()
+    assert {r["asset_id"] for r in d["items"] if r["mine"]} == {"dusty", "fresh", "used"}, \
+        "no segment, or a retired one, is General's"

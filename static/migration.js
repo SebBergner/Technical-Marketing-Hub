@@ -446,6 +446,19 @@
          fmtSize(p.volume_ready_bytes) + " ready now");
     tile(t, "~" + (p.estimate_hours || 0) + " h", "Estimated time",
          "at " + p.estimate_rate_mb_s + " MB/s, measured from a workstation", true);
+    // GXC Gallery rows (2026-10-29): where they go, and who will see them.
+    var gx = $("pvGxc");
+    gx.innerHTML = "";
+    gx.hidden = !p.gxc_rows;
+    if (p.gxc_rows) {
+      gx.appendChild(box("warnbox", fmtInt(p.gxc_rows) + " GXC Gallery " +
+        (p.gxc_rows === 1 ? "video goes" : "videos go") + " to " +
+        (p.gxc_library || "the GXC library (not configured here)") + ", not " + p.library +
+        ". Restricted: on the Hub only people with View GXC videos (and Administrators) see " +
+        "them; SharePoint limits the library to its own group. They are written as not " +
+        "customer facing, with Segment, Video Type and products left empty, to fill in " +
+        "afterwards with Edit metadata."));
+    }
     renderShare($("pvSegments"), "Segment", p.segments || [],
       "Of every video in this migration, including those that need fixing. A video can have several segments.");
     renderShare($("pvProducts"), "Hub Products", p.hub_products || [],

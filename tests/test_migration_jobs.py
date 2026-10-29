@@ -337,3 +337,52 @@ def test_a_restart_resumes_an_unfinished_run_but_not_a_paused_one(client, tmp_pa
     monkeypatch.setattr(jobs, "_spawn", lambda b: jobs.execute(b))
     assert jobs.auto_resume() == bid
     assert jobs.run_status(bid)["state"] == "finished"
+
+
+# ─────────────────────────────────────────────────────── GXC (2026-10-29)
+def gxc_workbook(tmp_path) -> bytes:
+    """A GXC sheet as V29 has them: no Customer Facing, Segment or Video Type."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Lamborghini (GXC Gallery)"
+    ws.append(["Section", "Id", "Video Title", "Delete?", "Short Description", "Long Description"])
+    ws.append(["Lamborghini", VIDEO["id"], "Lamborghini walkthrough", False, "Short.", "Long."])
+    path = tmp_path / "gxc.xlsx"
+    wb.save(path)
+    return path.read_bytes()
+
+
+def upload_gxc(client, tmp_path):
+    r = client.post("/api/migration/brightcove/sheets", files={"file": (
+        "GXC.xlsx", gxc_workbook(tmp_path),
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 200, r.text
+    return r.json()["sheet_id"]
+
+
+def test_gxc_rows_go_to_the_gxc_library_never_customer_facing(client, tmp_path, isolated,
+                                                               monkeypatch):
+    # One fake library serves both names; which name each row resolves to is
+    # what Targets.for_record decides.
+    monkeypatch.setattr(settings, "migration_gxc_library", LIB)
+    admin(client)
+    sid = upload_gxc(client, tmp_path)
+    p = client.get(f"/api/migration/brightcove/sheets/{sid}").json()
+    assert p["status"] == "ready", p.get("error")
+    assert (p["gxc_rows"], p["gxc_library"], p["counts"]["new"]) == (1, LIB, 1)
+    assert p["rows"][0]["gxc"] is True
+    bid = client.post("/api/migration/brightcove/runs",
+                      json=body(sid, operator="Liwei")).json()["batch_id"]
+    assert client.get(f"/api/migration/brightcove/runs/{bid}").json()["state"] == "finished"
+    written = [b for m, p, b in isolated.calls if m == "PATCH" and p.endswith("/fields")]
+    assert written[0]["Customer_x0020_Facing"] is False
+    assert written[0]["Gallery"] == "GXC Gallery" and "Segment" not in written[0]
+
+
+def test_without_a_gxc_library_gxc_rows_wait(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "migration_gxc_library", "")
+    admin(client)
+    sid = upload_gxc(client, tmp_path)
+    p = client.get(f"/api/migration/brightcove/sheets/{sid}").json()
+    assert p["counts"]["invalid"] == 1
+    assert "MIGRATION_GXC_LIBRARY" in p["problems"][0]["rows"][0]["detail"]

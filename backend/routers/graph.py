@@ -176,6 +176,7 @@ def _run_sync(client: GraphClient, repo: AssetRepository, actor: str,
     summary = result.as_dict()
     summary["vm_pages"] = _sync_vm_pages(client, repo)
     summary["demo_video"] = _sync_demo_video(client, repo)
+    summary["gxc_video"] = _sync_gxc_video(client, repo)
     summary["demo_pages"] = _sync_demo_pages(client, repo)
     summary["partner_access"] = _sync_partner_access(client, repo)
     _record_attempt(repo, ok=True, summary=summary)
@@ -240,6 +241,20 @@ def _sync_demo_video(client: GraphClient, repo: AssetRepository) -> dict:
         return {"ok": True, **sync_videos(client, repo, site).as_dict()}
     except Exception as exc:                                 # noqa: BLE001
         log.exception("demo video sync failed")
+        return {"ok": False, "error": str(exc)[:300]}
+
+
+def _sync_gxc_video(client: GraphClient, repo: AssetRepository) -> dict:
+    """"GXC Video" (2026-10-29): the same as Demo Video, into its own mirror,
+    failing alone. Blank `graph_gxc_library` switches it off."""
+    from backend.integrations.graph.video_sync import GXC_VIDEO, sync_videos
+    if not GXC_VIDEO.name:
+        return {"ok": None, "skipped": "not configured"}
+    try:
+        site = client.resolve_site(settings.graph_site_url)
+        return {"ok": True, **sync_videos(client, repo, site, which=GXC_VIDEO).as_dict()}
+    except Exception as exc:                                 # noqa: BLE001
+        log.exception("gxc video sync failed")
         return {"ok": False, "error": str(exc)[:300]}
 
 

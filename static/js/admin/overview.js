@@ -276,7 +276,8 @@ function syncDetail(s) {
   if (!s) return "";
   var parts = [];
   if (s.skipped_total !== undefined) parts.push(s.skipped_total + " skipped");
-  var named = [["demo_video", "Demo Video"], ["vm_pages", "VM pages"], ["demo_pages", "Demo pages"]];
+  var named = [["demo_video", "Demo Video"], ["gxc_video", "GXC Video"], ["vm_pages", "VM pages"],
+               ["demo_pages", "Demo pages"]];
   named.forEach(function (n) {
     var p = s[n[0]];
     if (!p) return;

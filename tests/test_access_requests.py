@@ -47,9 +47,9 @@ class _Answer:
 def ask(client, who=ANN, level="internal", reason="Customer data in the recording"):
     """A request made before 2026-10-28, when people still asked on the Hub;
     now only one left from then exists (Report an issue instead)."""
-    from backend.deps import get_repo
+    from backend.deps import build_repo
     from backend.services import access_requests
-    repo = get_repo()
+    repo = build_repo()
     email = who["X-MS-CLIENT-PRINCIPAL-NAME"]
     try:
         made = access_requests.create(repo, repo.get("bobcat"), level, reason, f"user:{email}")

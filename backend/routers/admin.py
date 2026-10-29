@@ -134,6 +134,8 @@ def _sharepoint_libraries(repo: AssetRepository) -> list[dict]:
     rows = [
         {"name": settings.graph_list_name, "source": "sharepoint", "summary_key": None},
         {"name": settings.graph_video_library, "source": VIDEO, "summary_key": "demo_video"},
+        # 2026-10-29: GXC Video, for "View GXC videos" only on the Hub.
+        {"name": settings.graph_gxc_library, "source": "gxc_video", "summary_key": "gxc_video"},
         {"name": "Virtual Machines pages", "source": VM_PAGES, "summary_key": "vm_pages"},
         # 2026-10-05/06: the Demo Catalog's pages, and which demo folders
         # partners may download from. Both ride along with the same sync.
@@ -297,6 +299,45 @@ def content_assets(dim: str, value: str, repo: AssetRepository = Depends(get_rep
 
 class HideIn(BaseModel):
     asset_id: str
+
+
+class GxcIn(BaseModel):
+    downloads: bool
+
+
+def _gxc_state(repo: AssetRepository) -> dict:
+    """GXC Video at a glance (2026-10-29): the library, how many videos the
+    Hub has read from it, which groups see them, and the download switch."""
+    count = getattr(repo, "count_source_rows", None)
+    switches = repo.hub_settings()
+    groups = [{"id": g["id"], "name": g["name"], "members": len(g["members"]),
+               "auto": g.get("auto")}
+              for g in access.load_state()["groups"] if Perm.VIEW_GXC.value in g["permissions"]]
+    return {"library": settings.graph_gxc_library or None,
+            "videos": count("gxc_video") if count else None,
+            "groups": groups, "downloads": switches["gxc_downloads"],
+            "changed_by": switches.get("changed_by"), "changed_at": switches.get("changed_at")}
+
+
+@router.get("/gxc", dependencies=[VIEW_ADMIN])
+def get_gxc(repo: AssetRepository = Depends(get_repo)):
+    try:
+        return _gxc_state(repo)
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+
+
+@router.put("/gxc", dependencies=[VIEW_ADMIN])
+def set_gxc(body: GxcIn, repo: AssetRepository = Depends(get_repo),
+            actor: str = Depends(require_perm(Perm.MANAGE_ACCESS))):
+    """Whether GXC videos may be downloaded from the Hub (Liwei, 2026-10-29:
+    a switch, so the answer can change without code). Off by default."""
+    try:
+        repo.set_hub_settings(actor, gxc_downloads=body.downloads)
+        log.info("gxc downloads %s by %s", "on" if body.downloads else "off", actor)
+        return _gxc_state(repo)
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
 
 
 @router.get("/hidden", dependencies=[VIEW_ADMIN])

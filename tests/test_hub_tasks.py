@@ -50,8 +50,8 @@ def sp_list(monkeypatch):
 
 
 def _repo():
-    from backend.deps import get_repo
-    return get_repo()
+    from backend.deps import build_repo
+    return build_repo()
 
 
 def _rows(fake):

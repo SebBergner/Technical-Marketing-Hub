@@ -179,11 +179,11 @@ def test_the_whole_flow_publishes_at_once(client, sp, tmp_path):
 
 def _left_from_before(client, sp, sent_back=False):
     """An upload finished before review was removed: waiting, or sent back."""
-    from backend.deps import get_repo
+    from backend.deps import build_repo
     from backend.services import uploads
     record = start(client).json()
     upload_all(client, sp, record)
-    repo = get_repo()
+    repo = build_repo()
     uploads.submit(repo, record["id"], "user:maker@ptc.com", task=False)
     if sent_back:
         uploads.send_back(repo, record["id"], "user:boss@ptc.com", "Segment should be PLM")

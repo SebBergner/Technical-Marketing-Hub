@@ -36,6 +36,10 @@ def hub_activity(since: str | None = None, until: str | None = None,
                  repo: AssetRepository = Depends(get_repo)):
     reader = getattr(repo, "usage_events", None)
     events = reader() if reader else []
+    # A GXC video unlisted for this person would still show its id, which
+    # is its title (2026-10-29): its use is left out for them altogether.
+    if not getattr(repo, "gxc", True):
+        events = [e for e in events if not (e.get("asset_id") or "").startswith("gxc-")]
     # One listing, not a get() per demo: each get() rebuilds the catalogue
     # view, and hundreds of them took the page past a minute (2026-10-14).
     # A listing also leaves archived and hidden demos out by itself.

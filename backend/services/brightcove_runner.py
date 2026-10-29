@@ -61,6 +61,11 @@ from backend.services.brightcove_migration import batches_dir
 
 REQUIRED = ("brightcove_id", "customer_facing")
 BRIGHTCOVE = "brightcove"          # `source` value meaning "download by ID"
+#: The gallery whose videos go to the GXC Video library (Liwei, 2026-10-29):
+#: for a few PTC people only, so never customer facing; and its sheets carry
+#: no Customer Facing, Segment, Video Type or products -- those are filled in
+#: on the Hub afterwards with Edit metadata.
+GXC_GALLERY = "GXC Gallery"
 #: Extra manifest column -> (library column, is it a choice column).
 EXTRA = {"hub_products": ("HubProducts", True), "video_type": ("VideoType", True),
          "video_subtype": ("VideoSubtype", True), "named_customer": ("NamedCustomer", False),
@@ -105,6 +110,10 @@ class VideoRecord:
         return self.source == BRIGHTCOVE
 
     @property
+    def is_gxc(self) -> bool:
+        return self.extra.get("gallery") == GXC_GALLERY
+
+    @property
     def folder_name(self) -> str:
         return w.safe_folder_name(self.title)
 
@@ -128,8 +137,9 @@ def load_manifest(path: str) -> list[VideoRecord]:
     for i, raw in enumerate(rows, start=2):                  # row 1 is the header
         get = lambda k: m.clean_text(raw.get(k))             # noqa: E731
         problems = [f"unknown column {c!r} ignored" for c in sorted(unknown)] if i == 2 else []
+        gxc = get("gallery") == GXC_GALLERY
         for k in REQUIRED:
-            if not get(k):
+            if not get(k) and not (gxc and k == "customer_facing"):
                 problems.append(f"{k} is empty")
         published = None
         if get("original_publish_date"):
@@ -140,6 +150,8 @@ def load_manifest(path: str) -> list[VideoRecord]:
         cf = m.as_bool(get("customer_facing"))
         if get("customer_facing") and cf is None:
             problems.append(f"customer_facing {get('customer_facing')!r} is not yes/no")
+        if gxc:
+            cf = False
         current = m.as_bool(get("current"))
         if get("current") and current is None:
             problems.append(f"current {get('current')!r} is not yes/no")

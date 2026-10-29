@@ -182,9 +182,10 @@ async def demo_of_upload(upload_id: str):
     demo's page once the Hub has read the new folder, until then My demos,
     which says where it stands. Behind sign-in like every page."""
     from urllib.parse import quote
-    from backend.deps import get_repo
+    from backend.deps import build_repo
     from backend.services import uploads
-    repo = get_repo()
+    # Only to find where to send them; the demo's page decides what they see.
+    repo = build_repo()
     try:
         record = uploads.get(repo, upload_id)
     except LookupError:

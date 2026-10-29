@@ -901,8 +901,9 @@ function renderFilePreview() {
 
   // f.item_id is guaranteed here -- MODAL_PREVIEWABLE_KINDS already
   // required it before this file could reach the modal at all.
-  document.getElementById("hubFilePreviewDownload").href =
-    fileDownloadUrl(asset.id, f.item_id);
+  var downloadLink = document.getElementById("hubFilePreviewDownload");
+  downloadLink.href = fileDownloadUrl(asset.id, f.item_id);
+  downloadLink.hidden = !!asset.downloads_off;
 
   document.getElementById("hubFilePreviewPrev").disabled = state.index <= 0;
   document.getElementById("hubFilePreviewNext").disabled = state.index >= state.files.length - 1;
@@ -1254,14 +1255,18 @@ function buildFileRow(asset, f, nameEl, noActions) {
   row.insertBefore(nameEl, row.lastChild);
 
   if (f.item_id && !noActions) {
-    var download = document.createElement("a");
-    download.className = "vp-file__download";
-    download.href = fileDownloadUrl(asset.id, f.item_id);
-    download.target = "_blank";
-    download.rel = "noopener";
-    download.title = "Download";
-    download.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-clock"/></svg>Download';
-    row.appendChild(download);
+    // A GXC video while Admin keeps its downloads off: no button (the
+    // server refuses the download too).
+    if (!asset.downloads_off) {
+      var download = document.createElement("a");
+      download.className = "vp-file__download";
+      download.href = fileDownloadUrl(asset.id, f.item_id);
+      download.target = "_blank";
+      download.rel = "noopener";
+      download.title = "Download";
+      download.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-clock"/></svg>Download';
+      row.appendChild(download);
+    }
 
     var share = document.createElement("button");
     share.type = "button";
@@ -1657,10 +1662,14 @@ function renderAccessMark(meta, asset) {
   // State only; changing it is the Manage card's job (renderManage).
   meta.querySelectorAll(".hub-pill--internal").forEach(function (n) { n.remove(); });
   if (!asset.internal) return;
-  var tag = pill("PTC Only", "internal");
-  tag.title = (asset.internal_source === "sharepoint"
-    ? "Closed to partners in SharePoint. " : "Marked PTC Only on the Hub. ")
-    + "Partners cannot open its files, and it is not customer facing.";
+  // A GXC video (2026-10-29) says so instead: only a few people see it.
+  var tag = pill(asset.gxc ? "GXC only" : "PTC Only", "internal");
+  tag.title = asset.gxc
+    ? "A GXC video: only people with View GXC videos can see it on the Hub. "
+      + "Share it only with them."
+    : (asset.internal_source === "sharepoint"
+      ? "Closed to partners in SharePoint. " : "Marked PTC Only on the Hub. ")
+      + "Partners cannot open its files, and it is not customer facing.";
   meta.appendChild(tag);
 }
 

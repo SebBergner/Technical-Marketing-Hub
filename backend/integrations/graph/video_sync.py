@@ -28,11 +28,18 @@ folder still being migrated is not listed half-done.
 Every run reads the whole library. At a few hundred folders that is a couple
 of delta pages and one children listing -- seconds -- and it avoids keeping a
 second delta cursor in step.
+
+**GXC Video** (Liwei, 2026-10-29) is a second library of the same shape,
+read the same way into a mirror of its own (`gxc_video`, ids "gxc-"). Its
+demos exist on the Hub only for "View GXC videos" (json_repo drops them at
+the funnel for anyone else); SharePoint restricts the library itself.
 """
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+
+from backend.config import settings
 
 from backend.integrations.graph.client import GraphClient, SiteRef
 from backend.integrations.graph.sync import _latest_per_item, _relative_path, _with_fields
@@ -42,12 +49,37 @@ from backend.services import sharepoint_mapping as m
 
 log = logging.getLogger(__name__)
 
-#: The mirror file's name. Not what the UI sees: assets say "sharepoint".
-SOURCE_SYSTEM = "demo_video"
-#: Asset ids get this prefix, so a video can never take a Demo Catalog kit's
-#: slug. Ids are shared links and are never reused (json_repo identity), and
-#: the two libraries can hold folders with the same name.
-ID_PREFIX = "video-"
+@dataclass(frozen=True)
+class VideoLibrary:
+    """One library of single videos the Hub indexes."""
+    #: The mirror file's name. Not what the UI sees: assets say "sharepoint".
+    source: str
+    #: Asset ids get this prefix, so a video can never take a Demo Catalog
+    #: kit's slug, nor another library's. Ids are shared links and are never
+    #: reused (json_repo identity), and libraries can hold folders with the
+    #: same name.
+    id_prefix: str
+    #: The setting that names the library; blank switches it off.
+    setting: str
+    #: Its demos are for "View GXC videos" only.
+    gxc: bool = False
+
+    @property
+    def name(self) -> str | None:
+        return (getattr(settings, self.setting) or "").strip() or None
+
+
+DEMO_VIDEO = VideoLibrary("demo_video", "video-", "graph_video_library")
+GXC_VIDEO = VideoLibrary("gxc_video", "gxc-", "graph_gxc_library", gxc=True)
+LIBRARIES = (DEMO_VIDEO, GXC_VIDEO)
+
+SOURCE_SYSTEM = DEMO_VIDEO.source
+ID_PREFIX = DEMO_VIDEO.id_prefix
+
+
+def library_of(asset_id: str) -> VideoLibrary | None:
+    """The video library an asset id belongs to; None for anything else."""
+    return next((lib for lib in LIBRARIES if asset_id.startswith(lib.id_prefix)), None)
 #: Below this many indexed videos the shrink guard stands aside. The guard
 #: catches a partial read mistaken for a full one; while the library holds a
 #: handful of test items, emptying it on purpose (Liwei, 2026-09-29: the tests
@@ -99,10 +131,11 @@ class VideoSyncResult:
     #: is not configured here, so "not looked up" never reads as "none found".
     posters: int | None = None
     errors: list[str] = field(default_factory=list)
+    source: str = SOURCE_SYSTEM
 
     def as_dict(self) -> dict:
         return report(
-            SOURCE_SYSTEM,
+            self.source,
             unchanged=False,
             indexed=self.assets,
             examined=self.assets + self.skipped_no_demo_type,
@@ -128,9 +161,10 @@ def _search_text(fields: dict, hub_products: list[str]) -> str | None:
     return text or None
 
 
-def build_assets(items: list[dict]) -> tuple[list[Asset], VideoSyncResult]:
+def build_assets(items: list[dict], library: VideoLibrary = DEMO_VIDEO,
+                 ) -> tuple[list[Asset], VideoSyncResult]:
     """Top-level folders with a Demo Type become assets; files below are theirs."""
-    result = VideoSyncResult()
+    result = VideoSyncResult(source=library.source)
     items = _latest_per_item(items)
     assets: dict[str, dict] = {}
     stated: dict[str, tuple[bool | None, bool | None]] = {}
@@ -152,7 +186,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], VideoSyncResult]:
 
         segment, all_segments = m.parse_segment(_field(fields, "segment"))
         hub_products = m.parse_lookup(_field(fields, "hub_products"))
-        asset = m.blank_asset(ID_PREFIX + m.slugify(name, taken), name,
+        asset = m.blank_asset(library.id_prefix + m.slugify(name, taken), name,
                               m.TYPE_MAP[demo_type])
         asset.update(
             description=m.clean_text(_field(fields, "description")),
@@ -241,15 +275,16 @@ def add_posters(assets: list[Asset], result: VideoSyncResult, brightcove) -> Non
 
 
 def sync_videos(client: GraphClient, repo, site: SiteRef | None = None,
-                library: str | None = None, brightcove=None) -> VideoSyncResult:
+                library: str | None = None, brightcove=None,
+                which: VideoLibrary = DEMO_VIDEO) -> VideoSyncResult:
     """Read the whole library and replace this source's mirror.
 
+    `which`: Demo Video or GXC Video; `library` overrides its name.
     `brightcove`: the client posters are read with; by default the one the
     settings describe, if any."""
-    from backend.config import settings
     from backend.integrations.brightcove import get_brightcove_client
 
-    library = library if library is not None else settings.graph_video_library
+    library = library if library is not None else which.name
     site = site or client.resolve_site()
     drive = client.find_drive(site.site_id, library)
     if drive is None:
@@ -261,17 +296,17 @@ def sync_videos(client: GraphClient, repo, site: SiteRef | None = None,
     items, _, _ = mark_flags(client, site.site_id, drive.drive_id, page.items)
     from backend.integrations.graph.sync import lift_archive
     items, archive_id = lift_archive(items)
-    assets, result = build_assets(_with_fields(client, drive, items, archive_id))
+    assets, result = build_assets(_with_fields(client, drive, items, archive_id), which)
     result.library = library
     add_posters(assets, result,
                 brightcove if brightcove is not None else get_brightcove_client())
 
     counter = getattr(repo, "count_source_rows", None)
-    previous = counter(SOURCE_SYSTEM) if counter else 0
-    repo.replace_source_rows(assets, source_system=SOURCE_SYSTEM,
+    previous = counter(which.source) if counter else 0
+    repo.replace_source_rows(assets, source_system=which.source,
                              allow_shrink=previous < SHRINK_GUARD_FROM)
     if stamp := getattr(repo, "record_sync", None):
-        stamp(SOURCE_SYSTEM)
-    log.info("demo video sync: %d video(s) from %r, %s poster(s)",
-             result.assets, library, result.posters)
+        stamp(which.source)
+    log.info("%s sync: %d video(s) from %r, %s poster(s)",
+             which.source, result.assets, library, result.posters)
     return result

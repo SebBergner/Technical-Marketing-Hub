@@ -20,6 +20,7 @@ function canManageAccess() {
 }
 
 function loadContentAccess() {
+  loadGxc();
   loadRequests();
   loadChanges("caChanges", "Content access");
   return fetch("/api/admin/content-access")
@@ -171,6 +172,79 @@ function setAccess(assetId, level, status) {
       status.textContent = "Not saved: " + err.message;
       status.className = "promo-status err";
     });
+}
+
+/* ── GXC videos (Liwei, 2026-10-29) ─────────────────────────────────────
+ * The GXC Video library's demos exist on the Hub only for groups with
+ * "View GXC videos"; this card says how many there are, which groups see
+ * them, and holds the one switch: whether they can be downloaded. */
+function loadGxc() {
+  return fetch("/api/admin/gxc")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (s) { if (s) renderGxc(s); });
+}
+
+function renderGxc(s) {
+  var host = $("gxcCard");
+  host.innerHTML = "";
+  var head = el("div", "card-head");
+  head.appendChild(el("h2", null, "GXC videos"));
+  head.appendChild(el("span", "faint num", s.library
+    ? (s.videos == null ? "—" : s.videos) + " in " + s.library : "Not configured"));
+  host.appendChild(head);
+  host.appendChild(el("p", "muted", "Videos in the GXC Video library are for a few PTC "
+    + "people only. Anyone whose groups lack View GXC videos never sees them on the Hub: "
+    + "they are not listed or found, and a shared link opens nothing. Administrators "
+    + "always see them; partners never do. SharePoint restricts the library itself, "
+    + "so keep its group and these Hub groups the same people."));
+  var who = el("div", "promo-row__meta");
+  who.style.margin = "0 0 10px";
+  who.textContent = s.groups.length
+    ? "Seen by: " + s.groups.map(function (g) {
+        return g.name + (g.auto ? "" : " (" + g.members + ")");
+      }).join(", ")
+    : "No group has View GXC videos.";
+  host.appendChild(who);
+
+  var row = el("div", "promo-row");
+  row.style.gridTemplateColumns = "1fr auto";
+  var text = el("div");
+  text.appendChild(el("div", "promo-row__title", "Downloads"));
+  text.appendChild(el("div", "promo-row__meta", "Whether GXC videos can be downloaded "
+    + "from the Hub. Off, they still play in the preview; a copy can't be fully "
+    + "prevented either way. Off by default."));
+  row.appendChild(text);
+  var toggle = el("label", "switch");
+  var box = el("input");
+  box.type = "checkbox";
+  box.checked = !!s.downloads;
+  box.disabled = !canManageAccess();
+  box.setAttribute("aria-label", "GXC downloads");
+  toggle.appendChild(box);
+  toggle.appendChild(el("span", "switch__track"));
+  toggle.appendChild(el("span", "switch__label", s.downloads ? "On" : "Off"));
+  row.appendChild(toggle);
+  host.appendChild(row);
+  var status = el("div", "promo-status faint", canManageAccess() ? ""
+    : "Changing this needs Manage content access.");
+  host.appendChild(status);
+  box.addEventListener("change", function () {
+    box.disabled = true;
+    status.textContent = "Saving…";
+    fetch("/api/admin/gxc", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ downloads: box.checked }),
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(renderGxc).catch(function (err) {
+      box.checked = !box.checked;
+      box.disabled = false;
+      status.textContent = "Not saved: " + err.message;
+      status.className = "promo-status err";
+    });
+  });
 }
 
 function renderContentAccess(items) {

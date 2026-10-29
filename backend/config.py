@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     #: source of its own (backend/integrations/graph/video_sync.py). It rides
     #: along with every SharePoint sync. Blank switches it off.
     graph_video_library: str = "Demo Video"
+    #: The GXC Gallery's videos (Liwei, 2026-10-29): the same kind of library,
+    #: indexed the same way, but its demos exist on the Hub only for "View
+    #: GXC videos". SharePoint restricts the library itself. Blank switches
+    #: it off.
+    graph_gxc_library: str = "GXC Video"
 
     # ---------------------------------------------------------------- Consensus
     # Auth is a body object on every call, not a header — the OpenAPI spec
@@ -223,6 +228,10 @@ class Settings(BaseSettings):
     #: other sources too (Seb, Elio). The /migration page summarises it
     #: read-only, and the CLI refuses to write to it without --allow-production.
     migration_brightcove_library: str = "Demo Video"
+    #: Where the sheet's GXC Gallery rows go instead (Liwei, 2026-10-29): a
+    #: library restricted in SharePoint, whose demos only "View GXC videos"
+    #: sees on the Hub. Blank: GXC rows are reported, not migrated.
+    migration_gxc_library: str = "GXC Video"
     #: The term set Product's labels are looked up in. Extranet / "PTC Product":
     #: the Product term "Creo Parametric" on a Demo Catalog folder was found
     #: there on 2026-09-28 -- likely Product's bound set, not proven, since

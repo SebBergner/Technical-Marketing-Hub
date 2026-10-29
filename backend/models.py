@@ -412,6 +412,9 @@ class AssetBase(BaseModel):
     #: partners there) or "hub" (marked on the Hub).
     internal: bool = False
     internal_source: str | None = None
+    #: From the GXC Video library (2026-10-29): listed only for "View GXC
+    #: videos", and downloaded only while Admin allows it.
+    gxc: bool = False
     #: How old, in the bands people see (services/content_age.py): new,
     #: recent, aging, older -- None without a date.
     age_band: str | None = None
@@ -553,6 +556,9 @@ class Asset(AssetBase):
     #: Set on the response for a partner on a partner-restricted demo: the
     #: files are listed without the ids that open or download them.
     files_locked: bool = False
+    #: Set on the response for a GXC video while Admin keeps its downloads
+    #: off: previews play, Download is refused.
+    downloads_off: bool = False
     #: Every other asset: the VMs whose pages say they run it.
     used_by_vms: list[UsedByVm] = Field(default_factory=list)
 

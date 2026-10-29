@@ -1320,6 +1320,7 @@ body .hub-seg__fam:hover{border-color:var(--orion-indigo)}
 .hub-file-preview__actions + .hub-preview__close{margin-left:4px}
 .hub-preview__bar .hub-preview__title{min-width:0}
 .hub-preview__bar .hub-file-preview__download{margin:0;width:auto;padding:5px 12px;font-size:12px}
+.hub-file-preview__download[hidden]{display:none}
 .hub-preview__bar .hub-file-preview__share{margin:0;width:auto;padding:5px 12px;font-size:12px}
 .hub-file-preview__share{margin-top:8px;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 12px;font:inherit;font-size:12.5px;font-weight:700;color:var(--orion-text-2);background:var(--orion-surface);border:1px solid var(--orion-border-md);border-radius:var(--orion-radius-sm);cursor:pointer}
 .hub-file-preview__share:hover{color:var(--orion-text);border-color:var(--orion-text-3)}

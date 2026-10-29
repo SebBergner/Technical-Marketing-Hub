@@ -82,8 +82,8 @@ def test_warming_fetches_each_picture_once(client, monkeypatch, tmp_path):
     calls = []
     monkeypatch.setattr(thumbnails, "fetch",
                         lambda graph, url: calls.append(url) or (b"img", "image/png"))
-    from backend.deps import get_repo
-    repo = get_repo()
+    from backend.deps import build_repo
+    repo = build_repo()
     assert thumbnails.warm(repo, client=object()) == 1
     assert thumbnails.warm(repo, client=object()) == 0, "fresh in the cache"
     assert calls == [HILL]

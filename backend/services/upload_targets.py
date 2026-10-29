@@ -21,7 +21,7 @@ Rules for every target, whatever its entry says:
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 
 #: Field kinds the form knows how to draw.
@@ -157,6 +157,13 @@ DEMO_VIDEO = TargetSpec(
 #: The libraries uploads may go to. Add a library here (see the module doc).
 TARGETS: dict[str, TargetSpec] = {t.key: t for t in (DEMO_CATALOG, DEMO_VIDEO)}
 
+#: GXC Video (2026-10-29): Demo Video's columns, restricted in SharePoint.
+#: Its videos come from the migration and are filled in afterwards with
+#: Edit metadata, so it is edited here but never offered as an upload target.
+GXC_VIDEO = replace(DEMO_VIDEO, key="gxc_video", library="GXC Video",
+                    label="GXC Video — restricted videos", id_prefix="gxc-")
+EDIT_ONLY: dict[str, TargetSpec] = {GXC_VIDEO.key: GXC_VIDEO}
+
 #: Never an upload target, whatever TARGETS says.
 NEVER = frozenset({"documents", "wiki", "apps for sharepoint", "client side assets"})
 
@@ -182,8 +189,7 @@ def overrides() -> dict[str, str]:
 
 
 def target(key: str) -> TargetSpec:
-    from dataclasses import replace
-    spec = TARGETS.get(key)
+    spec = TARGETS.get(key) or EDIT_ONLY.get(key)
     if spec is None:
         raise UploadInvalid("Choose where it goes: " + ", ".join(t.label for t in TARGETS.values()))
     if key in overrides():

@@ -70,6 +70,8 @@ def target_key(record: dict) -> str:
         raise NotEditable("Only demo kits and videos are edited here.")
     if not record.get("source_item_id"):
         raise NotEditable("The Hub does not know this demo's SharePoint folder yet.")
+    if record["id"].startswith("gxc-"):
+        return "gxc_video"
     return "demo_video" if record["id"].startswith("video-") else "demo_catalog"
 
 
@@ -318,7 +320,8 @@ def apply_edits(rows: list[dict], edits: dict, synced: dict[str, str | None]) ->
     out = []
     for r in rows:
         e = edits.get(r["id"])
-        source = "demo_video" if r["id"].startswith("video-") else "sharepoint"
+        source = ("gxc_video" if r["id"].startswith("gxc-")
+                  else "demo_video" if r["id"].startswith("video-") else "sharepoint")
         if e and (not synced.get(source) or e.get("at", "") > synced[source]):
             r = {**r, **e.get("values", {})}
         out.append(r)

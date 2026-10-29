@@ -116,6 +116,10 @@ _MIRROR_FIELDS = (
 #: Under mirror/, and never read as catalogue data: _load_mirror only reads
 #: *.json at the top level of mirror/. Holds what VM pages say that only a
 #: signed-in person may see. Rebuilt by every VM sync, like the rest of mirror/.
+#: The mirrors whose demos are for "View GXC videos" only (video_sync.GXC_VIDEO;
+#: named here because the repository must not import the Graph code).
+GXC_SOURCES = frozenset({"gxc_video"})
+
 PRIVATE_DIR = "private"
 VM_SECRETS_FILE = "vm_credentials.json"
 PARTNER_ACCESS_FILE = "partner_access.json"
@@ -354,8 +358,12 @@ class JsonAssetRepository(AssetRepository):
     #: why this is not sufficient across processes.
     _lock = threading.RLock()
 
-    def __init__(self, data_dir: str):
+    def __init__(self, data_dir: str, gxc: bool = True):
         self._mirror_cache: dict[str, tuple[float, list]] = {}
+        #: Whether GXC videos exist for whoever this repository serves
+        #: (deps.get_repo). True for the Hub's own jobs -- syncs, the daily
+        #: run -- which must see everything.
+        self.gxc = gxc
         self.dir = data_dir
         self.mirror_dir = os.path.join(data_dir, "mirror")
         self.owned_dir = os.path.join(data_dir, "owned")
@@ -415,6 +423,17 @@ class JsonAssetRepository(AssetRepository):
                         tagged.append((source, record))
                     elif source == "sharepoint":
                         divested_folders.add(_folder_key(_catalog_folder(record)))
+        # GXC videos (Liwei, 2026-10-29): for anyone without "View GXC
+        # videos" they do not exist -- dropped here, at the funnel, like a
+        # divested product, so no list, search, related demo, thumbnail or
+        # link can reach one. For everyone else they are marked, and never
+        # customer facing.
+        # PTC Only too: the library is closed to partners in SharePoint, which
+        # the partner check confirms on its next run.
+        tagged = [(src, {**r, "gxc": True, "customer_facing": False, "internal": True,
+                         "internal_source": "sharepoint"}
+                   if src in GXC_SOURCES else r)
+                  for src, r in tagged if self.gxc or src not in GXC_SOURCES]
         identity = self._load("identity")
         # Retired items keep their identity row but leave the catalogue.
         live = [(src, r) for src, r in tagged
@@ -457,7 +476,7 @@ class JsonAssetRepository(AssetRepository):
             from backend.services.metadata_edit import apply_edits
             rows = apply_edits(rows, edits, {
                 s: (self._load("sync_state").get(s) or {}).get("last_success_at")
-                for s in ("sharepoint", "demo_video")})
+                for s in ("sharepoint", "demo_video", *GXC_SOURCES)})
         # Hidden from the Hub on the Admin page (owned/hidden.json): out of
         # every read here, at the funnel, like a retired item.
         hidden = self._load("hidden") or {}
@@ -812,6 +831,8 @@ class JsonAssetRepository(AssetRepository):
                 # On unless switched off: these demos (Lamborghini IPL...) are
                 # why the page source exists.
                 "show_page_only_demos": bool(state.get("show_page_only_demos", True)),
+                # GXC videos download only when switched on (Liwei, 2026-10-29).
+                "gxc_downloads": bool(state.get("gxc_downloads")),
                 "changed_by": state.get("changed_by"), "changed_at": state.get("changed_at")}
 
     def set_hub_settings(self, actor: str, **values) -> dict:
@@ -1648,6 +1669,7 @@ class JsonAssetRepository(AssetRepository):
             partner_restricted=bool(record.get("partner_restricted")),
             internal=bool(record.get("internal")),
             internal_source=record.get("internal_source"),
+            gxc=bool(record.get("gxc")),
             age_band=content_age.band(_as_date(record.get("uploaded_at"))),
             still_current_until=record.get("still_current_until"),
             still_current_by=record.get("still_current_by"),

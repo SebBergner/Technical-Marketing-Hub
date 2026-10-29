@@ -247,9 +247,9 @@ def test_a_demo_made_through_the_hub_is_credited_to_its_person(client, sp, tmp_p
         {"id": "kit-c", "type": "ldk", "title": "From elsewhere", "products": ["Creo"],
          "source_item_id": "folder-elsewhere", "creator": None,
          "submitted_by": "max.mustermann@ptc.com"}]), encoding="utf-8")
-    from backend.deps import get_repo
+    from backend.deps import build_repo
     from backend.repositories.base import AssetQuery
-    creators = {a.id: a.creator for a in get_repo().list(
+    creators = {a.id: a.creator for a in build_repo().list(
         AssetQuery(limit=10, include_pending=True)).items}
     assert creators == {"kit-a": "Jane Doe", "kit-b": "Seb",
                         "kit-c": "Max Mustermann"}, "submitted_by alone is enough"

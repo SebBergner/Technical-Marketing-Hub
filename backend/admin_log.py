@@ -42,6 +42,7 @@ ACTIONS: dict[tuple[str, str], str] = {
     ("POST", "/api/admin/hidden"): "Hid a demo",
     ("DELETE", "/api/admin/hidden/{asset_id}"): "Unhid a demo",
     ("PUT", "/api/admin/hub-settings"): "Changed the Hub's display options",
+    ("PUT", "/api/admin/gxc"): "Switched GXC video downloads",
     ("PUT", "/api/admin/promoted"): "Changed the Featured demos",
     ("POST", "/api/admin/access/groups"): "Created a group",
     ("PUT", "/api/admin/access/groups/{group_id}"): "Changed a group",
@@ -101,7 +102,7 @@ WATCHED = re.compile(r"^/api/(admin|graph|consensus/(sync|oauth)|curation/propos
 #: chain is untouched. First match wins.
 CATEGORIES: list[tuple[str, re.Pattern]] = [
     ("Content access", re.compile(r"^/api/assets/[^/]+/(access|access-requests)"
-                                  r"|^/api/admin/(hidden|access-requests)")),
+                                  r"|^/api/admin/(hidden|access-requests|gxc)")),
     ("Content review", re.compile(r"^/api/assets/[^/]+/(still-current|archive)$")),
     ("Uploads", re.compile(r"^/api/uploads(/|$)")),
     ("Users & groups", re.compile(r"^/api/admin/(access|api-tokens|consensus-licenses)(/|$)")),

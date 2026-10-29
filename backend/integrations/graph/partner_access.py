@@ -70,7 +70,8 @@ def sync_partner_access(client: GraphClient, repo, site: SiteRef | None = None) 
     previous = repo.partner_access() if hasattr(repo, "partner_access") else {}
     jobs = []
     for library, source in ((settings.graph_list_name, "sharepoint"),
-                            (settings.graph_video_library, "demo_video")):
+                            (settings.graph_video_library, "demo_video"),
+                            (settings.graph_gxc_library, "gxc_video")):
         if not library:
             continue
         drive = client.find_drive(site.site_id, library)

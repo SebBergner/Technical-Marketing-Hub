@@ -101,8 +101,19 @@ def http_clients():
     return None, None
 
 
+class Targets:
+    """Where each video goes: Demo Video, or GXC Video for the GXC Gallery's
+    (Liwei, 2026-10-29). `gxc` is None while the sheet has no GXC rows."""
+
+    def __init__(self, main, gxc=None):
+        self.main, self.gxc = main, gxc
+
+    def for_record(self, r):
+        return self.gxc if r.is_gxc else self.main
+
+
 def _prepare(manifest: str, *, progress=None):
-    """Target, terms, Brightcove client and validated records. Read-only."""
+    """Targets, terms, Brightcove client and validated records. Read-only."""
     from backend.integrations.graph import migration_writer as w
     graph, bc = clients()
     if graph is None:
@@ -111,6 +122,15 @@ def _prepare(manifest: str, *, progress=None):
                                      allow_production=True)    # resolve only reads
     terms = w.TermIndex.load(graph, target.site_id, settings.migration_product_term_set)
     records = run.load_manifest(manifest)
+    gxc = [r for r in records if r.is_gxc]
+    targets = Targets(target)
+    if gxc and settings.migration_gxc_library:
+        targets.gxc = w.LibraryTarget.resolve(graph, settings.migration_gxc_library,
+                                              allow_production=True)
+    elif gxc:
+        for r in gxc:
+            r.problems.append("GXC Gallery videos go to the GXC library, and none is "
+                              "configured here (MIGRATION_GXC_LIBRARY)")
     if any(r.from_brightcove for r in records):
         if bc is None:
             raise RuntimeError("Brightcove is not configured on this deployment "
@@ -120,10 +140,19 @@ def _prepare(manifest: str, *, progress=None):
             run.enrich(todo[i:i + 20], bc)
             if progress:
                 progress(min(i + 20, len(todo)), len(todo))
-    run.validate(records, target.choices, terms)
-    status = run.plan(records, w.existing_by_brightcove_id(graph, target),
-                      w.folder_names(graph, target))
-    return graph, bc, target, terms, records, status
+    # Each library checks its own rows: its options, and what it already holds.
+    status: dict[str, str] = {}
+    for lib, rows in ((targets.main, [r for r in records if not r.is_gxc]),
+                      (targets.gxc, gxc)):
+        if not rows:
+            continue
+        if lib is None:
+            status.update(run.plan(rows, {}, set()))
+            continue
+        run.validate(rows, lib.choices, terms)
+        status.update(run.plan(rows, w.existing_by_brightcove_id(graph, lib),
+                               w.folder_names(graph, lib)))
+    return graph, bc, targets, terms, records, status
 
 
 # ─────────────────────────────────────────────────────────────── sheets
@@ -170,7 +199,7 @@ def compute_preview(sheet_id: str) -> dict:
         _write_json(path, preview)
 
     try:
-        _, _, target, _, records, status = _prepare(os.path.join(folder, "manifest.csv"),
+        _, _, targets, _, records, status = _prepare(os.path.join(folder, "manifest.csv"),
                                                     progress=progress)
     except Exception as exc:                                   # noqa: BLE001
         log.exception("migration preview %s failed", sheet_id)
@@ -199,7 +228,10 @@ def compute_preview(sheet_id: str) -> dict:
              if status.get(r.brightcove_id or f"row {r.row}") != "existing"]
     volume = sum(r.size_bytes or 0 for r in scope)
     preview.update(
-        status="ready", computed_at=_now(), library=target.name,
+        status="ready", computed_at=_now(), library=targets.main.name,
+        # GXC Gallery rows go to the restricted library (2026-10-29).
+        gxc_library=targets.gxc.name if targets.gxc else settings.migration_gxc_library or None,
+        gxc_rows=sum(1 for r in records if r.is_gxc),
         counts={"rows": len(records), "new": counts.get("new", 0),
                 "existing": counts.get("existing", 0), "conflict": counts.get("conflict", 0),
                 "invalid": counts.get("invalid", 0), "scope": len(scope)},
@@ -220,7 +252,7 @@ def compute_preview(sheet_id: str) -> dict:
                   for k, v in sorted(problems.items(), key=lambda kv: -len(kv[1]))],
         rows=[{"row": r.row, "brightcove_id": r.brightcove_id, "title": r.title,
                "status": status.get(r.brightcove_id) or status.get(f"row {r.row}"),
-               "size_bytes": r.size_bytes} for r in records],
+               "size_bytes": r.size_bytes, "gxc": r.is_gxc} for r in records],
     )
     _write_json(path, preview)
     return preview
@@ -410,7 +442,7 @@ def execute(batch_id: str) -> None:
         return
     try:
         blog = run.BatchLog.load(batch_id)
-        graph, bc, target, terms, records, status = _prepare(blog.data["manifest"])
+        graph, bc, targets, terms, records, status = _prepare(blog.data["manifest"])
         by_id = {r.brightcove_id: r for r in records}
         queue = [i["brightcove_id"] for i in blog.data["items"]
                  if i.get("status") in ("pending", "folder_created", "uploading", "uploaded")]
@@ -443,7 +475,8 @@ def execute(batch_id: str) -> None:
             blog.set_item(bcid, started_at=blog.item(bcid).get("started_at") or _now())
             try:
                 uploader, source_http = http_clients()
-                run.migrate_one(graph, target, terms, record, blog, bc=bc, uploader=uploader,
+                run.migrate_one(graph, targets.for_record(record), terms, record, blog,
+                                bc=bc, uploader=uploader,
                                 source_http=source_http, say=lambda _msg: _heartbeat())
                 blog.set_item(bcid, finished_at=_now())
             except Exception as exc:                       # noqa: BLE001

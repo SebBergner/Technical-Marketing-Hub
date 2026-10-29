@@ -73,6 +73,7 @@ class Perm(str, Enum):
     REVIEW_CONTENT = "review_content"
     ARCHIVE = "archive_content"
     VIEW_ARCHIVED = "view_archived"
+    VIEW_GXC = "view_gxc"
     VIEW_REPORTS = "view_reports"
     RUN_SYNC = "run_sync"
     RUN_MIGRATION = "run_migration"
@@ -110,6 +111,10 @@ CATALOGUE: list[tuple[Perm, str, str]] = [
      "people and team totals. Never partners' names."),
     (Perm.VIEW_ARCHIVED, "See archived content",
      "Open archived demos, and show them in lists with 'Show archived'."),
+    (Perm.VIEW_GXC, "View GXC videos",
+     "See the videos in the GXC Video library. Without it they do not exist on "
+     "the Hub: not listed, not found, and their links open nothing. Never given "
+     "to partner (guest) accounts."),
     (Perm.MANAGE_ACCESS, "Manage content access",
      "Mark demos Internal or Open (on the Admin page and on a demo's page), "
      "and hide demos from the Hub. Anyone else asks with Share feedback."),
@@ -132,12 +137,14 @@ _ADMIN_ONLY = frozenset({Perm.VIEW_ADMIN.value, Perm.MANAGE_USERS.value})
 #: (Liwei, 2026-10-14): administering the Hub stays with PTC accounts, the
 #: usual rule for guests in a tenant; nor do they upload into PTC's libraries
 #: (2026-10-15) or archive. Their other permissions are unaffected.
-PARTNER_NEVER = _ADMIN_ONLY | {Perm.UPLOAD.value, Perm.ARCHIVE.value}
+PARTNER_NEVER = _ADMIN_ONLY | {Perm.UPLOAD.value, Perm.ARCHIVE.value, Perm.VIEW_GXC.value}
 
 #: A permission new to a saved access.json goes, once, to these Hub groups by
 #: name as well as to Administrators (Liwei, 2026-10-28: Archive content for
 #: TDD Team). Removed afterwards, it stays removed (`catalogue`).
-INTRODUCED_FOR = {Perm.ARCHIVE.value: {"tdd team"}}
+INTRODUCED_FOR = {Perm.ARCHIVE.value: {"tdd team"},
+                  # GXC videos (Liwei, 2026-10-29): the team sees them.
+                  Perm.VIEW_GXC.value: {"tdd team"}}
 
 #: A permission that already existed, given once to Hub groups by name
 #: (Liwei, 2026-10-28: with review removed, TDD Team marks demos Internal or

@@ -101,7 +101,7 @@ def promoted_summaries(repo: AssetRepository) -> list[AssetSummary]:
 
 
 #: Every source the catalogue is built from (each sync's SOURCE_SYSTEM).
-_SOURCES = ("sharepoint", "demo_video", "demo_pages", "vm_pages", "consensus")
+_SOURCES = ("sharepoint", "demo_video", "gxc_video", "demo_pages", "vm_pages", "consensus")
 
 
 @router.get("/freshness")
@@ -192,6 +192,8 @@ def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo),
     if _locked_for(user, asset):
         asset = asset.model_copy(update={"resources": _without_file_ids(asset.resources),
                                          "files_locked": True})
+    if asset.gxc and not _gxc_downloads(repo):
+        asset = asset.model_copy(update={"downloads_off": True})
     # Which values are only the Hub's inference: for the people who can fix
     # them (Edit metadata), not for visitors or partners (2026-10-28).
     if asset.assumed and not user.can(Perm.EDIT_METADATA):
@@ -285,6 +287,24 @@ def _require_partner_access(asset_id: str, repo: AssetRepository, user: CurrentU
                             detail="These files are not available to your account.")
 
 
+def _gxc_downloads(repo: AssetRepository) -> bool:
+    """Admin's switch for GXC videos' downloads; off until switched on."""
+    try:
+        return bool(repo.hub_settings().get("gxc_downloads"))
+    except NotImplementedError:
+        return False
+
+
+def _require_gxc_download(asset_id: str, repo: AssetRepository) -> None:
+    """A GXC video downloads only while Admin allows it (Liwei, 2026-10-29).
+    Previews still play: nobody pretends that stops a copy, it only takes
+    away the button."""
+    asset = repo.get(asset_id)
+    if asset is not None and asset.gxc and not _gxc_downloads(repo):
+        raise HTTPException(status_code=403,
+                            detail="Downloads of GXC videos are switched off.")
+
+
 def _require_perm(user: CurrentUser, perm: Perm) -> None:
     """Preview and Download are permissions of their own (backend/access.py).
     Only checked for somebody: an anonymous caller exists only where sign-in
@@ -318,11 +338,12 @@ def _asset_drive(client: GraphClient, asset_id: str):
     (backend/integrations/graph/video_sync.py, ids "video-...") live in that
     library; everything else here is the Demo Catalog. Asking the Demo
     Catalog for a Demo Video file returned nothing, so download and preview
-    failed on every migrated video (Liwei, 2026-09-30).
+    failed on every migrated video (Liwei, 2026-09-30). GXC Video's
+    ("gxc-...", 2026-10-29) likewise.
     """
-    from backend.integrations.graph.video_sync import ID_PREFIX
-    library = (settings.graph_video_library if asset_id.startswith(ID_PREFIX)
-               and settings.graph_video_library else settings.graph_list_name)
+    from backend.integrations.graph.video_sync import library_of
+    videos = library_of(asset_id)
+    library = (videos.name if videos and videos.name else settings.graph_list_name)
     site = client.resolve_site()
     drive = client.find_drive(site.site_id, library)
     if drive is None:
@@ -442,6 +463,7 @@ def download_file(asset_id: str, item_id: str,
     _require_perm(user, Perm.DOWNLOAD)
     _require_listed_file(asset_id, item_id, repo)
     _require_partner_access(asset_id, repo, user)
+    _require_gxc_download(asset_id, repo)
     try:
         drive = _asset_drive(client, asset_id)
         url = client.download_url(drive.drive_id, item_id)

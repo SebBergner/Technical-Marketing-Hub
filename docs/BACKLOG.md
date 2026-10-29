@@ -50,7 +50,7 @@ Low（发布后）：Not indexed 状态（B8）、S1 邮件订阅、S5 Value Roa
 多个关键词用 OR 搜索、A13 相关推荐（已在本地完成）、C1 Consensus 视频迁移、C3 Consensus 视频分享（公开链接）、
 在 SharePoint 里创建 demo 页、搜索文档内容和字幕。
 
-会议里的其他事项（不在 Seb 的 High 里）：去掉 segment 的 SCO 选项；按 segment 指定负责人来分派问题（以后做，不阻塞发布）；
+会议里的其他事项（不在 Seb 的 High 里）：去掉 segment 的 SCO 选项（10/28 已做，v2026.3.158：新建和编辑不再提供，筛选里不显示，Report owners 没有 SCO 卡片；那一个 SCO demo 保留原值，问题归 General）；按 segment 指定负责人来分派问题（以后做，不阻塞发布）；
 数据清理，补上发布日期和元数据；11/2 周一和 Myles 开会，催 Consensus 迁移的信息。
 
 ---
@@ -196,7 +196,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - **依赖**：无。
 
 ### A2. Report asset：报告内容问题（用 Hub Tasks 接收）
-- **进度（10/28 本地完成，待推送 staging）**：demo 页 "Report an issue"、侧边栏 "Get help"（含 My reports，状态从 Hub Tasks 读回）、Admin → Report owners（CAD/PLM/ALM/SLM/SCO/General，Notify 开关、计数、无人通知标红）。写 Hub Tasks：TaskType Support request、Category、Segment、NotifyTo（"; " 分隔）。Partner 可提交，只记 "partner"。第一版没有附件。剩下：在 Report owners 填人；Power Automate 流程（你来配）。
+- **进度（10/28 本地完成，待推送 staging）**：demo 页 "Report an issue"、侧边栏 "Get help"（含 My reports，状态从 Hub Tasks 读回）、Admin → Report owners（CAD/PLM/ALM/SLM/General，Notify 开关、计数、无人通知标红）。写 Hub Tasks：TaskType Support request、Category、Segment、NotifyTo（"; " 分隔）。Partner 可提交，只记 "partner"。第一版没有附件。剩下：在 Report owners 填人；Power Automate 流程（你来配）。
 - **来源**：Seb，10/07 会议 —— 和 "Share feedback"（对应用的反馈）、"Request New Asset"
   （申请新 demo）分开，专门处理已有内容的问题和求助。**Summit 确认**：用 "Report asset" 代替开放评论和点赞
   （见 B1）；报告存进 SharePoint 中央列表，**按产品或 segment 分派给负责团队，不发给上传者本人**；

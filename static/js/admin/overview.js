@@ -4,7 +4,7 @@
  * Part of the Admin page's script, split out of static/admin.js on
  * 2026-10-15; static/js/admin/main.js loads it. */
 
-import { $, card, el, localHour, openSheet, row, two, when } from "./util.js";
+import { $, card, el, localHour, openSheet, row, session, two, when } from "./util.js";
 import { load } from "./main.js";
 
 /* Freshness is the one number on this page that rots by itself, so it is
@@ -353,6 +353,29 @@ function renderQueues(d) {
   host.appendChild(c2);
 }
 
+/* The way to /migration, which is its own page (app.py). Liwei,
+ * 2026-10-29: it was linked from nowhere and got lost; GXC work will need
+ * it more. For Run Brightcove migration only -- the page's API refuses
+ * everyone else anyway. */
+function renderMigrations() {
+  var may = (session.permissions || []).indexOf("run_migration") >= 0;
+  $("migrationsSection").hidden = !may;
+  if (!may) return;
+  var host = $("migrations");
+  host.innerHTML = "";
+  var c = card("Brightcove migration");
+  var p = el("p", "muted",
+    "Copies Brightcove Gallery videos into SharePoint, in batches you can pause "
+    + "and resume. Opens on its own page.");
+  p.style.cssText = "font-size:12.5px;margin:0 0 12px";
+  c.appendChild(p);
+  var open = el("button", "btn-primary", "Open Brightcove migration");
+  open.type = "button";
+  open.addEventListener("click", function () { location.assign("/migration"); });
+  c.appendChild(open);
+  host.appendChild(c);
+}
+
 export {
-  renderAutoSync, renderEnvironment, renderIntegrations, renderQueues
+  renderAutoSync, renderEnvironment, renderIntegrations, renderMigrations, renderQueues
 };

@@ -9,7 +9,7 @@
 
 import { $, session, show } from "./util.js";
 import {
-  renderAutoSync, renderEnvironment, renderIntegrations, renderQueues
+  renderAutoSync, renderEnvironment, renderIntegrations, renderMigrations, renderQueues
 } from "./overview.js";
 import { loadUsage, renderDims, renderRanges } from "./usage.js";
 import { loadHubSettings, loadPromoted } from "./home.js";
@@ -109,6 +109,7 @@ function load() {
       contentState.loaded = false;
       showTab(tabFromHash());
       renderQueues(d);
+      renderMigrations();
       renderRanges();
       renderDims();
       $("loadedAt").textContent = "Loaded " + new Date().toLocaleString();

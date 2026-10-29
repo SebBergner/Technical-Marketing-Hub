@@ -7,7 +7,7 @@ what is wrong, and the demo when there is one. It is
 kept here (owned/support_reports.json) and copied to the Hub Tasks list as a
 "Support request" row (integrations/graph/hub_tasks.py), where whoever
 handles it changes its status in SharePoint. The Hub reads the status back
-for "My reports" and for the counts on Admin -> Report owners.
+for "My feedback" and for the counts on Admin -> Report owners.
 
 Who hears about it is decided here, not in Power Automate: each segment has
 its owners (owned/report_owners.json, managed on Admin -> Report owners), and
@@ -41,9 +41,16 @@ GENERAL = "General"
 #: read off the list 2026-10-28): a choice must match exactly. Two sets
 #: (Liwei 2026-10-28): a demo's page asks about that demo; Get help, in the
 #: sidebar, about the Hub itself, and always goes to General.
-DEMO_CATEGORIES = ["File won’t open or is missing", "Content is outdated or wrong",
-                   "Details are wrong (product, date, owner)",
-                   "Demo environment or VM problem", "Other"]
+#: Share feedback asks for more than problems (Liwei 2026-10-28): what went
+#: well, ideas and questions first, then the problems, in two groups.
+DEMO_SHARE = ["This demo helped me", "Idea or suggestion", "Question about this demo"]
+DEMO_PROBLEMS = ["File won’t open or is missing", "Content is outdated or wrong",
+                 "Details are wrong (product, date, owner)",
+                 "Demo environment or VM problem"]
+DEMO_CATEGORIES = DEMO_SHARE + DEMO_PROBLEMS + ["Other"]
+DEMO_GROUPS = [{"label": "Share something", "items": DEMO_SHARE},
+               {"label": "Something isn’t right", "items": DEMO_PROBLEMS},
+               {"label": None, "items": ["Other"]}]
 HUB_CATEGORIES = ["Hub won’t load or is slow", "Demo list is out of date",
                   "Can’t find content", "Sign-in or access problem",
                   "Search or filters don’t work", "Other"]
@@ -82,7 +89,7 @@ def _save(repo, name: str, value) -> None:
 
 
 def reporter_key(user) -> str:
-    """Who made a report, one way: matched for "My reports", never shown."""
+    """Who made a report, one way: matched for "My feedback", never shown."""
     who = f"{user.object_id or ''}|{_norm_email(user.email)}".lower()
     return hashlib.sha256(("hub-report:" + who).encode()).hexdigest()[:24]
 

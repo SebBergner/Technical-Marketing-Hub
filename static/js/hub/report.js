@@ -6,7 +6,7 @@
  * on Admin -> Report owners, services/support_reports.py). "Get help", at
  * the foot of the sidebar (#/help), is about the Hub
  * itself -- it will not load, the list is out of date -- and goes to the
- * Hub team; it has its own categories. Below it, "My reports": everything
+ * Hub team; it has its own categories. Below it, "My feedback": everything
  * this person reported and where it stands. Both are handled in the Hub
  * Tasks list and their status is read back from there. Partners may report
  * too and are recorded only as "partner".
@@ -18,7 +18,7 @@ import { fullDate, report as complain } from "./util.js";
 import { hubPermissions } from "./permissions.js";
 import { closeAdvancedSearch } from "./search.js";
 
-var categories = null;          // {demo: [...], hub: [...]}, from /api/support/options, once
+var categories = null;          // {demo, demo_groups, hub}, from /api/support/options, once
 
 function el(tag, cls, text) {
   var n = document.createElement(tag);
@@ -42,21 +42,28 @@ function reportForm(asset, onDone, onCancel) {
   form.noValidate = true;
   var host = el("div", "hub-rpt__cats");
   host.setAttribute("role", "radiogroup");
-  host.setAttribute("aria-label", "What kind of problem");
-  var label = el("div", "hub-rpt__label", asset ? "What is wrong with this demo?"
+  host.setAttribute("aria-label", asset ? "What kind of feedback" : "What kind of problem");
+  var label = el("div", "hub-rpt__label", asset ? "What would you like to share?"
                                                 : "What is wrong with the Hub?");
   form.appendChild(label);
   form.appendChild(host);
+  function addChoice(c) {
+    var opt = el("label", "hub-rpt__cat");
+    var radio = el("input");
+    radio.type = "radio";
+    radio.name = "category";
+    radio.value = c;
+    opt.appendChild(radio);
+    opt.appendChild(el("span", null, c));
+    host.appendChild(opt);
+  }
   options().then(function (sets) {
-    (asset ? sets.demo : sets.hub).forEach(function (c) {
-      var opt = el("label", "hub-rpt__cat");
-      var radio = el("input");
-      radio.type = "radio";
-      radio.name = "category";
-      radio.value = c;
-      opt.appendChild(radio);
-      opt.appendChild(el("span", null, c));
-      host.appendChild(opt);
+    // A demo's choices come in groups: what went well first, then problems.
+    var groups = asset ? (sets.demo_groups || [{ items: sets.demo }]) : [{ items: sets.hub }];
+    groups.forEach(function (g) {
+      if (g.label) host.appendChild(el("div", "hub-rpt__group", g.label));
+      else if (host.firstChild) host.appendChild(el("div", "hub-rpt__gap"));
+      g.items.forEach(addChoice);
     });
   }).catch(function (err) { host.textContent = "Could not load the categories: " + err.message; });
 
@@ -64,7 +71,8 @@ function reportForm(asset, onDone, onCancel) {
   text.rows = 5;
   text.maxLength = 2000;
   text.placeholder = asset
-    ? "What happened, which file, what you expected. A link or file name helps."
+    ? "What worked, what you would change, or what went wrong. For a problem, say which "
+      + "file and what you expected."
     : "What happened, where, and what you expected. For a problem with one demo, use "
       + "Share feedback on its page.";
   text.setAttribute("aria-label", "Details");
@@ -72,10 +80,10 @@ function reportForm(asset, onDone, onCancel) {
   form.appendChild(text);
 
   var note = el("div", "hub-rpt__note", asset
-    // Asking for a demo to be made Internal or Open is "Other" (Liwei,
+    // Asking for a demo to be made PTC Only or Open is "Other" (Liwei,
     // 2026-10-28: rare, no category of its own; the request flow is gone).
     ? "It goes to the team that looks after this demo's segment, not to the person who uploaded "
-      + "it. To ask for it to be made Internal or Open, choose Other and say why."
+      + "it. To ask for it to be made PTC Only or Open, choose Other and say why."
     : "It goes to the team that runs the Hub.");
   form.appendChild(note);
   var error = el("div", "hub-rpt__error");
@@ -98,7 +106,11 @@ function reportForm(asset, onDone, onCancel) {
     e.preventDefault();
     var picked = form.querySelector("input[name=category]:checked");
     error.textContent = "";
-    if (!picked) { error.textContent = "Choose what kind of problem it is."; return; }
+    if (!picked) {
+      error.textContent = asset ? "Choose what kind of feedback it is."
+                                : "Choose what kind of problem it is.";
+      return;
+    }
     if (text.value.trim().length < 5) { error.textContent = "Say a little more in Details."; return; }
     send.disabled = true;
     send.textContent = "Sending…";
@@ -125,7 +137,7 @@ function sentNote(answer) {
   box.innerHTML = '<svg class="orion-ico orion-ico--sm"><use href="#i-check"/></svg>';
   box.appendChild(el("span", null, "Sent to the " + (answer.segment === "General"
     ? "Hub team" : answer.segment + " owners") + ". "));
-  var a = el("a", null, "See it under My reports");
+  var a = el("a", null, "See it under My feedback");
   a.href = "#/help";
   box.appendChild(a);
   return box;
@@ -175,7 +187,7 @@ function openReportModal(asset) {
   document.body.appendChild(back);
 }
 
-/* ── Get help and My reports (#/help) ─────────────────────────────────── */
+/* ── Get help and My feedback (#/help) ─────────────────────────────────── */
 function buildPage() {
   var page = document.getElementById("hubHelpPage");
   if (page) return page;
@@ -191,7 +203,7 @@ function buildPage() {
     +   'For a problem with one demo, use Share feedback on its page.</div>'
     + '</div></div>'
     + '<div class="hub-rpt"><section class="hub-rpt__card" id="hubHelpForm"></section>'
-    + '<section class="hub-rpt__card"><h2 class="hub-rpt__h">My reports</h2>'
+    + '<section class="hub-rpt__card"><h2 class="hub-rpt__h">My feedback</h2>'
     + '<div id="hubMyReports"></div></section></div>';
   var anchor = document.getElementById("videoPreviewPage");
   if (anchor) anchor.parentNode.insertBefore(page, anchor);

@@ -33,7 +33,8 @@ class ReportIn(BaseModel):
 
 @router.get("/options", dependencies=[Depends(require_perm(Perm.VIEW_HUB))])
 def options():
-    return {"demo": sr.DEMO_CATEGORIES, "hub": sr.HUB_CATEGORIES}
+    return {"demo": sr.DEMO_CATEGORIES, "demo_groups": sr.DEMO_GROUPS,
+            "hub": sr.HUB_CATEGORIES}
 
 
 @router.post("/reports")

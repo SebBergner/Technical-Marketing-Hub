@@ -454,7 +454,6 @@ function renderRelated(page, asset) {
     section.innerHTML =
         '<div class="section-head"><div class="section-head__title">'
       +   '<svg class="orion-ico ico-green"><use href="#i-layers"/></svg> Related demos'
-      +   ' <span class="section-head__sub">same product, segment or type</span>'
       + '</div></div>'
       + '<div class="hub-related__pick" hidden></div>'
       + '<div class="asset-grid"></div>'

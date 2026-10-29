@@ -100,6 +100,15 @@ def test_a_demo_and_the_hub_each_have_their_own_categories(client):
     assert "Can\u2019t find content" in opts["hub"] and "Can\u2019t find content" not in opts["demo"]
 
 
+def test_share_feedback_offers_more_than_problems_in_groups(client):
+    """Liwei 2026-10-28: what went well and ideas first, then the problems."""
+    opts = client.get("/api/support/options", headers=ANN).json()
+    groups = opts["demo_groups"]
+    assert [g["label"] for g in groups][:2] == ["Share something", "Something isn\u2019t right"]
+    assert [c for g in groups for c in g["items"]] == opts["demo"]
+    assert report(client, ANN, "cad", category="This demo helped me").status_code == 200
+
+
 def test_a_partner_reports_anonymously_and_sees_only_their_own(client, monkeypatch):
     rid = report(client, PARTNER, "cad").json()["id"]
     report(client, ANN, "plm")

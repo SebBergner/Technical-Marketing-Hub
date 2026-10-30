@@ -1,6 +1,10 @@
 # Deploying to Azure App Service
 
-> **See also `docs/HANDOVER-DEPLOYMENT.md`** (written 2026-09-03). This file is
+> **Parts of this predate SSO and the staging slot (2026-10-30):** pushes now deploy
+> to staging, and production changes only by Swap. Where they differ,
+> `docs/HANDOVER-DEPLOYMENT.md` (rewritten 2026-10-30) is right.
+>
+> **See also `docs/HANDOVER-DEPLOYMENT.md`.** This file is
 > the *reference* for each Azure setting and why it exists. That one is the
 > *current state and running order*: what is live today, the PR to merge, the
 > sequence to follow, and the verification steps. Read that one to deploy;

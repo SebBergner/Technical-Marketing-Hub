@@ -576,14 +576,14 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 
 | 项目 | 为什么 | 怎么做 | 工作量 |
 |---|---|---|---|
-| D1. **备份 owned 数据** | 权限组、Admin log、审核记录、归档、使用历史只在 Azure Files 上，丢了找不回 | Portal 里给两个 share 开快照或 Azure Backup | 你在 Portal 里设，30 分钟 |
+| D1. **备份 owned 数据** | 权限组、Admin log、审核记录、归档、使用历史只在 Azure Files 上，丢了找不回。**10/30 Liwei 已备份完毕** | Portal 里给两个 share 开快照或 Azure Backup | 完成 |
 | D2. **关掉共享密码登录** | 管理员都走 SSO 了，过渡期可以结束 | 先确认需要进 Admin 的人都在组里，再删两个 slot 的 `ADMIN_PASSWORD`；之后再删相关代码 | 设置 5 分钟；代码清理半天 |
 | D3. 安全响应头 | **10/30 已做**（5187024）：nosniff、只允许 Hub 自己嵌入、Referrer-Policy，HTTPS 的 slot 加 HSTS | —— | 完成 |
 | D4. 同步失败提醒 | 失败只记在 Admin 里，没人知道 | 失败时往 Hub Tasks 写一行（可设提醒），或接 Application Insights 告警 | 半天 |
 | D5. Admin 显示当前配置 | **10/30 已做**（5187024）：Overview 的 Configuration 卡片，显示登录方式、Hub Tasks、上传测试库、共享密码、curator 设置、常驻管理员；只显示数量 | —— | 完成 |
 | D6. 清理 `AUTH_CURATOR_*` | **10/30 定：保留**（Liwei）。两个 slot 上只有 Liwei、Elio、Seb 三人，留作备用入口；合并权限后它们给的是 Maintain content。防止所有人被锁在外面靠的是 `HUB_ADMIN_EMAILS` | 以后想清理时：改由组管理，再删环境变量 | 暂不做 |
 | D7. 删除不用的代码 | `/api/debug/backend`、SQL 存储层 | 删除并更新测试 | 半天 |
-| D8. 更新 HANDOVER-DEPLOYMENT.md | 还写着 SSO 之前的生产 | 按现在的 slot、设置、swap 流程重写 | 半天 |
+| D8. 更新 HANDOVER 文档 | **10/30 已做**：HANDOVER-DEPLOYMENT 按现在的 slot、设置、swap 流程重写；HANDOVER-DEVELOPMENT 开头加了 10/15 之后的改动；GUIDE 和 deploying.md 加了提示 | —— | 完成 |
 | D9. 删测试库和测试数据 | Gallery_Brightcove、Gallery_Brightcove_Test，Hub Tasks 第 1 行 | 每项删除前由你确认 | 你来删，10 分钟 |
 | D10. 手机和无障碍检查 | 销售会用手机打开 | 手机宽度逐页过一遍，修布局；检查键盘操作和对比度 | 1 天 |
 | D11. 对外开放前的安全审查 | Summit：做公开链接、对外下载之前要先验证。不是一个功能，是 C3 上线前的一次把关；这次发布只对内，不阻塞 | 先定 C3 的范围 → 威胁清单 → 公开链接的设计（随机令牌、可过期、可撤销、只限 customer-facing、限速、留日志）→ 确认 SharePoint 的恶意文件检测 → 请安全团队审查或渗透测试 | 1–2 天 + 安全团队 |

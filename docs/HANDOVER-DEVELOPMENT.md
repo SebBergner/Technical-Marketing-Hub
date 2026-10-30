@@ -57,14 +57,80 @@ down there.
 
 ---
 
-## Current state — 2026-10-15 (read this before §4, §5 and §9)
+## Changes since 2026-10-15 (read this first; updated 2026-10-30)
+
+The section after this one was written on 2026-10-15; where they disagree, this
+one wins. `docs/BACKLOG.md` has the reasoning for each item, and
+`docs/HANDOVER-DEPLOYMENT.md` the deployment.
+
+> 中文：10/15 之后的主要改动：去掉审核、权限合并成 Maintain content、partner 白名单、
+> 归档移入 `_Archive`、Share feedback、GXC。
+
+**No review (2026-10-28).** Whoever may create or change something does it directly.
+Create without review, Request content access change, Send back and a token's
+`skip_review` are gone. Uploads and requests left from before are still listed for
+someone to finish (Admin → Content review; Content access → Requests).
+
+**Permissions (2026-10-30), `backend/access.py`.**
+- 13 permissions, 12 offered on the Admin page under four headings
+  (`CATALOGUE`; `HIDDEN` leaves out Request new asset).
+- `Perm.MAINTAIN` ("Maintain content") replaces Edit metadata, Manage content
+  access, Review content, Archive content and See archived content.
+  `Perm.RUN_SYNC` absorbs Run Brightcove migration.
+- `MERGED` maps old ids when read; `TEAM` is the group named "Team Member", given
+  new permissions once by name (`INTRODUCED_FOR`, `GRANTED_ONCE`).
+- `PARTNER_ALLOWED` is an allow-list: `PARTNER_NEVER` is everything else, so a new
+  permission is never a partner's by accident. This reversed the 10/07 rule that a
+  partner given Access internal content could open it.
+- The repository is built per request: `deps.get_repo(user)` →
+  `build_repo(gxc=user.can(Perm.VIEW_GXC))`; `build_repo()` is the system's view.
+- `tests/test_access_audit.py` keeps diagnostics closed and checks the security
+  headers (`security_headers` in `app.py`).
+
+**Editing (A1, A4, A11, A15).** Edit on a demo's Details card
+(`static/js/hub/edit.js`, `backend/services/metadata_edit.py`): the upload form's
+fields plus Demo Owner, the preview video and the card picture, written to
+SharePoint at once and logged. Only changed fields are checked. Titles cannot
+change: they are the folder name, and ids and links come from it.
+
+**Archive (A8, A6), `backend/services/archive.py`.** Moves the folder into its
+library's `_Archive`, comparing permissions before and after and moving back if
+they differ; Restore moves it back, always after a confirmation. Content to review
+(`#/review`, `static/js/hub/review.js`) lists every demo with why it may need a
+look, works in bulk, and has an Archived view. Tested on staging on 2026-10-30.
+
+**Feedback (A2), `backend/services/support_reports.py`, `routers/support.py`.**
+Share feedback on a demo, Get help in the sidebar, Admin → Report owners. Rows go
+to Hub Tasks with `NotifyTo`: the owners of the demo's segment with Notify on, else
+General. No email in v1 (Power Automate comes later).
+
+**GXC (2026-10-29).** `video_sync.LIBRARIES` holds Demo Video and GXC Video (ids
+`gxc-`). The repository drops `GXC_SOURCES` at `_load_mirror`, so every endpoint
+inherits it; anything that leaks an id or title outside that funnel (`hub_activity`,
+`archived()`) filters by itself. Migration `Targets` send GXC Gallery rows to
+`MIGRATION_GXC_LIBRARY`. Not yet synced or migrated for real.
+
+**Also new.** Related demos (`/api/assets/{id}/related`, `owned/related_picks.json`);
+the Dashboard and table view (`dashboard.js`, `table.js`); the Consensus licence
+list (`backend/consensus_licenses.py`); PTC Only is the display name of what the
+code still calls `internal`; Admin → Overview → Configuration.
+
+**Owned files added since the list below:** `consensus_licenses.json`,
+`support_reports.json`, `related_picks.json`, `metadata_edits.json`,
+`hub_settings.json`.
+
+**Tests:** `python -m pytest -q`: 945 pass, 3 skip (2026-10-30).
+
+---
+
+## State on 2026-10-15 (read with the section above, before §4, §5 and §9)
 
 Sections 0–3 and 6–8 still hold. **§4's front-end entries, §5.5 and most of
 §9 describe the September code** and are kept as history: `static/hub-api.js`
 no longer exists, Elio's 2.5 MB `index.html` was rebuilt (79 KB), and the
 September backlog is either shipped or superseded. What changed, in one place:
 
-> 中文：2026-10-15 的现状。§4 的前端部分、§5.5 和 §9 是九月的代码和待办，留作历史；
+> 中文：2026-10-15 的状态。§4 的前端部分、§5.5 和 §9 是九月的代码和待办，留作历史；
 > hub-api.js 已拆成 `static/js/hub/` 下的 ES 模块，admin.js 拆成 `static/js/admin/`。
 > 权限、Create New Demo、API token、Admin log、同步队列、Hub Tasks 见下文。
 > 上线（swap）步骤在 `docs/SWAP-CHECKLIST.md`。

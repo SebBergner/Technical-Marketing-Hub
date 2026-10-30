@@ -2,6 +2,12 @@
 
 写给 Liwei，2026-09-03。假设你手边没有 AI 助手，只有终端和 Azure 门户。
 
+> **2026-10-30 更新，和下文不一致时以这里为准：**
+> - 推送到 `main` 只部署到 **staging**（`https://dev-tmh.ptcxc.com`）。下文说的"线上"，现在都指 staging。
+>   production 只有在 Azure Portal 点 **Swap** 时才变，步骤见 `SWAP-CHECKLIST.md`。
+> - 线上会自己同步（每天两次，也可以在 Admin → Overview 点 Sync），不再需要把本地 `mirror/` 传上去。
+> - 已经全部用 SSO 登录，权限在 Admin → Users & groups。现状见 `HANDOVER-DEPLOYMENT.md`。
+
 英文版的完整交接在 `docs/HANDOVER-DEVELOPMENT.md`（开发）和
 `docs/HANDOVER-DEPLOYMENT.md`（部署）。这一份只讲**你自己动手时的操作流程**。
 

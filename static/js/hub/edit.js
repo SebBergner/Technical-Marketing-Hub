@@ -1,6 +1,6 @@
 /* Editing a demo on its Details card (A1, Liwei 2026-10-26).
  *
- * People with "Edit metadata" (Administrators, TDD Team) get an Edit
+ * People with "Edit metadata" (Administrators, Team Member) get an Edit
  * button on the Details table. It opens the library's own fields in a
  * dialog -- the side card is too narrow for them -- the upload form's,
  * minus the title, plus the Demo Owner --

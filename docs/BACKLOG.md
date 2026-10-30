@@ -1,6 +1,6 @@
 # Technical Marketing Hub — 待办清单
 
-更新于 2026-10-28（staging v2026.3.155；第 1–3 周已完成，第 3 周和"去掉审核"在本地、待推送）。来源：9/2–10/7 的会议笔记、管理层 10/02 的六项要求、
+更新于 2026-10-29（staging v2026.3.163，production 仍是 v2026.3.123；第 1–3 周、"去掉审核"、Seb 的 High 和 GXC 都已上 staging，等切换）。来源：9/2–10/7 的会议笔记、管理层 10/02 的六项要求、
 Serge / Seb / Elio 的意见、2026-10-16 的全面代码扫描、FY27 Summit 的 Hub 讨论（10/20 那周）、
 Serge 10/23 的会议，以及常见内部内容门户的做法。
 
@@ -35,22 +35,35 @@ Low 的项目都放到发布之后。
 - PTC Only：标成 PTC Only 时把 SharePoint 的 CustomerFacing 写成 No，编辑器里这一项锁定；取消 PTC Only 时不自动改回。
 - A13 相关推荐照常随这次推送上线。
 
-**进度（10/28 本地完成，待推送 staging）**：High 里除"测试归档"外的 7 项都已完成。
+**进度（10/29，staging v2026.3.163）**：High 里除"测试归档"外的 7 项都已上 staging，10/29 在 staging 上逐项看过。
 - Usage：可以点创建者。
 - Share feedback：已移到操作栏，侧边栏的链接已去掉；Admin 里看问题用现有的 Admin → Report owners（点计数列出该 segment 的报告）。
 - PTC Only：已改名，写 CustomerFacing No 并锁定。
 - 申请表、Value Roadmap 标签页：已隐藏。
 - Consensus 名单：在 Admin → Users & groups → Consensus licences 上传。
 
+- Create DemoBoard 只看名单，不看权限：没有许可证的 Administrator 也看不到（Consensus 本来就要求本人有账号）。
+
 推送后要做：
-- 上传 Elio 的 CSV（Highlevel 文件夹里的 October 2026 版）。
-- 和 Liwei 一起测试归档和恢复。
+- ~~上传 Elio 的 CSV~~：staging 已上传（263 人，19 个 partner）；**production 切换后要再传一次**（数据按 slot 分开）。
+- 和 Liwei 一起测试归档和恢复：**还没做**，staging 上一个已归档的 demo 都没有。三个库的 `_Archive` 都已建好（GXC Video 的 10/29 补建）。
+
+**10/29 新增（都在 v2026.3.163）**：
+- Share feedback 分组：先 "Share something"（这个 demo 有用、想法），再 "Something isn't right"；Related demos 和页面正文分开显示。
+- 编辑元数据只检查改动过的字段；没有 Owner 的 demo，问题发给它所在 segment 的负责人。
+- Admin → Overview 加了 Brightcove migration 的入口（有 Run Brightcove migration 权限才显示）。
+- **GXC 视频**：单独的 SharePoint 库 "GXC Video"；新权限 View GXC videos（Administrators 自动有，Team Member 组一次性加上，partner 永远没有）。
+  没有权限的人在 Hub 里完全看不到，打开链接也是 404；有权限的人看到的是 PTC Only、不是 customer facing。下载由 Admin → Content access 的开关控制，默认关。
+  迁移时 GXC Gallery 的行进 GXC Video，Segment、Video Type、Products 先空着，以后用 Edit metadata 补。还没真正同步或迁移过（库是空的）。
+- 团队组的名字按 production 改成 **Team Member**（之前代码里写的是 TDD Team，切换后三项新权限会落空）。
+
+**切换前后**（详见 docs/SWAP-CHECKLIST.md）：测试归档；切换后在 production 上传 Consensus 名单、填 Report owners（staging 也还空着）、建 GXC 组、选 Featured、跑一次完整同步。
 
 Low（发布后）：Not indexed 状态（B8）、S1 邮件订阅、S5 Value Roadmap 索引（通过 API 推送）、A3 个人播放列表和收藏、
 多个关键词用 OR 搜索、A13 相关推荐（已在本地完成）、C1 Consensus 视频迁移、C3 Consensus 视频分享（公开链接）、
 在 SharePoint 里创建 demo 页、搜索文档内容和字幕。
 
-会议里的其他事项（不在 Seb 的 High 里）：去掉 segment 的 SCO 选项（10/28 已做，v2026.3.158：新建和编辑不再提供，筛选里不显示，Report owners 没有 SCO 卡片；那一个 SCO demo 保留原值，问题归 General）；按 segment 指定负责人来分派问题（以后做，不阻塞发布）；
+会议里的其他事项（不在 Seb 的 High 里）：去掉 segment 的 SCO 选项（10/28 已做，v2026.3.158：新建和编辑不再提供，筛选里不显示，Report owners 没有 SCO 卡片；那一个 SCO demo 保留原值，问题归 General）；按 segment 指定负责人来分派问题（10/29 已做：没有 Owner 的 demo 发给 segment 负责人）；
 数据清理，补上发布日期和元数据；11/2 周一和 Myles 开会，催 Consensus 迁移的信息。
 
 ---
@@ -578,12 +591,12 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 
 ---
 
-## 去掉审核（Liwei 10/28，本地完成，待推送 staging）
+## 去掉审核（Liwei 10/28，已上 staging）
 
 - **决定**：有修改权限的人直接完成修改、更新、上传，不再审核；没有权限的人用 Report an issue 提要求（改 Internal / Open 选 Other，自己写明）。
 - **Create New Demo**：有 Create new demo 权限的人（API token 也一样）完成即发布；去掉 "Create without review" 权限、token 的 "skip review" 选项、Send back，
   也不再为新 demo 写 Hub Tasks 行。
-- **Internal / Open**：去掉 "Request content access change" 权限和申请、撤回流程；Manage content access 一次性加给 TDD Team（以后去掉不会再加回）。
+- **Internal / Open**：去掉 "Request content access change" 权限和申请、撤回流程；Manage content access 一次性加给 Team Member 组（production 上的名字；以后去掉不会再加回）。
 - **遗留**：推送前还在等审核或被退回的上传、还没决定的访问申请，都不自动处理：Admin → Content review 列出 "Uploads left from before review was removed"
   （只有 Publish），被退回的由上传人在 My demos 里 "Fix and publish"；Admin → Content access 的 Requests 照旧可批准或拒绝。推送后把清单列给 Liwei。
 - **不变**：Edit metadata、Archive 本来就不审核；Request New Asset（申请新 demo）和 Still current 不是审核，保留。

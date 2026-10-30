@@ -1,149 +1,174 @@
 # Slot swap checklist (staging → production)
 
-Written 2026-10-15 for the swap planned on **Friday 2026-10-16**: production
-goes from **v2026.3.72** (2026-10-06) to the staging build (**v2026.3.100**
-or later). Reusable for later swaps; update the version numbers and the
-"what is new" list each time.
+Updated 2026-10-29 for the release swap before **Monday 2026-11-02**:
+production goes from **v2026.3.123** (2026-10-20, `6cdd300`) to the staging
+build (**v2026.3.163** or later, `6afc0e9`+). The first version of this list
+was written for the 10/16 swap (v72 → v100). Reusable for later swaps; update
+the version numbers and the "what is new" list each time.
 
-> 中文导读：明天切换照着这份做。最要紧的三件事：切换前确认 /migration 没在跑；
-> 切换后**马上**检查两个 slot 的登录（并把当前代码重新部署到 staging）；生产上
-> 跑一次完整同步，再设好管理员和权限组。生产的数据（owned/）和 staging 是分开的，
-> staging 上做的设置不会带过去。
+> 中文导读：切换前做三件事：在 staging 上测一次归档和恢复、确认 /migration 没在跑、
+> 备份 production 的 owned/。切换后**马上**检查两个 slot 的登录，并把当前代码重新部署到
+> staging。然后在 production 上：确认 Team Member 组拿到了三项新权限，跑一次完整同步，
+> 上传 Consensus 名单，填 Report owners，按需要建 GXC 组。production 的数据（owned/）
+> 和 staging 是分开的，staging 上做的设置不会带过去。
 
 ## What changes for production users
 
-Everything built since 2026-10-06, all of it new on production:
+Everything built since 2026-10-20 is new on production:
 
-- Users & groups (Administrators / PTC employees / Partners + custom groups) and
-  18 permissions; partners never get View Admin, Manage users, access requests,
-  Create new demo or Create without review.
-- Open / Internal per demo, the SharePoint partner rule, and **requests** to make
-  a demo Internal (PTC employees ask, Manage content access decides).
-- Content age: kit dates from files, Published filter and Sort, age badges,
-  Still current (12 months), Content review and Hub-only **archive**.
-- Hub activity (`#/activity`) for all PTC employees; per-person usage tracking
-  for PTC accounts, partners anonymous.
-- Admin page reorganised (Overview, Home page, Content dashboard + Data
-  completeness, Content review, Content access, Hub usage, Users & groups,
-  Sign-ins + the append-only **Admin log**).
-- Demo pages: a Details | Manage tab for people who may change a demo.
-- **Create New Demo** (2026-10-15): people with "Create new demo" (only
-  Administrators by default) create a video in Demo Video or a kit in the Demo
-  Catalog, metadata first; it is listed once someone with Review content
-  publishes it. New folders only -- nothing existing is changed. Tested end to
-  end against the test library only; the first real kit on production is worth
-  watching in SharePoint (its Language / Owned By columns were never written by
-  a test).
-- **Create without review** (permission, Administrators by default): a new
-  demo from such a person is listed at once. API tokens (Admin -> Users &
-  groups -> API tokens) carry the same choice per token, for scripts such as
-  Seb's (`static/docs/api-create-demo.html`).
-- The Hub page rebuilt (index.html 2.6 MB → 79 KB; scripts as ES modules).
+- **No review** (Liwei 10/28): whoever may create, edit or upload does it
+  directly. "Create without review" and "Request content access change" are
+  gone; people without a permission use Share feedback instead.
+- **Edit metadata** on a demo's Details card (A1), including the preview video
+  and the card picture; only changed fields are checked. Demo Owner (A4),
+  product version (A11), video subtypes that follow the video type (A15), and
+  "assumed" marks for values the Hub guessed.
+- **Archive** moves the demo's folder into the library's `_Archive` folder
+  (A8), with Restore; **Content to review** helps the team archive or confirm
+  old demos in bulk (A6). New permission Archive content.
+- **Share feedback** on a demo's action bar and **Get help** in the sidebar
+  (A2), sent to each segment's owners (Admin → Report owners); demos without an
+  Owner go to their segment's owners. No email in v1.
+- **PTC Only** (was "Internal"): a PTC Only demo is never customer facing.
+- **Create DemoBoard** only for people on Elio's Consensus licence list
+  (Admin → Users & groups → Consensus licences). Administrators without a
+  licence do not see it either.
+- **Related demos** at the foot of a demo's page (A13), picked automatically or
+  by hand.
+- Hub activity: pick a creator to see their most used demos. Tiles show dates,
+  a table view with CSV export, the Dashboard (Library and Usage tabs),
+  freshness, data-update time.
+- Hidden: Request New Asset, the Value Roadmap tab, the sidebar feedback link,
+  the SCO segment (its one demo keeps its value).
+- **GXC videos** (10/29): a separate library "GXC Video" that only "View GXC
+  videos" sees (Administrators always; Team Member once; partners never).
+  Without it a GXC video does not exist on the Hub, its link included.
+  Downloads are switched off by default (Admin → Content access).
+- Admin: menu down the left, an icon per tab; Overview links to the Brightcove
+  migration page.
 
 ## Facts that shape the swap
 
 - **Each slot has its own data share** (`portaldata` for production,
   `portaldatastaging` for staging; the mount is a slot setting). Nothing set on
-  staging — groups, Featured, hidden demos, archive marks, Still current,
-  access requests, the Admin log, usage history — exists on
-  production. Production starts from its own `owned/` as of 2026-10-06.
-- **Sticky (slot) settings stay with the slot:** the nine SSO settings
-  (AUTH_MODE, OIDC_*, SECRET_KEY, HTTPS_ONLY, AUTH_CURATOR_EMAILS,
-  CUSTOM_DOMAIN) and the three BRIGHTCOVE_* settings. **Everything else moves
-  with the code**, so production receives staging's values for them.
-- **New settings since v2026.3.72:** `HUB_ADMIN_EMAILS` (no default; names the
-  Hub's permanent administrators) and `STILL_CURRENT_MONTHS` (default 12).
-- `sync.MAPPING_VERSION` is 3 in the new code: **the first SharePoint sync on
-  production rebuilds the mirror in full** (kit dates from files, demo
-  creators). Until it has run, production shows migration-day dates on kits
-  and an empty "Whose demos were used most".
+  staging exists on production: groups, Featured, the Consensus licence list,
+  Report owners, feedback, archive marks, the Admin log, usage history.
+- **Sticky (slot) settings stay with the slot:** the SSO settings (AUTH_MODE,
+  OIDC_*, SECRET_KEY, HTTPS_ONLY, AUTH_CURATOR_EMAILS, CUSTOM_DOMAIN), the
+  BRIGHTCOVE_* settings, and `HUB_TASKS_LIST` on staging (empty, so trials
+  there do not reach the team's list). **Everything else moves with the code.**
+- **New settings since v2026.3.123:** `GRAPH_GXC_LIBRARY` and
+  `MIGRATION_GXC_LIBRARY`, both defaulting to "GXC Video". Nothing to set.
+- **Permissions are given once, by group name**, the first time production's
+  `access.json` is read by the new code: Archive content and View GXC videos
+  to Administrators and the group named **"Team Member"**, and Manage content
+  access to "Team Member". The name must match (case does not matter); a group
+  renamed later does not get them again. Removed permissions (Create without
+  review, Request content access change) drop out of every group.
+- `sync.MAPPING_VERSION` is 5 in the new code (3 on production): **the first
+  SharePoint sync on production rebuilds the mirror in full** (Demo Owner,
+  product version, thumbnails, assumed values). Until it has run, production
+  shows those fields empty.
+- `_Archive` exists in Demo Catalog, Demo Video and GXC Video (checked
+  2026-10-29, all empty). Archive refuses in a library without one.
 
 ## Before the swap
 
-1. **No migration is running** — `/migration` on both slots shows no active run.
-2. **Staging is the build you want**: `https://dev-tmh.ptcxc.com/api/version`
+1. **Archive test on staging** (Seb's High item, with Liwei): archive the
+   oldest, never-used demo; check in SharePoint that its folder moved into
+   `_Archive` and kept its permissions; restore it from Admin → Content review
+   and check it is back at the library root and listed again.
+2. **No migration is running** — `/migration` on both slots shows no active run.
+3. **Staging is the build you want**: `https://dev-tmh.ptcxc.com/api/version`
    shows the expected version; sign in and spot-check Home, a demo page, Hub
    activity and the Admin page.
-3. **Settings by name** (Cloud Shell; there is no az CLI on the workstation):
+4. **Settings by name** (Cloud Shell; there is no az CLI on the workstation):
    ```bash
    az webapp config appsettings list -g Technical-Marketing-Hub_RG -n Technical-Marketing-Hub \
      --query "[].[name,slotSetting]" -o table
    az webapp config appsettings list -g Technical-Marketing-Hub_RG -n Technical-Marketing-Hub \
      --slot staging --query "[].[name,slotSetting]" -o table
    ```
-   - `HUB_ADMIN_EMAILS` is set on **staging** with the people who must always be
-     administrators (it moves to production with the swap). At least one PTC
-     address; partner addresses are ignored for admin rights.
-   - The SSO and BRIGHTCOVE settings are slot settings on both slots.
-4. **Back up production `owned/`** (Azure Portal → storage account → file share
+   - `HUB_ADMIN_EMAILS` on staging names the permanent administrators (it moves
+     to production).
+   - The SSO, BRIGHTCOVE and staging's `HUB_TASKS_LIST` settings are slot
+     settings.
+   - `UPLOAD_LIBRARY_OVERRIDES` is empty on both slots.
+5. **Production's team group is still named "Team Member"** (Admin → Users &
+   groups on `tmh.ptcxc.com`; 26 members on 2026-10-29). Do not rename it
+   before the swap.
+6. **Back up production `owned/`** (Azure Portal → storage account → file share
    `portaldata` → `owned/` → download). It is the only data a sync cannot
    rebuild; the swap does not touch it, this is just the safety net.
 
 ## The swap
 
-5. Azure Portal → Technical-Marketing-Hub → Deployment slots → **Swap**
+7. Azure Portal → Technical-Marketing-Hub → Deployment slots → **Swap**
    staging → production. Note the time.
 
 ## Immediately after (first five minutes)
 
-6. **Both slots enforce sign-in.** Anonymously:
+8. **Both slots enforce sign-in.** Anonymously:
    - `https://tmh.ptcxc.com/` and `https://dev-tmh.ptcxc.com/` → 302 to `/login`;
-   - `/api/auth/me` on both → 401.
+   - `/api/assets` on both → 401.
    Then sign in to production: the Microsoft page shows production's client
-   id (starts `c965ef60`) and comes back to `tmh.ptcxc.com`.
-7. **Redeploy the current commit to staging.** After a swap, staging runs the
-   old code (v2026.3.72) against staging's newer data. Rerun the last deploy so
+   id (starts `c965ef60`) and comes back to `tmh.ptcxc.com`. Staging's starts
+   `5cc8e937`.
+9. **Redeploy the current commit to staging.** After a swap, staging runs the
+   old code (v2026.3.123) against staging's newer data. Rerun the last deploy so
    both slots run the same build:
    ```bash
    gh run rerun $(gh run list --repo SebBergner/Technical-Marketing-Hub --limit 1 \
      --json databaseId -q '.[0].databaseId') --repo SebBergner/Technical-Marketing-Hub
    ```
    Then `https://dev-tmh.ptcxc.com/api/version` shows the new version again.
-8. `https://tmh.ptcxc.com/api/version` shows the new version.
+10. `https://tmh.ptcxc.com/api/version` shows the new version.
 
 ## On production, in order
 
-9. **Admin → Users & groups.** You should be in Administrators (via
-   `HUB_ADMIN_EMAILS` or as a member). Add the other administrators and any
-   team groups (e.g. a group with View Admin + Review content for reviewers;
-   Marketing ops). PTC employees gain View Hub activity and Request content
-   access change automatically.
-10. **Admin → Overview → Sync SharePoint now**, then **Sync Consensus now**.
-    The SharePoint run is a full rebuild this once (MAPPING_VERSION 3); expect
-    it to take longer than a normal sync. Afterwards:
-    - Content dashboard: totals close to staging's (about 1,287 demos);
-    - a few demo pages: kit dates are no longer 2024-03/05 migration days;
-    - Sync history shows every part (Demo Catalog, Demo Video, pages, VMs,
-      partner downloads) succeeded.
-11. **Automatic sync**: Overview → switch on, two times a day; and in the Azure
-    Portal, **Always On** for the production slot if not already.
-12. **Home page tab**: Featured demos and the two display options (production
-    has its own; re-pick if wanted). **Content access → Hidden demos**: hide the
-    four old page-only story pages if still wanted.
-13. **`UPLOAD_LIBRARY_OVERRIDES` must be empty** on both slots (it points
-    Create New Demo at a test library; only for trials).
-14. **API tokens** are per slot like every other owned
-    setting: tokens made on staging do not work on production. Create Seb's
-    token on production after the swap and send it to him directly.
-15. **Hub Tasks list**: both slots write to the same SharePoint list. After
-    the swap, set `HUB_TASKS_LIST` to empty **as a slot setting on staging**,
-    so trials there do not reach the team's to-do list (production keeps the
-    default, "Hub Tasks").
-16. **Hub activity starts empty** on production and fills with real use from
-    today; per-person tracking there starts at the swap. (Sample activity was
-    removed on 2026-10-16; a `usage_events.demo.jsonl` left on staging's share
-    is never read and can be deleted.)
-17. **Spot checks**: search and filters; a demo page (Files, Manage tab for an
-    admin); Hub activity opens; Admin → Sign-ins → Admin log shows your sync
+11. **Admin → Users & groups.** Team Member now has Archive content, Manage
+    content access and View GXC videos; Administrators has every permission.
+    If Team Member lacks them, tick them by hand.
+12. **Admin → Overview → Sync SharePoint now**, then **Sync Consensus now**.
+    The SharePoint run is a full rebuild this once (MAPPING_VERSION 5); expect
+    it to take longer. Afterwards:
+    - Sync history shows every part succeeded: Demo Catalog, Demo Video, GXC
+      Video, pages, VMs, partner downloads;
+    - Content dashboard totals close to staging's;
+    - a few demo pages show Demo Owner and product version where SharePoint
+      has them.
+13. **Automatic sync**: Overview → on, two times a day (if not already).
+14. **Consensus licences** (Users & groups): upload Elio's CSV again (October
+    2026 version, 263 people, 19 partners). Without it nobody sees Create
+    DemoBoard.
+15. **Report owners**: name each segment's owners and General's. Without them
+    every feedback lands in General and nobody is told.
+16. **GXC**: anyone besides Team Member and Administrators who should see GXC
+    videos goes into a group with View GXC videos (PTC addresses only), and the
+    same people into the SharePoint GXC group. Downloads stay off unless decided
+    otherwise (Admin → Content access).
+17. **Home page tab**: Featured demos and the two display options (production
+    has its own; re-pick if wanted).
+18. **Left from before review was removed**: Admin → Content review lists
+    uploads that were waiting for review (Publish or leave), and Content access
+    still shows open access requests to approve or reject. List them for Liwei.
+19. **API tokens** stay per slot: production's existing tokens keep working;
+    tokens made on staging do not.
+20. **Spot checks**: search and filters; a demo page (Edit on the Details card,
+    Share feedback, Related demos, Create DemoBoard for a licensed person); Hub
+    activity with a creator picked; Admin → Sign-ins → Admin log shows your sync
     and group changes; a partner test account (if you have one) cannot open
-    `/admin`.
+    `/admin` and sees no GXC video.
+21. **Tell Elio, Seb and Serge**; Serge sends the announcement.
 
 ## If something is wrong
 
-- **Swap back** (same Swap button). Production returns to v2026.3.72 with its
-  own share; files the new code wrote there (`access.json`, `admin_log.jsonl`,
-  `archived.json`, ...) are ignored by the old code, and are there again on
-  the next swap forward.
+- **Swap back** (same Swap button). Production returns to v2026.3.123 with its
+  own share; files only the new code reads (`consensus_licenses.json`,
+  `support_reports.json`, ...) are ignored by the old code and are there again
+  on the next swap forward.
+- A demo archived after the swap sits in `_Archive` in SharePoint. The old code
+  was never run against `_Archive`: restore such demos before swapping back.
 - Settings are not rolled back by a swap or a redeploy; undo a setting change
   by hand.
 - Code-only rollback of a slot: `gh workflow run "Build and deploy Python app to

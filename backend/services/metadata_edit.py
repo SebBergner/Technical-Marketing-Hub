@@ -1,6 +1,6 @@
 """Editing a demo's metadata on its Details card (A1, Liwei 2026-10-26).
 
-People with "Edit metadata" (Administrators and TDD Team) change a demo's
+People with "Edit metadata" (Administrators and Team Member) change a demo's
 columns in place on its page; the Hub writes them to the demo's folder in
 SharePoint at once -- no review (Liwei, 2026-10-26: "改完不用审核") -- and
 every change lands in the Admin log (the route is watched, admin_log.py).

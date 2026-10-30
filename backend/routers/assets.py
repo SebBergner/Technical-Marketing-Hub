@@ -673,7 +673,7 @@ def set_archived(asset_id: str, body: ArchiveIn, repo: AssetRepository = Depends
 
 
 # ── Editing on the Details card (A1, Liwei 2026-10-26) ─────────────────────
-#: Administrators and TDD Team (the "Edit metadata" permission); no review,
+#: Administrators and Team Member (the "Edit metadata" permission); no review,
 #: every change in the Admin log (backend/admin_log.py watches these routes).
 EDIT = Depends(require_perm(Perm.EDIT_METADATA))
 

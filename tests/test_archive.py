@@ -129,7 +129,7 @@ def client(tmp_path, monkeypatch):
         spec=ut.TARGETS[key], site_id="s", drive_id="drive", list_id="l",
         demo_content_type_id="x", product_note_field=None, choices={}, terms=None))
     monkeypatch.setattr(up, "_sync_soon", lambda repo, actor: None)
-    access.create_group("TDD Team", "", ["view_hub", "archive_content", "view_archived",
+    access.create_group("Team Member", "", ["view_hub", "archive_content", "view_archived",
                                           "view_admin"], ["team@ptc.com"], "test")
     access.create_group("Reviewers", "", ["view_hub", "review_content"], ["rev@ptc.com"], "test")
     c = TestClient(app, base_url="http://localhost")

@@ -273,13 +273,13 @@ def test_a_new_default_reaches_groups_saved_before_it_but_not_a_removed_one(tmp_
 
 
 
-def test_tdd_team_is_given_manage_content_access_once(tmp_path, monkeypatch):
-    """Liwei, 2026-10-28: with review removed, TDD Team marks demos Internal
-    or Open itself. Given once to a saved file's TDD Team; removed later, it
-    stays removed; other groups never get it."""
+def test_team_member_is_given_manage_content_access_once(tmp_path, monkeypatch):
+    """Liwei, 2026-10-28: with review removed, the team marks demos Internal
+    or Open itself. Given once to a saved file's Team Member group (its name on
+    production); removed later, it stays removed; other groups never get it."""
     monkeypatch.setattr(access, "_owned", lambda name: str(tmp_path / name))
     (tmp_path / "access.json").write_text(json.dumps({"catalogue": sorted(access.ALL), "groups": [
-        {"id": "tdd-team", "name": "TDD Team", "permissions": ["view_hub", "edit_metadata"],
+        {"id": "tdd-team", "name": "Team Member", "permissions": ["view_hub", "edit_metadata"],
          "members": ["tdd@ptc.com"]},
         {"id": "pm", "name": "Product managers", "permissions": ["view_hub"],
          "members": ["pm@ptc.com"]}]}), encoding="utf-8")

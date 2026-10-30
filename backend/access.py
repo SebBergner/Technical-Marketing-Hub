@@ -139,18 +139,22 @@ _ADMIN_ONLY = frozenset({Perm.VIEW_ADMIN.value, Perm.MANAGE_USERS.value})
 #: (2026-10-15) or archive. Their other permissions are unaffected.
 PARTNER_NEVER = _ADMIN_ONLY | {Perm.UPLOAD.value, Perm.ARCHIVE.value, Perm.VIEW_GXC.value}
 
+#: The team's Hub group, by name. Production calls it "Team Member" (Liwei,
+#: 2026-10-29), not "TDD Team" as first written here.
+TEAM = {"team member"}
+
 #: A permission new to a saved access.json goes, once, to these Hub groups by
 #: name as well as to Administrators (Liwei, 2026-10-28: Archive content for
-#: TDD Team). Removed afterwards, it stays removed (`catalogue`).
-INTRODUCED_FOR = {Perm.ARCHIVE.value: {"tdd team"},
+#: the team). Removed afterwards, it stays removed (`catalogue`).
+INTRODUCED_FOR = {Perm.ARCHIVE.value: TEAM,
                   # GXC videos (Liwei, 2026-10-29): the team sees them.
-                  Perm.VIEW_GXC.value: {"tdd team"}}
+                  Perm.VIEW_GXC.value: TEAM}
 
 #: A permission that already existed, given once to Hub groups by name
-#: (Liwei, 2026-10-28: with review removed, TDD Team marks demos Internal or
+#: (Liwei, 2026-10-28: with review removed, the team marks demos Internal or
 #: Open itself). Applied the first time a saved access.json is read after
 #: this; `grants` records it, so a later removal stays removed.
-GRANTED_ONCE = {"2026-10-28 manage content access": (Perm.MANAGE_ACCESS.value, {"tdd team"})}
+GRANTED_ONCE = {"2026-10-28 manage content access": (Perm.MANAGE_ACCESS.value, TEAM)}
 
 _EMPLOYEE_DEFAULT = [Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD, Perm.INTERNAL,
                      Perm.CREATE_DEMO, Perm.VIEW_REPORTS]

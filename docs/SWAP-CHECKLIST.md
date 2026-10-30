@@ -105,7 +105,9 @@ Everything built since 2026-10-20 is new on production:
    - `UPLOAD_LIBRARY_OVERRIDES` is empty on both slots.
 5. **Production's team group is still named "Team Member"** (Admin → Users &
    groups on `tmh.ptcxc.com`; 26 members on 2026-10-29). Do not rename it
-   before the swap.
+   before the swap. **Every administrator is a listed member of Administrators**,
+   not only in `HUB_ADMIN_EMAILS`: that setting can change with a swap, and staging's
+   names only Liwei (Elio and Seb were HUB_ADMIN_EMAILS-only on 2026-10-30).
 6. **Back up production `owned/`** (Azure Portal → storage account → file share
    `portaldata` → `owned/` → download). It is the only data a sync cannot
    rebuild; the swap does not touch it, this is just the safety net.
@@ -154,8 +156,7 @@ Everything built since 2026-10-20 is new on production:
 15. **Report owners**: name each segment's owners and General's. Without them
     every feedback lands in General and nobody is told.
 16. **GXC**: create a group "GXC" with View GXC videos and Liwei's list of 30
-    people (2026-10-30; Seb, Elio and Serge are on it and see nothing until then).
-    PTC addresses only. The same people go into the SharePoint GXC group. Downloads
+    people (2026-10-30; until then only Administrators see GXC). PTC addresses only. The same people go into the SharePoint GXC group. Downloads
     stay off unless decided otherwise (Admin → Content access).
 17. **Home page tab**: Featured demos and the two display options (production
     has its own; re-pick if wanted).

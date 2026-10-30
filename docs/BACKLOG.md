@@ -68,14 +68,13 @@ Low（发布后）：Not indexed 状态（B8）、S1 邮件订阅、S5 Value Roa
 
 ### 这次发布的范围变大（Liwei 10/30）：不只本团队，还有 PTC 其他部门
 
-10/23 和 Serge 定的顺序是先团队、再 Marketing、最后全 PTC。范围变大后要在发布前确认：
+用户仍然都是 @ptc.com。Liwei 10/30 定：
 
-1. **其他部门能否登录**：Entra 里 Hub 的应用是否要求分配用户（Assignment required）。
-2. **其他部门能否预览**：预览用 SharePoint 的 embed 页面，Hub 的文件下载走应用身份。没有站点权限的人能否看预览，**还没验证**，要找一位团队外的同事试。
-3. **Open Video / Download Kit 直接链到 SharePoint**：没有站点权限的人会看到申请访问页面，owner 可能收到大量邮件。要定：隐藏、给权限，还是接受。
-4. **Hub activity 对所有 PTC 员工公开**，包括 "Most active people" 的姓名和 Teams。范围变大后要定是否只给团队看，是否要问 legal。
-5. **反馈没人收到**：第一版不发邮件，Report owners 还是空的；范围变大后反馈会变多。
-6. **PTC Only 对所有 PTC 员工开放**：确认符合预期。
+1. **SharePoint 访问**：PTC 内部人员通过 Visitor 组能访问站点；没有权限的人本来就应该申请，所以 Open Video 和 Download Kit 保持原样。
+2. **Hub activity**：所有 PTC 员工都能看，包括 "Most active people" 的姓名，这是 Serge 自己要的。
+3. **PTC Only**：对所有 PTC 用户开放。**GXC** 只给 GXC 用户。
+4. **Report owners**：这周末 Liwei 把 GXC Video 导入 TMH 之后添加。Report owners 按 slot 分开，切换后 production 上要填。
+5. **还要验证**：Liwei 找一位其他部门的同事试登录和预览（预计没问题，Entra 对所有 PTC 员工开放）。
 
 ---
 

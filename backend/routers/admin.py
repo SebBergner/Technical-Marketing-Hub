@@ -195,7 +195,8 @@ def _configuration() -> list[dict]:
          "warn": settings.admin_configured},
         {"label": "Curator settings (AUTH_CURATOR_*)",
          "value": f"{curators} entries, each given Maintain content" if curators else "None",
-         "warn": bool(curators)},
+         # Kept on purpose (Liwei, 2026-10-30): Liwei, Elio and Seb, as a spare way in.
+         "warn": False},
         {"label": "Permanent administrators (HUB_ADMIN_EMAILS)",
          "value": str(names(settings.hub_admin_emails)),
          "warn": not names(settings.hub_admin_emails)},

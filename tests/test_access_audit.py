@@ -64,7 +64,7 @@ def test_overview_says_how_this_slot_is_set_and_never_who(client, monkeypatch):
     assert rows["Shared Admin password"] == {"label": "Shared Admin password", "value": "Off",
                                              "warn": False}
     curators = rows["Curator settings (AUTH_CURATOR_*)"]
-    assert curators["warn"] is True and curators["value"].startswith("2 entries")
+    assert curators["warn"] is False and curators["value"].startswith("2 entries")
     assert "old@ptc.com" not in r.text
     assert rows["Permanent administrators (HUB_ADMIN_EMAILS)"]["value"] == "1"
 

@@ -578,16 +578,18 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 |---|---|---|---|
 | D1. **备份 owned 数据** | 权限组、Admin log、审核记录、归档、使用历史只在 Azure Files 上，丢了找不回 | Portal 里给两个 share 开快照或 Azure Backup | 你在 Portal 里设，30 分钟 |
 | D2. **关掉共享密码登录** | 管理员都走 SSO 了，过渡期可以结束 | 先确认需要进 Admin 的人都在组里，再删两个 slot 的 `ADMIN_PASSWORD`；之后再删相关代码 | 设置 5 分钟；代码清理半天 |
-| D3. 安全响应头 | 现在没有 HSTS、X-Content-Type-Options、frame-ancestors | 中间件统一加 | 半天 |
+| D3. 安全响应头 | **10/30 已做**（5187024）：nosniff、只允许 Hub 自己嵌入、Referrer-Policy，HTTPS 的 slot 加 HSTS | —— | 完成 |
 | D4. 同步失败提醒 | 失败只记在 Admin 里，没人知道 | 失败时往 Hub Tasks 写一行（可设提醒），或接 Application Insights 告警 | 半天 |
-| D5. Admin 显示当前配置 | 今天只能靠实际操作确认 Hub Tasks 开没开 | Overview 加一行：Hub Tasks 列表、上传是否指向测试库 | 2 小时 |
-| D6. 清理 `AUTH_CURATOR_*` | 只给 Edit metadata，已被权限组取代 | 改由组管理，删过时的警告，之后可删环境变量 | 半天 |
+| D5. Admin 显示当前配置 | **10/30 已做**（5187024）：Overview 的 Configuration 卡片，显示登录方式、Hub Tasks、上传测试库、共享密码、curator 设置、常驻管理员；只显示数量 | —— | 完成 |
+| D6. 清理 `AUTH_CURATOR_*` | **10/30 定：保留**（Liwei）。两个 slot 上只有 Liwei、Elio、Seb 三人，留作备用入口；合并权限后它们给的是 Maintain content。防止所有人被锁在外面靠的是 `HUB_ADMIN_EMAILS` | 以后想清理时：改由组管理，再删环境变量 | 暂不做 |
 | D7. 删除不用的代码 | `/api/debug/backend`、SQL 存储层 | 删除并更新测试 | 半天 |
 | D8. 更新 HANDOVER-DEPLOYMENT.md | 还写着 SSO 之前的生产 | 按现在的 slot、设置、swap 流程重写 | 半天 |
 | D9. 删测试库和测试数据 | Gallery_Brightcove、Gallery_Brightcove_Test，Hub Tasks 第 1 行 | 每项删除前由你确认 | 你来删，10 分钟 |
 | D10. 手机和无障碍检查 | 销售会用手机打开 | 手机宽度逐页过一遍，修布局；检查键盘操作和对比度 | 1 天 |
-| D11. 对外开放前的安全审查 | Summit：做公开链接、对外下载之前要先验证 | 安全扫描（文件、链接、下载、公开页面），和 D3 一起做；作为 C3 的前提 | 1–2 天 + 安全团队 |
-| D12. 上传被网络拦截时说清原因 | Serge 会议：一次 Create demo 失败是 Zscaler 没登录，拦住了浏览器直传 SharePoint 的请求 | 浏览器报网络错误时提示"可能被公司代理（Zscaler）拦截，请确认 Zscaler 已运行并登录后重试" | 2 小时 |
+| D11. 对外开放前的安全审查 | Summit：做公开链接、对外下载之前要先验证。不是一个功能，是 C3 上线前的一次把关；这次发布只对内，不阻塞 | 先定 C3 的范围 → 威胁清单 → 公开链接的设计（随机令牌、可过期、可撤销、只限 customer-facing、限速、留日志）→ 确认 SharePoint 的恶意文件检测 → 请安全团队审查或渗透测试 | 1–2 天 + 安全团队 |
+| D12. 上传被网络拦截时说清原因 | **已做**：`static/js/hub/upload.js` 在浏览器报网络错误时提示可能是 Zscaler | —— | 完成 |
+| D13. 完整的内容安全策略（CSP） | 现在只有 `frame-ancestors`。页面要嵌入 SharePoint 和 Consensus，还用了内联样式，配错一项预览就全坏 | 先用 Report-Only 模式收集一段时间，确认来源后再强制 | 1 天，发布后 |
+| D14. 第三方依赖的漏洞扫描 | 10/30 手动扫过一次：按 `requirements.txt` 新装的 38 个包没有已知漏洞。但 `requirements.txt` 没有固定版本，每次部署取最新版，部署之间也没人检查 | GitHub Actions 每周跑一次 `pip-audit`（或开 Dependabot，要 Seb 开仓库设置）；发布后考虑固定版本 | 半天 |
 
 ---
 

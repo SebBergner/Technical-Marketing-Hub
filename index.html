@@ -1,4 +1,5 @@
 <title>Technical Marketing Hub</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <!-- ============================================================
      Hoisted deliberately, and it has to stay here.
 
@@ -105,6 +106,10 @@
 </svg>
 
 <div class="orion-app">
+  <!-- Phones only (D10, 2026-10-30): the sidebar slides in. static/js/hub-ui.js -->
+  <button class="hub-nav-open" id="hubNavOpen" type="button" aria-label="Open the menu"
+          aria-expanded="false"><svg class="orion-ico" aria-hidden="true"><use href="#i-panel"/></svg></button>
+  <div class="hub-nav-scrim" id="hubNavScrim"></div>
   <aside class="orion-side">
     <div class="orion-side__brand">
       <span class="lockup">

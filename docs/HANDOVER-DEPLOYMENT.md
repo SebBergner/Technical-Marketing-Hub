@@ -102,7 +102,7 @@ Every setting is in `backend/config.py`, most with the reason beside it.
 |---|---|
 | `HUB_ADMIN_EMAILS` | Permanent administrators; moves with a swap. **This is what prevents a lockout.** One address on staging on 2026-10-30 (Liwei). Partner addresses are ignored. |
 | `AUTH_CURATOR_EMAILS` | Kept on purpose as a spare way in (Liwei, Elio, Seb). Grants Maintain content, not administration. |
-| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | The old shared Admin sign-in. Off on staging on 2026-10-30; remove from production too (backlog D2). |
+| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | The old shared Admin sign-in. Removed from both slots on 2026-10-30; the code is still there (backlog D2). Do not set them again. |
 | `HUB_TASKS_LIST` | The SharePoint list for feedback and tasks. Empty switches it off. |
 | `UPLOAD_LIBRARY_OVERRIDES` | Points Create New Demo at a test library. Must be empty outside trials. |
 | `GRAPH_GXC_LIBRARY`, `MIGRATION_GXC_LIBRARY` | Default to "GXC Video". Nothing to set. |

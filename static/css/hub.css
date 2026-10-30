@@ -1766,3 +1766,26 @@ textarea.hub-edit__input{resize:vertical}
 .hub-act__card-head h3{margin:0 0 2px}
 .hub-act__chip{flex:none;border:1px solid var(--orion-border);background:var(--orion-surface-2);color:var(--orion-text);border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;cursor:pointer}
 .hub-act__chip:hover{border-color:var(--orion-link);color:var(--orion-link)}
+
+/* Phones (D10, 2026-10-30). Below 768px only, so nothing changes on a desktop:
+   the sidebar slides over the page, and whatever sat side by side stacks. */
+.hub-nav-open,.hub-nav-scrim{display:none}
+@media (max-width:768px){
+  .orion-app{grid-template-columns:minmax(0,1fr)}
+  .orion-side{position:fixed;top:0;bottom:0;left:0;width:min(85vw,300px);z-index:200;
+    transform:translateX(-100%);transition:transform .18s ease;overflow-y:auto}
+  html.hub-nav-shown .orion-side{transform:none;box-shadow:0 0 24px rgba(0,0,0,.3)}
+  .hub-nav-open{display:flex;align-items:center;justify-content:center;position:fixed;top:8px;right:8px;
+    width:40px;height:40px;z-index:150;border:1px solid var(--orion-border-md);
+    border-radius:var(--orion-radius-sm);background:var(--orion-surface);color:var(--orion-text)}
+  html.hub-nav-shown .hub-nav-scrim{display:block;position:fixed;inset:0;z-index:190;background:rgba(0,0,0,.4)}
+  .orion-topbar{padding:12px 16px}
+  .orion-topbar .orion-title{padding-right:44px}
+  .orion-thread{padding:14px 16px 32px}
+  #mainTopbar .hero-search__field{min-width:0;flex:1 1 100%}
+  #mainTopbar .hero-search__field input{min-width:0;flex:1 1 auto;width:0}
+  .vp-head{flex-direction:column;gap:12px}
+  .vp-actions{flex-wrap:wrap}
+  .video-preview-page{padding-left:16px;padding-right:16px}
+  .vp-back{margin-right:48px}
+}

@@ -66,6 +66,17 @@ Low（发布后）：Not indexed 状态（B8）、S1 邮件订阅、S5 Value Roa
 会议里的其他事项（不在 Seb 的 High 里）：去掉 segment 的 SCO 选项（10/28 已做，v2026.3.158：新建和编辑不再提供，筛选里不显示，Report owners 没有 SCO 卡片；那一个 SCO demo 保留原值，问题归 General）；按 segment 指定负责人来分派问题（10/29 已做：没有 Owner 的 demo 发给 segment 负责人）；
 数据清理，补上发布日期和元数据；11/2 周一和 Myles 开会，催 Consensus 迁移的信息。
 
+### 这次发布的范围变大（Liwei 10/30）：不只本团队，还有 PTC 其他部门
+
+10/23 和 Serge 定的顺序是先团队、再 Marketing、最后全 PTC。范围变大后要在发布前确认：
+
+1. **其他部门能否登录**：Entra 里 Hub 的应用是否要求分配用户（Assignment required）。
+2. **其他部门能否预览**：预览用 SharePoint 的 embed 页面，Hub 的文件下载走应用身份。没有站点权限的人能否看预览，**还没验证**，要找一位团队外的同事试。
+3. **Open Video / Download Kit 直接链到 SharePoint**：没有站点权限的人会看到申请访问页面，owner 可能收到大量邮件。要定：隐藏、给权限，还是接受。
+4. **Hub activity 对所有 PTC 员工公开**，包括 "Most active people" 的姓名和 Teams。范围变大后要定是否只给团队看，是否要问 legal。
+5. **反馈没人收到**：第一版不发邮件，Report owners 还是空的；范围变大后反馈会变多。
+6. **PTC Only 对所有 PTC 员工开放**：确认符合预期。
+
 ---
 
 ## 开发计划（2026-10-27 起；10/28 起由上面的发布前清单取代）
@@ -577,7 +588,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 | 项目 | 为什么 | 怎么做 | 工作量 |
 |---|---|---|---|
 | D1. **备份 owned 数据** | 权限组、Admin log、审核记录、归档、使用历史只在 Azure Files 上，丢了找不回。**10/30 Liwei 已备份完毕** | Portal 里给两个 share 开快照或 Azure Backup | 完成 |
-| D2. **关掉共享密码登录** | 管理员都走 SSO 了，过渡期可以结束 | 先确认需要进 Admin 的人都在组里，再删两个 slot 的 `ADMIN_PASSWORD`；之后再删相关代码 | 设置 5 分钟；代码清理半天 |
+| D2. **关掉共享密码登录** | **10/30 两个 slot 都已关闭**（Liwei 删了 production 的账号和密码，已确认 SSO 仍能进 Admin）。还剩代码清理 | 删相关代码 | 代码清理半天，发布后 |
 | D3. 安全响应头 | **10/30 已做**（5187024）：nosniff、只允许 Hub 自己嵌入、Referrer-Policy，HTTPS 的 slot 加 HSTS | —— | 完成 |
 | D4. 同步失败提醒 | 失败只记在 Admin 里，没人知道 | 失败时往 Hub Tasks 写一行（可设提醒），或接 Application Insights 告警 | 半天 |
 | D5. Admin 显示当前配置 | **10/30 已做**（5187024）：Overview 的 Configuration 卡片，显示登录方式、Hub Tasks、上传测试库、共享密码、curator 设置、常驻管理员；只显示数量 | —— | 完成 |
@@ -585,7 +596,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 | D7. 删除不用的代码 | `/api/debug/backend`、SQL 存储层 | 删除并更新测试 | 半天 |
 | D8. 更新 HANDOVER 文档 | **10/30 已做**：HANDOVER-DEPLOYMENT 按现在的 slot、设置、swap 流程重写；HANDOVER-DEVELOPMENT 开头加了 10/15 之后的改动；GUIDE 和 deploying.md 加了提示 | —— | 完成 |
 | D9. 删测试库和测试数据 | Gallery_Brightcove、Gallery_Brightcove_Test，Hub Tasks 第 1 行 | 每项删除前由你确认 | 你来删，10 分钟 |
-| D10. 手机和无障碍检查 | 销售会用手机打开 | 手机宽度逐页过一遍，修布局；检查键盘操作和对比度 | 1 天 |
+| D10. 手机和无障碍检查 | **10/30 第一轮已做**：Hub 页面本来没有手机布局，已加（768px 以下侧边栏滑入、搜索和按钮换行，桌面不变）；首页、Content to review、Hub activity、Dashboard、demo 页没有横向溢出；侧边栏可用键盘操作，页面标明语言。还没做：真机检查、Admin 和 Create New Demo 的手机布局、对比度测量 | 真机和对比度 | 半天 |
 | D11. 对外开放前的安全审查 | Summit：做公开链接、对外下载之前要先验证。不是一个功能，是 C3 上线前的一次把关；这次发布只对内，不阻塞 | 先定 C3 的范围 → 威胁清单 → 公开链接的设计（随机令牌、可过期、可撤销、只限 customer-facing、限速、留日志）→ 确认 SharePoint 的恶意文件检测 → 请安全团队审查或渗透测试 | 1–2 天 + 安全团队 |
 | D12. 上传被网络拦截时说清原因 | **已做**：`static/js/hub/upload.js` 在浏览器报网络错误时提示可能是 Zscaler | —— | 完成 |
 | D13. 完整的内容安全策略（CSP） | 现在只有 `frame-ancestors`。页面要嵌入 SharePoint 和 Consensus，还用了内联样式，配错一项预览就全坏 | 先用 Report-Only 模式收集一段时间，确认来源后再强制 | 1 天，发布后 |

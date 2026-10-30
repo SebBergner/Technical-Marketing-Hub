@@ -467,3 +467,45 @@ document.addEventListener("change", function (e) {
   }
 });
 
+/* Phones (D10, 2026-10-30): the sidebar is off screen until asked for, and
+ * leaves again when something in it is chosen, or on the scrim or Esc. */
+(function () {
+  var open = document.getElementById("hubNavOpen");
+  var scrim = document.getElementById("hubNavScrim");
+  if (!open || !scrim) return;
+  function show(on) {
+    document.documentElement.classList.toggle("hub-nav-shown", on);
+    open.setAttribute("aria-expanded", String(on));
+  }
+  open.addEventListener("click", function () {
+    show(!document.documentElement.classList.contains("hub-nav-shown"));
+  });
+  scrim.addEventListener("click", function () { show(false); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") show(false);
+  });
+  var side = document.querySelector(".orion-side");
+  side.addEventListener("click", function (e) {
+    if (e.target.closest(".orion-navitem")) show(false);
+  });
+
+  /* Keyboard and screen readers (D10): the nav items are divs, filled in and
+   * rebuilt by static/js/hub/nav.js, so they are marked as they appear. */
+  function markItems() {
+    side.querySelectorAll(".orion-navitem:not([tabindex])").forEach(function (item) {
+      item.tabIndex = 0;
+      item.setAttribute("role", "button");
+    });
+  }
+  markItems();
+  new MutationObserver(markItems).observe(side, { childList: true, subtree: true });
+  side.addEventListener("keydown", function (e) {
+    var item = e.target.closest && e.target.closest(".orion-navitem");
+    if (item && e.target === item && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      item.click();
+    }
+  });
+  // This file has no <html> tag of its own to say so.
+  document.documentElement.lang = "en";
+})();

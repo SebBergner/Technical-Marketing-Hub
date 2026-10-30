@@ -1,6 +1,6 @@
 # Technical Marketing Hub — 待办清单
 
-更新于 2026-10-29（staging v2026.3.163，production 仍是 v2026.3.123；第 1–3 周、"去掉审核"、Seb 的 High 和 GXC 都已上 staging，等切换）。来源：9/2–10/7 的会议笔记、管理层 10/02 的六项要求、
+更新于 2026-10-30（staging v2026.3.168，production 仍是 v2026.3.123；第 1–3 周、"去掉审核"、Seb 的 8 项 High、GXC、权限合并和技术债都已上 staging，等下周切换）。来源：9/2–10/7 的会议笔记、管理层 10/02 的六项要求、
 Serge / Seb / Elio 的意见、2026-10-16 的全面代码扫描、FY27 Summit 的 Hub 讨论（10/20 那周）、
 Serge 10/23 的会议，以及常见内部内容门户的做法。
 
@@ -14,7 +14,7 @@ SharePoint 里的数据清理（kit 日期、Demo Type、标错的 LDK/VDK、旧
 
 ## 发布前（2026-10-28 与 Elio、Seb 开会定，取代下面的周计划）
 
-High 的 8 项做完、测试、上线 production 后发布，目标是下周一（11/2）之前。上线后通知 Elio、Seb、Serge，Serge 发公告。
+High 的 8 项做完、测试、上线 production 后发布，目标是下周。范围也比原来大：本团队和 PTC 其他部门。上线后通知 Elio、Seb、Serge，Serge 发公告。
 Low 的项目都放到发布之后。
 
 | High（发布前） | 现状 | 要做的 |
@@ -35,7 +35,7 @@ Low 的项目都放到发布之后。
 - PTC Only：标成 PTC Only 时把 SharePoint 的 CustomerFacing 写成 No，编辑器里这一项锁定；取消 PTC Only 时不自动改回。
 - A13 相关推荐照常随这次推送上线。
 
-**进度（10/29，staging v2026.3.163）**：High 里除"测试归档"外的 7 项都已上 staging，10/29 在 staging 上逐项看过。
+**进度（10/30，staging v2026.3.168）**：High 的 8 项全部完成，都在 staging 上看过。
 - Usage：可以点创建者。
 - Share feedback：已移到操作栏，侧边栏的链接已去掉；Admin 里看问题用现有的 Admin → Report owners（点计数列出该 segment 的报告）。
 - PTC Only：已改名，写 CustomerFacing No 并锁定。
@@ -46,7 +46,7 @@ Low 的项目都放到发布之后。
 
 推送后要做：
 - ~~上传 Elio 的 CSV~~：staging 已上传（263 人，19 个 partner）；**production 切换后要再传一次**（数据按 slot 分开）。
-- 和 Liwei 一起测试归档和恢复：**还没做**，staging 上一个已归档的 demo 都没有。三个库的 `_Archive` 都已建好（GXC Video 的 10/29 补建）。
+- 测试归档和恢复：**10/30 通过**（Creo Parametric In Action，Liwei 操作）：文件夹移进 `_Archive`，只少了 Visitors 的 Read；恢复后回到根目录，ID 不变，权限和根目录一致。记录在 docs/archive-test-2026-10-30.md。
 
 **10/29 新增（都在 v2026.3.163）**：
 - Share feedback 分组：先 "Share something"（这个 demo 有用、想法），再 "Something isn't right"；Related demos 和页面正文分开显示。
@@ -55,12 +55,22 @@ Low 的项目都放到发布之后。
 - **GXC 视频**：单独的 SharePoint 库 "GXC Video"；新权限 Access GXC videos（Administrators 自动有，其他人靠单独的 GXC 组，10/30 Liwei 定：不自动给 Team Member；partner 永远没有）。
   没有权限的人在 Hub 里完全看不到，打开链接也是 404；有权限的人看到的是 PTC Only、不是 customer facing。下载由 Admin → Content access 的开关控制，默认关。
   迁移时 GXC Gallery 的行进 GXC Video，Segment、Video Type、Products 先空着，以后用 Edit metadata 补。还没真正同步或迁移过（库是空的）。
-- 团队组的名字按 production 改成 **Team Member**（之前代码里写的是 TDD Team，切换后三项新权限会落空）。
+- 团队组的名字按 production 改成 **Team Member**（之前代码里写的是 TDD Team）。
 
-**切换前后**（详见 docs/SWAP-CHECKLIST.md）：测试归档；切换后在 production 上传 Consensus 名单、填 Report owners（staging 也还空着）、建 GXC 组、选 Featured、跑一次完整同步。
+**10/30 新增（都在 v2026.3.168）**：
+- Content to review 加了 Archived 视图，可以批量 Restore；Restore 都先确认。
+- **权限合并（Liwei）**：18 项减到显示 12 项，分四组。Edit metadata、Manage content access、Review content、Archive content、See archived content 合成 **Maintain content**；Run Brightcove migration 并入 **Run sync & migration**；Request new asset 隐藏；View GXC 改名为 **Access GXC videos**；"Internal" 在 Admin 里都改成 PTC Only。已有的组自动转换。
+- **Partner 白名单**：不管在哪个组，最多只有 View the Hub、Preview、Download、Request new asset。推翻了 10/07 "partner 被给了 Access internal content 就能打开" 的规则。
+- **安全检查（按身份调用全部 230 个路由）**：没有发现 PTC Only 文件、GXC、已归档或隐藏 demo 泄露。关闭了 13 个对所有登录者开放的诊断和集成接口；通过 Consensus 分享要有许可证；只有 View Admin 的人在 Admin log 和个人活动里看不到 GXC ID。
+- **技术债**：D2、D3、D5、D8、D10 第一轮、D12 完成；D1 手动备份完成；D6 决定保留。
+- **Hub 能在手机上用**（768px 以下）。
+- **View Admin（Liwei）**：能查看任何一位 PTC 员工看过和搜过什么，不改代码；Liwei 保证有这个权限的都是 TDD 内部人员。
+
+**切换前（Liwei）**：请团队外的同事试登录、预览和手机；这个周末导入 GXC（先跑 1 个）；把 `enicolosi`、`sbergner` 加为 Administrators 的成员（他们现在只靠 `HUB_ADMIN_EMAILS`，切换后可能失去管理员）；再备份一次 `owned/`。
+**切换后（Liwei，详见 docs/SWAP-CHECKLIST.md）**：跑一次完整同步、上传 Consensus 名单、建 GXC 组（30 人，SharePoint 组同步）、填 Report owners、建 Report owners 组（只给 View Admin）、选 Featured、改写公告。
 
 Low（发布后）：Not indexed 状态（B8）、S1 邮件订阅、S5 Value Roadmap 索引（通过 API 推送）、A3 个人播放列表和收藏、
-多个关键词用 OR 搜索、A13 相关推荐（已在本地完成）、C1 Consensus 视频迁移、C3 Consensus 视频分享（公开链接）、
+多个关键词用 OR 搜索、C1 Consensus 视频迁移、C3 Consensus 视频分享（公开链接）、
 在 SharePoint 里创建 demo 页、搜索文档内容和字幕。
 
 会议里的其他事项（不在 Seb 的 High 里）：去掉 segment 的 SCO 选项（10/28 已做，v2026.3.158：新建和编辑不再提供，筛选里不显示，Report owners 没有 SCO 卡片；那一个 SCO demo 保留原值，问题归 General）；按 segment 指定负责人来分派问题（10/29 已做：没有 Owner 的 demo 发给 segment 负责人）；
@@ -211,7 +221,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   2. 改动要不要审核后才写回，还是直接写？
   3. 谁有权限：目前 Administrators 和 TDD Team 都勾了 `edit_metadata`。
 - **工作量**：2–3 天。
-- **10/26 已定并已做（本地，待推送）**：能改的字段是该库上传表单的全部字段（标题除外）加 Demo Owner，另可改 PreviewVideo
+- **10/26 已定并已做，已上 staging**：能改的字段是该库上传表单的全部字段（标题除外）加 Demo Owner，另可改 PreviewVideo
   和卡片图片（上传图片或从视频选一帧）；不审核，直接写回，记进 Admin log；只有 Administrators 和 TDD Team（Edit metadata）。
   - **标题不可改**：标题就是文件夹名，Hub 的 ID 和所有分享链接由它生成；Title 列与文件夹名在 15 个 kit 上不一致（有的明显错误），
     所以也不能改用 Title 列。Liwei：暂不允许改标题。
@@ -219,7 +229,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - **依赖**：无。
 
 ### A2. Report asset：报告内容问题（用 Hub Tasks 接收）
-- **进度（10/28 本地完成，待推送 staging）**：demo 页 "Report an issue"、侧边栏 "Get help"（含 My reports，状态从 Hub Tasks 读回）、Admin → Report owners（CAD/PLM/ALM/SLM/General，Notify 开关、计数、无人通知标红）。写 Hub Tasks：TaskType Support request、Category、Segment、NotifyTo（"; " 分隔）。Partner 可提交，只记 "partner"。第一版没有附件。剩下：在 Report owners 填人；Power Automate 流程（你来配）。
+- **进度（10/28 完成，已上 staging）**：demo 页 "Report an issue"、侧边栏 "Get help"（含 My reports，状态从 Hub Tasks 读回）、Admin → Report owners（CAD/PLM/ALM/SLM/General，Notify 开关、计数、无人通知标红）。写 Hub Tasks：TaskType Support request、Category、Segment、NotifyTo（"; " 分隔）。Partner 可提交，只记 "partner"。第一版没有附件。剩下：在 Report owners 填人；Power Automate 流程（你来配）。
 - **来源**：Seb，10/07 会议 —— 和 "Share feedback"（对应用的反馈）、"Request New Asset"
   （申请新 demo）分开，专门处理已有内容的问题和求助。**Summit 确认**：用 "Report asset" 代替开放评论和点赞
   （见 B1）；报告存进 SharePoint 中央列表，**按产品或 segment 分派给负责团队，不发给上传者本人**；
@@ -287,7 +297,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - **工作量**：1 天。
 
 ### A6. 协助团员归档过期 demo（Liwei 10/21，含原"团队用的内容复查清单"）
-- **进度（10/28 本地完成，待推送 staging）**：侧边栏 "Content to review"（Review content 或 Archive content 可见），全部 demo 按最近使用从旧到新、显示年龄和最近使用日期，Mine / All、按类型和年龄筛选；勾选后批量 Archive（一个理由、一次确认）或 Still current，逐个执行、被拒的说明原因，可 Undo。不做清理行动（Liwei 10/28）。
+- **进度（10/28 完成，已上 staging）**：侧边栏 "Content to review"（Review content 或 Archive content 可见），全部 demo 按最近使用从旧到新、显示年龄和最近使用日期，Mine / All、按类型和年龄筛选；勾选后批量 Archive（一个理由、一次确认）或 Still current，逐个执行、被拒的说明原因，可 Undo。不做清理行动（Liwei 10/28）。
 - **来源**：Liwei 2026-10-21：团员需要在 Hub 里把过期的 demo 归档。归档标准来自 10/07 会议
   （Elio：约 1 年；Seb：还要看使用量）和 Serge 的年龄方案。
 - **现状**：归档功能已有，只在 Hub 里隐藏、SharePoint 不动、可以 Restore。TDD Team 有 Review content，
@@ -314,7 +324,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 ### A7. 订阅新 demo 通知 —— 已并入 S1（Serge 10/23 定为个人邮件订阅）
 
 ### A8. 归档改为移入 SharePoint 的 _Archive 文件夹（Liwei 10/21 定，Summit 确认，开始做时再建文件夹）
-- **进度（10/28 本地完成，待推送 staging）**：新权限 Archive content（Administrators、TDD Team）；SharePoint demo 的文件夹移入 `_Archive`，移动前后各比对一次权限，不一致就移回并拒绝；Restore 移回库根目录、同名时拒绝；同步把 `_Archive` 里的 demo 当作原 demo 读。Admin → Content review 标出以前只在 Hub 里归档的 demo（推送后列进 Data Clean 清单，手动处理）。推送后用一个最老、从没人用过的 demo 做第一次真实归档。
+- **进度（10/28 完成，已上 staging）**：新权限 Archive content（Administrators、TDD Team）；SharePoint demo 的文件夹移入 `_Archive`，移动前后各比对一次权限，不一致就移回并拒绝；Restore 移回库根目录、同名时拒绝；同步把 `_Archive` 里的 demo 当作原 demo 读。Admin → Content review 标出以前只在 Hub 里归档的 demo（推送后列进 Data Clean 清单，手动处理）。推送后用一个最老、从没人用过的 demo 做第一次真实归档。
 - **来源**：Liwei 2026-10-21。现在的 Archive 只在 Hub 里隐藏，partner 和其他内部人员在 SharePoint 里
   仍能打开。改为把 demo 文件夹移进一个只有团队（TDD Team）能看的文件夹，partner 和团队外的内部人员
   都看不到（Liwei 10/23）。
@@ -399,10 +409,10 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   有了 Value Roadmap 数据后加上"同一能力"。
 - **工作量**：1 天。可直接做。
 - **已定**（Liwei 10/28）：显示 6 个。
-- **进度（10/28 本地完成，待推送 staging）**：demo 页底部 "Related demos"，`/api/assets/{id}/related`。打分：共有产品族 4 分（每多共有一个族再加 1）、
+- **进度（10/28 完成，已上 staging）**：demo 页底部 "Related demos"，`/api/assets/{id}/related`。打分：共有产品族 4 分（每多共有一个族再加 1）、
   同 segment 2 分、同类型 1 分；既不同族也不同 segment 的不算相关。同分时同语言优先（否则同一视频的日语、意大利语版会占位置），
   再按浏览量、发布日期。归档、隐藏、旧版 VM 不会出现。
-- **手动推荐（Liwei 10/28 加，本地完成，待推送）**：有 Edit metadata 权限的人在 Related demos 右上角点 "Add"，按名字搜索后添加；
+- **手动推荐（Liwei 10/28 加，已上 staging）**：有 Edit metadata 权限的人在 Related demos 右上角点 "Add"，按名字搜索后添加；
   手动挑的排在最前面、不加标签，剩下的位置由自动推荐补满 6 个。双向：A 推荐了 B，B 的页面也显示 A。每页最多手动挑 6 个。
   手动挑的卡片底部有 "Remove"（两边同时去掉）；自动推荐的有 "Not related"（只对这一页，下方列出可 Undo）。
   存在 Hub 自己的数据（owned/related_picks.json），每次改动记进 Admin log（Metadata）。
@@ -434,7 +444,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   3. Release（3 个视频）不在新规则里：保留给已有视频、不再提供，还是改成别的子类型？
   4. 已有的 6 个 "Customer 但没有客户名" 的视频：保持原样，等下次编辑时再补（编辑时会要求填）？
 - **工作量**：约 1 天。
-- **10/27 已定并已做（本地，待推送）**：你在 SharePoint 加 Experience Asset 类型，删掉 Presenter Support 类型（改作
+- **10/27 已定并已做，已上 staging**：你在 SharePoint 加 Experience Asset 类型，删掉 Presenter Support 类型（改作
   Experience Asset 的子类型）；子类型加 Product、Social、Attract Loop、Presenter Support、XDP Clip。Release 保留给那 3 个视频，
   新建时不再提供。缺客户名的 6 个视频保持原样，下次编辑时要求补填。SharePoint 还没有的子类型，表单会注明缺哪些。
 
@@ -597,6 +607,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 | D9. 删测试库和测试数据 | Gallery_Brightcove、Gallery_Brightcove_Test，Hub Tasks 第 1 行 | 每项删除前由你确认 | 你来删，10 分钟 |
 | D10. 手机和无障碍检查 | **10/30 第一轮已做**：Hub 页面本来没有手机布局，已加（768px 以下侧边栏滑入、搜索和按钮换行，桌面不变）；首页、Content to review、Hub activity、Dashboard、demo 页没有横向溢出；侧边栏可用键盘操作，页面标明语言。还没做：真机检查、Admin 和 Create New Demo 的手机布局、对比度测量 | 真机和对比度 | 半天 |
 | D11. 对外开放前的安全审查 | Summit：做公开链接、对外下载之前要先验证。不是一个功能，是 C3 上线前的一次把关；这次发布只对内，不阻塞 | 先定 C3 的范围 → 威胁清单 → 公开链接的设计（随机令牌、可过期、可撤销、只限 customer-facing、限速、留日志）→ 确认 SharePoint 的恶意文件检测 → 请安全团队审查或渗透测试 | 1–2 天 + 安全团队 |
+| D15. 重名 Consensus demo 的 ID 不稳定 | ID 里的 `-2`、`-3` 取决于 Consensus 返回的顺序，顺序一变，已分享的链接可能指向另一个 demo（9/3 测：36 个 demo）。对内影响不大 | C3 对外分享之前修：用 Consensus UUID 区分，或按 identity.json 固定 | 半天 |
 | D12. 上传被网络拦截时说清原因 | **已做**：`static/js/hub/upload.js` 在浏览器报网络错误时提示可能是 Zscaler | —— | 完成 |
 | D13. 完整的内容安全策略（CSP） | 现在只有 `frame-ancestors`。页面要嵌入 SharePoint 和 Consensus，还用了内联样式，配错一项预览就全坏 | 先用 Report-Only 模式收集一段时间，确认来源后再强制 | 1 天，发布后 |
 | D14. 第三方依赖的漏洞扫描 | 10/30 手动扫过一次：按 `requirements.txt` 新装的 38 个包没有已知漏洞。但 `requirements.txt` 没有固定版本，每次部署取最新版，部署之间也没人检查 | GitHub Actions 每周跑一次 `pip-audit`（或开 Dependabot，要 Seb 开仓库设置）；发布后考虑固定版本 | 半天 |

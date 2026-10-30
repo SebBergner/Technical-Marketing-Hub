@@ -20,6 +20,10 @@ from backend.repositories.base import AssetRepository
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/graph", tags=["graph"])
 
+#: Who may look at or test the SharePoint integration (access audit,
+#: 2026-10-30: these were open to anyone signed in, partners included).
+RUN_SYNC = Depends(require_perm(Perm.RUN_SYNC))
+
 
 def require_client() -> GraphClient:
     client = get_graph_client()
@@ -33,7 +37,7 @@ def require_client() -> GraphClient:
     return client
 
 
-@router.get("/status")
+@router.get("/status", dependencies=[RUN_SYNC])
 def status(repo: AssetRepository = Depends(get_repo)):
     """Cheap, credential-free: is Graph wired up, and how old is the mirror?
 
@@ -52,7 +56,7 @@ def status(repo: AssetRepository = Depends(get_repo)):
     }
 
 
-@router.get("/verify")
+@router.get("/verify", dependencies=[RUN_SYNC])
 def verify(user: CurrentUser = Depends(require_authenticated),
            client: GraphClient = Depends(require_client)):
     """Run this FIRST when IT delivers credentials.
@@ -276,7 +280,7 @@ def _record_attempt(repo: AssetRepository, ok: bool, summary: dict | None = None
         log.warning("could not record the sync attempt", exc_info=True)
 
 
-@router.get("/writeback/backlog")
+@router.get("/writeback/backlog", dependencies=[RUN_SYNC])
 def writeback_backlog(repo: AssetRepository = Depends(get_repo)):
     """What write-back would push, without calling Graph. Credential-free."""
     return backlog(repo)

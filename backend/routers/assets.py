@@ -74,7 +74,7 @@ def list_assets(
     user: CurrentUser = Depends(get_current_user),
 ):
     return repo.list(AssetQuery(
-        include_archived=archived and user.can(Perm.VIEW_ARCHIVED),
+        include_archived=archived and user.can(Perm.MAINTAIN),
         text=q, types=type, products=product, funnel_stages=stage, segments=segment,
         industries=industry, value_drivers=driver, languages=language, content_depths=video_type_filter(depth),
         sources=source, product_families=family,
@@ -181,10 +181,10 @@ def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo),
         if repo.is_hidden(asset_id):
             raise HTTPException(status_code=404, detail="This demo is hidden from the Hub.")
         raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
-    if asset.archived and not user.can(Perm.VIEW_ARCHIVED):
+    if asset.archived and not user.can(Perm.MAINTAIN):
         raise HTTPException(status_code=404, detail="This demo is archived.")
     # An upload not yet published: its uploader and reviewers only.
-    if asset.upload_review and not user.can(Perm.REVIEW_CONTENT):
+    if asset.upload_review and not user.can(Perm.MAINTAIN):
         from backend.services import uploads as _uploads
         record = _uploads.by_folder(repo, asset.source_item_id)
         if record is None or record["uploaded_by"].split(":", 1)[-1] != user.email:
@@ -196,7 +196,7 @@ def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo),
         asset = asset.model_copy(update={"downloads_off": True})
     # Which values are only the Hub's inference: for the people who can fix
     # them (Edit metadata), not for visitors or partners (2026-10-28).
-    if asset.assumed and not user.can(Perm.EDIT_METADATA):
+    if asset.assumed and not user.can(Perm.MAINTAIN):
         asset = asset.model_copy(update={"assumed": []})
     return asset
 
@@ -368,7 +368,7 @@ def related(asset_id: str, limit: int = Query(default=6, ge=1, le=24),
         if items is None:
             raise HTTPException(status_code=404, detail="Asset not found")
         hidden = []
-        if user.can(Perm.EDIT_METADATA):
+        if user.can(Perm.MAINTAIN):
             for other_id, mark in repo.not_related(asset_id).items():
                 other = repo.get(other_id)
                 if other is not None:
@@ -383,7 +383,7 @@ def related(asset_id: str, limit: int = Query(default=6, ge=1, le=24),
 # keeps the scorer from offering a demo on this page only.
 @router.put("/{asset_id}/related/{other_id}")
 def add_related(asset_id: str, other_id: str, repo: AssetRepository = Depends(get_repo),
-                actor: str = Depends(require_perm(Perm.EDIT_METADATA))):
+                actor: str = Depends(require_perm(Perm.MAINTAIN))):
     try:
         return {"picked": repo.add_related_pick(asset_id, other_id, actor)}
     except KeyError as exc:
@@ -396,7 +396,7 @@ def add_related(asset_id: str, other_id: str, repo: AssetRepository = Depends(ge
 
 @router.delete("/{asset_id}/related/{other_id}")
 def remove_related(asset_id: str, other_id: str, repo: AssetRepository = Depends(get_repo),
-                   actor: str = Depends(require_perm(Perm.EDIT_METADATA))):
+                   actor: str = Depends(require_perm(Perm.MAINTAIN))):
     try:
         return {"picked": repo.remove_related_pick(asset_id, other_id)}
     except KeyError:
@@ -412,7 +412,7 @@ class NotRelatedIn(BaseModel):
 @router.put("/{asset_id}/not-related/{other_id}")
 def mark_not_related(asset_id: str, other_id: str, body: NotRelatedIn,
                      repo: AssetRepository = Depends(get_repo),
-                     actor: str = Depends(require_perm(Perm.EDIT_METADATA))):
+                     actor: str = Depends(require_perm(Perm.MAINTAIN))):
     try:
         return {"not_related": sorted(repo.set_not_related(asset_id, other_id,
                                                            body.not_related, actor))}
@@ -531,7 +531,7 @@ class AccessIn(BaseModel):
 
 @router.put("/{asset_id}/access")
 def set_access(asset_id: str, body: AccessIn, repo: AssetRepository = Depends(get_repo),
-               actor: str = Depends(require_perm(Perm.MANAGE_ACCESS))):
+               actor: str = Depends(require_perm(Perm.MAINTAIN))):
     """Mark a demo Internal, or Open again (2026-10-07). Hub-owned data only
     (owned/content_access.json); SharePoint is never written. Opening a demo
     whose folder SharePoint closes to partners changes nothing: it stays
@@ -584,12 +584,12 @@ def _requests_view(repo, asset_id: str, user) -> dict:
     from backend.services import access_requests
     return {"pending": access_requests.pending_for(repo, asset_id),
             "history": access_requests.listing(repo, asset_id=asset_id, limit=20),
-            "may_decide": user.can(Perm.MANAGE_ACCESS)}
+            "may_decide": user.can(Perm.MAINTAIN)}
 
 
 @router.get("/{asset_id}/access-requests")
 def get_access_requests(asset_id: str, repo: AssetRepository = Depends(get_repo),
-                        actor: str = Depends(require_perm(Perm.MANAGE_ACCESS)),
+                        actor: str = Depends(require_perm(Perm.MAINTAIN)),
                         user: CurrentUser = Depends(get_current_user)):
     """A demo's requests to change its access (2026-10-15). Nobody asks this
     way any more (Liwei, 2026-10-28: Report an issue instead); one left
@@ -605,7 +605,7 @@ class StillCurrentIn(BaseModel):
 @router.put("/{asset_id}/still-current")
 def set_still_current(asset_id: str, body: StillCurrentIn,
                       repo: AssetRepository = Depends(get_repo),
-                      actor: str = Depends(require_perm(Perm.REVIEW_CONTENT))):
+                      actor: str = Depends(require_perm(Perm.MAINTAIN))):
     """Confirm the interface a demo shows still matches today's release, or
     withdraw that (Serge, 2026-10-13). Lasts STILL_CURRENT_MONTHS, then the
     age badge returns. Hub-owned (owned/content_review.json)."""
@@ -627,7 +627,7 @@ class ArchiveIn(BaseModel):
 
 @router.put("/{asset_id}/archive")
 def set_archived(asset_id: str, body: ArchiveIn, repo: AssetRepository = Depends(get_repo),
-                 actor: str = Depends(require_perm(Perm.ARCHIVE))):
+                 actor: str = Depends(require_perm(Perm.MAINTAIN))):
     """Archive a demo or restore it ("Archive content", 2026-10-28).
 
     A demo kit or video in SharePoint: its folder moves into the library's
@@ -675,7 +675,7 @@ def set_archived(asset_id: str, body: ArchiveIn, repo: AssetRepository = Depends
 # ── Editing on the Details card (A1, Liwei 2026-10-26) ─────────────────────
 #: Administrators and Team Member (the "Edit metadata" permission); no review,
 #: every change in the Admin log (backend/admin_log.py watches these routes).
-EDIT = Depends(require_perm(Perm.EDIT_METADATA))
+EDIT = Depends(require_perm(Perm.MAINTAIN))
 
 
 def _editable(repo: AssetRepository, asset_id: str):

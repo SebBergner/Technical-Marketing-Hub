@@ -485,7 +485,7 @@ function renderRelated(page, asset) {
   Promise.all([getJSON(url), hubPermissions]).then(function (got) {
     if (!detailAsset || detailAsset.id !== asset.id) return;
     var data = got[0];
-    var editor = got[1].indexOf("edit_metadata") >= 0;
+    var editor = got[1].indexOf("maintain_content") >= 0;
     data.items.forEach(function (a) {
       var card = buildCard(a);
       if (editor) card.appendChild(relatedControl(asset, a, page));
@@ -2041,9 +2041,10 @@ function renderManage(asset) {
   if (!card) return;
   hubPermissions.then(function (granted) {
     granted = granted || [];
-    var may = { manage: granted.indexOf("manage_content_access") >= 0,
-                review: granted.indexOf("review_content") >= 0,
-                archive: granted.indexOf("archive_content") >= 0 };
+    // One permission since 2026-10-30, Maintain content; kept apart here
+    // as the three things it allows on this card.
+    var on = granted.indexOf("maintain_content") >= 0;
+    var may = { manage: on, review: on, archive: on };
     if (detailAsset !== asset || (!may.manage && !may.review && !may.archive)) {
       return null;
     }

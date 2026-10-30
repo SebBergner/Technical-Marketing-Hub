@@ -28,8 +28,9 @@ from backend.services import migration_jobs as jobs
 
 log = logging.getLogger(__name__)
 
-#: Its own permission (Liwei, 2026-10-06): a run uploads to SharePoint.
-RUN_MIGRATION = require_perm(Perm.RUN_MIGRATION)
+#: Its own permission (Liwei, 2026-10-06): a run uploads to SharePoint. Part
+#: of "Run sync & migration" since 2026-10-30.
+RUN_MIGRATION = require_perm(Perm.RUN_SYNC)
 
 router = APIRouter(prefix="/api/migration", tags=["migration"],
                    dependencies=[Depends(RUN_MIGRATION)])

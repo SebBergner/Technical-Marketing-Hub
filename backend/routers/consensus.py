@@ -26,6 +26,11 @@ from backend.services.consensus_match import reconcile
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["consensus"])
 
+#: Who may look at, test or connect the Consensus integration (access audit,
+#: 2026-10-30: status, probe and reconcile were open to anyone signed in,
+#: partners included; connecting the Hub's own account was Edit metadata).
+RUN_SYNC = Depends(require_perm(Perm.RUN_SYNC))
+
 
 def get_client() -> ConsensusClient:
     return get_consensus_client()
@@ -102,7 +107,7 @@ def _match_out(match) -> MatchOut:
 
 
 # ------------------------------------------------------------------ status
-@router.get("/consensus/status")
+@router.get("/consensus/status", dependencies=[RUN_SYNC])
 def status(client: ConsensusClient = Depends(get_client),
            repo: AssetRepository = Depends(get_repo)):
     """Is the real client active, and how old is the indexed copy?"""
@@ -120,7 +125,7 @@ def status(client: ConsensusClient = Depends(get_client),
                          if state else None}
 
 
-@router.get("/consensus/probe")
+@router.get("/consensus/probe", dependencies=[RUN_SYNC])
 def probe(client: ConsensusClient = Depends(get_client)):
     """Diagnostic — returns the raw upstream payload and how we mapped it.
 
@@ -153,7 +158,7 @@ def search(
 
 
 # ---------------------------------------------------------- reconciliation
-@router.get("/consensus/reconcile")
+@router.get("/consensus/reconcile", dependencies=[RUN_SYNC])
 def reconcile_catalogues(
     threshold: float = Query(default=0.72, ge=0.0, le=1.0),
     repo: AssetRepository = Depends(get_repo),
@@ -221,6 +226,13 @@ def share_to_consensus(
             detail="This asset is marked internal-only and cannot be shared with customers.",
         )
 
+    # Only for whoever holds a Consensus licence -- Elio's list, the rule
+    # Create DemoBoard follows (access audit, 2026-10-30: the page hid the
+    # button, but the API let anyone signed in share through the Hub's key).
+    from backend import consensus_licenses
+    if not user.is_dev_principal and not consensus_licenses.is_licensed(user.email):
+        raise HTTPException(status_code=403,
+                            detail="Sharing through Consensus needs a Consensus licence.")
     if body.trackable and not body.organization:
         raise HTTPException(
             status_code=422,
@@ -359,13 +371,13 @@ def require_oauth() -> ConsensusOAuth:
     return oauth
 
 
-@router.get("/consensus/oauth/status")
+@router.get("/consensus/oauth/status", dependencies=[RUN_SYNC])
 def oauth_status(oauth: ConsensusOAuth = Depends(get_oauth)):
     """Is V2 usable? Credential-free, and returns no token values."""
     return oauth.status()
 
 
-@router.get("/consensus/oauth/start")
+@router.get("/consensus/oauth/start", dependencies=[RUN_SYNC])
 def oauth_start(user: CurrentUser = Depends(require_curator),
                 oauth: ConsensusOAuth = Depends(require_oauth)):
     """Begin authorisation. Open the returned URL in a browser.
@@ -427,7 +439,7 @@ def oauth_callback(code: str | None = None, state: str | None = None,
     }
 
 
-@router.post("/consensus/oauth/revoke")
+@router.post("/consensus/oauth/revoke", dependencies=[RUN_SYNC])
 def oauth_revoke(user: CurrentUser = Depends(require_curator),
                  oauth: ConsensusOAuth = Depends(require_oauth)):
     """Forget the stored tokens. Re-authorising needs a browser again."""

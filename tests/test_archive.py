@@ -129,9 +129,9 @@ def client(tmp_path, monkeypatch):
         spec=ut.TARGETS[key], site_id="s", drive_id="drive", list_id="l",
         demo_content_type_id="x", product_note_field=None, choices={}, terms=None))
     monkeypatch.setattr(up, "_sync_soon", lambda repo, actor: None)
-    access.create_group("Team Member", "", ["view_hub", "archive_content", "view_archived",
-                                          "view_admin"], ["team@ptc.com"], "test")
-    access.create_group("Reviewers", "", ["view_hub", "review_content"], ["rev@ptc.com"], "test")
+    access.create_group("Team Member", "", ["view_hub", "maintain_content", "view_admin"],
+                        ["team@ptc.com"], "test")
+    access.create_group("Viewers", "", ["view_hub", "view_admin"], ["rev@ptc.com"], "test")
     c = TestClient(app, base_url="http://localhost")
     c.drive = drive
     return c
@@ -140,7 +140,7 @@ def client(tmp_path, monkeypatch):
 TEAM_USER = easyauth_headers("team@ptc.com")
 
 
-def test_archiving_needs_archive_content_and_moves_the_folder(client):
+def test_archiving_needs_maintain_content_and_moves_the_folder(client):
     url = "/api/assets/kit/archive"
     assert client.put(url, json={"archived": True},
                       headers=easyauth_headers("rev@ptc.com")).status_code == 403

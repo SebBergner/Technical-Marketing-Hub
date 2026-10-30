@@ -265,7 +265,7 @@ def test_curator_may_curate(enforcing, client):
 def test_forbidden_message_says_how_to_get_access(enforcing, client):
     response = client.post("/api/curation/propose",
                            headers=easyauth_headers("viewer@ptc.com"))
-    assert "Edit metadata" in response.json()["detail"]
+    assert "Maintain content" in response.json()["detail"]
 
 
 def test_reads_stay_open_to_the_platform_gate(enforcing, client):

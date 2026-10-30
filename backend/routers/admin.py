@@ -329,7 +329,7 @@ def get_gxc(repo: AssetRepository = Depends(get_repo)):
 
 @router.put("/gxc", dependencies=[VIEW_ADMIN])
 def set_gxc(body: GxcIn, repo: AssetRepository = Depends(get_repo),
-            actor: str = Depends(require_perm(Perm.MANAGE_ACCESS))):
+            actor: str = Depends(require_perm(Perm.MANAGE_USERS))):
     """Whether GXC videos may be downloaded from the Hub (Liwei, 2026-10-29:
     a switch, so the answer can change without code). Off by default."""
     try:
@@ -350,7 +350,7 @@ def list_hidden(repo: AssetRepository = Depends(get_repo)):
 
 @router.post("/hidden", dependencies=[VIEW_ADMIN])
 def hide_demo(body: HideIn, repo: AssetRepository = Depends(get_repo),
-              actor: str = Depends(require_perm(Perm.MANAGE_ACCESS))):
+              actor: str = Depends(require_perm(Perm.MAINTAIN))):
     """Hide a demo from the Hub -- every list, search and page -- without
     touching SharePoint or Consensus. Manage content access, on the Admin
     page's Content access tab (Liwei, 2026-10-14; Manage the Home page until
@@ -367,7 +367,7 @@ def hide_demo(body: HideIn, repo: AssetRepository = Depends(get_repo),
 
 @router.delete("/hidden/{asset_id}", dependencies=[VIEW_ADMIN])
 def unhide_demo(asset_id: str, repo: AssetRepository = Depends(get_repo),
-                actor: str = Depends(require_perm(Perm.MANAGE_ACCESS))):
+                actor: str = Depends(require_perm(Perm.MAINTAIN))):
     try:
         items = repo.unhide(asset_id)
     except NotImplementedError:
@@ -896,7 +896,7 @@ class DecisionIn(BaseModel):
 @router.post("/access-requests/{request_id}/decision", dependencies=[VIEW_ADMIN])
 def decide_access_request(request_id: str, body: DecisionIn, request: Request,
                           repo: AssetRepository = Depends(get_repo),
-                          actor: str = Depends(require_perm(Perm.MANAGE_ACCESS))):
+                          actor: str = Depends(require_perm(Perm.MAINTAIN))):
     """Approve -- which applies the change -- or reject, with a note."""
     from backend.services import access_requests
     try:

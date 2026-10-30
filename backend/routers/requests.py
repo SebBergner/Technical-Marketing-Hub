@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from backend.access import Perm
+from backend.admin_auth import require_perm
 from backend.auth import CurrentUser, get_current_user, require_authenticated
 from backend.config import settings
 from backend.deps import get_repo
@@ -205,7 +206,8 @@ async def _submit(body: AssetRequestCreate, files: list, repo, user) -> RequestA
                            attachments_rejected=rejected, warning=warning)
 
 
-@router.get("/unsynced", response_model=list[AssetRequest])
+@router.get("/unsynced", response_model=list[AssetRequest],
+            dependencies=[Depends(require_perm(Perm.VIEW_ADMIN))])
 def list_unsynced(
     repo: AssetRepository = Depends(get_repo),
     user: CurrentUser = Depends(require_authenticated),

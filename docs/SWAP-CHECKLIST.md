@@ -8,7 +8,7 @@ the version numbers and the "what is new" list each time.
 
 > 中文导读：切换前做三件事：在 staging 上测一次归档和恢复、确认 /migration 没在跑、
 > 备份 production 的 owned/。切换后**马上**检查两个 slot 的登录，并把当前代码重新部署到
-> staging。然后在 production 上：确认 Team Member 组拿到了三项新权限，跑一次完整同步，
+> staging。然后在 production 上：确认 Team Member 组拿到了 Maintain content 和 View GXC videos，跑一次完整同步，
 > 上传 Consensus 名单，填 Report owners，按需要建 GXC 组。production 的数据（owned/）
 > 和 staging 是分开的，staging 上做的设置不会带过去。
 
@@ -25,7 +25,7 @@ Everything built since 2026-10-20 is new on production:
   "assumed" marks for values the Hub guessed.
 - **Archive** moves the demo's folder into the library's `_Archive` folder
   (A8), with Restore; **Content to review** helps the team archive or confirm
-  old demos in bulk (A6). New permission Archive content.
+  old demos in bulk (A6). Permission: Maintain content.
 - **Share feedback** on a demo's action bar and **Get help** in the sidebar
   (A2), sent to each segment's owners (Admin → Report owners); demos without an
   Owner go to their segment's owners. No email in v1.
@@ -59,12 +59,20 @@ Everything built since 2026-10-20 is new on production:
   there do not reach the team's list). **Everything else moves with the code.**
 - **New settings since v2026.3.123:** `GRAPH_GXC_LIBRARY` and
   `MIGRATION_GXC_LIBRARY`, both defaulting to "GXC Video". Nothing to set.
+- **Fewer permissions (2026-10-30), 12 shown under four headings.** Edit
+  metadata, Manage content access, Review content, Archive content and See
+  archived content are one, **Maintain content**; Run Brightcove migration is
+  part of **Run sync & migration**; Request new asset is hidden. A group holding
+  any old one holds the new one. Removed permissions (Create without review,
+  Request content access change) drop out of every group.
+- **Partners hold at most View the Hub, Preview, Download and Request new
+  asset**, whatever group they are in: never PTC Only, GXC, Hub activity,
+  Maintain content or anything administrative.
 - **Permissions are given once, by group name**, the first time production's
-  `access.json` is read by the new code: Archive content and View GXC videos
-  to Administrators and the group named **"Team Member"**, and Manage content
-  access to "Team Member". The name must match (case does not matter); a group
-  renamed later does not get them again. Removed permissions (Create without
-  review, Request content access change) drop out of every group.
+  `access.json` is read by the new code: Maintain content and View GXC videos
+  to the group named **"Team Member"** (Administrators have everything). The
+  name must match (case does not matter); a group renamed later does not get
+  them again.
 - `sync.MAPPING_VERSION` is 5 in the new code (3 on production): **the first
   SharePoint sync on production rebuilds the mirror in full** (Demo Owner,
   product version, thumbnails, assumed values). Until it has run, production
@@ -126,9 +134,10 @@ Everything built since 2026-10-20 is new on production:
 
 ## On production, in order
 
-11. **Admin → Users & groups.** Team Member now has Archive content, Manage
-    content access and View GXC videos; Administrators has every permission.
-    If Team Member lacks them, tick them by hand.
+11. **Admin → Users & groups.** Team Member now has Maintain content and View
+    GXC videos; Administrators has every permission. If Team Member lacks them,
+    tick them by hand. Check no other group holds more than it should under the
+    new, broader Maintain content.
 12. **Admin → Overview → Sync SharePoint now**, then **Sync Consensus now**.
     The SharePoint run is a full rebuild this once (MAPPING_VERSION 5); expect
     it to take longer. Afterwards:

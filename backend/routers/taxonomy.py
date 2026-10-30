@@ -92,7 +92,7 @@ def get_facets(
         content_depths=video_type_filter(depth), sources=source, tags=tag,
         published=published,
         customer_facing=customer_facing, include_older_vms=include_older_vms,
-        include_archived=archived and user.can(Perm.VIEW_ARCHIVED),
+        include_archived=archived and user.can(Perm.MAINTAIN),
     )
     any_filter = any([q, type, product, family, umbrella, stage, segment,
                       language, depth, source, tag, published, include_older_vms,

@@ -40,7 +40,7 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 
 UPLOAD = require_perm(Perm.UPLOAD)
-REVIEW = require_perm(Perm.REVIEW_CONTENT)
+REVIEW = require_perm(Perm.MAINTAIN)
 
 
 def _client():
@@ -116,7 +116,7 @@ def _view(record: dict, user: CurrentUser | None = None, repo=None,
 
 
 def _mine_or_reviewer(record: dict, actor: str, user: CurrentUser) -> None:
-    if record["uploaded_by"] != actor and not user.can(Perm.REVIEW_CONTENT):
+    if record["uploaded_by"] != actor and not user.can(Perm.MAINTAIN):
         raise HTTPException(status_code=403, detail="Not your upload.")
 
 
@@ -390,7 +390,7 @@ def index_now(upload_id: str, request: Request, repo: AssetRepository = Depends(
     for an upload whose folder the Hub has not seen yet."""
     from backend.admin_auth import _actor
     record = _get(repo, upload_id)
-    actor = (_actor(request, user, Perm.REVIEW_CONTENT.value)
+    actor = (_actor(request, user, Perm.MAINTAIN.value)
              or _actor(request, user, Perm.UPLOAD.value))
     if actor is None:
         raise HTTPException(status_code=403, detail="Not available for your account.")
@@ -413,7 +413,7 @@ def cancel(upload_id: str, request: Request, repo: AssetRepository = Depends(get
     folder stays in SharePoint, for a person to delete there."""
     from backend.admin_auth import _actor
     _get(repo, upload_id)
-    reviewer = _actor(request, user, Perm.REVIEW_CONTENT.value)
+    reviewer = _actor(request, user, Perm.MAINTAIN.value)
     actor = _actor(request, user, Perm.UPLOAD.value) or reviewer
     if actor is None:
         raise HTTPException(status_code=403, detail="Not available for your account.")
@@ -430,14 +430,14 @@ def listing(status: str | None = None, mine: bool = False,
             limit: int = Query(100, ge=1, le=500), repo: AssetRepository = Depends(get_repo),
             user: CurrentUser = Depends(get_current_user)):
     """Reviewers see every upload; uploaders their own."""
-    if not (user.can(Perm.UPLOAD) or user.can(Perm.REVIEW_CONTENT)):
+    if not (user.can(Perm.UPLOAD) or user.can(Perm.MAINTAIN)):
         raise HTTPException(status_code=403, detail="Not available for your account.")
     # A token's uploads are recorded as token:<name> (2026-10-21: this read
     # user:None for a token, so ?mine=true always came back empty to one).
     me = (f"token:{user.token_name}" if user.token_name
           else f"{'dev' if user.is_dev_principal else 'user'}:{user.email}")
     records = uploads.all_records(repo)
-    if mine or not user.can(Perm.REVIEW_CONTENT):
+    if mine or not user.can(Perm.MAINTAIN):
         records = [r for r in records if r["uploaded_by"] == me]
     if status:
         wanted = set(status.split(","))

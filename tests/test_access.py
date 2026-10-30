@@ -56,7 +56,8 @@ def test_admins_are_matched_on_the_upn_as_well_as_the_email(monkeypatch):
 def test_a_partner_never_administers_the_hub_whatever_group_they_are_in(monkeypatch):
     """2026-10-14: View Admin and Manage users & groups stay with PTC accounts,
     whether a partner is added to Administrators, named in HUB_ADMIN_EMAILS or
-    put in a group of their own that grants them."""
+    put in a group of their own that grants them. Since 2026-10-30 a partner
+    holds only what PARTNER_ALLOWED names, whatever the group gives."""
     monkeypatch.setattr(settings, "hub_admin_emails", "boss@partner.it")
     access.update_group(ADMINS, "test", members=["p@partner.it", ME])
     access.create_group("Reviewers", "", ["view_hub", "view_admin", "review_content"],
@@ -64,9 +65,35 @@ def test_a_partner_never_administers_the_hub_whatever_group_they_are_in(monkeypa
     for partner in (person("p@partner.it"), person("boss@partner.it"), person("r@partner.it"),
                     person("guest@ptc.com", external=True)):
         assert not partner.can(Perm.VIEW_ADMIN) and not partner.can(Perm.MANAGE_USERS), partner.email
-    assert person("p@partner.it").can(Perm.RUN_SYNC), "the rest of the group's permissions stand"
-    assert person("r@partner.it").can(Perm.REVIEW_CONTENT)
+    assert person("p@partner.it").permissions == access.PARTNER_ALLOWED, \
+        "an administrator's every permission, less what a partner may never hold"
+    assert not person("r@partner.it").can(Perm.MAINTAIN)
     assert person("staff@ptc.com").can(Perm.VIEW_ADMIN), "a PTC member is unaffected"
+    assert person("staff@ptc.com").can(Perm.MAINTAIN), "review_content read as Maintain content"
+
+
+def test_a_partner_may_hold_only_the_viewing_basics():
+    """Liwei, 2026-10-30: PTC Only, GXC, the names on Hub activity,
+    maintaining content and every Admin permission are never a partner's; a
+    permission added later is not either, unless PARTNER_ALLOWED names it."""
+    assert access.PARTNER_ALLOWED == {"view_hub", "preview", "download", "create_demo"}
+    for p in ("access_internal", "view_gxc", "view_reports", "maintain_content",
+              "upload_content", "run_sync", "manage_home", "view_admin", "manage_users"):
+        assert p in access.PARTNER_NEVER, p
+
+
+def test_retired_permissions_are_read_as_the_one_that_took_them_over():
+    """Liwei, 2026-10-30: five content permissions became Maintain content and
+    Run Brightcove migration joined Run sync; a saved group keeps what it
+    could do."""
+    access.create_group("Old", "", ["edit_metadata", "view_archived", "run_migration"],
+                        ["old@ptc.com"], "a")
+    assert [g for g in access.load_state()["groups"] if g["id"] == "old"][0][
+        "permissions"] == ["maintain_content", "run_sync"]
+    shown = {p["id"]: p for p in access.catalogue()}
+    assert "create_demo" not in shown, "Request New Asset is hidden"
+    assert list(dict.fromkeys(p["section"] for p in access.catalogue())) == [
+        "Viewing", "Contributing", "Maintaining content", "Administration"]
 
 
 def test_a_partner_is_refused_the_admin_page(monkeypatch, tmp_path):
@@ -87,12 +114,12 @@ def test_local_development_has_everything_but_the_admin_page():
     """So the Admin page still needs a real sign-in on a laptop, as before."""
     assert not DEV_PRINCIPAL.can(Perm.VIEW_ADMIN)
     assert not DEV_PRINCIPAL.can(Perm.MANAGE_USERS)
-    assert DEV_PRINCIPAL.can(Perm.RUN_SYNC) and DEV_PRINCIPAL.can(Perm.EDIT_METADATA)
+    assert DEV_PRINCIPAL.can(Perm.RUN_SYNC) and DEV_PRINCIPAL.can(Perm.MAINTAIN)
 
 
-def test_the_curator_settings_still_grant_edit_metadata_only():
+def test_the_curator_settings_still_grant_maintain_content_only():
     seb = person("seb@ptc.com", roles={"viewer", "curator"})
-    assert seb.can(Perm.EDIT_METADATA) and not seb.can(Perm.RUN_MIGRATION)
+    assert seb.can(Perm.MAINTAIN) and not seb.can(Perm.RUN_SYNC)
 
 
 # ─────────────────────────────────────────────── groups
@@ -112,10 +139,10 @@ def test_a_group_grants_its_members_its_permissions_and_is_audited():
 
 def test_changes_are_audited_with_what_changed():
     access.create_group("Reviewers", "", [], [], "a")
-    access.update_group("reviewers", "b", permissions=["edit_metadata"], members=["x@ptc.com"])
+    access.update_group("reviewers", "b", permissions=["maintain_content"], members=["x@ptc.com"])
     access.update_group("reviewers", "c", members=[])
     latest, middle = access.audit_log()[:2]
-    assert middle["permissions"] == {"added": ["edit_metadata"], "removed": []}
+    assert middle["permissions"] == {"added": ["maintain_content"], "removed": []}
     assert middle["members"] == {"added": ["x@ptc.com"], "removed": []}
     assert latest["members"] == {"added": [], "removed": ["x@ptc.com"]}
     access.update_group("reviewers", "d", members=[])
@@ -273,19 +300,24 @@ def test_a_new_default_reaches_groups_saved_before_it_but_not_a_removed_one(tmp_
 
 
 
-def test_team_member_is_given_manage_content_access_once(tmp_path, monkeypatch):
-    """Liwei, 2026-10-28: with review removed, the team marks demos Internal
-    or Open itself. Given once to a saved file's Team Member group (its name on
-    production); removed later, it stays removed; other groups never get it."""
+def test_team_member_is_given_maintain_content_once(tmp_path, monkeypatch):
+    """Liwei, 2026-10-28/30: the team maintains content itself. Given once to
+    a saved file's Team Member group (its name on production), as production's
+    file is (saved before Maintain content existed); removed later, it stays
+    removed; other groups never get it."""
     monkeypatch.setattr(access, "_owned", lambda name: str(tmp_path / name))
-    (tmp_path / "access.json").write_text(json.dumps({"catalogue": sorted(access.ALL), "groups": [
-        {"id": "tdd-team", "name": "Team Member", "permissions": ["view_hub", "edit_metadata"],
+    before = sorted({"view_hub", "preview", "download", "access_internal", "create_demo",
+                     "upload_content", "edit_metadata", "manage_home", "manage_content_access",
+                     "review_content", "view_archived", "view_reports", "run_sync",
+                     "run_migration", "view_admin", "manage_users"})
+    (tmp_path / "access.json").write_text(json.dumps({"catalogue": before, "groups": [
+        {"id": "tdd-team", "name": "Team Member", "permissions": ["view_hub"],
          "members": ["tdd@ptc.com"]},
         {"id": "pm", "name": "Product managers", "permissions": ["view_hub"],
          "members": ["pm@ptc.com"]}]}), encoding="utf-8")
     access._cache.clear()
-    assert "manage_content_access" in person("tdd@ptc.com").permissions
-    assert "manage_content_access" not in person("pm@ptc.com").permissions
-    access.update_group("tdd-team", "a", permissions=["view_hub", "edit_metadata"])
+    assert {"maintain_content", "view_gxc"} <= person("tdd@ptc.com").permissions
+    assert "maintain_content" not in person("pm@ptc.com").permissions
+    access.update_group("tdd-team", "a", permissions=["view_hub"])
     access._cache.clear()
-    assert "manage_content_access" not in person("tdd@ptc.com").permissions
+    assert "maintain_content" not in person("tdd@ptc.com").permissions

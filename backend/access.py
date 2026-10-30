@@ -34,11 +34,19 @@ Who else gets in
   except the Admin page's own two, so the Admin page still needs a real
   sign-in locally -- as it did before groups existed.
 * The shared Admin sign-in (backend/admin_auth.py) has everything but
-  editing metadata, which writes SharePoint columns and so must be traceable
-  to a person. It stays as a way in until ADMIN_PASSWORD is removed from the
+  Maintain content, which writes SharePoint columns and moves folders and so
+  must be traceable to a person. It stays as a way in until ADMIN_PASSWORD is removed from the
   app settings (Liwei, 2026-10-06: kept for the transition).
 * The curator settings (AUTH_CURATOR_GROUPS / _EMAILS / _OIDS) still grant
-  editing metadata, so nothing that worked before stops working.
+  Maintain content (editing metadata, before 2026-10-30), so nothing that
+  worked before stops working.
+
+Fewer, broader permissions (Liwei, 2026-10-30)
+----------------------------------------------
+Edit metadata, Manage content access, Review content, Archive content and See
+archived content became one, **Maintain content**: the team that does one
+does all of them. Run Brightcove migration joined **Run sync**. A saved group
+holding any of the old ones holds the new one (`MERGED`).
 """
 from __future__ import annotations
 
@@ -67,77 +75,87 @@ class Perm(str, Enum):
     INTERNAL = "access_internal"
     CREATE_DEMO = "create_demo"
     UPLOAD = "upload_content"
-    EDIT_METADATA = "edit_metadata"
+    MAINTAIN = "maintain_content"
     MANAGE_HOME = "manage_home"
-    MANAGE_ACCESS = "manage_content_access"
-    REVIEW_CONTENT = "review_content"
-    ARCHIVE = "archive_content"
-    VIEW_ARCHIVED = "view_archived"
     VIEW_GXC = "view_gxc"
     VIEW_REPORTS = "view_reports"
     RUN_SYNC = "run_sync"
-    RUN_MIGRATION = "run_migration"
     VIEW_ADMIN = "view_admin"
     MANAGE_USERS = "manage_users"
 
 
-#: In the order the Admin page lists them, with the words it shows.
-CATALOGUE: list[tuple[Perm, str, str]] = [
-    (Perm.VIEW_HUB, "View the Hub", "Sign in and browse, search and open demos."),
-    (Perm.PREVIEW, "Preview files", "Open a demo's files in the preview."),
-    (Perm.DOWNLOAD, "Download files", "Download a demo's files."),
-    (Perm.INTERNAL, "Access internal content",
-     "Preview and download Internal demos: marked so on the Hub, or closed to "
-     "partners in SharePoint."),
-    (Perm.CREATE_DEMO, "Request new asset", "Submit a request for a new demo or asset."),
-    (Perm.UPLOAD, "Create new demo",
-     "Create a demo -- a video or a demo kit, with its metadata -- on a "
-     "destination platform. It is listed in the Hub at once: there is no review "
-     "(Liwei, 2026-10-28)."),
-    (Perm.EDIT_METADATA, "Edit metadata",
-     "Edit a demo's metadata, thumbnail and preview video on its Details card; "
-     "saved to SharePoint at once."),
-    (Perm.MANAGE_HOME, "Manage the Home page",
-     "Choose Featured demos and switch the Hub's display options."),
-    (Perm.REVIEW_CONTENT, "Review content",
-     "Mark demos Still current (the interface shown matches today's release) "
-     "and work through the content-review list."),
-    (Perm.ARCHIVE, "Archive content",
-     "Archive a demo or restore it. A SharePoint demo's folder moves into its "
-     "library's _Archive folder, which only the team can open. Never given to "
-     "partner (guest) accounts."),
-    (Perm.VIEW_REPORTS, "View Hub activity",
-     "See the Hub activity page: the most used content, the most active PTC "
-     "people and team totals. Never partners' names."),
-    (Perm.VIEW_ARCHIVED, "See archived content",
-     "Open archived demos, and show them in lists with 'Show archived'."),
-    (Perm.VIEW_GXC, "View GXC videos",
-     "See the videos in the GXC Video library. Without it they do not exist on "
-     "the Hub: not listed, not found, and their links open nothing. Never given "
-     "to partner (guest) accounts."),
-    (Perm.MANAGE_ACCESS, "Manage content access",
-     "Mark demos Internal or Open (on the Admin page and on a demo's page), "
-     "and hide demos from the Hub. Anyone else asks with Share feedback."),
-    (Perm.RUN_SYNC, "Run sync", "Sync SharePoint and Consensus, and set the daily sync."),
-    (Perm.RUN_MIGRATION, "Run Brightcove migration",
-     "Use the migration page, which uploads videos to SharePoint."),
-    (Perm.VIEW_ADMIN, "View Admin", "Open the Admin page: usage, content and sync status. "
-     "Never given to partner (guest) accounts."),
-    (Perm.MANAGE_USERS, "Manage users & groups", "Create groups, add members, set permissions. "
-     "Never given to partner (guest) accounts."),
+#: In the order the Admin page lists them, under its headings, with the words
+#: it shows (grouped 2026-10-30).
+CATALOGUE: list[tuple[str, list[tuple[Perm, str, str]]]] = [
+    ("Viewing", [
+        (Perm.VIEW_HUB, "View the Hub", "Sign in and browse, search and open demos."),
+        (Perm.PREVIEW, "Preview files", "Open a demo's files in the preview."),
+        (Perm.DOWNLOAD, "Download files", "Download a demo's files."),
+        (Perm.INTERNAL, "Access PTC Only content",
+         "Preview and download PTC Only demos: marked so on the Hub, or closed to "
+         "partners in SharePoint. Never given to partner (guest) accounts."),
+        (Perm.VIEW_GXC, "View GXC videos",
+         "See the videos in the GXC Video library. Without it they do not exist on "
+         "the Hub: not listed, not found, and their links open nothing. Never given "
+         "to partner (guest) accounts."),
+        (Perm.VIEW_REPORTS, "View Hub activity",
+         "See the Hub activity page: the most used content, the most active PTC "
+         "people and team totals. Never partners' names."),
+    ]),
+    ("Contributing", [
+        (Perm.UPLOAD, "Create new demo",
+         "Create a demo -- a video or a demo kit, with its metadata -- on a "
+         "destination platform. It is listed in the Hub at once: there is no review "
+         "(Liwei, 2026-10-28). Never given to partner (guest) accounts."),
+        (Perm.CREATE_DEMO, "Request new asset", "Submit a request for a new demo or asset."),
+    ]),
+    ("Maintaining content", [
+        (Perm.MAINTAIN, "Maintain content",
+         "Edit a demo's metadata, thumbnail and preview video (saved to SharePoint at "
+         "once); mark demos PTC Only or Open and hide them; mark them Still current; "
+         "archive and restore them (a SharePoint demo's folder moves into its library's "
+         "_Archive, which only the team can open) and open archived ones; work through "
+         "Content to review. Never given to partner (guest) accounts."),
+    ]),
+    ("Administration", [
+        (Perm.VIEW_ADMIN, "View Admin", "Open the Admin page: usage, content and sync status. "
+         "Never given to partner (guest) accounts."),
+        (Perm.MANAGE_HOME, "Manage the Home page",
+         "Choose Featured demos and switch the Hub's display options."),
+        (Perm.MANAGE_USERS, "Manage users & groups", "Create groups, add members, set "
+         "permissions, upload the Consensus licence list, switch GXC downloads. Never given "
+         "to partner (guest) accounts."),
+        (Perm.RUN_SYNC, "Run sync & migration",
+         "Sync SharePoint and Consensus, set the daily sync, and use the Brightcove "
+         "migration page, which uploads videos to SharePoint. Never given to partner "
+         "(guest) accounts."),
+    ]),
 ]
 ALL = frozenset(p.value for p in Perm)
+
+#: Not offered on the Admin page while what they allow is hidden: Request New
+#: Asset (Seb, 2026-10-28). A group keeps it; nothing shows it.
+HIDDEN = frozenset({Perm.CREATE_DEMO.value})
+
+#: Retired permissions and the one that took each over (Liwei, 2026-10-30).
+MERGED = {"edit_metadata": Perm.MAINTAIN.value, "manage_content_access": Perm.MAINTAIN.value,
+          "review_content": Perm.MAINTAIN.value, "archive_content": Perm.MAINTAIN.value,
+          "view_archived": Perm.MAINTAIN.value, "run_migration": Perm.RUN_SYNC.value}
 
 ADMINS, EMPLOYEES, PARTNERS = "administrators", "ptc-employees", "partners"
 
 #: The Admin page's own permissions, which a local run does not get for free.
 _ADMIN_ONLY = frozenset({Perm.VIEW_ADMIN.value, Perm.MANAGE_USERS.value})
 
-#: Never a partner's, whatever group they are in or HUB_ADMIN_EMAILS says
-#: (Liwei, 2026-10-14): administering the Hub stays with PTC accounts, the
-#: usual rule for guests in a tenant; nor do they upload into PTC's libraries
-#: (2026-10-15) or archive. Their other permissions are unaffected.
-PARTNER_NEVER = _ADMIN_ONLY | {Perm.UPLOAD.value, Perm.ARCHIVE.value, Perm.VIEW_GXC.value}
+#: All a partner may ever hold, whatever group they are in or
+#: HUB_ADMIN_EMAILS says: administering the Hub stays with PTC accounts, the
+#: usual rule for guests in a tenant (Liwei, 2026-10-14); nor do they upload
+#: into PTC's libraries (2026-10-15), maintain content, see GXC or PTC Only
+#: content, or the names on Hub activity (2026-10-30). Named as what is
+#: allowed, so a permission added later is never a partner's by mistake.
+PARTNER_ALLOWED = frozenset({Perm.VIEW_HUB.value, Perm.PREVIEW.value, Perm.DOWNLOAD.value,
+                             Perm.CREATE_DEMO.value})
+PARTNER_NEVER = ALL - PARTNER_ALLOWED
 
 #: The team's Hub group, by name. Production calls it "Team Member" (Liwei,
 #: 2026-10-29), not "TDD Team" as first written here.
@@ -145,8 +163,9 @@ TEAM = {"team member"}
 
 #: A permission new to a saved access.json goes, once, to these Hub groups by
 #: name as well as to Administrators (Liwei, 2026-10-28: Archive content for
-#: the team). Removed afterwards, it stays removed (`catalogue`).
-INTRODUCED_FOR = {Perm.ARCHIVE.value: TEAM,
+#: the team; Maintain content took it over). Removed afterwards, it stays
+#: removed (`catalogue`).
+INTRODUCED_FOR = {Perm.MAINTAIN.value: TEAM,
                   # GXC videos (Liwei, 2026-10-29): the team sees them.
                   Perm.VIEW_GXC.value: TEAM}
 
@@ -154,7 +173,7 @@ INTRODUCED_FOR = {Perm.ARCHIVE.value: TEAM,
 #: (Liwei, 2026-10-28: with review removed, the team marks demos Internal or
 #: Open itself). Applied the first time a saved access.json is read after
 #: this; `grants` records it, so a later removal stays removed.
-GRANTED_ONCE = {"2026-10-28 manage content access": (Perm.MANAGE_ACCESS.value, TEAM)}
+GRANTED_ONCE = {"2026-10-28 manage content access": (Perm.MAINTAIN.value, TEAM)}
 
 _EMPLOYEE_DEFAULT = [Perm.VIEW_HUB, Perm.PREVIEW, Perm.DOWNLOAD, Perm.INTERNAL,
                      Perm.CREATE_DEMO, Perm.VIEW_REPORTS]
@@ -197,7 +216,8 @@ _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def _clean_perms(values) -> list[str]:
-    return sorted({str(v) for v in values or []} & ALL)
+    """Known permissions only, a retired one read as the one that took it over."""
+    return sorted({MERGED.get(str(v), str(v)) for v in values or []} & ALL)
 
 
 # ───────────────────────────────────────────────────────────────── the store
@@ -455,14 +475,14 @@ def permissions_of(user) -> frozenset[str]:
         perms.update(g["permissions"])
     if user.can_curate:
         # AUTH_CURATOR_* -- the way in before groups existed.
-        perms.add(Perm.EDIT_METADATA.value)
+        perms.add(Perm.MAINTAIN.value)
     if user.is_partner:
         perms -= PARTNER_NEVER
     return frozenset(perms)
 
 
 #: The shared Admin sign-in: everything but writing SharePoint columns.
-ADMIN_SESSION_PERMS = ALL - {Perm.EDIT_METADATA.value}
+ADMIN_SESSION_PERMS = ALL - {Perm.MAINTAIN.value}
 
 
 # ─────────────────────────────────────────────────────────── who signed in
@@ -544,5 +564,7 @@ def users_view() -> list[dict]:
 
 
 def catalogue() -> list[dict]:
-    return [{"id": p.value, "label": label, "description": text}
-            for p, label, text in CATALOGUE]
+    """What the Admin page offers, each with its heading; HIDDEN left out."""
+    return [{"id": p.value, "label": label, "description": text, "section": section}
+            for section, perms in CATALOGUE for p, label, text in perms
+            if p.value not in HIDDEN]

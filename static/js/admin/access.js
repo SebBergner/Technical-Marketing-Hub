@@ -16,7 +16,12 @@ import { showTab } from "./main.js";
  * its own page. Only "Access internal content" opens an Internal demo's
  * files; everyone else sees its card and description. */
 function canManageAccess() {
-  return (session.permissions || []).indexOf("manage_content_access") >= 0;
+  return (session.permissions || []).indexOf("maintain_content") >= 0;
+}
+
+/* GXC downloads are an access decision for administrators (2026-10-30). */
+function canSwitchGxc() {
+  return (session.permissions || []).indexOf("manage_users") >= 0;
 }
 
 function loadContentAccess() {
@@ -218,15 +223,15 @@ function renderGxc(s) {
   var box = el("input");
   box.type = "checkbox";
   box.checked = !!s.downloads;
-  box.disabled = !canManageAccess();
+  box.disabled = !canSwitchGxc();
   box.setAttribute("aria-label", "GXC downloads");
   toggle.appendChild(box);
   toggle.appendChild(el("span", "switch__track"));
   toggle.appendChild(el("span", "switch__label", s.downloads ? "On" : "Off"));
   row.appendChild(toggle);
   host.appendChild(row);
-  var status = el("div", "promo-status faint", canManageAccess() ? ""
-    : "Changing this needs Manage content access.");
+  var status = el("div", "promo-status faint", canSwitchGxc() ? ""
+    : "Changing this needs Manage users & groups.");
   host.appendChild(status);
   box.addEventListener("change", function () {
     box.disabled = true;
@@ -345,7 +350,7 @@ function renderContentAccess(items) {
     });
   } else {
     host.appendChild(el("p", "faint", "Viewing only: marking demos needs the "
-      + "Manage content access permission."));
+      + "Maintain content permission."));
   }
   host.appendChild(status);
 }

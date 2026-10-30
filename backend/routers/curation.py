@@ -20,6 +20,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from backend.access import Perm
+from backend.admin_auth import require_perm
 from backend.deps import CurrentUser, get_repo, require_curator
 from backend.integrations.consensus import (
     ConsensusClient, ConsensusError, get_consensus_client,
@@ -50,7 +52,8 @@ class DecisionResponse(BaseModel):
     awaiting_writeback: bool
 
 
-@router.get("/summary", response_model=ProposalSummary)
+@router.get("/summary", response_model=ProposalSummary,
+            dependencies=[Depends(require_perm(Perm.MAINTAIN))])
 def summary(repo: AssetRepository = Depends(get_repo)):
     """Counts by state, field and origin, plus the write-back backlog."""
     return repo.proposal_summary()
@@ -83,7 +86,8 @@ def propose(
     )
 
 
-@router.get("/proposals", response_model=Page[MetadataProposal])
+@router.get("/proposals", response_model=Page[MetadataProposal],
+            dependencies=[Depends(require_perm(Perm.MAINTAIN))])
 def list_proposals(
     state: str | None = Query(default=None, pattern="^(pending|accepted|rejected|written)$"),
     field: str | None = None,

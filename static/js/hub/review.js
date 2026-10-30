@@ -121,7 +121,7 @@ function load() {
     state.granted = both[0] || [];
     var d = both[1];
     if (d.forbidden) {
-      host.textContent = "Content to review needs Review content or Archive content.";
+      host.textContent = "Content to review needs Maintain content.";
       return;
     }
     state.items = d.items || [];
@@ -408,8 +408,7 @@ function picked() {
 }
 
 function canAct() {
-  if (state.scope === "archived") return may("archive_content");
-  return may("archive_content") || may("review_content");
+  return may("maintain_content");
 }
 
 /* ── archived (2026-10-30) ────────────────────────────────────────────── */
@@ -525,13 +524,13 @@ function bulkBar(rows) {
     back.type = "button";
     back.addEventListener("click", function () { askRestore(bar, ids); });
     bar.appendChild(back);
-  } else if (may("archive_content")) {
+  } else if (may("maintain_content")) {
     var arch = el("button", "btn-primary-sm", "Archive…");
     arch.type = "button";
     arch.addEventListener("click", function () { askArchive(bar, ids); });
     bar.appendChild(arch);
   }
-  if (may("review_content") && state.scope !== "archived") {
+  if (may("maintain_content") && state.scope !== "archived") {
     var cur = el("button", "btn-ghost", "Still current");
     cur.type = "button";
     cur.title = "The interface these show still matches today's release, for "
@@ -664,8 +663,7 @@ function lastResult() {
 /* ── the sidebar item, under Dashboard ────────────────────────────────── */
 function addReviewNav() {
   hubPermissions.then(function (granted) {
-    if ((granted.indexOf("review_content") < 0 && granted.indexOf("archive_content") < 0)
-        || document.getElementById("navReview")) return;
+    if (granted.indexOf("maintain_content") < 0 || document.getElementById("navReview")) return;
     var after = document.getElementById("navActivity") || document.getElementById("navHome");
     if (!after) return;
     var item = el("div", "orion-navitem");

@@ -380,10 +380,10 @@ async def require_curator(
     """For anything that will eventually write to SharePoint: the "Edit
     metadata" permission, which the AUTH_CURATOR_* settings still grant."""
     from backend.access import Perm
-    if not user.can(Perm.EDIT_METADATA):
+    if not user.can(Perm.MAINTAIN):
         raise HTTPException(
             status_code=403,
-            detail="This action needs the Edit metadata permission. Ask an "
+            detail="This action needs the Maintain content permission. Ask an "
                    "administrator to add you to a group that has it.",
         )
     return user

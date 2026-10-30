@@ -7,12 +7,17 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from backend.access import Perm
+from backend.admin_auth import require_perm
 from backend.auth import AuthMode, security_warnings
 from backend.config import BASE_DIR, settings
 
-router = APIRouter(prefix="/api/debug", tags=["debug"])
+#: Run sync & migration only (access audit, 2026-10-30): it names the data
+#: folder, the sign-in mode and its weaknesses.
+router = APIRouter(prefix="/api/debug", tags=["debug"],
+                   dependencies=[Depends(require_perm(Perm.RUN_SYNC))])
 
 
 @router.get("/backend")

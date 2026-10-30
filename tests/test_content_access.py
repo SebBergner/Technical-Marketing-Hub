@@ -71,13 +71,14 @@ def test_a_demo_marked_internal_on_the_hub_closes_to_partners_only(client, repo)
     assert asset["files_locked"] and asset["internal_source"] == "hub"
 
 
-def test_the_permission_decides_not_the_account_type(client, repo):
-    """One rule now: a group without Access internal content is shut out of
-    Internal demos too, and a partner given it gets in."""
+def test_the_permission_decides_and_a_partner_never_holds_it(client, repo):
+    """A group without Access PTC Only content is shut out of PTC Only demos
+    too. A partner never gets in, even given it (Liwei, 2026-10-30: PTC Only
+    means PTC only; it was the other way since 2026-10-07)."""
     access.update_group(EMPLOYEES, "a", permissions=["view_hub", "preview", "download"])
     assert file_id(client, STAFF, "lambo") is None
     access.create_group("Trusted partners", "", ["access_internal"], [PARTNER], "a")
-    assert file_id(client, PARTNER, "lambo") == "I-1"
+    assert file_id(client, PARTNER, "lambo") is None
 
 
 def test_opening_on_the_hub_cannot_open_a_folder_sharepoint_closed(repo):

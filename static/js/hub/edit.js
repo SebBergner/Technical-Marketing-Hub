@@ -56,7 +56,7 @@ function editButton(asset) {
   b.hidden = true;
   if (!editable(asset)) return b;
   hubPermissions.then(function (granted) {
-    if (granted.indexOf("edit_metadata") >= 0) b.hidden = false;
+    if (granted.indexOf("maintain_content") >= 0) b.hidden = false;
   });
   b.addEventListener("click", function () { openEditor(asset); });
   return b;

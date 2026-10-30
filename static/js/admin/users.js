@@ -387,7 +387,13 @@ function renderEditor() {
   pf.appendChild(el("h3", null, "Permissions"));
   var perms = el("div", "ug-perms");
   var fixed = g.id === "administrators" || !editable;
+  var section = null;
   ug.data.catalogue.forEach(function (p) {
+    // Under headings since 2026-10-30: Viewing, Contributing, ...
+    if (p.section && p.section !== section) {
+      section = p.section;
+      perms.appendChild(el("div", "ug-perms__head", section));
+    }
     var row = el("label", "ug-perm");
     var box = el("input");
     box.type = "checkbox";

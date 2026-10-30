@@ -16,12 +16,12 @@ import { act } from "./signins.js";
  * and, since A8 (2026-10-28), moves its SharePoint folder into _Archive;
  * Restore puts it back. */
 function canReviewContent() {
-  return (session.permissions || []).indexOf("review_content") >= 0;
+  return (session.permissions || []).indexOf("maintain_content") >= 0;
 }
 
 /* Archive and Restore are "Archive content" since 2026-10-28 (A8). */
 function canArchive() {
-  return (session.permissions || []).indexOf("archive_content") >= 0;
+  return (session.permissions || []).indexOf("maintain_content") >= 0;
 }
 
 /* Where an archived demo is (A8): moved into SharePoint's _Archive, kept
@@ -103,7 +103,7 @@ function loadUploads() {
         }
         row.appendChild(info);
         var acts = el("div", "req-row__acts");
-        if (session.permissions.indexOf("review_content") >= 0) {
+        if (session.permissions.indexOf("maintain_content") >= 0) {
           var status = el("span", "promo-status faint");
           var act = function (path) {
             status.textContent = "Saving…";
@@ -345,11 +345,11 @@ function renderReview(d) {
     + "its folder in the library's _Archive, which only the team can open"
     + (hubOnly ? "; " + hubOnly + " archived before that still have their folder where it was "
        + "(to move by hand: Restore, then Archive)" : "")
-    + ". People with “See archived content” can still open them.", arch);
+    + ". People with “Maintain content” can still open them.", arch);
   host.appendChild(status);
   if (!canReviewContent()) {
     host.appendChild(el("p", "faint", "Viewing only: acting on these needs the "
-      + "Review content permission."));
+      + "Maintain content permission."));
   }
 }
 

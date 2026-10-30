@@ -359,7 +359,7 @@ function renderQueues(d) {
  * it more. For Run Brightcove migration only -- the page's API refuses
  * everyone else anyway. */
 function renderMigrations() {
-  var may = (session.permissions || []).indexOf("run_migration") >= 0;
+  var may = (session.permissions || []).indexOf("run_sync") >= 0;
   $("migrationsSection").hidden = !may;
   if (!may) return;
   var host = $("migrations");

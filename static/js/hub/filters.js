@@ -752,7 +752,7 @@ async function applyFilters() {
   updateVmVersionFilter();
   ensurePublishedFilter();
   hubPermissions.then(function (granted) {
-    if (granted.indexOf("view_archived") >= 0) ensureArchivedFilter();
+    if (granted.indexOf("maintain_content") >= 0) ensureArchivedFilter();
   });
   reflectSort();
   var params = currentQuery();

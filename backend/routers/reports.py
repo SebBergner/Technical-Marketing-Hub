@@ -107,13 +107,13 @@ _MISSING = [("demo_owner", "Demo owner"), ("publish_date", "Publish date"),
 
 
 async def _reviewer(request: Request) -> CurrentUser:
-    """Review content or Archive content: the two things done from the list."""
+    """Maintain content (Review and Archive content until 2026-10-30)."""
     user = principal_from_request(request)
-    if user.can(Perm.REVIEW_CONTENT.value) or user.can(Perm.ARCHIVE.value):
+    if user.can(Perm.MAINTAIN.value):
         return user
     if user.is_authenticated:
-        raise HTTPException(status_code=403, detail="Content to review needs Review "
-                            "content or Archive content.")
+        raise HTTPException(status_code=403,
+                            detail="Content to review needs Maintain content.")
     raise HTTPException(status_code=401, detail="Sign-in required.")
 
 

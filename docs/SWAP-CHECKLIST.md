@@ -155,7 +155,7 @@ Everything built since 2026-10-20 is new on production:
     DemoBoard.
 15. **Report owners**: name each segment's owners and General's. Without them
     every feedback lands in General and nobody is told.
-16. **GXC**: create a group "GXC" with View GXC videos and Liwei's list of 30
+16. **GXC**: create a group "GXC" with Access GXC videos and Liwei's list of 30
     people (2026-10-30; until then only Administrators see GXC). PTC addresses only. The same people go into the SharePoint GXC group. Downloads
     stay off unless decided otherwise (Admin → Content access).
 17. **Home page tab**: Featured demos and the two display options (production

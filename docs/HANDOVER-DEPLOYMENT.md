@@ -154,7 +154,7 @@ on Admin → Users & groups. Every endpoint checks on the server.
 
 | Heading | Permissions |
 |---|---|
-| Viewing | View the Hub, Preview files, Download files, Access PTC Only content, View GXC videos, View Hub activity |
+| Viewing | View the Hub, Preview files, Download files, Access PTC Only content, Access GXC videos, View Hub activity |
 | Contributing | Create new demo (Request new asset is hidden while its form is) |
 | Maintaining content | Maintain content |
 | Administration | View Admin, Manage the Home page, Manage users & groups, Run sync & migration |
@@ -180,7 +180,7 @@ on Admin → Users & groups. Every endpoint checks on the server.
 - **PTC Only:** the card shows to everyone; files open only with Access PTC Only
   content, and it is never customer facing.
 - **GXC:** the library "GXC Video" is filtered out at the repository
-  (`JsonAssetRepository(gxc=...)`) for anyone without View GXC videos, so it does
+  (`JsonAssetRepository(gxc=...)`) for anyone without Access GXC videos, so it does
   not exist for them. Downloads follow an Admin switch, off by default. Its
   SharePoint permissions are separate and kept by hand: add people to both lists.
 - **Create DemoBoard / sharing through Consensus:** only people on the Consensus

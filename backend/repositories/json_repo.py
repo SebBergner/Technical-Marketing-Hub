@@ -116,7 +116,7 @@ _MIRROR_FIELDS = (
 #: Under mirror/, and never read as catalogue data: _load_mirror only reads
 #: *.json at the top level of mirror/. Holds what VM pages say that only a
 #: signed-in person may see. Rebuilt by every VM sync, like the rest of mirror/.
-#: The mirrors whose demos are for "View GXC videos" only (video_sync.GXC_VIDEO;
+#: The mirrors whose demos are for "Access GXC videos" only (video_sync.GXC_VIDEO;
 #: named here because the repository must not import the Graph code).
 GXC_SOURCES = frozenset({"gxc_video"})
 
@@ -423,7 +423,7 @@ class JsonAssetRepository(AssetRepository):
                         tagged.append((source, record))
                     elif source == "sharepoint":
                         divested_folders.add(_folder_key(_catalog_folder(record)))
-        # GXC videos (Liwei, 2026-10-29): for anyone without "View GXC
+        # GXC videos (Liwei, 2026-10-29): for anyone without "Access GXC
         # videos" they do not exist -- dropped here, at the funnel, like a
         # divested product, so no list, search, related demo, thumbnail or
         # link can reach one. For everyone else they are marked, and never

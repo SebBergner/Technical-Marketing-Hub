@@ -1665,7 +1665,7 @@ function renderAccessMark(meta, asset) {
   // A GXC video (2026-10-29) says so instead: only a few people see it.
   var tag = pill(asset.gxc ? "GXC only" : "PTC Only", "internal");
   tag.title = asset.gxc
-    ? "A GXC video: only people with View GXC videos can see it on the Hub. "
+    ? "A GXC video: only people with Access GXC videos can see it on the Hub. "
       + "Share it only with them."
     : (asset.internal_source === "sharepoint"
       ? "Closed to partners in SharePoint. " : "Marked PTC Only on the Hub. ")
@@ -2007,13 +2007,13 @@ function uploadRow(asset, record) {
   // Left from before review was removed (2026-10-28): published by hand.
   setState(r.state, asset.upload_review === "sent_back" ? "Sent back" : "Not published",
            "Uploaded by " + by + " · " + onDay(record.submitted_at || record.created_at)
-           + (record.internal ? " · asked to be Internal" : ""));
+           + (record.internal ? " · asked to be PTC Only" : ""));
   if (record.status === "pending") {
     var publish = manageButton("Publish", true);
     publish.addEventListener("click", function () {
       confirmStep(r.row, {
         lead: "It will be listed in the Hub for everyone who may see it"
-          + (record.internal ? ", as Internal." : "."),
+          + (record.internal ? ", as PTC Only." : "."),
         placeholder: "Note (optional)",
         confirm: "Publish",
         submit: function (note) {

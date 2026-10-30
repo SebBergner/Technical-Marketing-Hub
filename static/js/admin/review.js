@@ -72,7 +72,7 @@ function loadUploads() {
           "by " + actorWord(u.uploaded_by)
             + (u.submitted_by ? " for " + u.submitted_by : ""),
           u.submitted_at ? new Date(u.submitted_at).toLocaleDateString() : null,
-          u.internal ? "asks to be Internal" : null,
+          u.internal ? "asks to be PTC Only" : null,
           u.asset_id ? null : "not in the Hub yet"
         ].filter(Boolean).join(" · ")));
         if (!u.asset_id) {

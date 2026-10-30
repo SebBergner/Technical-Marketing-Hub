@@ -31,7 +31,7 @@ second delta cursor in step.
 
 **GXC Video** (Liwei, 2026-10-29) is a second library of the same shape,
 read the same way into a mirror of its own (`gxc_video`, ids "gxc-"). Its
-demos exist on the Hub only for "View GXC videos" (json_repo drops them at
+demos exist on the Hub only for "Access GXC videos" (json_repo drops them at
 the funnel for anyone else); SharePoint restricts the library itself.
 """
 from __future__ import annotations
@@ -61,7 +61,7 @@ class VideoLibrary:
     id_prefix: str
     #: The setting that names the library; blank switches it off.
     setting: str
-    #: Its demos are for "View GXC videos" only.
+    #: Its demos are for "Access GXC videos" only.
     gxc: bool = False
 
     @property

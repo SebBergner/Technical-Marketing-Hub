@@ -134,7 +134,7 @@ def _sharepoint_libraries(repo: AssetRepository) -> list[dict]:
     rows = [
         {"name": settings.graph_list_name, "source": "sharepoint", "summary_key": None},
         {"name": settings.graph_video_library, "source": VIDEO, "summary_key": "demo_video"},
-        # 2026-10-29: GXC Video, for "View GXC videos" only on the Hub.
+        # 2026-10-29: GXC Video, for "Access GXC videos" only on the Hub.
         {"name": settings.graph_gxc_library, "source": "gxc_video", "summary_key": "gxc_video"},
         {"name": "Virtual Machines pages", "source": VM_PAGES, "summary_key": "vm_pages"},
         # 2026-10-05/06: the Demo Catalog's pages, and which demo folders
@@ -1029,24 +1029,26 @@ def get_activity(since: str | None = None, until: str | None = None,
 @router.get("/admin-log", dependencies=[VIEW_ADMIN])
 def get_admin_log(since: str | None = None, until: str | None = None, q: str | None = None,
                   category: str | None = None, result: str | None = None,
-                  offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500)):
+                  offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500),
+                  repo: AssetRepository = Depends(get_repo)):
     """Every change made through the Admin page's API, newest first, with
     whether the hash chain is intact (backend/admin_log.py). There is no
     endpoint that changes or deletes an entry, by design."""
     from backend import admin_log
-    return admin_log.read(since=since, until=until, q=q, category=category, result=result,
-                          offset=offset, limit=limit)
+    return admin_log.read(gxc=getattr(repo, "gxc", True), since=since, until=until, q=q,
+                          category=category, result=result, offset=offset, limit=limit)
 
 
 @router.get("/admin-log.csv", dependencies=[VIEW_ADMIN])
 def export_admin_log(since: str | None = None, until: str | None = None, q: str | None = None,
-                     category: str | None = None, result: str | None = None):
+                     category: str | None = None, result: str | None = None,
+                     repo: AssetRepository = Depends(get_repo)):
     """The same filters, every matching entry, as a CSV download (2026-10-15).
     The export itself is an entry in the log."""
     from fastapi.responses import Response as _Response
     from backend import admin_log
-    rows = admin_log.read(since=since, until=until, q=q, category=category, result=result,
-                          limit=None)["items"]
+    rows = admin_log.read(gxc=getattr(repo, "gxc", True), since=since, until=until, q=q,
+                          category=category, result=result, limit=None)["items"]
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M")
     # The BOM lets Excel read it as UTF-8 (names, quotes, non-English text).
     return _Response("﻿" + admin_log.to_csv(rows), media_type="text/csv; charset=utf-8",
@@ -1124,6 +1126,9 @@ def get_person_activity(email: str, since: str | None = None, until: str | None 
     no address."""
     from backend import activity
     events = _events(repo, None, None)
+    if not getattr(repo, "gxc", True):
+        # A GXC id spells its title (2026-10-30), as on Hub activity.
+        events = [e for e in events if not (e.get("asset_id") or "").startswith("gxc-")]
     mine = (email or "").strip().lower()
     ids = {e.get("asset_id") for e in events if e.get("asset_id") and e.get("user") == mine}
     # One listing rather than a get() per demo, which rebuilds the catalogue

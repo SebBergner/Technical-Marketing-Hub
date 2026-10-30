@@ -36,7 +36,7 @@ def build_repo(gxc: bool = True) -> AssetRepository:
 
 def get_repo(user: CurrentUser = Depends(get_current_user)) -> AssetRepository:
     """The catalogue as this person may see it: without GXC videos unless
-    they have "View GXC videos" (2026-10-29). Every route reads through
+    they have "Access GXC videos" (2026-10-29). Every route reads through
     this, so the rule is kept in one place."""
     from backend.access import Perm
     return build_repo(gxc=user.can(Perm.VIEW_GXC))

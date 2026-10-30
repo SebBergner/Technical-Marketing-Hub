@@ -16,7 +16,7 @@ Three are built in and cannot be deleted:
   the Hub with nobody able to manage it.
 * **PTC employees** -- automatic: everyone who signs in with a member account.
 * **Partners** -- automatic: everyone who signs in with a guest account
-  (`CurrentUser.is_partner`). By default they may not see Internal content.
+  (`CurrentUser.is_partner`). They never open PTC Only content.
 
 The two automatic groups have no member list; their permissions can be changed.
 Any other group is created on the page, with its members typed as an email or
@@ -94,10 +94,11 @@ CATALOGUE: list[tuple[str, list[tuple[Perm, str, str]]]] = [
         (Perm.INTERNAL, "Access PTC Only content",
          "Preview and download PTC Only demos: marked so on the Hub, or closed to "
          "partners in SharePoint. Never given to partner (guest) accounts."),
-        (Perm.VIEW_GXC, "View GXC videos",
-         "See the videos in the GXC Video library. Without it they do not exist on "
-         "the Hub: not listed, not found, and their links open nothing. Never given "
-         "to partner (guest) accounts."),
+        (Perm.VIEW_GXC, "Access GXC videos",
+         "Find, open and preview the videos in the GXC Video library, and download them "
+         "when Admin -> Content access switches that on. Without it they do not exist on "
+         "the Hub: not listed, not found, and their links open nothing. Never given to "
+         "partner (guest) accounts."),
         (Perm.VIEW_REPORTS, "View Hub activity",
          "See the Hub activity page: the most used content, the most active PTC "
          "people and team totals. Never partners' names."),
@@ -165,7 +166,7 @@ TEAM = {"team member"}
 #: name as well as to Administrators (Liwei, 2026-10-28: Archive content for
 #: the team; Maintain content took it over). Removed afterwards, it stays
 #: removed (`catalogue`).
-#: Not View GXC videos (Liwei, 2026-10-30): its list is its own, and overlaps
+#: Not Access GXC videos (Liwei, 2026-10-30): its list is its own, and overlaps
 #: the team's without matching it.
 INTRODUCED_FOR = {Perm.MAINTAIN.value: TEAM}
 

@@ -78,7 +78,7 @@ def create(repo, asset, level: str, reason: str, actor: str) -> dict:
     if len(reason) > REASON_MAX:
         raise RequestError(f"Keep the reason under {REASON_MAX} characters.")
     if level == "internal" and asset.internal:
-        raise RequestError("This demo is already Internal.")
+        raise RequestError("This demo is already PTC Only.")
     if level == "open" and not asset.internal:
         raise RequestError("This demo is already Open.")
     if level == "open" and asset.internal_source == "sharepoint":

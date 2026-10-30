@@ -181,7 +181,7 @@ function setAccess(assetId, level, status) {
 
 /* ── GXC videos (Liwei, 2026-10-29) ─────────────────────────────────────
  * The GXC Video library's demos exist on the Hub only for groups with
- * "View GXC videos"; this card says how many there are, which groups see
+ * "Access GXC videos"; this card says how many there are, which groups see
  * them, and holds the one switch: whether they can be downloaded. */
 function loadGxc() {
   return fetch("/api/admin/gxc")
@@ -198,7 +198,7 @@ function renderGxc(s) {
     ? (s.videos == null ? "—" : s.videos) + " in " + s.library : "Not configured"));
   host.appendChild(head);
   host.appendChild(el("p", "muted", "Videos in the GXC Video library are for a few PTC "
-    + "people only. Anyone whose groups lack View GXC videos never sees them on the Hub: "
+    + "people only. Anyone whose groups lack Access GXC videos never sees them on the Hub: "
     + "they are not listed or found, and a shared link opens nothing. Administrators "
     + "always see them; partners never do. SharePoint restricts the library itself, "
     + "so keep its group and these Hub groups the same people."));
@@ -208,7 +208,7 @@ function renderGxc(s) {
     ? "Seen by: " + s.groups.map(function (g) {
         return g.name + (g.auto ? "" : " (" + g.members + ")");
       }).join(", ")
-    : "No group has View GXC videos.";
+    : "No group has Access GXC videos.";
   host.appendChild(who);
 
   var row = el("div", "promo-row");
@@ -260,7 +260,7 @@ function renderContentAccess(items) {
   var sp = items.filter(function (i) { return i.source === "sharepoint"; });
 
   var head = el("div", "card-head");
-  head.appendChild(el("h2", null, "Internal demos"));
+  head.appendChild(el("h2", null, "PTC Only demos"));
   head.appendChild(el("span", "faint num", hub.length + " marked here · " + sp.length
     + " closed in SharePoint"));
   host.appendChild(head);
@@ -279,7 +279,7 @@ function renderContentAccess(items) {
     info.appendChild(title);
     var why = i.source === "sharepoint"
       ? "Closed to partners in SharePoint — open it there to make it Open"
-      : "Marked Internal" + (i.marked_by ? " by " + i.marked_by.replace(/^(user|dev):/, "") : "")
+      : "Marked PTC Only" + (i.marked_by ? " by " + i.marked_by.replace(/^(user|dev):/, "") : "")
         + (i.marked_at ? " · " + new Date(i.marked_at).toLocaleString() : "")
         + (i.reason ? " — " + i.reason : "");
     info.appendChild(el("div", "promo-row__meta",
@@ -301,7 +301,7 @@ function renderContentAccess(items) {
 
   if (manage) {
     var add = el("div", "promo-add");
-    var label = el("label", null, "Mark a demo Internal");
+    var label = el("label", null, "Mark a demo PTC Only");
     var input = el("input");
     input.type = "search";
     input.placeholder = "Search by title…";

@@ -199,17 +199,24 @@ def _result(entry: dict) -> str:
     return "done" if 200 <= status < 400 else ("refused" if status in (401, 403) else "failed")
 
 
-def read(*, since: str | None = None, until: str | None = None, q: str | None = None,
+def read(*, gxc: bool = True, since: str | None = None, until: str | None = None,
+         q: str | None = None,
          category: str | None = None, result: str | None = None,
          offset: int = 0, limit: int | None = 50) -> dict:
     """Newest first, filtered by period, area (category), result (done /
-    refused / failed) and a word in who, what or target."""
+    refused / failed) and a word in who, what or target. `gxc`: False leaves
+    out entries about GXC videos."""
     entries = _entries()
     check = verify(entries)
     for e in entries:
         e["category"] = category_of(e.get("path", ""))
         e["result"] = _result(e)
     rows = entries
+    if not gxc:
+        # For someone without Access GXC videos: a GXC id spells its title
+        # (2026-10-30). The chain is checked above, over every entry.
+        rows = [e for e in rows if "gxc-" not in json.dumps(
+            [e.get("path"), e.get("target"), e.get("detail")], ensure_ascii=False)]
     if category:
         wanted = {c.strip() for c in category.split(",") if c.strip()}
         rows = [e for e in rows if e["category"] in wanted]

@@ -412,7 +412,7 @@ class AssetBase(BaseModel):
     #: partners there) or "hub" (marked on the Hub).
     internal: bool = False
     internal_source: str | None = None
-    #: From the GXC Video library (2026-10-29): listed only for "View GXC
+    #: From the GXC Video library (2026-10-29): listed only for "Access GXC
     #: videos", and downloaded only while Admin allows it.
     gxc: bool = False
     #: How old, in the bands people see (services/content_age.py): new,

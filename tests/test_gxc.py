@@ -1,4 +1,4 @@
-"""GXC videos: a library only "View GXC videos" sees (Liwei, 2026-10-29).
+"""GXC videos: a library only "Access GXC videos" sees (Liwei, 2026-10-29).
 
 Without the permission a GXC video does not exist on the Hub -- not listed,
 not found, and its link opens nothing; with it, it is PTC Only and never
@@ -169,6 +169,20 @@ def test_an_archived_gxc_video_is_listed_only_for_whoever_sees_gxc(client, repo)
         "/api/reports/content-to-review", headers=easyauth_headers(who)).json()["archived"]]
     assert listed(STAFF) == [], "not even its title"
     assert listed(MEMBER) == ["gxc-lamborghini"]
+
+
+def test_view_admin_alone_shows_no_gxc_id(client, repo):
+    """The access audit, 2026-10-30: a report owner with View Admin and no GXC
+    reads the Admin log and a person's activity."""
+    access.create_group("Owners", "", ["view_admin"], ["owner@ptc.com"], "t")
+    repo.record_usage_event("view", "gxc-lamborghini", actor="user:" + MEMBER)
+    client.put("/api/assets/gxc-lamborghini/still-current", json={"still_current": True},
+               headers=easyauth_headers(ADMIN))
+    owner, boss = easyauth_headers("owner@ptc.com"), easyauth_headers(ADMIN)
+    for url in ("/api/admin/admin-log", "/api/admin/admin-log.csv",
+                "/api/admin/activity/person?email=" + MEMBER):
+        assert "gxc-lamborghini" not in client.get(url, headers=owner).text, url
+    assert "gxc-lamborghini" in client.get("/api/admin/admin-log", headers=boss).text
 
 
 def test_hub_activity_leaves_out_a_gxc_video_for_whoever_cannot_see_it(client, repo):

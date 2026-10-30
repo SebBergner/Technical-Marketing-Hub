@@ -229,7 +229,7 @@ class Settings(BaseSettings):
     #: read-only, and the CLI refuses to write to it without --allow-production.
     migration_brightcove_library: str = "Demo Video"
     #: Where the sheet's GXC Gallery rows go instead (Liwei, 2026-10-29): a
-    #: library restricted in SharePoint, whose demos only "View GXC videos"
+    #: library restricted in SharePoint, whose demos only "Access GXC videos"
     #: sees on the Hub. Blank: GXC rows are reported, not migrated.
     migration_gxc_library: str = "GXC Video"
     #: The term set Product's labels are looked up in. Extranet / "PTC Product":

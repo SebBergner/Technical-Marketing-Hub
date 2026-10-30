@@ -174,7 +174,7 @@ def submit(repo, upload_id: str, actor: str, values: dict | None = None,
     if record.get("internal"):
         marks = _load(repo, INTERNAL, {})
         marks.setdefault(record["folder_id"], {"by": record["uploaded_by"], "at": _now(),
-                                               "reason": "Marked Internal when created"})
+                                               "reason": "Marked PTC Only when created"})
         _save(repo, INTERNAL, marks)
     if task:
         _task(repo, record)

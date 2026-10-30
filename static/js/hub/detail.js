@@ -1732,11 +1732,12 @@ function confirmStep(row, opts) {
   row.querySelectorAll(".hub-manage__form").forEach(function (n) { n.remove(); });
   var form = mk("div", "hub-manage__form");
   if (opts.lead) form.appendChild(mk("p", "hub-manage__lead", opts.lead));
+  // No placeholder, no box: a plain "are you sure" (Restore, 2026-10-30).
   var box = mk("textarea", "hub-manage__input");
   box.rows = 2;
   box.maxLength = 1000;
-  box.placeholder = opts.placeholder;
-  form.appendChild(box);
+  box.placeholder = opts.placeholder || "";
+  if (opts.placeholder) form.appendChild(box);
   var err = mk("p", "hub-manage__err");
   var bar = mk("div", "hub-manage__formbar");
   var ok = manageButton(opts.confirm, true);
@@ -1747,7 +1748,7 @@ function confirmStep(row, opts) {
   form.appendChild(err);
   cancel.addEventListener("click", function () { form.remove(); });
   ok.addEventListener("click", function () {
-    var text = box.value.trim();
+    var text = opts.placeholder ? box.value.trim() : "";
     if (opts.required && !text) { err.textContent = "Please say why."; box.focus(); return; }
     ok.disabled = cancel.disabled = true;
     err.textContent = "";
@@ -1757,7 +1758,7 @@ function confirmStep(row, opts) {
     });
   });
   row.appendChild(form);
-  box.focus();
+  (opts.placeholder ? box : ok).focus();
 }
 
 function manageRow(label) {
@@ -1923,12 +1924,15 @@ function archiveRow(asset) {
   var b = manageButton(asset.archived ? "Restore" : "Archive");
   b.addEventListener("click", function () {
     if (asset.archived) {
-      b.disabled = true;
-      b.textContent = moves && asset.sharepoint_archived ? "Moving back…" : "Restoring…";
-      apply(false).catch(function (e) {
-        b.disabled = false;
-        b.textContent = "Restore";
-        report(e.message, true);
+      // Asked first, as Archive is (Liwei 2026-10-30).
+      confirmStep(r.row, {
+        lead: moves && asset.sharepoint_archived
+          ? "Its folder moves back out of SharePoint's _Archive, takes the library's "
+            + "permissions again (partners included where the library allows them), and it "
+            + "returns to the Hub's lists and search."
+          : "It returns to the Hub's lists and search.",
+        confirm: "Restore",
+        submit: function () { return apply(false); }
       });
       return;
     }

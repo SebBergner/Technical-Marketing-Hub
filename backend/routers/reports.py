@@ -167,12 +167,15 @@ def content_to_review(user: CurrentUser = Depends(_reviewer),
     * `missing`: the columns the Data Clean list counts as empty.
 
     Every demo is listed, with or without a reason; `mine` marks the ones
-    credited to the person asking."""
+    credited to the person asking. `archived` lists what is archived, to
+    restore from here (Liwei 2026-10-30: the team archives here, and may not
+    open Admin)."""
     from datetime import date as _date, timedelta as _td
     from backend.repositories.base import AssetQuery as _Q
     from backend.routers.admin import (REVIEW_EXPIRING_DAYS, REVIEW_IDLE_DAYS,
                                        REVIEW_MIN_AGE_DAYS)
     from backend.services import content_age
+    from backend.services.metadata_edit import NotEditable, target_key
 
     reader = getattr(repo, "usage_events", None)
     events = reader() if reader else []
@@ -208,6 +211,14 @@ def content_to_review(user: CurrentUser = Depends(_reviewer),
                                f"{REVIEW_IDLE_DAYS // 30} months"})
         return out
 
+    def moves(a) -> bool:
+        """Whether archiving moves its folder: a SharePoint demo the Hub can
+        edit (Demo Catalog, Demo Video, GXC Video), as the archive route."""
+        try:
+            return bool(target_key(a.model_dump(mode="json")))
+        except NotEditable:
+            return False
+
     rows = []
     for a in repo.list(_Q(limit=10 ** 6, include_older_vms=True)).items:
         rows.append({
@@ -219,14 +230,19 @@ def content_to_review(user: CurrentUser = Depends(_reviewer),
             "last_used": (last_used.get(a.id) or "")[:10] or None,
             "owner": a.demo_owner or a.submitted_by or a.creator,
             "mine": _is_mine(a, user, my_segments),
-            "in_sharepoint": a.source == "sharepoint",
+            "in_sharepoint": moves(a),
             "still_current_until": str(a.still_current_until) if a.still_current_until
                                    else None,
             "reasons": reasons(a),
             "missing": _missing(records.get(a.id) or {})})
     # Never used first, then the longest unused; within those, the oldest.
     rows.sort(key=lambda r: (r["last_used"] or "", r["uploaded_at"] or ""))
-    return {"items": rows, "usage_since": (events[0].get("at") or "")[:10] if events else None,
+    try:
+        archived = repo.archived()
+    except NotImplementedError:
+        archived = []
+    return {"items": rows, "archived": archived,
+            "usage_since": (events[0].get("at") or "")[:10] if events else None,
             "still_current_months": settings.still_current_months,
             "missing_labels": dict(_MISSING),
             "idle_days": REVIEW_IDLE_DAYS, "dust_years": content_age.DUST_YEARS}

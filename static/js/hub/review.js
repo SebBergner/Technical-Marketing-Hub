@@ -1,7 +1,9 @@
 /* Content to review (#/review; A6, Liwei 2026-10-23/28): every demo the Hub
  * lists, with its age, its last use and why it may need a look, for the
  * team to judge and to archive, or confirm Still current, several at a
- * time. Each step can be undone and is in the Admin log.
+ * time. Each step can be undone and is in the Admin log. Archived (Liwei
+ * 2026-10-30) lists what is archived, to restore several at a time: the
+ * team archives here and may not open Admin -> Content review.
  *
  * Why (2026-10-28), worked out by the server: Admin -> Content review's own
  * rules (collecting dust, little used, Still current running out), and the
@@ -23,7 +25,8 @@ import { closeAdvancedSearch } from "./search.js";
 
 var state = {
   items: null, usageSince: null, months: 12,
-  scope: null,            // "mine" | "all"; Mine first when there are any
+  archived: [],
+  scope: null,            // "mine" | "all" | "archived"; Mine first when there are any
   type: "", age: "", why: "", q: "",
   sort: ["why", "desc"],
   missingLabels: {},
@@ -65,7 +68,8 @@ function buildPage() {
     +   '<div class="vp-title">Content to review</div>'
     +   '<div class="orion-subtle">Every demo in the Hub, with why it may need a look: old, '
     +   'little used, Still current running out, or details missing in SharePoint. Archive what '
-    +   'is out of date, or confirm it is still current. Both can be undone.</div>'
+    +   'is out of date, or confirm it is still current. Both can be undone; Archived lists '
+    +   'what is archived, to restore.</div>'
     + '</div></div>'
     + '<div class="hub-rvw" id="hubRvw"></div>';
   var anchor = document.getElementById("videoPreviewPage");
@@ -121,6 +125,7 @@ function load() {
       return;
     }
     state.items = d.items || [];
+    state.archived = d.archived || [];
     state.usageSince = d.usage_since;
     state.months = d.still_current_months || 12;
     state.missingLabels = d.missing_labels || {};
@@ -137,6 +142,12 @@ function load() {
 
 function shown() {
   var q = state.q.trim().toLowerCase();
+  if (state.scope === "archived") {
+    return state.archived.filter(function (r) {
+      return !q || ((r.title || "") + " " + (r.reason || "") + " " + (r.by || ""))
+        .toLowerCase().indexOf(q) >= 0;
+    });
+  }
   var rows = state.items.filter(function (r) {
     if (state.scope === "mine" && !r.mine) return false;
     if (state.type && r.type !== state.type) return false;
@@ -179,9 +190,12 @@ function render() {
   if (!rows.length) {
     host.appendChild(el("div", "hub-rvw__empty", state.scope === "mine"
       ? "None of the demos credited to you match. Try All demos."
-      : "No demo matches these filters."));
+      : state.scope === "archived"
+        ? (state.archived.length ? "No archived demo matches." : "Nothing is archived.")
+        : "No demo matches these filters."));
     return;
   }
+  if (state.scope === "archived") return renderArchived(host, rows);
   var wrap = el("div", "hub-table-wrap");
   var table = el("table", "hub-table hub-rvw__table");
   table.appendChild(head(rows));
@@ -203,7 +217,8 @@ function toolbar() {
   seg.setAttribute("role", "group");
   seg.setAttribute("aria-label", "Whose demos");
   var mine = state.items.filter(function (r) { return r.mine; }).length;
-  [["mine", "Mine (" + mine + ")"], ["all", "All demos (" + state.items.length + ")"]]
+  [["mine", "Mine (" + mine + ")"], ["all", "All demos (" + state.items.length + ")"],
+   ["archived", "Archived (" + state.archived.length + ")"]]
     .forEach(function (s) {
       var b = el("button", null, s[1]);
       b.type = "button";
@@ -212,6 +227,10 @@ function toolbar() {
       seg.appendChild(b);
     });
   bar.appendChild(seg);
+  if (state.scope === "archived") {
+    bar.appendChild(searchBox("Filter by title, reason or who archived"));
+    return bar;
+  }
 
   var types = {};
   state.items.forEach(function (r) { types[r.type] = 1; });
@@ -224,10 +243,14 @@ function toolbar() {
     ["missing", "Any detail missing"]].concat(Object.keys(state.missingLabels).map(function (k) {
       return ["m:" + k, "Missing " + state.missingLabels[k]];
     })).concat([["none", "Nothing to review"]])));
+  bar.appendChild(searchBox("Filter by title, product or owner"));
+  return bar;
+}
 
+function searchBox(placeholder) {
   var search = el("input", "hub-rvw__search");
   search.type = "search";
-  search.placeholder = "Filter by title, product or owner";
+  search.placeholder = placeholder;
   search.value = state.q;
   search.addEventListener("input", function () {
     state.q = search.value;
@@ -237,8 +260,7 @@ function toolbar() {
     again.focus();
     try { again.setSelectionRange(at, at); } catch (e) { /* type=search */ }
   });
-  bar.appendChild(search);
-  return bar;
+  return search;
 }
 
 function select(label, key, options) {
@@ -386,7 +408,105 @@ function picked() {
 }
 
 function canAct() {
+  if (state.scope === "archived") return may("archive_content");
   return may("archive_content") || may("review_content");
+}
+
+/* ── archived (2026-10-30) ────────────────────────────────────────────── */
+var WHERE = { sharepoint: "Folder in _Archive",
+              hub_only: "Folder not moved (archived before _Archive)",
+              hub: "Hub only" };
+
+function renderArchived(host, rows) {
+  var wrap = el("div", "hub-table-wrap");
+  var table = el("table", "hub-table hub-rvw__table");
+  var thead = el("thead");
+  var tr = thead.insertRow();
+  var th0 = el("th", "hub-rvw__pick");
+  var all = el("input");
+  all.type = "checkbox";
+  all.setAttribute("aria-label", "Select every archived demo shown");
+  var n = rows.filter(function (r) { return state.picked[r.asset_id]; }).length;
+  all.checked = n > 0 && n === rows.length;
+  all.indeterminate = n > 0 && n < rows.length;
+  all.disabled = !canAct();
+  all.addEventListener("change", function () {
+    state.picked = {};
+    if (all.checked) rows.forEach(function (r) { state.picked[r.asset_id] = r; });
+    document.querySelectorAll("#hubRvw tbody input[type=checkbox]").forEach(function (b) {
+      b.checked = all.checked;
+    });
+    picked();
+  });
+  th0.appendChild(all);
+  tr.appendChild(th0);
+  ["Title", "Type", "Archived", "Reason", "In SharePoint"].forEach(function (h) {
+    var th = el("th");
+    th.appendChild(el("span", "hub-rvw__th", h));
+    tr.appendChild(th);
+  });
+  table.appendChild(thead);
+  var body = el("tbody");
+  rows.forEach(function (r) {
+    var row = el("tr");
+    var td0 = el("td", "hub-rvw__pick");
+    var box = el("input");
+    box.type = "checkbox";
+    box.checked = !!state.picked[r.asset_id];
+    box.disabled = !canAct();
+    box.setAttribute("aria-label", "Select " + (r.title || r.asset_id));
+    box.addEventListener("change", function () {
+      if (box.checked) state.picked[r.asset_id] = r; else delete state.picked[r.asset_id];
+      picked();
+    });
+    td0.appendChild(box);
+    row.appendChild(td0);
+    var title = el("td", "hub-table__td--title");
+    var a = el("a", null, r.title || r.asset_id);
+    a.href = "#/asset/" + encodeURIComponent(r.asset_id);
+    a.addEventListener("click", function () { window.hubDetailReturn = "#/review"; });
+    title.appendChild(a);
+    row.appendChild(title);
+    row.appendChild(el("td", "hub-table__td--type", (TYPE_CHIP[r.type] || [])[1] || r.type || ""));
+    var when = el("td", "hub-rvw__age");
+    if (r.at) {
+      when.appendChild(el("b", null, fullDate(r.at.slice(0, 10))));
+      if (r.by) when.appendChild(el("div", "hub-rvw__sub", r.by.replace(/^(user|dev):/, "")));
+    } else {
+      when.appendChild(el("span", "hub-rvw__sub", "Moved in SharePoint"));
+    }
+    row.appendChild(when);
+    row.appendChild(el("td", "hub-rvw__sub", r.reason || ""));
+    row.appendChild(el("td", "hub-rvw__sub", WHERE[r.where] || ""));
+    body.appendChild(row);
+  });
+  table.appendChild(body);
+  wrap.appendChild(table);
+  host.appendChild(wrap);
+  host.appendChild(el("div", "hub-rvw__note",
+    "Archived demos are out of every list and search in the Hub. Restore moves a folder in "
+    + "_Archive back to its library, with the library's permissions again."));
+}
+
+/* Asked once for the batch, as Archive is. */
+function askRestore(bar, ids) {
+  bar.innerHTML = "";
+  var moving = ids.filter(function (id) { return state.picked[id].where === "sharepoint"; }).length;
+  bar.appendChild(el("span", "hub-rvw__count", "Restore " + ids.length + " demo"
+    + (ids.length === 1 ? "" : "s") + "?"));
+  bar.appendChild(el("span", "hub-rvw__lead", (moving
+    ? moving + " move back out of SharePoint's _Archive and take their library's permissions "
+      + "again, partners included where the library allows them. " : "")
+    + "They return to the Hub's lists and search."));
+  var go = el("button", "btn-primary-sm", "Restore " + ids.length);
+  go.type = "button";
+  go.addEventListener("click", function () { run("archive", ids, false); });
+  bar.appendChild(go);
+  var cancel = el("button", "btn-ghost", "Cancel");
+  cancel.type = "button";
+  cancel.addEventListener("click", picked);
+  bar.appendChild(cancel);
+  go.focus();
 }
 
 /* ── several at a time ────────────────────────────────────────────────── */
@@ -400,13 +520,18 @@ function bulkBar(rows) {
   bar.appendChild(el("span", "hub-rvw__count", ids.length
     ? ids.length + " selected" : rows.length + " shown · select demos to act on them"));
   if (!ids.length || state.busy) return bar;
-  if (may("archive_content")) {
+  if (state.scope === "archived") {
+    var back = el("button", "btn-primary-sm", "Restore…");
+    back.type = "button";
+    back.addEventListener("click", function () { askRestore(bar, ids); });
+    bar.appendChild(back);
+  } else if (may("archive_content")) {
     var arch = el("button", "btn-primary-sm", "Archive…");
     arch.type = "button";
     arch.addEventListener("click", function () { askArchive(bar, ids); });
     bar.appendChild(arch);
   }
-  if (may("review_content")) {
+  if (may("review_content") && state.scope !== "archived") {
     var cur = el("button", "btn-ghost", "Still current");
     cur.type = "button";
     cur.title = "The interface these show still matches today's release, for "
@@ -494,7 +619,8 @@ function run(kind, ids, on, reason) {
 }
 
 function find(id) {
-  return (state.items || []).filter(function (r) { return r.asset_id === id; })[0];
+  return (state.items || []).concat(state.archived || [])
+    .filter(function (r) { return r.asset_id === id; })[0];
 }
 
 function verb(kind, on, ing) {

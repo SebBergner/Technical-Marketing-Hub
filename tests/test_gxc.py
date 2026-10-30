@@ -161,6 +161,15 @@ def test_a_gxc_row_needs_no_customer_facing_and_is_never_customer_facing(tmp_pat
     assert run.fields_for(gxc)["Customer_x0020_Facing"] is False
 
 
+def test_an_archived_gxc_video_is_listed_only_for_whoever_sees_gxc(client, repo):
+    repo.set_archived("gxc-lamborghini", True, "user:" + ADMIN)
+    access.create_group("Archivers", "", ["view_hub", "archive_content"], [STAFF, MEMBER], "t")
+    listed = lambda who: [a["asset_id"] for a in client.get(  # noqa: E731
+        "/api/reports/content-to-review", headers=easyauth_headers(who)).json()["archived"]]
+    assert listed(STAFF) == [], "not even its title"
+    assert listed(MEMBER) == ["gxc-lamborghini"]
+
+
 def test_hub_activity_leaves_out_a_gxc_video_for_whoever_cannot_see_it(client, repo):
     repo.record_usage_event("view", "gxc-lamborghini", actor="user:" + MEMBER)
     url = "/api/reports/activity"

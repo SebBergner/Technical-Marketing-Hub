@@ -149,8 +149,14 @@ def test_content_to_review_is_for_reviewers_and_archivers_least_used_first(clien
     assert missing["idle"] == ["demo_owner", "publish_date"]
     assert missing["video-cust"] == ["named_customer"]
     assert missing["dusty"] == [], "not a SharePoint demo: nothing to fill in here"
-    client.put("/api/assets/dusty/archive", json={"archived": True}, headers=BOSS)
-    assert "dusty" not in [r["asset_id"] for r in client.get(url, headers=STAFF).json()["items"]]
+    assert {r["asset_id"]: r["in_sharepoint"] for r in d["items"]}["video-cust"] is False,         "no SharePoint folder known: archiving moves nothing"
+    client.put("/api/assets/dusty/archive", json={"archived": True, "reason": "UI from 2018"},
+               headers=BOSS)
+    d = client.get(url, headers=STAFF).json()
+    assert "dusty" not in [r["asset_id"] for r in d["items"]]
+    # Liwei 2026-10-30: restored from here too, as the team may not open Admin.
+    [entry] = d["archived"]
+    assert (entry["asset_id"], entry["reason"], entry["where"]) == ("dusty", "UI from 2018", "hub")
 
 
 def test_a_demo_with_no_owner_is_mine_when_i_own_its_segment(client, tmp_path):

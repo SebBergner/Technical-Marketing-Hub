@@ -315,8 +315,23 @@ function renderReview(d) {
         var restore = el("button", null, "Restore");
         restore.type = "button";
         restore.addEventListener("click", function () {
-          reviewAction("/api/assets/" + encodeURIComponent(a.asset_id) + "/archive",
-            { archived: false }, status);
+          // Asked in place first, as Archive is (Liwei 2026-10-30).
+          acts.innerHTML = "";
+          acts.appendChild(el("span", "faint", a.where === "sharepoint"
+            ? "Moves its folder back out of _Archive. " : ""));
+          var yes = el("button", "btn-small btn-primary", "Restore");
+          yes.type = "button";
+          yes.addEventListener("click", function () {
+            yes.disabled = no.disabled = true;
+            reviewAction("/api/assets/" + encodeURIComponent(a.asset_id) + "/archive",
+              { archived: false }, status).then(function () { yes.disabled = no.disabled = false; });
+          });
+          var no = el("button", "btn-small", "Cancel");
+          no.type = "button";
+          no.addEventListener("click", loadReview);
+          acts.appendChild(yes);
+          acts.appendChild(no);
+          yes.focus();
         });
         acts.appendChild(restore);
       }

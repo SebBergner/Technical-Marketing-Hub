@@ -743,9 +743,12 @@ class JsonAssetRepository(AssetRepository):
         and `where` (A8, 2026-10-28): "sharepoint", the folder is in _Archive;
         "hub_only", a SharePoint folder archived in the Hub before _Archive
         existed, still where it was; "hub", not a SharePoint folder. A folder
-        moved into _Archive in SharePoint itself is listed too."""
+        moved into _Archive in SharePoint itself is listed too. A GXC video
+        only for whoever sees GXC (its title is in the record)."""
+        from backend.integrations.graph.video_sync import GXC_VIDEO
         from backend.services.metadata_edit import NotEditable, target_key
-        state = self._load("archived") or {}
+        state = {k: v for k, v in (self._load("archived") or {}).items()
+                 if self.gxc or not k.startswith(GXC_VIDEO.id_prefix)}
         records = {r["id"]: r for r in self._load_mirror()}
 
         def where(asset_id: str) -> str:

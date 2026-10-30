@@ -8,7 +8,7 @@ the version numbers and the "what is new" list each time.
 
 > 中文导读：切换前做三件事：在 staging 上测一次归档和恢复、确认 /migration 没在跑、
 > 备份 production 的 owned/。切换后**马上**检查两个 slot 的登录，并把当前代码重新部署到
-> staging。然后在 production 上：确认 Team Member 组拿到了 Maintain content 和 View GXC videos，跑一次完整同步，
+> staging。然后在 production 上：确认 Team Member 组拿到了 Maintain content，建好 GXC 组，跑一次完整同步，
 > 上传 Consensus 名单，填 Report owners，按需要建 GXC 组。production 的数据（owned/）
 > 和 staging 是分开的，staging 上做的设置不会带过去。
 
@@ -41,7 +41,7 @@ Everything built since 2026-10-20 is new on production:
 - Hidden: Request New Asset, the Value Roadmap tab, the sidebar feedback link,
   the SCO segment (its one demo keeps its value).
 - **GXC videos** (10/29): a separate library "GXC Video" that only "View GXC
-  videos" sees (Administrators always; Team Member once; partners never).
+  videos" sees (Administrators always; a GXC group; partners never).
   Without it a GXC video does not exist on the Hub, its link included.
   Downloads are switched off by default (Admin → Content access).
 - Admin: menu down the left, an icon per tab; Overview links to the Brightcove
@@ -69,10 +69,11 @@ Everything built since 2026-10-20 is new on production:
   asset**, whatever group they are in: never PTC Only, GXC, Hub activity,
   Maintain content or anything administrative.
 - **Permissions are given once, by group name**, the first time production's
-  `access.json` is read by the new code: Maintain content and View GXC videos
-  to the group named **"Team Member"** (Administrators have everything). The
-  name must match (case does not matter); a group renamed later does not get
-  them again.
+  `access.json` is read by the new code: Maintain content to the group named
+  **"Team Member"** (Administrators have everything). The name must match (case
+  does not matter); a group renamed later does not get it again. **View GXC
+  videos goes to nobody by name** (2026-10-30): until the GXC group exists only
+  Administrators see GXC.
 - `sync.MAPPING_VERSION` is 5 in the new code (3 on production): **the first
   SharePoint sync on production rebuilds the mirror in full** (Demo Owner,
   product version, thumbnails, assumed values). Until it has run, production
@@ -134,10 +135,10 @@ Everything built since 2026-10-20 is new on production:
 
 ## On production, in order
 
-11. **Admin → Users & groups.** Team Member now has Maintain content and View
-    GXC videos; Administrators has every permission. If Team Member lacks them,
-    tick them by hand. Check no other group holds more than it should under the
-    new, broader Maintain content.
+11. **Admin → Users & groups.** Team Member now has Maintain content;
+    Administrators has every permission. If Team Member lacks it, tick it by
+    hand. Check no other group holds more than it should under the new, broader
+    Maintain content.
 12. **Admin → Overview → Sync SharePoint now**, then **Sync Consensus now**.
     The SharePoint run is a full rebuild this once (MAPPING_VERSION 5); expect
     it to take longer. Afterwards:
@@ -152,10 +153,10 @@ Everything built since 2026-10-20 is new on production:
     DemoBoard.
 15. **Report owners**: name each segment's owners and General's. Without them
     every feedback lands in General and nobody is told.
-16. **GXC**: anyone besides Team Member and Administrators who should see GXC
-    videos goes into a group with View GXC videos (PTC addresses only), and the
-    same people into the SharePoint GXC group. Downloads stay off unless decided
-    otherwise (Admin → Content access).
+16. **GXC**: create a group "GXC" with View GXC videos and Liwei's list of 30
+    people (2026-10-30; Seb, Elio and Serge are on it and see nothing until then).
+    PTC addresses only. The same people go into the SharePoint GXC group. Downloads
+    stay off unless decided otherwise (Admin → Content access).
 17. **Home page tab**: Featured demos and the two display options (production
     has its own; re-pick if wanted).
 18. **Left from before review was removed**: Admin → Content review lists

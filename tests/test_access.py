@@ -316,7 +316,7 @@ def test_team_member_is_given_maintain_content_once(tmp_path, monkeypatch):
         {"id": "pm", "name": "Product managers", "permissions": ["view_hub"],
          "members": ["pm@ptc.com"]}]}), encoding="utf-8")
     access._cache.clear()
-    assert {"maintain_content", "view_gxc"} <= person("tdd@ptc.com").permissions
+    assert "maintain_content" in person("tdd@ptc.com").permissions
     assert "maintain_content" not in person("pm@ptc.com").permissions
     access.update_group("tdd-team", "a", permissions=["view_hub"])
     access._cache.clear()

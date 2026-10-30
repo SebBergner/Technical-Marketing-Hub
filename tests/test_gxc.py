@@ -114,19 +114,20 @@ def test_admin_says_which_groups_see_gxc(client):
     assert {g["name"] for g in s["groups"]} >= {"Administrators", "GXC"}
 
 
-def test_team_member_is_given_view_gxc_once():
+def test_no_group_is_given_view_gxc_by_name():
+    """Liwei, 2026-10-30: the GXC list overlaps Team Member without matching it,
+    so a saved file gains it for Administrators alone."""
     saved_before = {
         "catalogue": sorted(access.ALL - {"view_gxc"}),
         "groups": [{"id": "tdd-team", "name": "Team Member", "members": ["a@ptc.com"],
                     "permissions": ["view_hub"]},
-                   {"id": "tdd", "name": "TDD Team", "members": [], "permissions": ["view_hub"]},
                    {"id": "sales", "name": "Sales", "members": [], "permissions": ["view_hub"]}]}
     with open(access._owned(access.STATE_FILE), "w", encoding="utf-8") as fh:
         json.dump(saved_before, fh)
     groups = {g["id"]: g for g in access.load_state()["groups"]}
-    assert "view_gxc" in groups["tdd-team"]["permissions"]
+    assert "view_gxc" not in groups["tdd-team"]["permissions"]
     assert "view_gxc" not in groups["sales"]["permissions"]
-    assert "view_gxc" not in groups["tdd"]["permissions"], "only the name production uses"
+    assert "view_gxc" in groups[access.ADMINS]["permissions"]
     assert "view_gxc" not in groups[access.EMPLOYEES]["permissions"]
 
 

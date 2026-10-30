@@ -165,9 +165,9 @@ TEAM = {"team member"}
 #: name as well as to Administrators (Liwei, 2026-10-28: Archive content for
 #: the team; Maintain content took it over). Removed afterwards, it stays
 #: removed (`catalogue`).
-INTRODUCED_FOR = {Perm.MAINTAIN.value: TEAM,
-                  # GXC videos (Liwei, 2026-10-29): the team sees them.
-                  Perm.VIEW_GXC.value: TEAM}
+#: Not View GXC videos (Liwei, 2026-10-30): its list is its own, and overlaps
+#: the team's without matching it.
+INTRODUCED_FOR = {Perm.MAINTAIN.value: TEAM}
 
 #: A permission that already existed, given once to Hub groups by name
 #: (Liwei, 2026-10-28: with review removed, the team marks demos Internal or

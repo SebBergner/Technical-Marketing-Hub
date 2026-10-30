@@ -52,7 +52,7 @@ Low 的项目都放到发布之后。
 - Share feedback 分组：先 "Share something"（这个 demo 有用、想法），再 "Something isn't right"；Related demos 和页面正文分开显示。
 - 编辑元数据只检查改动过的字段；没有 Owner 的 demo，问题发给它所在 segment 的负责人。
 - Admin → Overview 加了 Brightcove migration 的入口（有 Run Brightcove migration 权限才显示）。
-- **GXC 视频**：单独的 SharePoint 库 "GXC Video"；新权限 View GXC videos（Administrators 自动有，Team Member 组一次性加上，partner 永远没有）。
+- **GXC 视频**：单独的 SharePoint 库 "GXC Video"；新权限 View GXC videos（Administrators 自动有，其他人靠单独的 GXC 组，10/30 Liwei 定：不自动给 Team Member；partner 永远没有）。
   没有权限的人在 Hub 里完全看不到，打开链接也是 404；有权限的人看到的是 PTC Only、不是 customer facing。下载由 Admin → Content access 的开关控制，默认关。
   迁移时 GXC Gallery 的行进 GXC Video，Segment、Video Type、Products 先空着，以后用 Edit metadata 补。还没真正同步或迁移过（库是空的）。
 - 团队组的名字按 production 改成 **Team Member**（之前代码里写的是 TDD Team，切换后三项新权限会落空）。

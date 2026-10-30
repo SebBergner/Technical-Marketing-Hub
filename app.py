@@ -159,6 +159,25 @@ app.add_middleware(
 app.middleware("http")(oidc.canonical_host)
 
 
+@app.middleware("http")
+async def security_headers(request, call_next):
+    """On every answer, redirects and errors included (D3, 2026-10-30).
+
+    Framing is limited to the Hub itself: nothing embeds it, and sign-in could
+    not work in another site's frame anyway. No fuller Content-Security-Policy:
+    the pages frame SharePoint and Consensus and use inline styles, and one
+    wrong source would break previews for everybody. HSTS only where the slot
+    is HTTPS, so a local run on http is untouched."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'self'")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    if settings.https_only:
+        response.headers.setdefault("Strict-Transport-Security", "max-age=15552000")
+    return response
+
+
 @app.get("/admin", include_in_schema=False)
 async def admin_page():
     """The Admin page. Its own file because it is ours, index.html is

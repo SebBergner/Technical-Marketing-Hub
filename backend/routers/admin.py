@@ -176,6 +176,32 @@ def _source_state(repo: AssetRepository, source: str) -> dict:
     }
 
 
+def _configuration() -> list[dict]:
+    """What this slot is set to, for the checks a swap needs (D5, 2026-10-30):
+    today these can only be read in Cloud Shell. How many, never who or what
+    secret. `warn`: worth a look before people rely on this slot."""
+    def names(value: str) -> int:
+        return len([v for v in (value or "").split(",") if v.strip()])
+    curators = (names(settings.auth_curator_emails) + names(settings.auth_curator_oids)
+                + names(settings.auth_curator_groups))
+    overrides = (settings.upload_library_overrides or "").strip()
+    return [
+        {"label": "Sign-in", "value": settings.auth_mode, "warn": False},
+        {"label": "Hub Tasks list", "value": settings.hub_tasks_list or "Off on this slot",
+         "warn": False},
+        {"label": "Upload test library", "value": "On: " + overrides if overrides else "Off",
+         "warn": bool(overrides)},
+        {"label": "Shared Admin password", "value": "On" if settings.admin_configured else "Off",
+         "warn": settings.admin_configured},
+        {"label": "Curator settings (AUTH_CURATOR_*)",
+         "value": f"{curators} entries, each given Maintain content" if curators else "None",
+         "warn": bool(curators)},
+        {"label": "Permanent administrators (HUB_ADMIN_EMAILS)",
+         "value": str(names(settings.hub_admin_emails)),
+         "warn": not names(settings.hub_admin_emails)},
+    ]
+
+
 @router.get("/overview", dependencies=[VIEW_ADMIN])
 def overview(repo: AssetRepository = Depends(get_repo)):
     """One payload, in the order the page reads it."""
@@ -196,6 +222,7 @@ def overview(repo: AssetRepository = Depends(get_repo)):
                 os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(
                     os.path.abspath(__file__)))))),
         },
+        "configuration": _configuration(),
         "integrations": {
             "sharepoint": {
                 "configured": settings.graph_configured,

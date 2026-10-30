@@ -544,6 +544,15 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   3. 对已有内容的影响：现在 Admin 的 "Hidden" 已能把 demo 从 Hub 移除；Unindexed 是否就是它的一个对外版本。
 - **工作量**：定下来后 1–2 天。
 - **10/27 备注**：先记录，等 Liwei 和 Seb 开会，由 Seb 说明具体要什么。
+- **Seb 的定义（来自 "TMH To Do: Permissions / APIs / More" 会议的 AI 总结，Liwei 10/30 转来）**：Not Indexed 是发布前的审阅状态，放在发布后的 Low。
+  不出现在搜索和首页（包括 Recent 等发现区域）；详情页照常，有链接的人能打开，页面设计不变，只加一个 "Not Indexed" 标签；管理员仍能找到和管理。
+  用途（Elio）：页面已经可以发给别人审阅，但还不想让所有人在 Hub 里看到。和 Archive 不同：Not Indexed 是不被发现但可访问，Archived 是移出 Hub。
+  细节待 Liwei 确认后再开发。
+- **建议的做法（10/30，未开发，新功能延后到发布之后）**：约 1 天。和归档一样在列表层过滤，按链接仍能取到，但不限制谁能打开。不出现在搜索、筛选、首页、Recent、Featured、Related demos；详情页加 "Not Indexed" 标签；Content to review 加一个视图用来查找和管理；在 Manage 标签和 Content to review 批量设置，记进 Admin log。
+  - **它不是权限控制**：登录的人有链接就能打开，ID 由标题生成，可以猜到；要限制访问仍用 PTC Only 或 GXC。
+  - **Hub activity**：通过链接打开后不应出现在 "Most used content" 里，和 GXC 一样只对有 Maintain content 的人显示。
+  - **要定**：① 谁能找到（建议 Maintain content，Seb 说的是管理员）；② Create New Demo 和 API 是否加这个选项（建议加，默认公开）；③ 状态存哪里（建议 Hub 自己的数据，不改 SharePoint 的列）；④ Partner 能否按链接打开（建议能，文件权限规则不变）。
+  - **顺带**：隐藏的 Value Roadmap 标签里有 "Not indexed yet"，意思是还没有 AI 索引；S5 重新打开标签时改掉，以免混淆。
 
 ---
 

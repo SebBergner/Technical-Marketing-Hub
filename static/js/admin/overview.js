@@ -69,6 +69,23 @@ function renderEnvironment(env) {
   $("envDetail").textContent = bits.join(" · ");
 }
 
+/* What this slot is set to (D5, 2026-10-30): the checks a swap needs, which
+ * could only be read in Cloud Shell before. */
+function renderConfiguration(rows) {
+  var host = $("configuration");
+  host.innerHTML = "";
+  var table = el("table");
+  var body = table.createTBody();
+  (rows || []).forEach(function (r) {
+    var tr = body.insertRow();
+    tr.insertCell().textContent = r.label;
+    var value = tr.insertCell();
+    value.appendChild(r.warn ? el("span", "pill pill--warn", r.value)
+                             : document.createTextNode(r.value));
+  });
+  host.appendChild(table);
+}
+
 function renderIntegrations(d) {
   var host = $("integrations");
   host.innerHTML = "";
@@ -378,5 +395,6 @@ function renderMigrations() {
 }
 
 export {
-  renderAutoSync, renderEnvironment, renderIntegrations, renderMigrations, renderQueues
+  renderAutoSync, renderConfiguration, renderEnvironment, renderIntegrations, renderMigrations,
+  renderQueues
 };

@@ -9,7 +9,8 @@
 
 import { $, session, show } from "./util.js";
 import {
-  renderAutoSync, renderEnvironment, renderIntegrations, renderMigrations, renderQueues
+  renderAutoSync, renderConfiguration, renderEnvironment, renderIntegrations, renderMigrations,
+  renderQueues
 } from "./overview.js";
 import { loadUsage, renderDims, renderRanges } from "./usage.js";
 import { loadHubSettings, loadPromoted } from "./home.js";
@@ -109,6 +110,7 @@ function load() {
       contentState.loaded = false;
       showTab(tabFromHash());
       renderQueues(d);
+      renderConfiguration(d.configuration);
       renderMigrations();
       renderRanges();
       renderDims();

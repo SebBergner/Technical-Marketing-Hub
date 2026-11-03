@@ -20,8 +20,16 @@
 
 import { dateLabel, escapeHtml, fullDate, report } from "./util.js";
 import { hubPermissions } from "./permissions.js";
-import { TYPE_CHIP } from "./cards.js";
+import { gxcPill, TYPE_CHIP } from "./cards.js";
 import { closeAdvancedSearch } from "./search.js";
+
+/* After a GXC video's title: "GXC only", as on its card (cards.gxcPill). */
+function gxcTag(cell, r) {
+  var tag = gxcPill(r);
+  if (!tag) return;
+  tag.classList.add("hub-table__pill");
+  cell.appendChild(tag);
+}
 
 var state = {
   items: null, usageSince: null, months: 12,
@@ -339,6 +347,7 @@ function row(r) {
   a.href = "#/asset/" + encodeURIComponent(r.asset_id);
   a.addEventListener("click", function () { window.hubDetailReturn = "#/review"; });
   title.appendChild(a);
+  gxcTag(title, r);
   if ((r.products || []).length) title.appendChild(el("div", "hub-rvw__sub", r.products.join(", ")));
   tr.appendChild(title);
   tr.appendChild(whyCell(r));
@@ -465,6 +474,7 @@ function renderArchived(host, rows) {
     a.href = "#/asset/" + encodeURIComponent(r.asset_id);
     a.addEventListener("click", function () { window.hubDetailReturn = "#/review"; });
     title.appendChild(a);
+    gxcTag(title, r);
     row.appendChild(title);
     row.appendChild(el("td", "hub-table__td--type", (TYPE_CHIP[r.type] || [])[1] || r.type || ""));
     var when = el("td", "hub-rvw__age");

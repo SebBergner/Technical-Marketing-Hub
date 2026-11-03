@@ -112,6 +112,13 @@ async function openAssetDetail(id, fileItemId) {
     }
     return;
   }
+  // An old GXC link (B10, 2026-11-03) answers with the video's new id: the
+  // address bar takes it, so the link copied from here is the new one.
+  if (asset.id !== id) {
+    id = asset.id;
+    history.replaceState(null, "", fileItemId ? fileHash(id, fileItemId)
+                                              : "#/asset/" + encodeURIComponent(id));
+  }
   // The card's chosen picture (HubThumbnail, B5) is a file in the folder,
   // but not one of the demo's files to list.
   asset.resources = (asset.resources || []).filter(function (r) { return !r.hub_thumbnail; });

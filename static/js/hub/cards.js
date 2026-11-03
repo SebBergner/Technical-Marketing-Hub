@@ -97,12 +97,26 @@ function familiesText(families, shown) {
        + " and " + (families.length - shown) + " more";
 }
 
+/* "GXC only" on a GXC video's card, table row and Content to review row
+ * (B10, 2026-11-03), as on its page: the GXC group sees GXC like any demo,
+ * and knows before sharing that it is restricted. A review row has no `gxc`,
+ * only its id, whose "gxc-" says it. */
+function gxcPill(a) {
+  if (!a || !(a.gxc || /^gxc-/.test(a.asset_id || ""))) return null;
+  var tag = pill("GXC only", "internal");
+  tag.title = "A GXC video: only people with Access GXC videos can see it on the Hub. "
+    + "Share it only with them.";
+  return tag;
+}
+
 function renderCardTags(card, a) {
   var meta = card.querySelector(".asset-card__meta");
   if (!meta) return;
 
   var pills = document.createElement("div");
   pills.className = "hub-card-pills";
+  var gxc = gxcPill(a);
+  if (gxc) pills.appendChild(gxc);
   if (videoTypeOf(a)) pills.appendChild(pill(videoTypeOf(a), "vtype"));
   if (a.segment) pills.appendChild(pill(a.segment, "segment"));
   if (a.named_customer) pills.appendChild(pill(a.named_customer, "customer"));
@@ -758,6 +772,6 @@ function renderAgeMark(meta, asset) {
 }
 
 export {
-  buildCard, consensusUrl, embedInlinePlayer, paintCoverInto, previewUrl,
+  buildCard, consensusUrl, embedInlinePlayer, gxcPill, paintCoverInto, previewUrl,
   renderAgeMark, stopInlinePlayer, TYPE_CHIP, videoTypeOf
 };

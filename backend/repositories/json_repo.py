@@ -1391,6 +1391,70 @@ class JsonAssetRepository(AssetRepository):
             self._save("identity", identity)
             return len(seen)
 
+    #: Owned files a rename leaves alone: identity keeps the old id as the
+    #: alias; the logs are records of what happened, under the id it had.
+    _RENAME_SKIPS = frozenset({"identity.json", "admin_log.jsonl", "access_audit.jsonl",
+                               "signin_events.jsonl", "sync_runs.jsonl"})
+
+    def adopt_new_ids(self, assets: list[Asset], source_system: str) -> dict[str, str]:
+        """Move the Hub's own data from the ids a source's folders had to the
+        ids they have now, once (B10, 2026-11-03: GXC Video's ids stop being
+        titles). Called by the GXC sync before replace_source_rows.
+
+        An old id is matched to its new one by folder (identity's
+        source_item_id). Every owned file that names the old id -- curation,
+        stats, archive marks, edits, related picks, usage events... -- is
+        rewritten; the old identity row keeps `renamed_to`, which is both
+        the alias old links follow (renamed_to()) and the mark that this is
+        done. Returns {old: new}.
+
+        Within the process lock only: an event appended by another worker
+        while a file is rewritten could be lost. It runs once per slot."""
+        new_by_folder = {a.source_item_id: a.id for a in assets if a.source_item_id}
+        with self._lock:
+            identity = self._load("identity")
+            renames = {old: new_by_folder[row["source_item_id"]]
+                       for old, row in identity.items()
+                       if row.get("source_system") == source_system
+                       and not row.get("renamed_to")
+                       and row.get("source_item_id") in new_by_folder
+                       and new_by_folder[row["source_item_id"]] != old}
+            if not renames:
+                return {}
+            word = re.compile(r"(?<![a-z0-9-])(" + "|".join(
+                re.escape(k) for k in sorted(renames, key=len, reverse=True))
+                + r")(?![a-z0-9-])")
+            for name in sorted(os.listdir(self.owned_dir)):
+                path = os.path.join(self.owned_dir, name)
+                if (name in self._RENAME_SKIPS or not os.path.isfile(path)
+                        or not name.endswith((".json", ".jsonl"))):
+                    continue
+                with open(path, encoding="utf-8") as fh:
+                    text = fh.read()
+                changed = word.sub(lambda hit: renames[hit.group(1)], text)
+                if changed != text:
+                    tmp = path + ".tmp"
+                    with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
+                        fh.write(changed)
+                    os.replace(tmp, path)
+            now = utcnow().isoformat(timespec="seconds")
+            for old, new in renames.items():
+                row = identity[old]
+                identity.setdefault(new, {
+                    "first_seen_at": row.get("first_seen_at") or now,
+                    "source_system": source_system,
+                    "source_item_id": row["source_item_id"], "retired_at": None})
+                row["renamed_to"] = new
+                row["retired_at"] = row.get("retired_at") or now
+            self._save("identity", identity)
+            self._invalidate()
+            log.info("%s: %d id(s) renamed in the Hub's own data", source_system, len(renames))
+            return renames
+
+    def renamed_to(self, asset_id: str) -> str | None:
+        """The id an old one became (adopt_new_ids), for its old links."""
+        return ((self._load("identity").get(asset_id) or {}).get("renamed_to")) or None
+
     # ------------------------------------------------- owned-data write paths
     def set_curation(self, asset_id: str, **fields: Any) -> None:
         with self._lock:

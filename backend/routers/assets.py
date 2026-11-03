@@ -177,6 +177,13 @@ def _without_file_ids(resources: list) -> list:
 def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo),
               user: CurrentUser = Depends(get_current_user)):
     asset = repo.get(asset_id)
+    if asset is None and getattr(repo, "gxc", False) and asset_id.startswith("gxc-"):
+        # A GXC link from before B10 (2026-11-03), whose id spelled the title:
+        # the video under its new id, for whoever may see GXC. The page puts
+        # the new id in the address bar. Anyone else: the 404 below.
+        renamed = getattr(repo, "renamed_to", None)
+        if new_id := (renamed(asset_id) if renamed else None):
+            asset = repo.get(new_id)
     if asset is None:
         if repo.is_hidden(asset_id):
             raise HTTPException(status_code=404, detail="This demo is hidden from the Hub.")

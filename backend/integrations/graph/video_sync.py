@@ -33,10 +33,16 @@ second delta cursor in step.
 read the same way into a mirror of its own (`gxc_video`, ids "gxc-"). Its
 demos exist on the Hub only for "Access GXC videos" (json_repo drops them at
 the funnel for anyone else); SharePoint restricts the library itself.
+Its ids are not made from the title but from the folder (B10, 2026-11-03,
+`gxc_id`): knowing a video's name must not be enough to spell its link.
 """
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import logging
+import os
 from dataclasses import dataclass, field
 
 from backend.config import settings
@@ -76,6 +82,37 @@ LIBRARIES = (DEMO_VIDEO, GXC_VIDEO)
 
 SOURCE_SYSTEM = DEMO_VIDEO.source
 ID_PREFIX = DEMO_VIDEO.id_prefix
+
+
+#: For a GXC id made on a developer's machine, where no key is set.
+_DEV_GXC_KEY = "tmh-local-development-only"
+#: Base32 characters in a GXC id after "gxc-": 80 bits, lower case, so the
+#: id stays inside the slug alphabet ([a-z0-9-]) every route expects.
+GXC_ID_LENGTH = 16
+
+
+class MissingGxcKey(RuntimeError):
+    """GXC_ID_KEY is not set on an Azure slot."""
+
+
+def gxc_id(folder_id: str) -> str:
+    """A GXC video's id (B10, 2026-11-03): an HMAC-SHA256 of its SharePoint
+    folder's item id under GXC_ID_KEY, so it cannot be guessed from the
+    title or derived from another slot's ids, and needs no table to keep.
+    A folder moved into _Archive keeps its item id, and so its id; a folder
+    deleted and made again gets a new one.
+
+    On Azure (WEBSITE_HOSTNAME) the key must be set: a fallback there would
+    mint ids that change, breaking every link, the day the key is added."""
+    key = (settings.gxc_id_key or "").strip()
+    if not key:
+        if os.environ.get("WEBSITE_HOSTNAME"):
+            raise MissingGxcKey("GXC_ID_KEY is not set on this slot, so GXC Video "
+                                "cannot be indexed (see docs/SWAP-CHECKLIST.md)")
+        key = _DEV_GXC_KEY
+    digest = hmac.new(key.encode(), folder_id.encode(), hashlib.sha256).digest()
+    code = base64.b32encode(digest).decode().lower()[:GXC_ID_LENGTH]
+    return GXC_VIDEO.id_prefix + code
 
 
 def library_of(asset_id: str) -> VideoLibrary | None:
@@ -187,8 +224,9 @@ def build_assets(items: list[dict], library: VideoLibrary = DEMO_VIDEO,
 
         segment, all_segments = m.parse_segment(_field(fields, "segment"))
         hub_products = m.parse_lookup(_field(fields, "hub_products"))
-        asset = m.blank_asset(library.id_prefix + m.slugify(name, taken), name,
-                              m.TYPE_MAP[demo_type])
+        asset_id = (gxc_id(item["id"]) if library.gxc
+                    else library.id_prefix + m.slugify(name, taken))
+        asset = m.blank_asset(asset_id, name, m.TYPE_MAP[demo_type])
         asset.update(
             description=m.clean_text(_field(fields, "description")),
             products=hub_products,
@@ -307,6 +345,10 @@ def sync_videos(client: GraphClient, repo, site: SiteRef | None = None,
     previous = counter(which.source) if counter else 0
     repo.replace_source_rows(assets, source_system=which.source,
                              allow_shrink=previous < SHRINK_GUARD_FROM)
+    # Once the mirror holds them: GXC ids made from titles before B10 move to
+    # the folder-made ones, with the Hub's own data (json_repo.adopt_new_ids).
+    if which.gxc and (adopt := getattr(repo, "adopt_new_ids", None)):
+        adopt(assets, which.source)
     if stamp := getattr(repo, "record_sync", None):
         stamp(which.source)
     if stamp_read := getattr(repo, "record_read", None):

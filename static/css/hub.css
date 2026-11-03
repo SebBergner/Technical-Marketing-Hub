@@ -1089,6 +1089,8 @@ video.hub-inline-player__media { object-fit: contain; }
    it carries three tags or none (one line tall; a long customer name
    ellipses rather than wrapping). */
 .hub-card-pills{display:flex;gap:6px;margin:2px 0 6px;min-height:22px;overflow:hidden}
+/* "GXC only" (B10) is read in full; the other tags give way. */
+.hub-card-pills .hub-pill--internal{flex-shrink:0}
 /* One style for every tag, from theme tokens only, so it reads on both
    the light and the dark ground (the "indigo" tokens are PTC green, and
    the soft ones have no dark counterpart -- see index.html). */
@@ -1530,6 +1532,7 @@ a.hub-up__title:hover{text-decoration:underline}
 .hub-table__td--title { min-width: 260px; }
 .hub-table__td--title a { color: var(--orion-text); font-weight: 600; }
 .hub-table__td--title a:hover { color: var(--orion-link); }
+.hub-table__pill { margin-left: 8px; vertical-align: 1px; }
 .hub-table__td--date, .hub-table__td--type, .hub-table__td--language { white-space: nowrap; }
 .hub-table__td--views, .hub-table__th--views button { text-align: right; }
 

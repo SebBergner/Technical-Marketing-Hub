@@ -64,6 +64,11 @@ Everything built since 2026-10-20 is new on production:
   there do not reach the team's list). **Everything else moves with the code.**
 - **New settings since v2026.3.123:** `GRAPH_GXC_LIBRARY` and
   `MIGRATION_GXC_LIBRARY`, both defaulting to "GXC Video". Nothing to set.
+  **`GXC_ID_KEY`** (B10, 2026-11-03): the key GXC videos' ids are made with.
+  One per slot, each a **slot setting** with its own random value, so the two
+  slots' GXC links differ and a swap does not carry a key across. Without it
+  a slot's GXC Video sync fails (Sync history says so) and no GXC ids are made.
+  Never change it once set: every GXC link would change.
 - **Fewer permissions (2026-10-30), 12 shown under four headings.** Edit
   metadata, Manage content access, Review content, Archive content and See
   archived content are one, **Maintain content**; Run Brightcove migration is
@@ -119,6 +124,8 @@ Everything built since 2026-10-20 is new on production:
    - The SSO, BRIGHTCOVE and staging's `HUB_TASKS_LIST` settings are slot
      settings.
    - `UPLOAD_LIBRARY_OVERRIDES` is empty on both slots.
+   - `GXC_ID_KEY` is set on **both** slots, as a slot setting, with different
+     values (for example from `python -c "import secrets; print(secrets.token_urlsafe(32))"`).
 6. **Production's team group is still named "Team Member"** (Admin → Users &
    groups on `tmh.ptcxc.com`; 26 members on 2026-10-29). Do not rename it
    before the swap. **Every administrator is a listed member of Administrators**,

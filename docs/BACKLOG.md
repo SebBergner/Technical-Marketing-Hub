@@ -625,6 +625,9 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - **IoT/AR 表**：Christine 给表后先只读检查再传。表里有 Operator Advisor 或 SCPA 的视频也照传，传完由 Liwei 归档（11/02）；GXC 里已有的 Beneteau（OA）和 Vestas（SCPA）两个视频保持不动。受众：GXC 组的 30 人能搜索和分享，其他 PTC 员工只能通过分享的链接看。tab 名带 "(GXC Gallery)" 才会进 GXC Video。`hub_products` 留空（Liwei 11/02），这样不受已出售产品的规则影响，不用改代码。但关键字搜索不读 HubProducts 和 Segment。原想填 `products`（托管元数据的 Product，只用来搜索），11/02 查过行不通：Hub 的应用读不到这个术语集（termStore 请求返回空），填了会被当成未知产品，验证不通过。所以 `products` 也留空，把 "ThingWorx"、"IoT"、"Vuforia"、"AR" 这类词写进 Gallery Section（自由文本，会被搜索）或长描述。GXC Video 的 Gallery 选项只有 PTC Gallery 和 GXC Gallery，用 GXC Gallery；Segment 有 IoT、AR 可选，可以填，但它不会被搜索，也不是筛选项。先查和 Demo Video、GXC Video 有没有重复，有就归档 Demo Video 那份。
 - **工作量**：不公开列出约 1–2 天；随机 id 约半天；每人一个链接和授权约 1.5–2 天；Lamborghini 标记几小时。合计约 3.5–4.5 天，分两步上线，排在发布之后。
 - **依赖**：Christine 的表；发布之后，或 swap 之后。
+- **11/03 Liwei 改了规则（对 GXC 组）**：Home 上也显示 GXC（Serge 在 Home 按 Type 找不到会以为没有数据），搜索、Advanced Search、Published（年份和年龄档）、Recently published 都能看到；维护页面（Content to review、Admin 列表）显示 GXC，只给能看 GXC 的人；GXC 组的卡片标 "GXC only"；所有 Lamborghini 都算 "GXC group only"，这个标记放到最后做。11/03 再定：**对 GXC 组，GXC 在所有地方都当普通内容显示**（导航、筛选和计数、相关推荐、Dashboard、"most used" 都不藏），只多一个 "GXC only" 标识。所以上面"不公开列出"那几条对 GXC 组作废；没有 Access GXC videos 的人照旧完全看不到，到第二步才凭个人链接打开。
+- **11/03 "GXC only" 标识已做，本地完成，未上 staging**：搜索结果的卡片、表格视图、Content to review 的行都显示（和详情页同一个提示）。Admin 页面的列表还没加。
+- **11/03 随机 id 已做，本地完成，未上 staging**：`gxc-` 加 16 位 base32，HMAC-SHA256（`GXC_ID_KEY`）算 SharePoint 文件夹 id（`video_sync.gxc_id`）。Azure 上没设密钥，GXC 同步就失败，不生成 id；本地用固定的开发密钥。第一次同步时，`json_repo.adopt_new_ids` 把 owned 里旧 id 的数据（归档、stats、编辑、相关推荐、使用记录等）改成新 id，Admin log 和登录、权限记录不改；旧 id 在 identity 里记 `renamed_to`，GXC 组的人打开旧链接会看到新 id，其他人 404。**上 staging 之前要先在 staging 设 `GXC_ID_KEY`（slot setting）**，否则 staging 的 GXC 同步会失败。SWAP-CHECKLIST 已写。
 
 ---
 
@@ -663,7 +666,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 | D12. 上传被网络拦截时说清原因 | **已做**：`static/js/hub/upload.js` 在浏览器报网络错误时提示可能是 Zscaler | —— | 完成 |
 | D13. 完整的内容安全策略（CSP） | 现在只有 `frame-ancestors`。页面要嵌入 SharePoint 和 Consensus，还用了内联样式，配错一项预览就全坏 | 先用 Report-Only 模式收集一段时间，确认来源后再强制 | 1 天，发布后 |
 | D14. 第三方依赖的漏洞扫描 | 10/30 手动扫过一次：按 `requirements.txt` 新装的 38 个包没有已知漏洞。但 `requirements.txt` 没有固定版本，每次部署取最新版，部署之间也没人检查 | GitHub Actions 每周跑一次 `pip-audit`（或开 Dependabot，要 Seb 开仓库设置）；发布后考虑固定版本 | 半天 |
-| D16. 刚归档的 demo 显示 "Folder not moved" | **11/03 已修，本地完成，未上 staging**。11/02（两个 Snowmobile 套件，相隔 24 秒）和 11/03（SCPa Medical Device，15:52:21）是同一个原因：归档后 Hub 先记一条临时标记（`sharepoint_archived`），等同步读到文件夹进了 `_Archive` 再丢掉。旧代码拿标记的时间和同步**完成**时间比；一次在归档前就开始读 SharePoint、归档后才完成的同步（几个 gunicorn worker 可能同时在同步），会让标记被当成"已同步"丢掉，而它的 mirror 里文件夹还在原处，于是显示 hub_only，直到下一次定时同步 | 同步在开始读 SharePoint 时记下时间（`sync_state` 的 `last_read_at`，Demo Catalog、Demo Video、GXC Video），临时标记改为和这个时间比。Details 卡片的其他编辑也一样受益。旧数据没有 `last_read_at` 时照旧用完成时间 | 完成 |
+| D16. 刚归档的 demo 显示 "Folder not moved" | **11/03 已修，已上 staging（`ca14146`）**。11/02（两个 Snowmobile 套件，相隔 24 秒）和 11/03（SCPa Medical Device，15:52:21）是同一个原因：归档后 Hub 先记一条临时标记（`sharepoint_archived`），等同步读到文件夹进了 `_Archive` 再丢掉。旧代码拿标记的时间和同步**完成**时间比；一次在归档前就开始读 SharePoint、归档后才完成的同步（几个 gunicorn worker 可能同时在同步），会让标记被当成"已同步"丢掉，而它的 mirror 里文件夹还在原处，于是显示 hub_only，直到下一次定时同步 | 同步在开始读 SharePoint 时记下时间（`sync_state` 的 `last_read_at`，Demo Catalog、Demo Video、GXC Video），临时标记改为和这个时间比。Details 卡片的其他编辑也一样受益。旧数据没有 `last_read_at` 时照旧用完成时间 | 完成 |
 | D17. 手动 Sync 报 HTTP 499 | 11/03 在 staging 连续两次：点 Sync 后浏览器要等同步跑完才有回复，现在要读三个库和 Brightcove 海报，超过 Azure 前端的等待时间就断开（499）。服务器上的同步照常跑完并记为成功（17:33 UTC 查过），只是页面显示失败，容易让人重复点 | Sync 按钮立刻返回，同步交给现有的后台队列（`graph.sync_soon`，归档已在用），页面轮询 Last attempt 直到完成 | 半天，发布后 |
 
 ---

@@ -17,6 +17,7 @@ from backend import access, admin_log
 from backend.auth import AuthMode
 from backend.config import settings
 from backend.integrations.graph import video_sync as vs
+from backend.models import Asset
 from backend.repositories.json_repo import GXC_SOURCES, JsonAssetRepository
 from backend.services import brightcove_runner as run
 from tests.test_auth import easyauth_headers
@@ -134,7 +135,7 @@ def test_no_group_is_given_view_gxc_by_name():
 def test_the_gxc_library_syncs_into_its_own_mirror_with_its_own_ids():
     (a,), result = vs.build_assets([doc_set("Lamborghini walkthrough"),
                                     mp4("Lamborghini walkthrough")], vs.GXC_VIDEO)
-    assert a.id == "gxc-lamborghini-walkthrough"
+    assert a.id == vs.gxc_id("id-Lamborghini walkthrough")
     assert result.as_dict()["source"] == "gxc_video"
     assert vs.library_of(a.id) is vs.GXC_VIDEO
     assert vs.library_of("video-x") is vs.DEMO_VIDEO and vs.library_of("bobcat") is None
@@ -192,3 +193,75 @@ def test_hub_activity_leaves_out_a_gxc_video_for_whoever_cannot_see_it(client, r
         url, headers=easyauth_headers(who)).json()["content"]]
     assert seen(STAFF) == [], "not even its id, which spells its title"
     assert seen(MEMBER) == ["gxc-lamborghini"]
+
+
+# ──────────────────────────────────────────── ids from the folder (B10, 2026-11-03)
+def test_a_gxc_id_comes_from_the_folder_never_the_title(monkeypatch):
+    monkeypatch.delenv("WEBSITE_HOSTNAME", raising=False)
+    monkeypatch.setattr(settings, "gxc_id_key", "staging-key")
+    a = vs.gxc_id("01ABCFOLDER")
+    assert a == vs.gxc_id("01ABCFOLDER"), "the same folder keeps its id"
+    assert a.startswith("gxc-") and len(a) == 4 + vs.GXC_ID_LENGTH
+    assert all(c in "abcdefghijklmnopqrstuvwxyz234567" for c in a[4:])
+    assert vs.gxc_id("01ABCFOLDES") != a
+    monkeypatch.setattr(settings, "gxc_id_key", "production-key")
+    assert vs.gxc_id("01ABCFOLDER") != a, "another slot's key, other ids"
+    (v,), _ = vs.build_assets([doc_set("Lamborghini walkthrough"),
+                               mp4("Lamborghini walkthrough")], vs.GXC_VIDEO)
+    assert "lamborghini" not in v.id
+    (d,), _ = vs.build_assets([doc_set("Lamborghini walkthrough"),
+                               mp4("Lamborghini walkthrough")], vs.DEMO_VIDEO)
+    assert d.id == "video-lamborghini-walkthrough", "Demo Video's ids are unchanged"
+
+
+def test_without_a_key_azure_refuses_to_make_gxc_ids(monkeypatch):
+    monkeypatch.setattr(settings, "gxc_id_key", None)
+    monkeypatch.delenv("WEBSITE_HOSTNAME", raising=False)
+    assert vs.gxc_id("F").startswith("gxc-"), "locally, the development key"
+    monkeypatch.setenv("WEBSITE_HOSTNAME", "tmh-staging.azurewebsites.net")
+    with pytest.raises(vs.MissingGxcKey):
+        vs.gxc_id("F")
+
+
+def renamed_repo(repo, tmp_path):
+    """The fixture's title-made id, as before B10, then a sync with the new one."""
+    repo.replace_source_rows([Asset.model_validate(
+        {"id": "gxc-lamborghini", "type": "video", "title": "Lamborghini walkthrough",
+         "source_item_id": "F-LAMBO"})], source_system="gxc_video")
+    repo.set_archived("gxc-lamborghini", True, "user:" + ADMIN)
+    repo.increment_stat("gxc-lamborghini", "views", 3)
+    repo.record_usage_event("view", "gxc-lamborghini", actor="user:" + MEMBER)
+    repo.record_usage_event("view", "gxc-lamborghini-2", actor="user:" + MEMBER)
+    new = vs.gxc_id("F-LAMBO")
+    moved = [Asset.model_validate({"id": new, "type": "video",
+                                   "title": "Lamborghini walkthrough",
+                                   "source_item_id": "F-LAMBO"})]
+    repo.replace_source_rows(moved, source_system="gxc_video")
+    assert repo.adopt_new_ids(moved, "gxc_video") == {"gxc-lamborghini": new}
+    return new
+
+
+def test_the_hubs_own_data_moves_to_the_new_id_once(repo, tmp_path):
+    new = renamed_repo(repo, tmp_path)
+    owned = tmp_path / "owned"
+    archived = json.loads((owned / "archived.json").read_text())
+    assert new in archived and "gxc-lamborghini" not in archived
+    assert json.loads((owned / "stats.json").read_text())[new]["views"] == 3
+    events = (owned / "usage_events.jsonl").read_text()
+    assert f'"{new}"' in events and '"gxc-lamborghini"' not in events
+    assert '"gxc-lamborghini-2"' in events, "a longer id is another id"
+    identity = json.loads((owned / "identity.json").read_text())
+    assert identity["gxc-lamborghini"]["renamed_to"] == new
+    assert repo.renamed_to("gxc-lamborghini") == new
+    assert repo.get(new).archived
+    assert repo.adopt_new_ids([repo.get(new)], "gxc_video") == {}, "done once"
+
+
+def test_an_old_gxc_link_opens_the_new_id_only_for_the_gxc_group(client, repo, tmp_path):
+    new = renamed_repo(repo, tmp_path)
+    repo.set_archived(new, False, "user:" + ADMIN)
+    r = client.get("/api/assets/gxc-lamborghini", headers=easyauth_headers(MEMBER))
+    assert r.status_code == 200 and r.json()["id"] == new
+    assert client.get("/api/assets/gxc-lamborghini",
+                      headers=easyauth_headers(STAFF)).status_code == 404
+    assert client.get("/api/assets/" + new, headers=easyauth_headers(STAFF)).status_code == 404

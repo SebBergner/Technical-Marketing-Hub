@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     #: GXC videos". SharePoint restricts the library itself. Blank switches
     #: it off.
     graph_gxc_library: str = "GXC Video"
+    #: The key GXC videos' ids are made with (B10, 2026-11-03): an HMAC of
+    #: the SharePoint folder id, so an id cannot be guessed from a title.
+    #: One per slot, set in the portal and never committed. Blank on Azure
+    #: fails the GXC sync rather than minting ids that later change; blank
+    #: locally uses a fixed development key (video_sync.gxc_id).
+    gxc_id_key: str | None = None
 
     # ---------------------------------------------------------------- Consensus
     # Auth is a body object on every call, not a header — the OpenAPI spec

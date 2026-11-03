@@ -13,7 +13,7 @@
 import { dateLabel, getJSON, LANGUAGE_LABEL, report } from "./util.js";
 import { familyDisplayName } from "./nav.js";
 import { openAssetDetail } from "./detail.js";
-import { TYPE_CHIP } from "./cards.js";
+import { gxcPill, TYPE_CHIP } from "./cards.js";
 
 var VIEW_KEY = "hub.resultsView";
 
@@ -109,6 +109,11 @@ function row(a) {
         openAssetDetail(a.id);
       });
       td.appendChild(link);
+      var gxc = gxcPill(a);
+      if (gxc) {
+        gxc.classList.add("hub-table__pill");
+        td.appendChild(gxc);
+      }
     } else {
       td.textContent = c[0] === "views" ? (v.views ? String(v.views) : "") : v[c[0]];
     }

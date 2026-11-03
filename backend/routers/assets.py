@@ -73,7 +73,7 @@ def list_assets(
     repo: AssetRepository = Depends(get_repo),
     user: CurrentUser = Depends(get_current_user),
 ):
-    return repo.list(AssetQuery(
+    return _with_share_tokens(repo.list(AssetQuery(
         include_archived=archived and user.can(Perm.MAINTAIN),
         text=q, types=type, products=product, funnel_stages=stage, segments=segment,
         industries=industry, value_drivers=driver, languages=language, content_depths=video_type_filter(depth),
@@ -84,7 +84,18 @@ def list_assets(
         include_older_vms=include_older_vms,
         sort=sort, limit=limit, offset=offset,
         descending=(order == "desc") if order else sort == "most_viewed",
-    ))
+    )), user)
+
+
+def _with_share_tokens(page: Page[AssetSummary], user: CurrentUser) -> Page[AssetSummary]:
+    """A GXC video's card links with the viewer's own token (B10), so a link
+    copied from a card is as personal as one from the page."""
+    from backend import gxc_shares
+    if not gxc_shares.may_share(user) or not any(a.gxc for a in page.items):
+        return page
+    page.items = [a.model_copy(update={"share_token": gxc_shares.token_for(user.email, a.id)})
+                  if a.gxc else a for a in page.items]
+    return page
 
 
 def promoted_summaries(repo: AssetRepository) -> list[AssetSummary]:
@@ -94,6 +105,9 @@ def promoted_summaries(repo: AssetRepository) -> list[AssetSummary]:
     out = []
     for asset_id in repo.promoted()["asset_ids"]:
         asset = repo.get(asset_id)
+        # A GXC video granted by a link is never featured to its holder.
+        if asset is not None and asset.gxc and not getattr(repo, "gxc", True):
+            continue
         if asset is not None and not asset.archived:
             out.append(AssetSummary.model_validate(
                 asset.model_dump(include=set(AssetSummary.model_fields))))
@@ -151,6 +165,11 @@ def advanced_search(
                             detail="Advanced Search needs the file-backed catalogue")
     page.items = [h.model_copy(update={"files": _without_file_ids(h.files)})
                   if _locked_for(user, h.asset) else h for h in page.items]
+    from backend import gxc_shares
+    if gxc_shares.may_share(user):
+        page.items = [h.model_copy(update={"asset": h.asset.model_copy(update={
+                          "share_token": gxc_shares.token_for(user.email, h.asset.id)})})
+                      if h.asset.gxc else h for h in page.items]
     return page
 
 
@@ -173,9 +192,46 @@ def _without_file_ids(resources: list) -> list:
     return [r.model_copy(update={"item_id": None}) for r in resources]
 
 
+def _through_link(asset_id: str, token: str | None, repo: AssetRepository,
+                  user: CurrentUser) -> AssetRepository:
+    """A GXC video opened through somebody's personal link (B10 step 2):
+    for a PTC person outside the GXC group, the first time grants it --
+    the repository they are served then holds it; for anyone, an open
+    through another person's link is recorded. A partner, an API token or
+    a link that does not hold (forged, revoked, another video's) changes
+    nothing -- the 404 stays."""
+    from backend import gxc_shares
+    from backend.deps import build_repo
+    if not token or not asset_id.startswith("gxc-"):
+        return repo
+    sender = gxc_shares.sender_of(token, asset_id)
+    me = (user.email or "").strip().lower()
+    if not sender or sender == me or user.is_partner or user.token_name:
+        return repo
+    granted = False
+    if not getattr(repo, "gxc", True) and gxc_shares.may_be_granted(user):
+        if repo.get(asset_id) is None and _is_gxc_video(asset_id):
+            granted = gxc_shares.grant(me, asset_id, sender)
+            repo = build_repo(gxc=False, gxc_granted=(
+                getattr(repo, "gxc_granted", frozenset()) | {asset_id}))
+    if repo.get(asset_id) is not None:
+        gxc_shares.record_open(asset_id, me, sender, granted)
+    return repo
+
+
+def _is_gxc_video(asset_id: str) -> bool:
+    """Whether the id is a GXC video that exists (as the Hub's jobs see it)."""
+    from backend.deps import build_repo
+    asset = build_repo(gxc=True).get(asset_id)
+    return asset is not None and asset.gxc
+
+
 @router.get("/{asset_id}", response_model=Asset)
 def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo),
-              user: CurrentUser = Depends(get_current_user)):
+              user: CurrentUser = Depends(get_current_user),
+              s: str | None = Query(default=None, max_length=64,
+                                    description="a personal GXC link's token (B10)")):
+    repo = _through_link(asset_id, s, repo, user)
     asset = repo.get(asset_id)
     if asset is None and getattr(repo, "gxc", False) and asset_id.startswith("gxc-"):
         # A GXC link from before B10 (2026-11-03), whose id spelled the title:
@@ -201,6 +257,15 @@ def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo),
                                          "files_locked": True})
     if asset.gxc and not _gxc_downloads(repo):
         asset = asset.model_copy(update={"downloads_off": True})
+    if asset.gxc:
+        from backend import gxc_shares
+        if gxc_shares.may_share(user):
+            # The viewer's own link, for the address bar and Share Internally.
+            asset = asset.model_copy(update={
+                "share_token": gxc_shares.token_for(user.email, asset.id)})
+        if not getattr(repo, "gxc", True):
+            # Through a link: the GXC library is closed to them in SharePoint.
+            asset = asset.model_copy(update={"gxc_link_only": True, "web_url": None})
     # Which values are only the Hub's inference: for the people who can fix
     # them (Edit metadata), not for visitors or partners (2026-10-28).
     if asset.assumed and not user.can(Perm.MAINTAIN):

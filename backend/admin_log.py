@@ -43,6 +43,8 @@ ACTIONS: dict[tuple[str, str], str] = {
     ("DELETE", "/api/admin/hidden/{asset_id}"): "Unhid a demo",
     ("PUT", "/api/admin/hub-settings"): "Changed the Hub's display options",
     ("PUT", "/api/admin/gxc"): "Switched GXC video downloads",
+    ("POST", "/api/admin/gxc-links/revoke"): "Revoked GXC personal links",
+    ("GET", "/api/admin/gxc-links.csv"): "Exported the GXC link records",
     ("PUT", "/api/admin/promoted"): "Changed the Featured demos",
     ("POST", "/api/admin/access/groups"): "Created a group",
     ("PUT", "/api/admin/access/groups/{group_id}"): "Changed a group",

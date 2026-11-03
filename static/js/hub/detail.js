@@ -47,7 +47,31 @@ import {
 var detailAsset = null;
 
 function assetUrl(id) {
-  return location.origin + location.pathname + "#/asset/" + encodeURIComponent(id);
+  return location.origin + location.pathname + "#/asset/" + encodeURIComponent(id)
+    + linkSuffix(id);
+}
+
+/* A GXC video's links carry the viewer's own token (B10 step 2): "?s=..."
+ * at the end of the hash, for the page that is showing. Anything else, or
+ * a person without one: nothing. */
+function linkSuffix(id) {
+  return detailAsset && detailAsset.id === id && detailAsset.share_token
+    ? "?s=" + encodeURIComponent(detailAsset.share_token) : "";
+}
+
+/* "This link is personal to you": beside Share Internally on a GXC video. */
+function renderGxcNotice(actions, asset) {
+  var old = document.getElementById("vpGxcNotice");
+  if (old) old.remove();
+  if (!actions || !asset.gxc || !asset.share_token) return;
+  var note = document.createElement("div");
+  note.id = "vpGxcNotice";
+  note.className = "vp-gxc-notice";
+  note.textContent = "This link is personal to you. The Hub records who opens it.";
+  // Under the title and buttons row, at the buttons' end: beside the row
+  // it squeezed the buttons.
+  var head = actions.parentNode;
+  head.parentNode.insertBefore(note, head.nextSibling);
 }
 
 /* One view, counted when a details page opens.
@@ -74,7 +98,7 @@ function recordView(id) {
 
 /* `fileItemId`: arrived on a shared file link (fileHash) -- open the page
  * and then that file's preview. */
-async function openAssetDetail(id, fileItemId) {
+async function openAssetDetail(id, fileItemId, linkToken) {
   var page0 = document.getElementById("videoPreviewPage");
   if (fileItemId && detailAsset && detailAsset.id === id
       && page0 && page0.classList.contains("active")) {
@@ -98,7 +122,8 @@ async function openAssetDetail(id, fileItemId) {
   window.hubDetailReturn = null;
   var asset;
   try {
-    asset = await getJSON("/api/assets/" + encodeURIComponent(id));
+    asset = await getJSON("/api/assets/" + encodeURIComponent(id)
+                          + (linkToken ? "?s=" + encodeURIComponent(linkToken) : ""));
   } catch (err) {
     console.error("[hub-api] could not load asset", id, err);
     // A link to a demo that has been hidden or removed used to do nothing
@@ -112,17 +137,20 @@ async function openAssetDetail(id, fileItemId) {
     }
     return;
   }
-  // An old GXC link (B10, 2026-11-03) answers with the video's new id: the
-  // address bar takes it, so the link copied from here is the new one.
-  if (asset.id !== id) {
-    id = asset.id;
-    history.replaceState(null, "", fileItemId ? fileHash(id, fileItemId)
-                                              : "#/asset/" + encodeURIComponent(id));
-  }
+  // An old GXC link (B10, 2026-11-03) answers with the video's new id.
+  var asked = id;
+  id = asset.id;
   // The card's chosen picture (HubThumbnail, B5) is a file in the folder,
   // but not one of the demo's files to list.
   asset.resources = (asset.resources || []).filter(function (r) { return !r.hub_thumbnail; });
   detailAsset = asset;
+  // The address bar takes the new id and, on a GXC video, the viewer's own
+  // token, whoever's link opened it -- so what they copy is theirs (B10).
+  if (location.hash.indexOf("#/asset/" + encodeURIComponent(asked)) === 0) {
+    var own = fileItemId ? fileHash(id, fileItemId)
+                         : "#/asset/" + encodeURIComponent(id) + linkSuffix(id);
+    if (location.hash !== own) history.replaceState(null, "", own);
+  }
   recordView(id);
 
   var page = document.getElementById("videoPreviewPage");
@@ -355,6 +383,7 @@ async function openAssetDetail(id, fileItemId) {
     });
     actions.appendChild(copy);
   }
+  renderGxcNotice(actions, asset);
 
   // Feedback on this demo (A2, 2026-10-28): to its segment's owners.
   // "Share feedback", at the end of the actions row and styled as a link,
@@ -448,7 +477,8 @@ async function openAssetDetail(id, fileItemId) {
 
   page.classList.add("active");
   page.scrollTop = 0;
-  var here = fileItemId ? fileHash(id, fileItemId) : "#/asset/" + encodeURIComponent(id);
+  var here = fileItemId ? fileHash(id, fileItemId)
+                        : "#/asset/" + encodeURIComponent(id) + linkSuffix(id);
   if (location.hash !== here) history.pushState(null, "", here);
   if (fileItemId) openFileById(asset, fileItemId);
 }
@@ -672,7 +702,8 @@ function filePreviewUrl(assetId, itemId) {
  * Internally on the page itself -- it opens the Hub, so it is for
  * colleagues, not customers. */
 function fileHash(assetId, itemId) {
-  return "#/asset/" + encodeURIComponent(assetId) + "/file/" + encodeURIComponent(itemId);
+  return "#/asset/" + encodeURIComponent(assetId) + "/file/" + encodeURIComponent(itemId)
+    + linkSuffix(assetId);
 }
 
 function fileShareUrl(assetId, itemId) {
@@ -935,7 +966,8 @@ function closeFilePreview(restoreHash) {
   var state = filePreviewState;
   filePreviewState = null;
   if (restoreHash && state && /\/file\//.test(location.hash)) {
-    history.replaceState(null, "", "#/asset/" + encodeURIComponent(state.asset.id));
+    history.replaceState(null, "", "#/asset/" + encodeURIComponent(state.asset.id)
+                                   + linkSuffix(state.asset.id));
   }
 }
 
@@ -1541,6 +1573,10 @@ var REQUEST_FORM_HIDDEN = true;
 
 function routeFromHash() {
   var hash = location.hash || "";
+  // A GXC video's personal link (B10): "?s=<token>" ends the hash.
+  var shared = /\?s=([A-Za-z0-9]+)$/.exec(hash);
+  var linkToken = shared ? shared[1] : null;
+  if (shared) hash = hash.slice(0, shared.index);
   // The request form is hidden for the first release (Elio, Seb,
   // 2026-10-28); an old link to it lands on Home.
   if (hash === "#/request" && REQUEST_FORM_HIDDEN) {
@@ -1603,12 +1639,12 @@ function routeFromHash() {
   }
   var file = /^#\/asset\/([^/]+)\/file\/([^/]+)$/.exec(hash);
   if (file) {
-    openAssetDetail(decodeURIComponent(file[1]), decodeURIComponent(file[2]));
+    openAssetDetail(decodeURIComponent(file[1]), decodeURIComponent(file[2]), linkToken);
     return;
   }
   closeFilePreview(false);
   var match = /^#\/asset\/(.+)$/.exec(hash);
-  if (match) { openAssetDetail(decodeURIComponent(match[1])); return; }
+  if (match) { openAssetDetail(decodeURIComponent(match[1]), null, linkToken); return; }
   closeAdvancedSearch();
   closeAssetDetail();
 }

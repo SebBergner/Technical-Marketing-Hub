@@ -94,9 +94,21 @@ function openSheet(title, sub) {
 var TYPE_WORD = { video: "Video", ldk: "LDK", vdk: "VDK", vm: "Virtual Machine",
                   cad_model: "CAD Dataset" };
 
+/* "GXC only" after a GXC video's title in Admin lists (B10, 2026-11-03),
+ * as on the Hub's cards: a GXC id begins "gxc-". */
+function gxcMark(link, id) {
+  if (!/^gxc-/.test(id || "")) return link;
+  var tag = el("span", "pill pill--warn", "GXC only");
+  tag.style.marginLeft = "6px";
+  tag.title = "A GXC video: only people with Access GXC videos can see it on the Hub.";
+  link.appendChild(tag);
+  return link;
+}
+
 function demoLink(id, title) {
   var a = el("a", null, title || id);
   a.href = "/#/asset/" + encodeURIComponent(id);
+  gxcMark(a, id);
   a.target = "_blank";
   a.rel = "noopener";
   return a;
@@ -113,6 +125,6 @@ function actorWord(actor) {
 var session = { via: null, permissions: [] };
 
 export {
-  $, actorWord, card, delta, demoLink, el, localHour, openSheet, row, session,
+  $, actorWord, card, delta, demoLink, el, gxcMark, localHour, openSheet, row, session,
   show, tile, two, TYPE_WORD, when
 };

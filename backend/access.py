@@ -96,9 +96,9 @@ CATALOGUE: list[tuple[str, list[tuple[Perm, str, str]]]] = [
          "partners in SharePoint. Never given to partner (guest) accounts."),
         (Perm.VIEW_GXC, "Access GXC videos",
          "Find, open and preview the videos in the GXC Video library, and download them "
-         "when Admin -> Content access switches that on. Without it they do not exist on "
-         "the Hub: not listed, not found, and their links open nothing. Never given to "
-         "partner (guest) accounts."),
+         "when Admin -> Content access switches that on. Without it they are never listed "
+         "or found; a PTC person opens one only through a personal link somebody shared, "
+         "and the Hub records who passed it on. Never given to partner (guest) accounts."),
         (Perm.VIEW_REPORTS, "View Hub activity",
          "See the Hub activity page: the most used content, the most active PTC "
          "people and team totals. Never partners' names."),
@@ -482,8 +482,9 @@ def permissions_of(user) -> frozenset[str]:
     return frozenset(perms)
 
 
-#: The shared Admin sign-in: everything but writing SharePoint columns.
-ADMIN_SESSION_PERMS = ALL - {Perm.MAINTAIN.value}
+#: The shared Admin sign-in: everything but writing SharePoint columns, and
+#: no GXC (B10, 2026-11-02: a shared password names nobody; D2 removes it).
+ADMIN_SESSION_PERMS = ALL - {Perm.MAINTAIN.value, Perm.VIEW_GXC.value}
 
 
 # ─────────────────────────────────────────────────────────── who signed in

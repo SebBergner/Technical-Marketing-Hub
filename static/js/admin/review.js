@@ -4,7 +4,7 @@
  * Part of the Admin page's script, split out of static/admin.js on
  * 2026-10-15; static/js/admin/main.js loads it. */
 
-import { $, actorWord, demoLink, el, row, session, TYPE_WORD } from "./util.js";
+import { $, actorWord, demoLink, el, gxcMark, row, session, TYPE_WORD } from "./util.js";
 import { loadChanges } from "./access.js";
 import { act } from "./signins.js";
 
@@ -61,6 +61,7 @@ function loadUploads() {
         var title = el(u.asset_id ? "a" : "span", "promo-row__title", u.title);
         if (u.asset_id) {
           title.href = "/#/asset/" + encodeURIComponent(u.asset_id);
+          gxcMark(title, u.asset_id);
           title.target = "_blank";
           title.rel = "noopener";
         }

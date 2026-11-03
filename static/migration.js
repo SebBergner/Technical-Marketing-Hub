@@ -457,7 +457,7 @@
         ". Restricted: on the Hub only people with Access GXC videos (and Administrators) see " +
         "them; SharePoint limits the library to its own group. They are written as not " +
         "customer facing, with Segment, Video Type and products left empty, to fill in " +
-        "afterwards with Edit metadata."));
+        "afterwards with Maintain content."));
     }
     renderShare($("pvSegments"), "Segment", p.segments || [],
       "Of every video in this migration, including those that need fixing. A video can have several segments.");

@@ -4,7 +4,7 @@
  * 2026-10-14; static/js/hub/main.js loads it. */
 
 import { escapeHtml, fullDate, getJSON } from "./util.js";
-import { buildCard, paintCoverInto, TYPE_CHIP, videoTypeOf } from "./cards.js";
+import { assetHref, buildCard, paintCoverInto, TYPE_CHIP, videoTypeOf } from "./cards.js";
 import { applyFilters, CONTROLS, navFilter } from "./filters.js";
 import {
   familyDisplayName, HIDDEN_UMBRELLAS, navMarkHtml, openFamily,
@@ -165,7 +165,7 @@ function buildHome(assets, facets) {
     recent.forEach(function (a) {
       var row = document.createElement("a");
       row.className = "hub-home-recent__row";
-      row.href = "#/asset/" + encodeURIComponent(a.id);
+      row.href = assetHref(a);
       var thumb = document.createElement("span");
       thumb.className = "hub-home-recent__thumb";
       if (a.thumbnail_url) thumb.style.backgroundImage = "url(" + JSON.stringify(a.thumbnail_url) + ")";

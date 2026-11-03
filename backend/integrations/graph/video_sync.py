@@ -95,6 +95,18 @@ class MissingGxcKey(RuntimeError):
     """GXC_ID_KEY is not set on an Azure slot."""
 
 
+def gxc_key() -> bytes:
+    """GXC_ID_KEY, or the development key off Azure (see gxc_id). The GXC
+    share links (backend/gxc_shares.py) derive their own key from it."""
+    key = (settings.gxc_id_key or "").strip()
+    if not key:
+        if os.environ.get("WEBSITE_HOSTNAME"):
+            raise MissingGxcKey("GXC_ID_KEY is not set on this slot, so GXC Video "
+                                "cannot be indexed (see docs/SWAP-CHECKLIST.md)")
+        key = _DEV_GXC_KEY
+    return key.encode()
+
+
 def gxc_id(folder_id: str) -> str:
     """A GXC video's id (B10, 2026-11-03): an HMAC-SHA256 of its SharePoint
     folder's item id under GXC_ID_KEY, so it cannot be guessed from the
@@ -104,13 +116,7 @@ def gxc_id(folder_id: str) -> str:
 
     On Azure (WEBSITE_HOSTNAME) the key must be set: a fallback there would
     mint ids that change, breaking every link, the day the key is added."""
-    key = (settings.gxc_id_key or "").strip()
-    if not key:
-        if os.environ.get("WEBSITE_HOSTNAME"):
-            raise MissingGxcKey("GXC_ID_KEY is not set on this slot, so GXC Video "
-                                "cannot be indexed (see docs/SWAP-CHECKLIST.md)")
-        key = _DEV_GXC_KEY
-    digest = hmac.new(key.encode(), folder_id.encode(), hashlib.sha256).digest()
+    digest = hmac.new(gxc_key(), folder_id.encode(), hashlib.sha256).digest()
     code = base64.b32encode(digest).decode().lower()[:GXC_ID_LENGTH]
     return GXC_VIDEO.id_prefix + code
 

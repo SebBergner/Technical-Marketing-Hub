@@ -4,7 +4,7 @@
  * Part of the Admin page's script, split out of static/admin.js on
  * 2026-10-15; static/js/admin/main.js loads it. */
 
-import { $, card, el, openSheet, tile, TYPE_WORD, when } from "./util.js";
+import { $, card, el, gxcMark, openSheet, tile, TYPE_WORD, when } from "./util.js";
 
 /* ── Content dashboard (HLR-F1) ─────────────────────────────────────
  *
@@ -146,6 +146,7 @@ function openContentSheet(dim, b) {
         var tr = tb.insertRow();
         var link = el("a", null, a.title);
         link.href = "/#/asset/" + encodeURIComponent(a.id);
+        gxcMark(link, a.id);
         link.target = "_blank";
         link.rel = "noopener";
         tr.insertCell().appendChild(link);

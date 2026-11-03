@@ -1091,6 +1091,8 @@ video.hub-inline-player__media { object-fit: contain; }
 .hub-card-pills{display:flex;gap:6px;margin:2px 0 6px;min-height:22px;overflow:hidden}
 /* "GXC only" (B10) is read in full; the other tags give way. */
 .hub-card-pills .hub-pill--internal{flex-shrink:0}
+/* Under Share Internally on a GXC video (B10). */
+.vp-gxc-notice{font-size:12px;color:var(--orion-text-muted,#6b7280);margin:4px 0 8px;text-align:right}
 /* One style for every tag, from theme tokens only, so it reads on both
    the light and the dark ground (the "indigo" tokens are PTC green, and
    the soft ones have no dark counterpart -- see index.html). */

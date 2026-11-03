@@ -584,8 +584,8 @@
       <div class="section-head"><h2>Report owners</h2></div>
       <p class="muted" style="margin:-6px 0 6px">Share feedback and Get help land in the Hub
         Tasks list. The owners of the demo's segment who have Notify on are written into the
-        row's NotifyTo column, which the Power Automate flow mails &mdash; never the person who
-        uploaded the demo. Click a count to list that segment's reports.</p>
+        row's NotifyTo column (not the person who uploaded the demo), ready for a Power Automate
+        flow to mail. No flow is set up yet, so no email goes out: someone reads Hub Tasks. Click a count to list that segment's reports.</p>
       <p class="faint" id="roIntro" style="margin:0 0 14px;font-size:12.5px"></p>
       <p id="roTasks" style="margin:0 0 14px;font-size:12.5px"></p>
       <div class="grid grid--2" id="roBody"></div>
@@ -636,6 +636,7 @@
         marking a SharePoint demo also sets its Customer facing column to No, since a PTC Only
         demo is never customer facing.</p>
       <div class="card" id="gxcCard" style="margin-bottom:12px"></div>
+      <div class="card" id="gxcLinksCard" style="margin-bottom:12px;display:none"></div>
       <div class="card" id="caRequests" style="margin-bottom:12px"></div>
       <div class="card" id="caList"></div>
       <div class="card" id="hiddenDemos" style="margin-top:12px"></div>

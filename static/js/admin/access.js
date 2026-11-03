@@ -4,7 +4,7 @@
  * Part of the Admin page's script, split out of static/admin.js on
  * 2026-10-15; static/js/admin/main.js loads it. */
 
-import { $, actorWord, el, row, session, TYPE_WORD } from "./util.js";
+import { $, actorWord, el, gxcMark, row, session, TYPE_WORD, when } from "./util.js";
 import { promoMeta } from "./home.js";
 import { act, adminLogTable, al } from "./signins.js";
 import { showTab } from "./main.js";
@@ -26,6 +26,7 @@ function canSwitchGxc() {
 
 function loadContentAccess() {
   loadGxc();
+  loadGxcLinks();
   loadRequests();
   loadChanges("caChanges", "Content access");
   return fetch("/api/admin/content-access")
@@ -64,6 +65,7 @@ function renderRequests(items) {
     var info = el("div");
     var title = el("a", "promo-row__title", q.title || q.asset_id);
     title.href = "/#/asset/" + encodeURIComponent(q.asset_id);
+    gxcMark(title, q.asset_id);
     title.target = "_blank";
     title.rel = "noopener";
     info.appendChild(title);
@@ -198,10 +200,11 @@ function renderGxc(s) {
     ? (s.videos == null ? "—" : s.videos) + " in " + s.library : "Not configured"));
   host.appendChild(head);
   host.appendChild(el("p", "muted", "Videos in the GXC Video library are for a few PTC "
-    + "people only. Anyone whose groups lack Access GXC videos never sees them on the Hub: "
-    + "they are not listed or found, and a shared link opens nothing. Administrators "
-    + "always see them; partners never do. SharePoint restricts the library itself, "
-    + "so keep its group and these Hub groups the same people."));
+    + "people only. Anyone whose groups lack Access GXC videos never finds them on the Hub: "
+    + "they are not listed or searchable. Another PTC person opens one only through a "
+    + "personal link somebody shared (see GXC personal links). Administrators always see "
+    + "them; partners never do. SharePoint restricts the library itself, so keep its group "
+    + "and these Hub groups the same people."));
   var who = el("div", "promo-row__meta");
   who.style.margin = "0 0 10px";
   who.textContent = s.groups.length
@@ -252,6 +255,131 @@ function renderGxc(s) {
   });
 }
 
+/* ── GXC personal links (B10 step 2, 2026-11-03) ─────────────────────────
+ * Every GXC link is personal (backend/gxc_shares.py). Who opened whose
+ * link, who may see which video because of it, and revoking: everything a
+ * person sent, or for one video, and whatever came through it. View Admin
+ * and Access GXC videos both; revoking needs Manage users & groups. */
+var gxcLinksFilter = "";
+
+function loadGxcLinks() {
+  var q = gxcLinksFilter.trim();
+  var params = !q ? "" : (/^gxc-/.test(q) ? "?asset_id=" : "?person=") + encodeURIComponent(q);
+  return fetch("/api/admin/gxc-links" + params)
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (data) { renderGxcLinks(data, q, params); });
+}
+
+function revokeGxc(sender, assetId, title) {
+  var what = assetId ? "the links " + sender + " sent for “" + title + "”"
+                     : "every GXC link " + sender + " sent";
+  if (!window.confirm("Revoke " + what + "?\n\nWhoever opened the video through them, "
+      + "and anyone they passed it on to, can no longer open it. This cannot be undone; "
+      + sender + " can share again later.")) return;
+  fetch("/api/admin/gxc-links/revoke", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sender: sender, asset_id: assetId || null }),
+  }).then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }).then(function (res) {
+    window.alert("Revoked. " + res.grants_revoked.length + " person/video access(es) ended.");
+    loadGxcLinks();
+  }).catch(function (err) { window.alert("Not revoked: " + err.message); });
+}
+
+function gxcTable(heads, rows, cells) {
+  var wrap = el("div", "rv-table");
+  var table = el("table");
+  var tr = el("tr");
+  heads.forEach(function (h) { tr.appendChild(el("th", null, h)); });
+  table.appendChild(tr);
+  rows.forEach(function (r) {
+    var line = el("tr");
+    cells(r).forEach(function (c) {
+      var td = el("td");
+      if (c instanceof Node) td.appendChild(c); else td.textContent = c == null ? "" : c;
+      line.appendChild(td);
+    });
+    table.appendChild(line);
+  });
+  wrap.appendChild(table);
+  return wrap;
+}
+
+function renderGxcLinks(data, q, params) {
+  var host = $("gxcLinksCard");
+  if (!data) { host.style.display = "none"; return; }       // no Access GXC videos
+  host.style.display = "";
+  host.innerHTML = "";
+  var canRevoke = canSwitchGxc();
+  var head = el("div", "card-head");
+  head.appendChild(el("h2", null, "GXC personal links"));
+  var csv = el("button", "btn-small", "Export CSV");
+  csv.addEventListener("click", function () {
+    window.location.href = "/api/admin/gxc-links.csv" + params;
+  });
+  head.appendChild(csv);
+  host.appendChild(head);
+  host.appendChild(el("p", "muted", "Every GXC link is personal: it names, to the Hub, "
+    + "whoever shared it. A PTC person outside the GXC group may open a video once someone's "
+    + "link has opened it for them. Revoking someone's links ends that access for everyone "
+    + "who came through them, and for whoever they passed it on to."));
+
+  var bar = el("div");
+  bar.style.margin = "0 0 10px";
+  var input = el("input");
+  input.type = "search";
+  input.placeholder = "A person's email, or a video id (gxc-…)";
+  input.value = q;
+  input.style.width = "min(360px,100%)";
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { gxcLinksFilter = input.value; loadGxcLinks(); }
+  });
+  bar.appendChild(input);
+  var go = el("button", "btn-small", "Show");
+  go.style.marginLeft = "8px";
+  go.addEventListener("click", function () { gxcLinksFilter = input.value; loadGxcLinks(); });
+  bar.appendChild(go);
+  if (q && !/^gxc-/.test(q) && canRevoke) {
+    var all = el("button", "btn-danger", "Revoke every link " + q + " sent");
+    all.style.marginLeft = "8px";
+    all.addEventListener("click", function () { revokeGxc(q.toLowerCase(), null); });
+    bar.appendChild(all);
+  }
+  host.appendChild(bar);
+
+  host.appendChild(el("h3", null, "Opened through someone's link (" + data.opens.length + ")"));
+  host.appendChild(data.opens.length ? gxcTable(
+    ["When", "Video", "Opened by", "Link of", ""], data.opens.slice(0, 200), function (o) {
+      return [when(o.at), o.title, o.who, o.via, o.granted ? "first time" : ""];
+    }) : el("p", "faint", "None yet."));
+
+  host.appendChild(el("h3", null, "May open because of a link (" + data.grants.length + ")"));
+  host.appendChild(data.grants.length ? gxcTable(
+    ["Since", "Video", "Person", "Through the link of", ""], data.grants.slice(0, 200),
+    function (g) {
+      var state;
+      if (g.revoked_at) state = "revoked " + when(g.revoked_at);
+      else if (canRevoke) {
+        state = el("button", "btn-danger", "Revoke " + g.via + "'s links");
+        state.title = "Revoke the links " + g.via + " sent for this video";
+        state.addEventListener("click", function () { revokeGxc(g.via, g.asset_id, g.title); });
+      } else state = "";
+      return [when(g.at), g.title, g.who, g.via, state];
+    }) : el("p", "faint", "None yet."));
+
+  if (data.revocations.length) {
+    host.appendChild(el("h3", null, "Revoked"));
+    host.appendChild(gxcTable(["When", "Links of", "Video", "By", "Access ended"],
+      data.revocations, function (r) {
+        return [when(r.at), r.sender, r.asset_id ? r.title : "every video", actorWord(r.by),
+                r.grants_revoked];
+      }));
+  }
+}
+
 function renderContentAccess(items) {
   var host = $("caList");
   host.innerHTML = "";
@@ -274,6 +402,7 @@ function renderContentAccess(items) {
     var info = el("div");
     var title = el("a", "promo-row__title", i.title || i.asset_id);
     title.href = "/#/asset/" + encodeURIComponent(i.asset_id);
+    gxcMark(title, i.asset_id);
     title.target = "_blank";
     title.rel = "noopener";
     info.appendChild(title);
@@ -450,6 +579,7 @@ function renderHidden(items) {
             var info = el("div");
             var title = el("a", "promo-row__title", a.title);
             title.href = "/#/asset/" + encodeURIComponent(a.id);
+            gxcMark(title, a.id);
             title.target = "_blank";
             title.rel = "noopener";
             info.appendChild(title);

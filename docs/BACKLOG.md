@@ -627,6 +627,12 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - **依赖**：Christine 的表；发布之后，或 swap 之后。
 - **11/03 Liwei 改了规则（对 GXC 组）**：Home 上也显示 GXC（Serge 在 Home 按 Type 找不到会以为没有数据），搜索、Advanced Search、Published（年份和年龄档）、Recently published 都能看到；维护页面（Content to review、Admin 列表）显示 GXC，只给能看 GXC 的人；GXC 组的卡片标 "GXC only"；所有 Lamborghini 都算 "GXC group only"，这个标记放到最后做。11/03 再定：**对 GXC 组，GXC 在所有地方都当普通内容显示**（导航、筛选和计数、相关推荐、Dashboard、"most used" 都不藏），只多一个 "GXC only" 标识。所以上面"不公开列出"那几条对 GXC 组作废；没有 Access GXC videos 的人照旧完全看不到，到第二步才凭个人链接打开。
 - **11/03 "GXC only" 标识已做，本地完成，未上 staging**：搜索结果的卡片、表格视图、Content to review 的行都显示（和详情页同一个提示）。Admin 页面的列表还没加。
+- **11/03 第二步（个人链接）已做，本地完成，未上 staging**（Lamborghini 标记除外）。Liwei 11/03 定：A 离开 GXC 组后链接照旧有效，只有作废才失效；作废可以按人，也可以按人加视频，都连带下游；Admin 记录页要 View Admin 加 Access GXC videos，作废要 Manage users & groups；B 有授权后不带标识也能打开；非 GXC 的人没有"分享给我的"列表；GXC 组的人通过别人的链接打开也记录。
+  - 标识是 `?s=` 加 22 位（每人 6 位随机代码 + 16 位 HMAC，密钥由 `GXC_ID_KEY` 派生，不另设），对同一人同一视频不变，不存表；代码存在 `owned/gxc_share_people.json`。授权在 `owned/gxc_grants.json`，打开记录在 `owned/gxc_opens.jsonl`，作废记录在 `owned/gxc_share_state.json`（`backend/gxc_shares.py`）。
+  - 授权在 `deps.get_repo` 里生效：页面、文件、缩略图、下载能打开，列表、搜索、计数、相关推荐、首页推荐都没有。非 GXC 的人看不到 Open in SharePoint；admin-session 不再有 Access GXC videos。
+  - 页面：地址栏、Share Internally、卡片和表格链接带看的人自己的标识；GXC 详情页按钮下面写 "This link is personal to you. The Hub records who opens it."；Admin → Content access 加了 "GXC personal links"（按人或视频查、CSV、作废）。
+  - 本地只能用开发账号（有 GXC 权限）在浏览器里看；非 GXC 账号打开、链式 A → B → C、作废连带只在自动测试里验证过。上 staging 后要一个非 GXC 的 PTC 账号实测。
+  - 没做：Hub activity 里，GXC 组的人能看到非 GXC 的人看过 GXC 视频的记录（使用记录照常记）；Admin 页面的列表没有 "GXC only" 标识。
 - **11/03 随机 id 已做，本地完成，未上 staging**：`gxc-` 加 16 位 base32，HMAC-SHA256（`GXC_ID_KEY`）算 SharePoint 文件夹 id（`video_sync.gxc_id`）。Azure 上没设密钥，GXC 同步就失败，不生成 id；本地用固定的开发密钥。第一次同步时，`json_repo.adopt_new_ids` 把 owned 里旧 id 的数据（归档、stats、编辑、相关推荐、使用记录等）改成新 id，Admin log 和登录、权限记录不改；旧 id 在 identity 里记 `renamed_to`，GXC 组的人打开旧链接会看到新 id，其他人 404。**上 staging 之前要先在 staging 设 `GXC_ID_KEY`（slot setting）**，否则 staging 的 GXC 同步会失败。SWAP-CHECKLIST 已写。
 
 ---

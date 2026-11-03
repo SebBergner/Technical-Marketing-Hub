@@ -368,6 +368,75 @@ def set_gxc(body: GxcIn, repo: AssetRepository = Depends(get_repo),
         raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
 
 
+# ─────────────────────────────────────────── GXC personal links (B10 step 2)
+#: Who passed a GXC link to whom: View Admin and Access GXC videos, both
+#: (Liwei, 2026-11-03), as GXC entries in the Admin log are only for them.
+VIEW_GXC = Depends(require_perm(Perm.VIEW_GXC))
+
+
+class GxcRevokeIn(BaseModel):
+    sender: str = Field(min_length=3, max_length=200)
+    #: One video's links, or every link the person sent when absent.
+    asset_id: str | None = Field(default=None, max_length=80)
+
+
+def _gxc_titles(repo: AssetRepository) -> dict[str, str]:
+    from backend.deps import build_repo
+    titles = {}
+    for record in build_repo(gxc=True).source_rows("gxc_video"):
+        titles[record["id"]] = record.get("title") or record["id"]
+    return titles
+
+
+def _gxc_link_report(asset_id: str | None, person: str | None,
+                     repo: AssetRepository) -> dict:
+    from backend import gxc_shares
+    out = gxc_shares.report(asset_id=asset_id, person=person)
+    titles = _gxc_titles(repo)
+    for rows in out.values():
+        for r in rows:
+            if r.get("asset_id"):
+                r["title"] = titles.get(r["asset_id"], r["asset_id"])
+    return out
+
+
+@router.get("/gxc-links", dependencies=[VIEW_ADMIN, VIEW_GXC])
+def gxc_links(asset_id: str | None = None, person: str | None = None,
+              repo: AssetRepository = Depends(get_repo)):
+    """Grants, opens through somebody's link and revocations -- by video or
+    by person (sender or receiver), newest first."""
+    return _gxc_link_report(asset_id, person, repo)
+
+
+@router.get("/gxc-links.csv", dependencies=[VIEW_ADMIN, VIEW_GXC])
+def gxc_links_csv(asset_id: str | None = None, person: str | None = None,
+                  repo: AssetRepository = Depends(get_repo)):
+    """Every open through somebody's link, with the same filters, as CSV."""
+    import csv
+    import io
+    from fastapi.responses import Response as _Response
+    rows = _gxc_link_report(asset_id, person, repo)["opens"]
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Opened (UTC)", "Video", "Video id", "Opened by", "Through the link of",
+                "First time (granted)"])
+    for r in rows:
+        w.writerow([r.get("at"), r.get("title"), r.get("asset_id"), r.get("who"),
+                    r.get("via"), "yes" if r.get("granted") else ""])
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M")
+    return _Response("﻿" + buf.getvalue(), media_type="text/csv; charset=utf-8",
+                     headers={"Content-Disposition":
+                              f'attachment; filename="hub-gxc-links-{stamp}.csv"'})
+
+
+@router.post("/gxc-links/revoke", dependencies=[VIEW_GXC])
+def revoke_gxc_links(body: GxcRevokeIn, actor: str = Depends(require_perm(Perm.MANAGE_USERS))):
+    """Stop the links a person sent -- for one video or all -- and every
+    grant that came through them, down the chain (gxc_shares.revoke)."""
+    from backend import gxc_shares
+    return gxc_shares.revoke(body.sender, body.asset_id, actor)
+
+
 @router.get("/hidden", dependencies=[VIEW_ADMIN])
 def list_hidden(repo: AssetRepository = Depends(get_repo)):
     try:
@@ -503,8 +572,11 @@ def _unsynced_requests(repo: AssetRepository) -> int | None:
 
 # ─────────────────────────────────────────────────────────────────── usage
 def _events(repo: AssetRepository, since: str | None, until: str | None) -> list[dict]:
+    from backend import gxc_shares
     reader = getattr(repo, "usage_events", None)
-    return reader(since=since, until=until) if reader else []
+    # A GXC video opened through a personal link, by someone outside the
+    # GXC group: not Hub usage (B10); GXC personal links shows it.
+    return gxc_shares.without_link_views(reader(since=since, until=until)) if reader else []
 
 
 def _tally(events: list[dict], key: str = "event") -> dict:

@@ -361,12 +361,17 @@ class JsonAssetRepository(AssetRepository):
     #: why this is not sufficient across processes.
     _lock = threading.RLock()
 
-    def __init__(self, data_dir: str, gxc: bool = True):
+    def __init__(self, data_dir: str, gxc: bool = True,
+                 gxc_granted: frozenset[str] = frozenset()):
         self._mirror_cache: dict[str, tuple[float, list]] = {}
         #: Whether GXC videos exist for whoever this repository serves
         #: (deps.get_repo). True for the Hub's own jobs -- syncs, the daily
         #: run -- which must see everything.
         self.gxc = gxc
+        #: Without GXC: the GXC videos a personal link granted this person
+        #: (backend/gxc_shares.py, B10). They open -- page, files, thumbnail
+        #: -- and are listed nowhere (_rows).
+        self.gxc_granted = frozenset(gxc_granted)
         self.dir = data_dir
         self.mirror_dir = os.path.join(data_dir, "mirror")
         self.owned_dir = os.path.join(data_dir, "owned")
@@ -441,7 +446,8 @@ class JsonAssetRepository(AssetRepository):
         tagged = [(src, {**r, "gxc": True, "customer_facing": False, "internal": True,
                          "internal_source": "sharepoint"}
                    if src in GXC_SOURCES else r)
-                  for src, r in tagged if self.gxc or src not in GXC_SOURCES]
+                  for src, r in tagged if self.gxc or src not in GXC_SOURCES
+                  or r["id"] in self.gxc_granted]
         identity = self._load("identity")
         # Retired items keep their identity row but leave the catalogue.
         live = [(src, r) for src, r in tagged
@@ -556,6 +562,10 @@ class JsonAssetRepository(AssetRepository):
         def keep(record: dict) -> bool:
             # Reachable by id, never met while browsing -- listing.py says why.
             if not listing.is_listed(record, query.include_older_vms):
+                return False
+            # A GXC video granted by a personal link (B10): its page opens,
+            # and no list, count, search or related demo ever names it.
+            if record.get("gxc") and not self.gxc:
                 return False
             if record.get("archived") and not query.include_archived:
                 return False

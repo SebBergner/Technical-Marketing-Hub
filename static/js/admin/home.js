@@ -3,7 +3,7 @@
  * Part of the Admin page's script, split out of static/admin.js on
  * 2026-10-15; static/js/admin/main.js loads it. */
 
-import { $, el, row, TYPE_WORD } from "./util.js";
+import { $, el, gxcMark, row, TYPE_WORD } from "./util.js";
 import { act } from "./signins.js";
 
 /* ── Promoted on Home ───────────────────────────────────────────────
@@ -70,6 +70,7 @@ function renderPromoted(state) {
     var info = el("div");
     var title = el("a", "promo-row__title", a.title);
     title.href = "/#/asset/" + encodeURIComponent(a.id);
+    gxcMark(title, a.id);
     title.target = "_blank";
     title.rel = "noopener";
     info.appendChild(title);

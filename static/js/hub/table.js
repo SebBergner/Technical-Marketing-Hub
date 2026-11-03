@@ -13,7 +13,7 @@
 import { dateLabel, getJSON, LANGUAGE_LABEL, report } from "./util.js";
 import { familyDisplayName } from "./nav.js";
 import { openAssetDetail } from "./detail.js";
-import { gxcPill, TYPE_CHIP } from "./cards.js";
+import { assetHref, gxcPill, TYPE_CHIP } from "./cards.js";
 
 var VIEW_KEY = "hub.resultsView";
 
@@ -102,7 +102,7 @@ function row(a) {
     td.className = "hub-table__td hub-table__td--" + c[0];
     if (c[0] === "title") {
       var link = document.createElement("a");
-      link.href = "#/asset/" + encodeURIComponent(a.id);
+      link.href = assetHref(a);
       link.textContent = v.title;
       link.addEventListener("click", function (e) {
         e.preventDefault();

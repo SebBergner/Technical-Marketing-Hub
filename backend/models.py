@@ -415,6 +415,9 @@ class AssetBase(BaseModel):
     #: From the GXC Video library (2026-10-29): listed only for "Access GXC
     #: videos", and downloaded only while Admin allows it.
     gxc: bool = False
+    #: A GXC video (B10): the viewer's own personal link token, set on the
+    #: response -- for the address bar, Share Internally and card links.
+    share_token: str | None = None
     #: How old, in the bands people see (services/content_age.py): new,
     #: recent, aging, older -- None without a date.
     age_band: str | None = None
@@ -559,6 +562,9 @@ class Asset(AssetBase):
     #: Set on the response for a GXC video while Admin keeps its downloads
     #: off: previews play, Download is refused.
     downloads_off: bool = False
+    #: A GXC video opened through a personal link by someone outside the GXC
+    #: group: no Open in SharePoint, which would not open for them.
+    gxc_link_only: bool = False
     #: Every other asset: the VMs whose pages say they run it.
     used_by_vms: list[UsedByVm] = Field(default_factory=list)
 

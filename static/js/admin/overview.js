@@ -363,7 +363,7 @@ function renderQueues(d) {
   var c2 = card("Metadata proposals");
   row(c2, "Pending", d.proposals.pending);
   var p = el("p", "muted",
-    "Suggested changes to SharePoint metadata. Deciding one needs Edit metadata "
+    "Suggested changes to SharePoint metadata. Deciding one needs Maintain content "
     + "and writes the value into SharePoint under that person's name; there is "
     + "no review screen for them here yet.");
   p.style.cssText = "font-size:12.5px;margin:8px 0 0";

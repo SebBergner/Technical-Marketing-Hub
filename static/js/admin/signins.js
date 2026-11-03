@@ -4,7 +4,7 @@
  * Part of the Admin page's script, split out of static/admin.js on
  * 2026-10-15; static/js/admin/main.js loads it. */
 
-import { $, actorWord, el, row, session, tile, when } from "./util.js";
+import { $, actorWord, el, gxcMark, row, session, tile, when } from "./util.js";
 import { groupNames, ug } from "./users.js";
 
 /* ── Sign-ins (backend/activity.py, 2026-10-07) ───────────────────────
@@ -539,6 +539,7 @@ function renderPerson(d) {
       } else if (e.asset_id) {
         var a = el("a", null, e.title || e.asset_id);
         a.href = "/#/asset/" + encodeURIComponent(e.asset_id);
+        gxcMark(a, e.asset_id);
         a.target = "_blank";
         a.rel = "noopener";
         what.appendChild(a);

@@ -97,6 +97,13 @@ function familiesText(families, shown) {
        + " and " + (families.length - shown) + " more";
 }
 
+/* A demo's link; a GXC video's carries the viewer's own token (B10), so
+ * a link copied from a card is as personal as the page's. */
+function assetHref(a) {
+  return "#/asset/" + encodeURIComponent(a.id)
+    + (a.gxc && a.share_token ? "?s=" + encodeURIComponent(a.share_token) : "");
+}
+
 /* "GXC only" on a GXC video's card, table row and Content to review row
  * (B10, 2026-11-03), as on its page: the GXC group sees GXC like any demo,
  * and knows before sharing that it is restricted. A review row has no `gxc`,
@@ -211,7 +218,7 @@ function cardShell(a) {
   var title = document.createElement("div");
   title.className = "asset-card__title";
   var open = document.createElement("a");
-  open.href = "#/asset/" + encodeURIComponent(a.id);
+  open.href = assetHref(a);
   open.className = "hub-detail-link";
   open.textContent = a.title || "";
   open.addEventListener("click", function (e) {
@@ -772,6 +779,6 @@ function renderAgeMark(meta, asset) {
 }
 
 export {
-  buildCard, consensusUrl, embedInlinePlayer, gxcPill, paintCoverInto, previewUrl,
+  assetHref, buildCard, consensusUrl, embedInlinePlayer, gxcPill, paintCoverInto, previewUrl,
   renderAgeMark, stopInlinePlayer, TYPE_CHIP, videoTypeOf
 };

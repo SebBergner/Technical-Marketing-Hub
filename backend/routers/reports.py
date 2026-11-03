@@ -34,8 +34,11 @@ def library(repo: AssetRepository = Depends(get_repo)):
 def hub_activity(since: str | None = None, until: str | None = None,
                  top: int = Query(10, ge=3, le=25),
                  repo: AssetRepository = Depends(get_repo)):
+    from backend import gxc_shares
     reader = getattr(repo, "usage_events", None)
-    events = reader() if reader else []
+    # A GXC video opened through a personal link by someone outside the GXC
+    # group (B10): not shown here, to anyone; GXC personal links has it.
+    events = gxc_shares.without_link_views(reader() if reader else [])
     # A GXC video unlisted for this person would still show its id, which
     # is its title (2026-10-29): its use is left out for them altogether.
     if not getattr(repo, "gxc", True):

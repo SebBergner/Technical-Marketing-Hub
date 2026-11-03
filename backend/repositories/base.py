@@ -103,6 +103,14 @@ class AssetRepository(ABC):
                      reason: str | None = None) -> dict:
         raise NotImplementedError
 
+    def divested(self) -> list[dict]:
+        """Demos no longer sold, still in their library (2026-11-03); file-backed only."""
+        raise NotImplementedError
+
+    def get_divested(self, asset_id: str):
+        """One demo no longer sold, for archiving it; file-backed only."""
+        return None
+
     def content_reviews(self) -> dict[str, dict]:
         """Still current confirmations (2026-10-14); file-backed only."""
         raise NotImplementedError

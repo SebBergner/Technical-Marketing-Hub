@@ -1,5 +1,5 @@
 /* The Content review tab: new uploads, collecting dust, little used,
- * Still current running out, archived.
+ * Still current running out, no longer sold, archived.
  *
  * Part of the Admin page's script, split out of static/admin.js on
  * 2026-10-15; static/js/admin/main.js loads it. */
@@ -256,6 +256,84 @@ function reviewTable(rows, status, opts) {
   return wrap;
 }
 
+/* A demo the Hub does not list opens in SharePoint instead. */
+function spLink(url, title) {
+  var a = el(url ? "a" : "span", null, title);
+  if (url) {
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener";
+  }
+  return a;
+}
+
+/* No longer sold (Liwei, 2026-11-03): a divested product's demo kits and
+ * videos, still in their library. Hidden in the Hub for everyone, so they
+ * were archived by hand in SharePoint; here they go through the Hub's
+ * Archive, which records who and why and can be restored. */
+function divestedList(rows) {
+  if (!rows.length) return el("div", "faint", "None left in the libraries.");
+  var wrap = el("div");
+  var find = el("input", "rv-reason rv-find");
+  find.type = "search";
+  find.placeholder = "Filter by title or product";
+  wrap.appendChild(find);
+  // Here, not at the foot of the tab: a refusal names the files to fix.
+  var status = el("div", "promo-status faint");
+  wrap.appendChild(status);
+  var list = el("div", "rv-divested");
+  wrap.appendChild(list);
+  rows.forEach(function (d) {
+    var r = el("div", "promo-row");
+    r.dataset.text = (d.title + " " + d.products.join(" ")).toLowerCase();
+    r.appendChild(el("span", "promo-row__n", ""));
+    var info = el("div");
+    info.appendChild(spLink(d.web_url, d.title));
+    info.appendChild(el("div", "promo-row__meta",
+      [TYPE_WORD[d.type] || d.type, d.products.join(", "), d.library,
+       d.hub_archived ? "archived in the Hub, folder not moved" : ""]
+        .filter(Boolean).join(" · ")));
+    r.appendChild(info);
+    var acts = el("div", "promo-row__actions");
+    if (canArchive()) {
+      var arch = el("button", "btn-small", "Archive");
+      arch.type = "button";
+      arch.title = "Moves its folder into the library's _Archive.";
+      arch.addEventListener("click", function () {
+        acts.innerHTML = "";
+        var reason = el("input", "rv-reason");
+        reason.placeholder = "Why (optional)";
+        reason.maxLength = 300;
+        var yes = el("button", "btn-small btn-danger--solid", "Archive");
+        yes.type = "button";
+        yes.addEventListener("click", function () {
+          yes.disabled = no.disabled = true;
+          reviewAction("/api/assets/" + encodeURIComponent(d.asset_id) + "/archive",
+            { archived: true, reason: reason.value }, status)
+            .then(function () { yes.disabled = no.disabled = false; });
+        });
+        var no = el("button", "btn-small", "Cancel");
+        no.type = "button";
+        no.addEventListener("click", loadReview);
+        acts.appendChild(reason);
+        acts.appendChild(yes);
+        acts.appendChild(no);
+        reason.focus();
+      });
+      acts.appendChild(arch);
+    }
+    r.appendChild(acts);
+    list.appendChild(r);
+  });
+  find.addEventListener("input", function () {
+    var q = find.value.trim().toLowerCase();
+    Array.prototype.forEach.call(list.children, function (r) {
+      r.hidden = !!q && r.dataset.text.indexOf(q) < 0;
+    });
+  });
+  return wrap;
+}
+
 function reviewSection(host, title, count, note, body) {
   var c = el("div", "card rv-card");
   var head = el("div", "card-head");
@@ -301,9 +379,10 @@ function renderReview(d) {
       var r = el("div", "promo-row");
       r.appendChild(el("span", "promo-row__n", ""));
       var info = el("div");
-      info.appendChild(demoLink(a.asset_id, a.title));
+      info.appendChild(a.divested ? spLink(a.web_url, a.title) : demoLink(a.asset_id, a.title));
       info.appendChild(el("div", "promo-row__meta",
         [TYPE_WORD[a.type] || a.type,
+         a.divested ? "no longer sold" : "",
          a.at ? "archived " + new Date(a.at).toLocaleDateString()
            + (a.by ? " by " + a.by.replace(/^(user|dev):/, "") : "") : "moved in SharePoint",
          WHERE[a.where] || "",
@@ -339,6 +418,12 @@ function renderReview(d) {
       arch.appendChild(r);
     });
   }
+  reviewSection(host, "No longer sold", d.divested.length,
+    "Demo kits and videos whose product PTC no longer sells. The Hub shows them to nobody, "
+    + "but their folders are still in the library, open to whoever it is open to. Archive moves "
+    + "a folder into _Archive, as for any demo; Restore under Archived moves it back.",
+    divestedList(d.divested));
+
   var hubOnly = d.archived.filter(function (a) { return a.where === "hub_only"; }).length;
   reviewSection(host, "Archived", d.archived.length,
     "Out of every list and search in the Hub. A SharePoint demo archived since 2026-10-28 has "

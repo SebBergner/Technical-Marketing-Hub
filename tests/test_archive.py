@@ -119,7 +119,10 @@ def client(tmp_path, monkeypatch):
     (tmp_path / "mirror").mkdir()
     (tmp_path / "mirror" / "sharepoint.json").write_text(json.dumps([
         {"id": "kit", "type": "ldk", "title": "Kit", "source": "sharepoint",
-         "source_item_id": "kit", "products": ["Creo"]}]), encoding="utf-8")
+         "source_item_id": "kit", "products": ["Creo"]},
+        {"id": "old", "type": "ldk", "title": "Old IoT kit", "source": "sharepoint",
+         "source_item_id": "kit", "products": ["ThingWorx Platform"],
+         "web_url": "https://sp/old"}]), encoding="utf-8")
     (tmp_path / "mirror" / "consensus.json").write_text(json.dumps([
         {"id": "tour", "type": "video", "title": "Tour", "source": "consensus",
          "source_item_id": "u1"}]), encoding="utf-8")
@@ -132,6 +135,8 @@ def client(tmp_path, monkeypatch):
     access.create_group("Team Member", "", ["view_hub", "maintain_content", "view_admin"],
                         ["team@ptc.com"], "test")
     access.create_group("Viewers", "", ["view_hub", "view_admin"], ["rev@ptc.com"], "test")
+    access.create_group("Maintainers", "", ["view_hub", "maintain_content"],
+                        ["keeper@ptc.com"], "test")
     c = TestClient(app, base_url="http://localhost")
     c.drive = drive
     return c
@@ -167,3 +172,35 @@ def test_a_refusal_says_why_and_archives_nothing(client):
     r = client.put("/api/assets/kit/archive", json={"archived": True}, headers=TEAM_USER)
     assert r.status_code == 422 and "a.mp4" in r.json()["detail"]
     assert not client.get("/api/assets/kit", headers=TEAM_USER).json()["archived"]
+
+
+# ── no longer sold (2026-11-03) ───────────────────────────────────────────
+def test_a_demo_no_longer_sold_is_listed_for_admin_and_archived_like_any_other(client):
+    """Hidden everywhere in the Hub, but its folder is still in the library:
+    Content review lists it, and Archive moves it into _Archive."""
+    assert client.get("/api/assets/old", headers=TEAM_USER).status_code == 404
+    review = client.get("/api/admin/content-review", headers=TEAM_USER).json()
+    assert [d["asset_id"] for d in review["divested"]] == ["old"]
+    assert review["divested"][0]["web_url"] == "https://sp/old"
+    r = client.put("/api/assets/old/archive", json={"archived": True, "reason": "OA"},
+                   headers=TEAM_USER)
+    assert r.status_code == 200, r.text
+    assert client.drive.parent["kit"] == "_arch"
+    review = client.get("/api/admin/content-review", headers=TEAM_USER).json()
+    assert review["divested"] == []
+    listed = review["archived"][0]
+    assert listed["asset_id"] == "old" and listed["divested"] and listed["where"] == "sharepoint"
+    assert listed["reason"] == "OA" and listed["web_url"] == "https://sp/old"
+    # Still nowhere in the Hub, archived or not.
+    assert client.get("/api/assets/old", headers=TEAM_USER).status_code == 404
+    r = client.put("/api/assets/old/archive", json={"archived": False}, headers=TEAM_USER)
+    assert r.status_code == 200, r.text
+    assert client.drive.parent["kit"] == "root"
+    assert [d["asset_id"] for d in client.get("/api/admin/content-review",
+                                              headers=TEAM_USER).json()["divested"]] == ["old"]
+
+
+def test_only_someone_who_may_open_admin_reaches_a_demo_no_longer_sold(client):
+    r = client.put("/api/assets/old/archive", json={"archived": True},
+                   headers=easyauth_headers("keeper@ptc.com"))
+    assert r.status_code == 404 and client.drive.moves == []

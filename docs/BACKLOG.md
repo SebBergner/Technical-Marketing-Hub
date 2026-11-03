@@ -350,6 +350,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - **和 A6 的关系**：A6 的批量归档就是批量移入 `_Archive`，同样要逐个做权限检查。
 - **工作量**：约 2–3 天（移动与恢复、新权限、权限检查、同步识别 `_Archive`、故事页、测试库验证）。
 - **10/26 备注**：两个库都已建好 `_Archive` 文件夹，并移除了 visitor 组的权限。
+- **11/03 补充：已出售产品的 demo 也能在 Admin 归档（本地完成，未上 staging）**：这些 demo 被已出售产品的规则挡在 Hub 外，以前只能在 SharePoint 里手动移。现在 Admin → Content review 多一个 "No longer sold" 列表，列出 Demo Catalog 和 Demo Video 里还没进 `_Archive` 的这类 demo kit 和视频，可以按标题或产品过滤，用同一个 Archive 归档（同样检查独立权限，同样记录谁、何时、理由，进 Admin log），在 Archived 列表里标 "no longer sold"，可以 Restore。标题链接到 SharePoint，因为 Hub 里没有它们的页面。只有能打开 Admin 的人（View Admin）能对这类 demo 归档，对其他人仍然不存在。Consensus 的不列：它们本来就只在 Hub 里隐藏。用途：OA/SCPA 的 8 个 ThingWorx 套件（11/03）。
 
 ### A9. View as：以某个组的身份预览 Hub（Liwei 10/21）
 - **来源**：Liwei 2026-10-21：只有自己的账号，没法测试 partner 和其他权限的人在 Hub 里看到什么。
@@ -574,6 +575,55 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   - **要定**：① 谁能找到（建议 Maintain content，Seb 说的是管理员）；② Create New Demo 和 API 是否加这个选项（建议加，默认公开）；③ 状态存哪里（建议 Hub 自己的数据，不改 SharePoint 的列）；④ Partner 能否按链接打开（建议能，文件权限规则不变）。
   - **顺带**：隐藏的 Value Roadmap 标签里有 "Not indexed yet"，意思是还没有 AI 索引；S5 重新打开标签时改掉，以免混淆。
 
+### B9. 已出售产品的内容：展示、隐藏，还是加一层权限（团队讨论，Liwei 10/30 转来，等 Jamie 和团队决定）
+- **来源**：团队 10/30 的聊天，由 Serge 找不到 Coast Guard 和 Servigistics 视频引出。一方认为团队做的内容都应该能搜到，IoT 的旧内容在 Schneider 收购的背景下仍有价值；另一方说 Velotic 拥有这些 IP，曾被要求从 Consensus 删除。也有人提议作为 "historical" 内容保留，设成 Internal。
+- **现状**：产品属于已出售产品（ThingWorx、Kepware、Vuforia、Integrity 等，`taxonomy.DIVESTED_PRODUCTS`）的 demo，在 `json_repo` 的统一读取入口被去掉，对所有人都不存在，管理员也一样。10/30 直接读 SharePoint 估算：Demo Catalog 的 763 个里约 86 个被隐藏（ThingWorx 64，Integrity 9，Kepware 4，其余是 DPM 等），未和 Hub 的同步结果对过。IoT Gallery 从未迁移，所以 DPM Cellfab（6316485538112）这类视频不在 Hub 里，也不在 GXC_Migration_V1 里。
+- **要先定的事**（前一项不解决，后面的不用谈）：
+  1. **Jamie**：这些内容 PTC 还能不能保留？如果 IP 属于 Velotic，只给少数人看也不行，权限层解决不了。
+  2. **谁可以看**：只有 TDD、所有 XC，还是全部 PTC？聊天里 "Truth 是给谁的" 没有结论。
+  3. **Navigate 算不算**：聊天里说要谨慎展示，它现在按 ThingWorx 一起被隐藏。
+  4. **IoT Gallery 要不要迁移**：只加权限看不到它，要另做一次迁移，放进受限的库。
+- **建议的做法（10/30，未开发，新功能延后到发布之后）**：Jamie 答复前不做。默认只给管理员，对其他人和现在一样，所以晚做不影响任何决定。
+  - **可以保留**：加一个权限，如 "Access retired products"，默认只给管理员和指定的组，partner 永远不能有；和 GXC 一样在统一读取入口判断，列表、搜索、相关推荐、缩略图都经过这里。还要定产品筛选和导航是否显示这些产品。
+  - **不能保留**：不做权限层，隐藏规则不变；另外处理 SharePoint 里的这些 demo，以及 GXC 表里的 42 行（下面）。
+- **发布前的临时做法**：GXC Video 已经是受限的库，不用写代码。GXC_Migration_V1 有 42 行的 Tag 带已出售产品：GXC tab 37 行只有 GXC 组能看到；Usual tab 5 行（V1 第 147、148、165、172、173 行）进 Demo Video 并设为 PTC Only（Seb 10/30），要在每个 slot 上标记；partner 看得到标题，但打不开文件。这些行没有 Product，所以不会被隐藏规则去掉；之后把 Product 设成这些产品，视频就会从 Hub 上消失。
+- **可能被误伤，要确认（未在 Hub 上逐个核对）**：5 个名字是 Codebeamer 的 VDK，Product 标成 Integrity Lifecycle Manager；4 个同时带 Creo 或 Windchill 的 demo（如 "Digital Engineering Overview VDK v.1"），只要有一个产品是已出售的，整个 demo 就被隐藏。前者可能只需改 SharePoint 的 Product；后者要定规则。
+- **工作量**：Jamie 和受众定下来后，权限层约 1–2 天；IoT Gallery 迁移另算，要先看表。
+- **依赖**：Jamie；团队的决定；发布之后。
+- **11/02 会议的结论**：IoT 和 AR 的视频由 Christine 给表，和 GXC 一样迁进 GXC Video，按 B10 的规则展示。Demo Catalog 里已出售产品的套件（ThingWorx 64 个等）暂时保持对所有人隐藏，以后再考虑移进 GXC 或更新（Liwei 11/02）。上面的权限层和 Admin 隐藏页先不做。法务认为这些内容可以内部使用（Liwei 11/02）。
+
+### B10. GXC 内容不公开列出，PTC 凭链接可看（11/02 会议定，Liwei 转来；未开发）
+- **来源**：11/02 会议对 B9 的结论。新迁入的 IoT、AR 视频和原有的 113 个 GXC 视频都按这个规则。
+- **规则**：
+  - **GXC 组**：只能用关键字搜索，或按年份浏览（Published 的年份）找到。不在左边导航、下拉筛选和首页，不计入任何计数；用了年份以外的筛选（Segment、Video Type 等）就不出现；没有 IoT、AR 筛选。
+  - **其他 PTC 账号**：搜不到，列表里也没有；拿到链接能打开和预览。下载和 GXC 组一样，由 Admin 的 "Allow GXC downloads" 决定。SharePoint 里打不开（GXC Video 只给 GXC 的 SharePoint 组），所以不显示 Open in SharePoint。Hub activity 不显示他们看过的 GXC 内容，和现在一样。
+  - **Partner**：永远不能。
+- **现状**：没有 "Access GXC videos" 的人打开链接是 404，GXC 组的人在列表、导航和筛选里都能看到。现在的规则比新规则严，所以先 swap 再改不会泄露任何内容。权限的说明文字（"Without it they do not exist on the Hub"）也要改。
+- **随机 id（单独一项，可以分开做）**：现在的 id 是 `gxc-` 加标题，比如 `gxc-lamborghini-tech-overview`，知道标题就能拼出链接。改成由 SharePoint 文件夹 id 生成、猜不出来的 id，不用另存对照表；Hub activity 里的 GXC 事件也就不再带标题。要在链接对 PTC 开放之前或同时上线。GXC 现在只在 staging，现在改不影响任何人的链接；swap 之后再改，就要处理旧链接。
+- **Lamborghini 特例（Liwei 11/02）**：只给 GXC 组，凭链接也不能打开，也就是保持现在的 404。做法待定：单独标记为"仅限 GXC 组"、归档，或单独建索引。先列出哪些算 Lamborghini 并确认：GXC Video 里的 Lamborghini 视频；Demo Video 里待归档的 `video-lamborghini-tech-overview`；Demo Catalog 的 Lamborghini IPL（现在对 partner 关闭，不在 GXC 里）。
+- **每人一个链接（Liwei 11/02 定，只用于 GXC）**：每个人打开 GXC 详情页时，拿到自己的标识，比如 `.../demo/gxc-7f3k9q?s=Xb82Lm4QzT`。标识是随机的，不含名字或邮箱，对应关系存在服务器上（每个 slot 一份，Staging 和 Production 的链接互不通用）；同一人、同一 demo 的标识不变，伪造或改动后失效。
+  - 打开页面后，地址栏换成看的人自己的标识；Share Internally 和 GXC 组搜索结果里的卡片链接也带上这个标识。
+  - B 用 A 的链接打开时，记下"B 何时通过 A 的链接打开了哪个 demo"，B 的地址栏随后换成 B 自己的标识。B 可以再转发，C 打开时记成"通过 B 的链接"，整条链都能查到。
+  - 非 GXC 组的人必须带有效标识才能打开，没有标识或标识无效都打不开。GXC 组的人不受限制。
+  - 不做过期。管理员可以作废某个人发出的所有链接。
+  - Admin 里按 demo 或按人查看谁的链接被谁打开过，可以导出 CSV，只有管理员能看。
+  - 限制：只能追查，不能阻止截图、录屏、共享屏幕，也阻止不了下载后转发（如果下载开关打开）。真正不能外传的内容按 Lamborghini 的方式处理。
+  - **文件也要管住（11/02 复查补上）**：预览、下载、缩略图和 Download Kit 都按 id 直接请求，只在详情页检查标识的话，可以绕过页面直接拿文件。做法是：B 第一次用有效链接打开时，记一条授权（B 可以看这个 demo，经由 A）。这条授权放进 `get_repo(user)` 的统一读取入口，和现在的 GXC 判断在同一处；查不到授权，这个 demo 对 B 就不存在。
+  - **作废要连带**：作废 A 的链接时，经由 A 拿到授权的人（B），以及 B 再转出去的人（C），授权一并作废。
+  - **告诉用户链接是个人的**：GXC 详情页和 Share Internally 旁边写明 "This link is personal to you. The Hub records who opens it." 按人记录分享关系，Seb 和 Elio 已同意（Liwei 11/02）。
+  - **共用的 Admin 密码登录**（`ADMIN_USERNAME` / `ADMIN_PASSWORD`，"admin-session"）：已于 10/30 从两个 slot 去掉，现实中没人能这样登录；代码还在（D2）。为保险起见，GXC 的判断里让 "admin-session" 看不到 GXC，D2 清理时一起删。本地开发账号也有 GXC 权限，只在本地，不影响 slot。
+  - **分享记录保留多久**：和现在的使用记录一样。
+- **Lamborghini：加"仅限 GXC 组"标记（Liwei 11/02 同意）**：有这个标记的内容，非 GXC 的人带着有效链接也是 404，Share Internally 不显示。不用归档：归档内容对 Maintain content 的人可见，而这些人不一定在 GXC 组，GXC 组的人反而看不到。约几小时。Demo Catalog 的 Lamborghini IPL 算不算在内，还要定。
+- **不公开列出要覆盖的地方**：首页各栏（Recently published、Editor's picks、首页推荐）、左边导航和所有下拉筛选的计数、相关推荐（GXC 页面上的和普通页面上的）、S2 的公开 Dashboard 和内容统计、Hub activity 的 "most used"、以后的 S1 邮件订阅。年份这一项的计数例外，对 GXC 组的人包括 GXC，否则数字和结果对不上。DemoBoard 不涉及（只用于有 Consensus id 的 demo）。
+- **GXC 组的卡片上也显示 "GXC only"**：现在只有详情页显示，卡片上也显示，让他们分享前就知道是受限内容。
+- **随机 id 不用赶在 swap 之前**：保留旧 id 到新 id 的对照，GXC 组的人用旧链接会跳到新链接，其他人仍然 404；Hub 自己按 id 存的数据（元数据修改、使用记录等）一次性改过去。生成 id 的密钥是新的设置，两个 slot 各设一个，写进 SWAP-CHECKLIST。文件夹重建后 id 会变。
+- **分两步上线**：第一步，随机 id 加不公开列出，不扩大任何人的访问范围；第二步，个人链接、授权、Lamborghini 标记和 Admin 查看页，这一步才把链接开放给 PTC。
+- **swap 之后到 B10 上线之间**：GXC 组的 30 人按现在的规则，在导航和筛选里能看到 GXC 内容，包括这段时间迁进来的 IoT/AR 视频。只有 GXC 组看得到，可以接受。
+- **测试**：要一个真实的非 GXC PTC 账号（比如 Team Member 里不在 GXC 名单上的同事），和第二个 GXC 账号来测 A → B → C。
+- **IoT/AR 表**：Christine 给表后先只读检查再传。表里有 Operator Advisor 或 SCPA 的视频也照传，传完由 Liwei 归档（11/02）；GXC 里已有的 Beneteau（OA）和 Vestas（SCPA）两个视频保持不动。受众：GXC 组的 30 人能搜索和分享，其他 PTC 员工只能通过分享的链接看。tab 名带 "(GXC Gallery)" 才会进 GXC Video。`hub_products` 留空（Liwei 11/02），这样不受已出售产品的规则影响，不用改代码。但关键字搜索不读 HubProducts 和 Segment。原想填 `products`（托管元数据的 Product，只用来搜索），11/02 查过行不通：Hub 的应用读不到这个术语集（termStore 请求返回空），填了会被当成未知产品，验证不通过。所以 `products` 也留空，把 "ThingWorx"、"IoT"、"Vuforia"、"AR" 这类词写进 Gallery Section（自由文本，会被搜索）或长描述。GXC Video 的 Gallery 选项只有 PTC Gallery 和 GXC Gallery，用 GXC Gallery；Segment 有 IoT、AR 可选，可以填，但它不会被搜索，也不是筛选项。先查和 Demo Video、GXC Video 有没有重复，有就归档 Demo Video 那份。
+- **工作量**：不公开列出约 1–2 天；随机 id 约半天；每人一个链接和授权约 1.5–2 天；Lamborghini 标记几小时。合计约 3.5–4.5 天，分两步上线，排在发布之后。
+- **依赖**：Christine 的表；发布之后，或 swap 之后。
+
 ---
 
 ## C. 等别人
@@ -611,6 +661,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 | D12. 上传被网络拦截时说清原因 | **已做**：`static/js/hub/upload.js` 在浏览器报网络错误时提示可能是 Zscaler | —— | 完成 |
 | D13. 完整的内容安全策略（CSP） | 现在只有 `frame-ancestors`。页面要嵌入 SharePoint 和 Consensus，还用了内联样式，配错一项预览就全坏 | 先用 Report-Only 模式收集一段时间，确认来源后再强制 | 1 天，发布后 |
 | D14. 第三方依赖的漏洞扫描 | 10/30 手动扫过一次：按 `requirements.txt` 新装的 38 个包没有已知漏洞。但 `requirements.txt` 没有固定版本，每次部署取最新版，部署之间也没人检查 | GitHub Actions 每周跑一次 `pip-audit`（或开 Dependabot，要 Seb 开仓库设置）；发布后考虑固定版本 | 半天 |
+| D16. 刚归档的 demo 显示 "Folder not moved" | 11/02 在 staging 归档两个 Snowmobile 套件：文件夹已移进 `_Archive`（Graph 确认，SharePoint App 21:35 UTC），但 Content review 写 "Folder not moved (archived before _Archive)"。`json_repo.archived()` 的 `where` 只看 mirror，归档后自动开始的同步（`_sync_soon`）跑完之前，mirror 还是旧位置；归档时存下的 `in_sharepoint` 没用上。同步跑完后就显示 "Folder in _Archive"，只错几分钟，不急 | `where` 先看 `in_sharepoint`；详情页的 "still where it was" 同理 | 1 小时 |
 
 ---
 

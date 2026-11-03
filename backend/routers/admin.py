@@ -823,7 +823,9 @@ def content_review(min_age_days: int = Query(REVIEW_MIN_AGE_DAYS, ge=0),
     * little used -- at least `min_age_days` old, not confirmed, and nobody
       opened, previewed or downloaded it in the last `idle_days`;
     * Still current running out within REVIEW_EXPIRING_DAYS, or just ran out;
-    * archived.
+    * archived;
+    * no longer sold (2026-11-03): demo kits and videos the Hub hides for a
+      divested product, still in their library, to archive in SharePoint.
 
     Usage is only as long as the Hub has recorded it (`usage_since`): until
     that reaches `idle_days`, "little used" means "unused since recording
@@ -888,9 +890,11 @@ def content_review(min_age_days: int = Query(REVIEW_MIN_AGE_DAYS, ge=0),
     expiring.sort(key=lambda r: r["still_current_until"] or "")
     try:
         archived = repo.archived()
+        divested = repo.divested()
     except NotImplementedError:
-        archived = []
+        archived, divested = [], []
     return {"dust": dust, "idle": idle, "expiring": expiring, "archived": archived,
+            "divested": divested,
             "usage_since": usage_since, "min_age_days": min_age_days,
             "idle_days": idle_days, "dust_years": content_age.DUST_YEARS,
             "still_current_months": settings.still_current_months}

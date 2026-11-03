@@ -119,6 +119,9 @@ _MIRROR_FIELDS = (
 #: The mirrors whose demos are for "Access GXC videos" only (video_sync.GXC_VIDEO;
 #: named here because the repository must not import the Graph code).
 GXC_SOURCES = frozenset({"gxc_video"})
+#: The mirrors whose demos are SharePoint folders the Hub can archive -- the
+#: ones Admin lists when their product is no longer sold (2026-11-03).
+DIVESTED_SOURCES = ("sharepoint", "demo_video")
 
 PRIVATE_DIR = "private"
 VM_SECRETS_FILE = "vm_credentials.json"
@@ -376,6 +379,23 @@ class JsonAssetRepository(AssetRepository):
         return os.path.join(self.owned_dir, f"{name}.json")
 
     # ---------------------------------------------------------------- loading
+    def _mirror_file(self, path: str) -> list[dict]:
+        """One mirror file's records, cached by mtime (see _load_mirror)."""
+        stamp = os.path.getmtime(path)
+        cached = self._mirror_cache.get(path)
+        if cached is None or cached[0] != stamp:
+            records = _read(path, [])
+            # A mirror written before the five Video Types (2026-09-30)
+            # still says "Overview"; filters and facets read these raw
+            # records, so they are brought up to date here rather than
+            # waiting for the next sync.
+            for record in records:
+                if record.get("content_depth"):
+                    record["content_depth"] = video_type(record["content_depth"])
+            cached = (stamp, records)
+            self._mirror_cache[path] = cached
+        return cached[1]
+
     def _load_mirror(self) -> list[dict]:
         """Cached per file.
 
@@ -395,19 +415,7 @@ class JsonAssetRepository(AssetRepository):
                 if not name.endswith(".json"):
                     continue
                 path = os.path.join(self.mirror_dir, name)
-                stamp = os.path.getmtime(path)
-                cached = self._mirror_cache.get(path)
-                if cached is None or cached[0] != stamp:
-                    records = _read(path, [])
-                    # A mirror written before the five Video Types (2026-09-30)
-                    # still says "Overview"; filters and facets read these raw
-                    # records, so they are brought up to date here rather than
-                    # waiting for the next sync.
-                    for record in records:
-                        if record.get("content_depth"):
-                            record["content_depth"] = video_type(record["content_depth"])
-                    cached = (stamp, records)
-                    self._mirror_cache[path] = cached
+                records = self._mirror_file(path)
                 # The filename IS the source system, which is what lets a
                 # collision be resolved rather than merely detected.
                 source = name[:-len(".json")]
@@ -418,7 +426,7 @@ class JsonAssetRepository(AssetRepository):
                 # in fourteen places. The sync also declines to index them, so
                 # this is the guarantee rather than the mechanism: it holds even
                 # against a mirror written by an older build.
-                for record in cached[1]:
+                for record in records:
                     if not taxonomy.is_excluded(record.get("products")):
                         tagged.append((source, record))
                     elif source == "sharepoint":
@@ -749,7 +757,10 @@ class JsonAssetRepository(AssetRepository):
         from backend.services.metadata_edit import NotEditable, target_key
         state = {k: v for k, v in (self._load("archived") or {}).items()
                  if self.gxc or not k.startswith(GXC_VIDEO.id_prefix)}
-        records = {r["id"]: r for r in self._load_mirror()}
+        # No longer sold too (2026-11-03): the Hub never lists them, so they
+        # link to SharePoint rather than to a demo page.
+        divested = {r["id"]: r for r in self._divested_records()}
+        records = {**divested, **{r["id"]: r for r in self._load_mirror()}}
 
         def where(asset_id: str) -> str:
             r = records.get(asset_id) or {}
@@ -764,6 +775,9 @@ class JsonAssetRepository(AssetRepository):
         items += [{"asset_id": r["id"], "title": r.get("title"), "type": r.get("type"),
                    "by": None, "at": None, "reason": None, "where": "sharepoint"}
                   for r in records.values() if r.get("sharepoint_archived") and r["id"] not in state]
+        for i in items:
+            if i["asset_id"] in divested:
+                i.update(divested=True, web_url=divested[i["asset_id"]].get("web_url"))
         return sorted(items, key=lambda i: i.get("at") or "", reverse=True)
 
     def set_archived(self, asset_id: str, on: bool, actor: str,
@@ -771,8 +785,9 @@ class JsonAssetRepository(AssetRepository):
         """Record a demo archived, or restored. `in_sharepoint`: its folder was
         moved into _Archive (True), or it is a SharePoint demo archived before
         that existed (None on a SharePoint demo means Hub-only, 2026-10-28);
-        the move itself is the route's (services/archive.py)."""
-        asset = self.get(asset_id)
+        the move itself is the route's (services/archive.py). A demo no longer
+        sold too: the route lets only an administrator reach one."""
+        asset = self.get(asset_id) or self.get_divested(asset_id)
         if asset is None:
             raise KeyError(asset_id)
         with self._lock:
@@ -787,6 +802,55 @@ class JsonAssetRepository(AssetRepository):
                 state.pop(asset_id, None)
             self._save("archived", state)
         return {"asset_id": asset_id, "archived": on}
+
+    # ─────────────────────────────────────────── No longer sold
+    def _divested_records(self) -> list[dict]:
+        """The demo kits and videos the funnel leaves out for a divested
+        product (taxonomy.is_excluded), as the mirror holds them, so that
+        Admin can archive them in SharePoint (Liwei, 2026-11-03): until then
+        their folders stay open to whoever the library is. Never catalogue
+        rows -- nothing but the Admin page and the archive route reads these."""
+        identity = self._load("identity")
+        out = []
+        for source in DIVESTED_SOURCES:
+            path = self._mirror_path(source)
+            if not os.path.exists(path):
+                continue
+            out += [r for r in self._mirror_file(path)
+                    if taxonomy.is_excluded(r.get("products"))
+                    and r.get("type") in ("ldk", "vdk", "video") and r.get("source_item_id")
+                    and not (identity.get(r["id"], {}) or {}).get("retired_at")]
+        edits = self._load("metadata_edits")
+        if edits and out:
+            # Archived a moment ago and not synced yet: shown so now.
+            from backend.services.metadata_edit import apply_edits
+            out = apply_edits(out, edits, {
+                s: (self._load("sync_state").get(s) or {}).get("last_success_at")
+                for s in DIVESTED_SOURCES})
+        return out
+
+    def divested(self) -> list[dict]:
+        """Demos no longer sold that are still in their library (not in
+        _Archive), by title: what the Content review tab offers to archive."""
+        archive = self._load("archived") or {}
+        return sorted(({"asset_id": r["id"], "title": r.get("title"), "type": r.get("type"),
+                        "products": r.get("products") or [], "web_url": r.get("web_url"),
+                        "library": "Demo Video" if r["id"].startswith("video-") else "Demo Catalog",
+                        "hub_archived": r["id"] in archive}
+                       for r in self._divested_records() if not r.get("sharepoint_archived")),
+                      key=lambda i: (i["title"] or "").lower())
+
+    def get_divested(self, asset_id: str) -> Asset | None:
+        """One demo no longer sold, as `get` would give it were it listed --
+        for archiving and restoring it. None for anything else."""
+        record = next((r for r in self._divested_records() if r["id"] == asset_id), None)
+        if record is None:
+            return None
+        archive = self._load("archived") or {}
+        if asset_id in archive or record.get("sharepoint_archived"):
+            record = {**record, "archived": True,
+                      "archived_at": (archive.get(asset_id) or {}).get("at")}
+        return self._asset(record)
 
     # ─────────────────────────────────────────── Still current
     def listed_records(self) -> dict[str, dict]:
@@ -1046,9 +1110,10 @@ class JsonAssetRepository(AssetRepository):
 
     def get(self, asset_id: str) -> Asset | None:
         record = next((r for r in self._load_mirror() if r["id"] == asset_id), None)
-        if record is None:
-            return None
+        return None if record is None else self._asset(record)
 
+    def _asset(self, record: dict) -> Asset:
+        asset_id = record["id"]
         own = self._load("curation").get(asset_id) or {}
         roadmap = self._load("roadmap").get(asset_id)
 

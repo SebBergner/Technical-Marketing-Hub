@@ -627,16 +627,23 @@ class ArchiveIn(BaseModel):
 
 @router.put("/{asset_id}/archive")
 def set_archived(asset_id: str, body: ArchiveIn, repo: AssetRepository = Depends(get_repo),
+                 user: CurrentUser = Depends(get_current_user),
                  actor: str = Depends(require_perm(Perm.MAINTAIN))):
     """Archive a demo or restore it ("Archive content", 2026-10-28).
 
     A demo kit or video in SharePoint: its folder moves into the library's
     _Archive folder, or back (services/archive.py) -- refused when part of it
     has permissions of its own. Anything else (Consensus, a page-only demo):
-    in the Hub only, as before. Nothing is deleted anywhere."""
+    in the Hub only, as before. Nothing is deleted anywhere.
+
+    A demo no longer sold (2026-11-03) is listed nowhere but Admin's Content
+    review, so only someone who may open Admin reaches it here; to anyone
+    else it does not exist, as everywhere else in the Hub."""
     from backend.services import archive as ar
     from backend.services import metadata_edit as me
     asset = repo.get(asset_id)
+    if asset is None and user.can(Perm.VIEW_ADMIN):
+        asset = repo.get_divested(asset_id)
     if asset is None:
         raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
     try:

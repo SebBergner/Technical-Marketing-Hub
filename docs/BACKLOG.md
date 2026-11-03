@@ -14,6 +14,8 @@ SharePoint 里的数据清理（kit 日期、Demo Type、标错的 LDK/VDK、旧
 
 ## 发布前（2026-10-28 与 Elio、Seb 开会定，取代下面的周计划）
 
+> **11/03 更新（Liwei）：发布推迟。** 等 IoT/AR 相关的功能和数据都处理好再发布；"发布前不做新功能"作废。B10（GXC 不公开列出、随机 ID、个人分享链接、Lamborghini 仅限 GXC 组）改为发布前完成，建议顺序：B10 第一步 → 第二步，IoT 表到了随时插进来。交接说明见 `docs/HANDOVER-2026-11-03.md`。
+
 High 的 8 项做完、测试、上线 production 后发布，目标是下周。范围也比原来大：本团队和 PTC 其他部门。上线后通知 Elio、Seb、Serge，Serge 发公告。
 Low 的项目都放到发布之后。
 
@@ -662,6 +664,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 | D13. 完整的内容安全策略（CSP） | 现在只有 `frame-ancestors`。页面要嵌入 SharePoint 和 Consensus，还用了内联样式，配错一项预览就全坏 | 先用 Report-Only 模式收集一段时间，确认来源后再强制 | 1 天，发布后 |
 | D14. 第三方依赖的漏洞扫描 | 10/30 手动扫过一次：按 `requirements.txt` 新装的 38 个包没有已知漏洞。但 `requirements.txt` 没有固定版本，每次部署取最新版，部署之间也没人检查 | GitHub Actions 每周跑一次 `pip-audit`（或开 Dependabot，要 Seb 开仓库设置）；发布后考虑固定版本 | 半天 |
 | D16. 刚归档的 demo 显示 "Folder not moved" | **11/03 已修，本地完成，未上 staging**。11/02（两个 Snowmobile 套件，相隔 24 秒）和 11/03（SCPa Medical Device，15:52:21）是同一个原因：归档后 Hub 先记一条临时标记（`sharepoint_archived`），等同步读到文件夹进了 `_Archive` 再丢掉。旧代码拿标记的时间和同步**完成**时间比；一次在归档前就开始读 SharePoint、归档后才完成的同步（几个 gunicorn worker 可能同时在同步），会让标记被当成"已同步"丢掉，而它的 mirror 里文件夹还在原处，于是显示 hub_only，直到下一次定时同步 | 同步在开始读 SharePoint 时记下时间（`sync_state` 的 `last_read_at`，Demo Catalog、Demo Video、GXC Video），临时标记改为和这个时间比。Details 卡片的其他编辑也一样受益。旧数据没有 `last_read_at` 时照旧用完成时间 | 完成 |
+| D17. 手动 Sync 报 HTTP 499 | 11/03 在 staging 连续两次：点 Sync 后浏览器要等同步跑完才有回复，现在要读三个库和 Brightcove 海报，超过 Azure 前端的等待时间就断开（499）。服务器上的同步照常跑完并记为成功（17:33 UTC 查过），只是页面显示失败，容易让人重复点 | Sync 按钮立刻返回，同步交给现有的后台队列（`graph.sync_soon`，归档已在用），页面轮询 Last attempt 直到完成 | 半天，发布后 |
 
 ---
 

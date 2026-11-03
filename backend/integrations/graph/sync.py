@@ -24,6 +24,7 @@ from backend.integrations.graph.client import (
 )
 from backend.models import Asset
 from backend.services import sharepoint_mapping as m
+from backend.tables import utcnow
 
 log = logging.getLogger(__name__)
 
@@ -373,6 +374,8 @@ def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
             f"no drive named {drive_name or settings.graph_list_name!r} on {site.web_url}")
 
     full = delta_token is None
+    # What the mirror will be as of (D16): an edit made after this is not in it.
+    read_at = utcnow().isoformat(timespec="seconds")
     if delta_token:
         try:
             page = client.delta(drive.drive_id, delta_token)
@@ -380,6 +383,8 @@ def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
                 log.info("graph sync: no changes since the last run")
                 if stamp := getattr(repo, "record_sync", None):
                     stamp(SOURCE_SYSTEM)      # we did check; the check is news
+                if stamp_read := getattr(repo, "record_read", None):
+                    stamp_read(SOURCE_SYSTEM, read_at)
                 # `indexed` promises a TOTAL, so read it from the index rather
                 # than reporting the zero work this run did. Otherwise an
                 # unchanged run claims the catalogue is empty, which is the
@@ -420,6 +425,8 @@ def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
     result.retired_seed = _retire_seed(repo)
     if stamp := getattr(repo, "record_sync", None):
         stamp(SOURCE_SYSTEM)
+    if stamp_read := getattr(repo, "record_read", None):
+        stamp_read(SOURCE_SYSTEM, read_at)
     return result
 
 

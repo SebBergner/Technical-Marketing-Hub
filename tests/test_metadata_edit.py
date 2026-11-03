@@ -165,6 +165,29 @@ def test_edits_lie_over_the_mirror_only_until_a_later_sync():
     assert [r["description"] for r in out] == ["new", "v"]
 
 
+def test_an_edit_made_while_a_sync_ran_outlasts_that_sync(tmp_path):
+    """D16 (2026-11-03): archived at 15:52:21 while a sync that had read
+    SharePoint at 15:52:01 was still running; it finished at 15:53:02 with the
+    folder where it was. The edit is newer than what that sync read, so it
+    stays until a sync that read after it."""
+    from backend.repositories.json_repo import JsonAssetRepository
+    (tmp_path / "mirror").mkdir()
+    (tmp_path / "mirror" / "sharepoint.json").write_text(json.dumps([
+        {"id": "kit", "type": "ldk", "title": "Kit", "source": "sharepoint",
+         "source_item_id": "f1", "products": ["Creo"]}]), encoding="utf-8")
+    repo = JsonAssetRepository(str(tmp_path))
+    repo._save("metadata_edits", {"kit": {"at": "2026-11-03T15:52:21",
+                                          "values": {"sharepoint_archived": True}}})
+    repo._save("sync_state", {"sharepoint": {"last_success_at": "2026-11-03T15:53:02",
+                                             "last_read_at": "2026-11-03T15:52:01"}})
+    assert repo.get("kit").sharepoint_archived
+    repo.record_read("sharepoint", "2026-11-03T15:53:30")
+    assert not repo.get("kit").sharepoint_archived       # that sync read the mirror's state
+    # A mirror from before last_read_at was recorded: the finish time, as before.
+    repo._save("sync_state", {"sharepoint": {"last_success_at": "2026-11-03T15:50:00"}})
+    assert repo.get("kit").sharepoint_archived
+
+
 def test_editing_a_video_applies_the_subtype_rules():
     """A15: a customer video names its customer when its type, subtype or
     customer is edited -- not on any edit (Liwei, 2026-10-29); a Release

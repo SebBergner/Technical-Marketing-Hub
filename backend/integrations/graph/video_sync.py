@@ -46,6 +46,7 @@ from backend.integrations.graph.sync import _latest_per_item, _relative_path, _w
 from backend.integrations.sync_report import report
 from backend.models import Asset, video_type
 from backend.services import sharepoint_mapping as m
+from backend.tables import utcnow
 
 log = logging.getLogger(__name__)
 
@@ -290,6 +291,7 @@ def sync_videos(client: GraphClient, repo, site: SiteRef | None = None,
     if drive is None:
         raise ValueError(f"no library named {library!r} on {site.web_url}")
 
+    read_at = utcnow().isoformat(timespec="seconds")      # D16, as in sync.py
     page = client.delta(drive.drive_id)
     # Ticked PreviewVideo files lead, as in the Demo Catalog (sync.py).
     from backend.integrations.graph.sync import mark_flags
@@ -307,6 +309,8 @@ def sync_videos(client: GraphClient, repo, site: SiteRef | None = None,
                              allow_shrink=previous < SHRINK_GUARD_FROM)
     if stamp := getattr(repo, "record_sync", None):
         stamp(which.source)
+    if stamp_read := getattr(repo, "record_read", None):
+        stamp_read(which.source, read_at)
     log.info("%s sync: %d video(s) from %r, %s poster(s)",
              which.source, result.assets, library, result.posters)
     return result

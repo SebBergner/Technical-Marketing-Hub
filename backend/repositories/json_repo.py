@@ -483,8 +483,7 @@ class JsonAssetRepository(AssetRepository):
         if edits:
             from backend.services.metadata_edit import apply_edits
             rows = apply_edits(rows, edits, {
-                s: (self._load("sync_state").get(s) or {}).get("last_success_at")
-                for s in ("sharepoint", "demo_video", *GXC_SOURCES)})
+                s: self._synced_at(s) for s in ("sharepoint", "demo_video", *GXC_SOURCES)})
         # Hidden from the Hub on the Admin page (owned/hidden.json): out of
         # every read here, at the funnel, like a retired item.
         hidden = self._load("hidden") or {}
@@ -824,9 +823,7 @@ class JsonAssetRepository(AssetRepository):
         if edits and out:
             # Archived a moment ago and not synced yet: shown so now.
             from backend.services.metadata_edit import apply_edits
-            out = apply_edits(out, edits, {
-                s: (self._load("sync_state").get(s) or {}).get("last_success_at")
-                for s in DIVESTED_SOURCES})
+            out = apply_edits(out, edits, {s: self._synced_at(s) for s in DIVESTED_SOURCES})
         return out
 
     def divested(self) -> list[dict]:
@@ -1575,6 +1572,25 @@ class JsonAssetRepository(AssetRepository):
             if api is not None:
                 row["api"] = api
             self._save("sync_state", state)
+
+    def record_read(self, source_system: str, read_at: str) -> None:
+        """When the sync that just wrote this source's mirror began reading
+        SharePoint (D16, 2026-11-03). An edit made after that is not in the
+        mirror, however late the sync finished: `_synced_at` compares with
+        this, not with last_success_at. Stamped after the mirror is written,
+        so it always belongs to the mirror on disk -- with two workers syncing
+        at once, the last writer's read time, even when it read first."""
+        with self._lock:
+            state = self._load("sync_state")
+            state.setdefault(source_system, {})["last_read_at"] = read_at
+            self._save("sync_state", state)
+
+    def _synced_at(self, source_system: str) -> str | None:
+        """What the mirror of this source is as of: when its sync read
+        SharePoint, or, for a mirror from before that was recorded, when the
+        sync finished."""
+        row = self._load("sync_state").get(source_system) or {}
+        return row.get("last_read_at") or row.get("last_success_at")
 
     def record_sync_attempt(self, source_system: str, ok: bool,
                             summary: dict | None = None,

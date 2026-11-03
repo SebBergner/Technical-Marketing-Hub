@@ -569,6 +569,8 @@ def test_an_unchanged_delta_says_so_rather_than_reporting_zeros():
         def replace_source_rows(self, assets, source_system):
             raise AssertionError("an unchanged delta must not rewrite the mirror")
         def record_sync(self, source): self.stamped.append(source)
+        def record_read(self, source, at): self.read.append((source, at))
+        read = []
 
     def handler(request):
         path = request.url.path
@@ -591,6 +593,8 @@ def test_an_unchanged_delta_says_so_rather_than_reporting_zeros():
     assert result.delta_token == "fresh", "the cursor still moves forward"
     assert repo.stamped == ["sharepoint"], \
         "we did check upstream, so freshness must advance even with no changes"
+    # ... and as of when it read (D16): what an edit is compared with.
+    assert [src for src, _ in repo.read] == ["sharepoint"] and repo.read[0][1][:2] == "20"
 
 
 def test_a_real_sync_is_not_marked_unchanged():

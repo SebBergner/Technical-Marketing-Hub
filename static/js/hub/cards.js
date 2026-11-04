@@ -110,9 +110,11 @@ function assetHref(a) {
  * only its id, whose "gxc-" says it. */
 function gxcPill(a) {
   if (!a || !(a.gxc || /^gxc-/.test(a.asset_id || ""))) return null;
-  var tag = pill("GXC only", "internal");
-  tag.title = "A GXC video: only people with Access GXC videos can see it on the Hub. "
-    + "Share it only with them.";
+  var tag = pill(a.gxc_group_only ? "GXC group only" : "GXC only", "internal");
+  tag.title = a.gxc_group_only
+    ? "For the GXC group alone: it cannot be shared, even through a personal link."
+    : "A GXC video: only people with Access GXC videos can see it on the Hub. "
+      + "Share it only with them.";
   return tag;
 }
 

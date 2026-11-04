@@ -374,10 +374,84 @@ function renderGxcLinks(data, q, params) {
     host.appendChild(el("h3", null, "Revoked"));
     host.appendChild(gxcTable(["When", "Links of", "Video", "By", "Access ended"],
       data.revocations, function (r) {
-        return [when(r.at), r.sender, r.asset_id ? r.title : "every video", actorWord(r.by),
-                r.grants_revoked];
+        return [when(r.at), r.sender || r.why || "", r.asset_id ? r.title : "every video",
+                actorWord(r.by), r.grants_revoked];
       }));
   }
+  var only = el("div");
+  only.id = "gxcGroupOnly";
+  host.appendChild(only);
+  loadGroupOnly();
+}
+
+/* ── GXC group only (Liwei 2026-11-02; Elio 2026-11-04) ──────────────────
+ * A GXC video for the GXC group alone: no personal links, no Share
+ * Internally, and the links already sent stop. The three Lamborghini
+ * videos in GXC Video; anything else marked here too. */
+function loadGroupOnly() {
+  return fetch("/api/admin/gxc-group-only")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { if (d) renderGroupOnly(d); });
+}
+
+function setGroupOnly(assetId, title, on) {
+  if (on && !window.confirm("Make “" + title + "” GXC group only?\n\n"
+      + "Only the GXC group can open it. Personal links to it stop working, and anyone "
+      + "outside the group who opened it through one can no longer open it.")) return;
+  fetch("/api/admin/gxc-group-only/" + encodeURIComponent(assetId), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ on: on }),
+  }).then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }).then(function () { loadGxcLinks(); })
+    .catch(function (err) { window.alert("Not saved: " + err.message); });
+}
+
+function renderGroupOnly(d) {
+  var host = $("gxcGroupOnly");
+  if (!host) return;
+  host.innerHTML = "";
+  var canChange = canSwitchGxc();
+  host.appendChild(el("h3", null, "GXC group only (" + d.marked.length + ")"));
+  host.appendChild(el("p", "muted", "For the GXC group alone: no personal links and no "
+    + "Share Internally, so nobody outside the group can open it, whatever link they have."));
+  if (d.marked.length) {
+    host.appendChild(gxcTable(["Video", "Since", "By", ""], d.marked, function (m) {
+      var off = "";
+      if (canChange) {
+        off = el("button", "btn-small", "Remove");
+        off.title = "Personal links can be shared again; earlier access does not come back.";
+        off.addEventListener("click", function () { setGroupOnly(m.asset_id, m.title, false); });
+      }
+      return [m.title, when(m.at), actorWord(m.by), off];
+    }));
+  }
+  if (!canChange) {
+    host.appendChild(el("p", "faint", "Changing this needs Manage users & groups."));
+    return;
+  }
+  var bar = el("div");
+  bar.style.margin = "8px 0 0";
+  var pick = el("select");
+  pick.setAttribute("aria-label", "A GXC video to make GXC group only");
+  pick.appendChild(el("option", null, "Choose a GXC video…"));
+  pick.firstChild.value = "";
+  d.videos.forEach(function (v) {
+    var o = el("option", null, v.title);
+    o.value = v.asset_id;
+    pick.appendChild(o);
+  });
+  bar.appendChild(pick);
+  var add = el("button", "btn-small", "Make GXC group only");
+  add.style.marginLeft = "8px";
+  add.addEventListener("click", function () {
+    if (!pick.value) return;
+    setGroupOnly(pick.value, pick.options[pick.selectedIndex].text, true);
+  });
+  bar.appendChild(add);
+  host.appendChild(bar);
 }
 
 function renderContentAccess(items) {

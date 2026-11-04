@@ -146,3 +146,33 @@ def test_hub_activity_leaves_out_views_through_a_link(client, repo):
     assert [e["user"] for e in kept if e.get("asset_id") == VIDEO] == [MEMBER]
     seen = client.get("/api/reports/activity", headers=easyauth_headers(ADMIN)).json()
     assert [c["views"] for c in seen["content"] if c["asset_id"] == VIDEO] == [1]
+
+
+# ───────────────────────────────── GXC group only (Liwei 11/02, Elio 11/04)
+def test_gxc_group_only_opens_for_the_group_alone(client):
+    a = own_token(client, MEMBER)
+    page(client, STAFF, a)                                   # granted before the mark
+    put = lambda who, on: client.put(f"/api/admin/gxc-group-only/{VIDEO}",  # noqa: E731
+                                     json={"on": on}, headers=easyauth_headers(who))
+    assert put(STAFF, True).status_code in (401, 403)
+    r = put(ADMIN, True)
+    assert r.status_code == 200 and r.json()["grants_ended"] == 1
+    assert page(client, STAFF).status_code == 404, "the earlier grant ended"
+    assert page(client, OTHER, a).status_code == 404, "a link sent before does nothing"
+    body = page(client, MEMBER).json()
+    assert body["gxc_group_only"] and body["share_token"] is None, "no link to share"
+    card = next(c for c in client.get("/api/assets", headers=easyauth_headers(MEMBER)).json()[
+        "items"] if c["id"] == VIDEO)
+    assert card["gxc_group_only"] and card["share_token"] is None
+    assert gxc_shares.opens()[-1]["who"] == STAFF, "the blocked opens are not recorded"
+    listing = client.get("/api/admin/gxc-group-only", headers=easyauth_headers(ADMIN)).json()
+    assert [m["asset_id"] for m in listing["marked"]] == [VIDEO]
+    assert put(ADMIN, False).status_code == 200
+    assert page(client, STAFF).status_code == 404, "unmarking brings no access back"
+    assert page(client, MEMBER).json()["share_token"], "links can be shared again"
+
+
+def test_only_a_gxc_video_can_be_marked(client):
+    r = client.put("/api/admin/gxc-group-only/bobcat", json={"on": True},
+                   headers=easyauth_headers(ADMIN))
+    assert r.status_code == 404

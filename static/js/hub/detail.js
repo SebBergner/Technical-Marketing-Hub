@@ -383,6 +383,9 @@ async function openAssetDetail(id, fileItemId, linkToken) {
     });
     actions.appendChild(copy);
   }
+  // GXC group only (B10): no link to pass on, so no Share Internally.
+  var copyBtn = document.getElementById("vpCopyLink");
+  if (copyBtn) copyBtn.style.display = asset.gxc_group_only ? "none" : "";
   renderGxcNotice(actions, asset);
 
   // Feedback on this demo (A2, 2026-10-28): to its segment's owners.
@@ -950,6 +953,8 @@ function renderFilePreview() {
 
 function openFilePreview(asset, files, index) {
   filePreviewState = { asset: asset, files: files, index: index };
+  var previewShare = document.getElementById("hubFilePreviewShare");
+  if (previewShare) previewShare.style.display = asset.gxc_group_only ? "none" : "";
   ensureFilePreviewModal();
   renderFilePreview();
   document.getElementById("hubFilePreviewBackdrop").classList.add("open");
@@ -1307,6 +1312,8 @@ function buildFileRow(asset, f, nameEl, noActions) {
       row.appendChild(download);
     }
 
+    // A GXC group only video's files have no link to share (B10).
+    if (asset.gxc_group_only) return row;
     var share = document.createElement("button");
     share.type = "button";
     share.className = "vp-file__share";
@@ -1706,8 +1713,11 @@ function renderAccessMark(meta, asset) {
   meta.querySelectorAll(".hub-pill--internal").forEach(function (n) { n.remove(); });
   if (!asset.internal) return;
   // A GXC video (2026-10-29) says so instead: only a few people see it.
-  var tag = pill(asset.gxc ? "GXC only" : "PTC Only", "internal");
-  tag.title = asset.gxc
+  var tag = pill(asset.gxc_group_only ? "GXC group only" : asset.gxc ? "GXC only" : "PTC Only",
+                 "internal");
+  tag.title = asset.gxc_group_only
+    ? "For the GXC group alone: it cannot be shared, even through a personal link."
+    : asset.gxc
     ? "A GXC video: only people with Access GXC videos can see it on the Hub. "
       + "Share it only with them."
     : (asset.internal_source === "sharepoint"

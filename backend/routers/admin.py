@@ -429,6 +429,35 @@ def gxc_links_csv(asset_id: str | None = None, person: str | None = None,
                               f'attachment; filename="hub-gxc-links-{stamp}.csv"'})
 
 
+class GxcGroupOnlyIn(BaseModel):
+    on: bool
+
+
+@router.get("/gxc-group-only", dependencies=[VIEW_ADMIN, VIEW_GXC])
+def gxc_group_only(repo: AssetRepository = Depends(get_repo)):
+    """The GXC videos for the GXC group alone, and every GXC video to pick
+    from (Liwei 2026-11-02; Elio 2026-11-04: the three Lamborghini ones)."""
+    from backend import gxc_shares
+    titles = _gxc_titles(repo)
+    marked = gxc_shares.group_only()
+    return {"marked": sorted(({"asset_id": k, "title": titles.get(k, k), **v}
+                              for k, v in marked.items()), key=lambda r: r["title"].lower()),
+            "videos": sorted(({"asset_id": k, "title": t} for k, t in titles.items()
+                              if k not in marked), key=lambda r: r["title"].lower())}
+
+
+@router.put("/gxc-group-only/{asset_id}", dependencies=[VIEW_GXC])
+def set_gxc_group_only(asset_id: str, body: GxcGroupOnlyIn,
+                       repo: AssetRepository = Depends(get_repo),
+                       actor: str = Depends(require_perm(Perm.MANAGE_USERS))):
+    """Mark or unmark one GXC video GXC group only. Marking ends the grants
+    its personal links made (gxc_shares.set_group_only)."""
+    from backend import gxc_shares
+    if asset_id not in _gxc_titles(repo):
+        raise HTTPException(status_code=404, detail="Not a GXC video.")
+    return gxc_shares.set_group_only(asset_id, body.on, actor)
+
+
 @router.post("/gxc-links/revoke", dependencies=[VIEW_GXC])
 def revoke_gxc_links(body: GxcRevokeIn, actor: str = Depends(require_perm(Perm.MANAGE_USERS))):
     """Stop the links a person sent -- for one video or all -- and every

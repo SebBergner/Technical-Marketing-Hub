@@ -91,10 +91,13 @@ def _with_share_tokens(page: Page[AssetSummary], user: CurrentUser) -> Page[Asse
     """A GXC video's card links with the viewer's own token (B10), so a link
     copied from a card is as personal as one from the page."""
     from backend import gxc_shares
-    if not gxc_shares.may_share(user) or not any(a.gxc for a in page.items):
+    if not any(a.gxc for a in page.items):
         return page
-    page.items = [a.model_copy(update={"share_token": gxc_shares.token_for(user.email, a.id)})
-                  if a.gxc else a for a in page.items]
+    closed = gxc_shares.group_only()
+    share = gxc_shares.may_share(user)
+    page.items = [a.model_copy(update={"gxc_group_only": True}) if a.gxc and a.id in closed
+                  else a.model_copy(update={"share_token": gxc_shares.token_for(user.email, a.id)})
+                  if a.gxc and share else a for a in page.items]
     return page
 
 
@@ -166,10 +169,14 @@ def advanced_search(
     page.items = [h.model_copy(update={"files": _without_file_ids(h.files)})
                   if _locked_for(user, h.asset) else h for h in page.items]
     from backend import gxc_shares
+    closed = gxc_shares.group_only()
     if gxc_shares.may_share(user):
         page.items = [h.model_copy(update={"asset": h.asset.model_copy(update={
                           "share_token": gxc_shares.token_for(user.email, h.asset.id)})})
-                      if h.asset.gxc else h for h in page.items]
+                      if h.asset.gxc and h.asset.id not in closed else h for h in page.items]
+    page.items = [h.model_copy(update={"asset": h.asset.model_copy(update={
+                      "gxc_group_only": True})}) if h.asset.id in closed else h
+                  for h in page.items]
     return page
 
 
@@ -259,7 +266,10 @@ def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo),
         asset = asset.model_copy(update={"downloads_off": True})
     if asset.gxc:
         from backend import gxc_shares
-        if gxc_shares.may_share(user):
+        if gxc_shares.is_group_only(asset.id):
+            # GXC group only: no personal link and no Share Internally.
+            asset = asset.model_copy(update={"gxc_group_only": True})
+        elif gxc_shares.may_share(user):
             # The viewer's own link, for the address bar and Share Internally.
             asset = asset.model_copy(update={
                 "share_token": gxc_shares.token_for(user.email, asset.id)})

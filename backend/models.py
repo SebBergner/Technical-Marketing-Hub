@@ -418,6 +418,9 @@ class AssetBase(BaseModel):
     #: A GXC video (B10): the viewer's own personal link token, set on the
     #: response -- for the address bar, Share Internally and card links.
     share_token: str | None = None
+    #: A GXC video for the GXC group alone (backend/gxc_shares.py): no
+    #: personal link, no Share Internally. Set on the response.
+    gxc_group_only: bool = False
     #: How old, in the bands people see (services/content_age.py): new,
     #: recent, aging, older -- None without a date.
     age_band: str | None = None

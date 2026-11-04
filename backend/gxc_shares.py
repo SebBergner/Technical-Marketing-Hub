@@ -27,6 +27,12 @@ Decisions this carries (Liwei, 2026-11-03, "都按建议"):
   so the whole chain can be read (owned/gxc_opens.jsonl). Kept like the
   usage history: no expiry.
 
+**GXC group only** (Liwei 2026-11-02; Elio 2026-11-04 agreed the scope:
+the three Lamborghini videos in GXC Video, nothing outside it): a GXC video
+so marked on Admin opens for the GXC group alone. No personal link, no
+Share Internally; a link sent before does nothing, and marking it ends the
+grants already made (recorded as a revocation). owned/gxc_group_only.json.
+
 The grant is enforced where GXC already is: `deps.get_repo` hands the
 repository the videos granted to the caller, and json_repo keeps them out
 of every list -- page, files, thumbnail and downloads open; nothing lists.
@@ -51,6 +57,7 @@ PEOPLE_FILE = "gxc_share_people.json"
 STATE_FILE = "gxc_share_state.json"
 GRANTS_FILE = "gxc_grants.json"
 OPENS_FILE = "gxc_opens.jsonl"
+GROUP_ONLY_FILE = "gxc_group_only.json"
 
 CODE_LENGTH = 6
 MAC_LENGTH = 16
@@ -147,6 +154,8 @@ def sender_of(token: str | None, asset_id: str) -> str | None:
     token = (token or "").strip().lower()
     if len(token) != TOKEN_LENGTH or not set(token) <= _ALPHABET:
         return None
+    if is_group_only(asset_id):
+        return None
     code, mac = token[:CODE_LENGTH], token[CODE_LENGTH:]
     email = _people()["codes"].get(code)
     if not email:
@@ -160,15 +169,58 @@ def sender_of(token: str | None, asset_id: str) -> str | None:
     return email
 
 
+# ─────────────────────────────────────────────────────── GXC group only
+def group_only() -> dict[str, dict]:
+    """{GXC video id: {by, at}}: for the GXC group alone, links or not."""
+    return _read(GROUP_ONLY_FILE, {}) or {}
+
+
+def is_group_only(asset_id: str) -> bool:
+    return asset_id in group_only()
+
+
+def set_group_only(asset_id: str, on: bool, actor: str) -> dict:
+    """Mark or unmark a GXC video. Marking ends every grant made for it,
+    so unmarking later opens nothing by itself."""
+    now = _now()
+    ended = 0
+    with _lock:
+        marked = group_only()
+        if on:
+            marked.setdefault(asset_id, {"by": actor, "at": now})
+            grants = _grants()
+            for mine in grants.values():
+                g = mine.get(asset_id)
+                if g and not g.get("revoked_at"):
+                    g["revoked_at"], g["revoked_by"] = now, actor
+                    ended += 1
+            if ended:
+                _write(GRANTS_FILE, grants)
+                state = _read(STATE_FILE, {}) or {}
+                state.setdefault("revocations", []).append(
+                    {"at": now, "by": actor, "sender": None, "asset_id": asset_id,
+                     "grants_revoked": ended, "why": "GXC group only"})
+                _write(STATE_FILE, state)
+        else:
+            marked.pop(asset_id, None)
+        _write(GROUP_ONLY_FILE, marked)
+    log.info("gxc group only %s: %s by %s (%d grant(s) ended)",
+             "on" if on else "off", asset_id, actor, ended)
+    return {"asset_id": asset_id, "group_only": on, "grants_ended": ended}
+
+
 # ─────────────────────────────────────────────────────────────── grants
 def _grants() -> dict:
     return _read(GRANTS_FILE, {}) or {}
 
 
 def granted_ids(email: str | None) -> frozenset[str]:
-    """The GXC videos this person may open without being in the GXC group."""
+    """The GXC videos this person may open without being in the GXC group
+    -- none that is GXC group only."""
     mine = _grants().get(_norm(email)) or {}
-    return frozenset(a for a, g in mine.items() if not g.get("revoked_at"))
+    closed = group_only()
+    return frozenset(a for a, g in mine.items()
+                     if not g.get("revoked_at") and a not in closed)
 
 
 def grant(email: str, asset_id: str, via: str) -> bool:

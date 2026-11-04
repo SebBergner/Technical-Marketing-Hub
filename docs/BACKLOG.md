@@ -633,6 +633,9 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   - 页面：地址栏、Share Internally、卡片和表格链接带看的人自己的标识；GXC 详情页按钮下面写 "This link is personal to you. The Hub records who opens it."；Admin → Content access 加了 "GXC personal links"（按人或视频查、CSV、作废）。
   - 本地只能用开发账号（有 GXC 权限）在浏览器里看；非 GXC 账号打开、链式 A → B → C、作废连带只在自动测试里验证过。上 staging 后要一个非 GXC 的 PTC 账号实测。
   - 11/03 补上：非 GXC 的人通过链接看 GXC 视频，不进 Hub activity 和 Admin 的 Hub usage（使用记录照常写入，`gxc_shares.without_link_views`）；Admin 各列表在 GXC 视频标题后显示 "GXC only"（`admin/util.js` 的 `gxcMark`）。
+- **11/04 "GXC group only" 已做，本地完成，未上 staging**。范围（Liwei 11/03 邮件，Elio 11/04 回复 "That looks good to me"）：只有 GXC Video 里的 3 个 Lamborghini 视频（Lamborghini Technical Overview、Lamborghini Engineering - Presenter Support、Lamborghini Manufacturing & Service Presenter Support）；GXC 以外的 7 个 Lamborghini 内容可见范围不变，Consensus 的两个营销视频继续对所有人开放、customer facing。
+  - 做法：Admin → Content access → GXC personal links → "GXC group only" 里逐个标记（要 Manage users & groups 和 Access GXC videos），记进 Admin log，存在 `owned/gxc_group_only.json`。标记后：不生成个人链接，没有 Share Internally 和文件的 Share，以前发出的链接打不开，已有的授权立刻作废（记为一次作废）；取消标记也不会恢复这些授权。卡片和详情页显示 "GXC group only"。
+  - **上 staging 后由 Liwei 在 staging 上标这 3 个**；swap 之后 production 也要各标一次（标记按 slot 分开）。
 - **11/03 随机 id 已做，本地完成，未上 staging**：`gxc-` 加 16 位 base32，HMAC-SHA256（`GXC_ID_KEY`）算 SharePoint 文件夹 id（`video_sync.gxc_id`）。Azure 上没设密钥，GXC 同步就失败，不生成 id；本地用固定的开发密钥。第一次同步时，`json_repo.adopt_new_ids` 把 owned 里旧 id 的数据（归档、stats、编辑、相关推荐、使用记录等）改成新 id，Admin log 和登录、权限记录不改；旧 id 在 identity 里记 `renamed_to`，GXC 组的人打开旧链接会看到新 id，其他人 404。**上 staging 之前要先在 staging 设 `GXC_ID_KEY`（slot setting）**，否则 staging 的 GXC 同步会失败。SWAP-CHECKLIST 已写。
 
 ---

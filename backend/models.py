@@ -451,6 +451,9 @@ class AssetBase(BaseModel):
     #: on the Details card; empty on demos that came in bulk. Credited as the
     #: creator ahead of everything else.
     demo_owner: str | None = None
+    #: The owner's name as it should show: the DemoOwnerName column
+    #: (2026-11-05). `creator` already carries it; kept for the editor.
+    demo_owner_name: str | None = None
     #: The Product Version column (A11, 2026-10-26), as typed; "N/A" when the
     #: uploader said it does not apply, which the page does not show.
     product_version: str | None = None

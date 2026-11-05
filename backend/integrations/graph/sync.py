@@ -48,6 +48,7 @@ COLUMNS = {
     "submitted_by": ("submitted_by",),
     # Who to ask (A4, 2026-10-26): text, an email address.
     "demo_owner": ("DemoOwner",),
+    "demo_owner_name": ("DemoOwnerName",),
     "segment": ("Segment",),
     "language": ("Language", "Language0"),
     "product": ("Product", "Product0"),
@@ -279,6 +280,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
                 source_item_id=item.get("id"),
                 submitted_by=(m.clean_text(_field(fields, "submitted_by")) or "").lower() or None,
                 demo_owner=(m.clean_text(_field(fields, "demo_owner")) or "").lower() or None,
+                demo_owner_name=m.clean_text(_field(fields, "demo_owner_name")),
                 product_version=m.clean_text(_field(fields, "product_version")),
             )
             stated[name] = (m.as_bool(_field(fields, "customer_facing")),

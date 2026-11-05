@@ -60,6 +60,7 @@ def fake(monkeypatch):
         return uw.Target(spec=ut.TARGETS[key], site_id="s", drive_id="d", list_id="l",
                          demo_content_type_id="0x0120", product_note_field="Product_0",
                          choices=CHOICES, terms=None, has_demo_owner=True,
+                         has_demo_owner_name=True,
                          has_thumbnail_flag=True)
     monkeypatch.setattr(up, "_target", target)
     client.syncs = []
@@ -255,3 +256,39 @@ def test_no_is_a_change_from_yes_and_from_empty(client, fake):
                    json={"values": {"customer_facing": False, "contains_audio": False}})
     assert r.json()["changed"] == ["customer_facing"], "audio was already No"
     assert fake.writes[-1][1] == {"Customer_x0020_Facing": False}
+
+
+def test_the_owner_s_name_is_said_and_shows_at_once(client, fake, tmp_path):
+    """Liwei, 2026-11-05: Jorge's address on a folder Liwei made showed
+    Liwei's name until the next sync. The name is a column of its own, and
+    the folder's creator never stands in for an owner."""
+    rows = json.loads((tmp_path / "mirror" / "sharepoint.json").read_text(encoding="utf-8"))
+    rows[0]["creator"] = "Chen, Liwei"
+    (tmp_path / "mirror" / "sharepoint.json").write_text(json.dumps(rows), encoding="utf-8")
+    keys = [f["key"] for f in client.get("/api/assets/kit/metadata", headers=EDITOR).json()["fields"]]
+    assert keys.index("demo_owner_name") == keys.index("demo_owner") - 1
+
+    r = client.put("/api/assets/kit/metadata", headers=EDITOR, json={"etag": '"1"', "values": {
+        "demo_owner": "jsuarez@ptc.com"}})
+    assert r.status_code == 200, r.text
+    shown = client.get("/api/assets/kit", headers=ANN).json()
+    assert (shown["creator"], shown["demo_owner"]) == ("jsuarez@ptc.com", "jsuarez@ptc.com"), \
+        "never signed in: the address, not the folder's creator"
+
+    r = client.put("/api/assets/kit/metadata", headers=EDITOR, json={"etag": '"1"', "values": {
+        "demo_owner_name": "Suarez, Jorge"}})
+    assert r.status_code == 200, r.text
+    assert fake.writes[-1][1] == {ut.OWNER_NAME_COLUMN: "Suarez, Jorge"}
+    shown = client.get("/api/assets/kit", headers=ANN).json()
+    assert shown["creator"] == "Suarez, Jorge" and shown["demo_owner_name"] == "Suarez, Jorge"
+
+
+def test_credit_order():
+    from backend.repositories.json_repo import _credit
+    named = {"jsuarez@ptc.com": "Suarez, Jorge"}
+    base = {"creator": "Chen, Liwei", "source_item_id": "f"}
+    assert _credit({**base, "demo_owner": "jsuarez@ptc.com"}, named, {})["creator"] == "Suarez, Jorge"
+    assert _credit({**base, "demo_owner": "jsuarez@ptc.com", "demo_owner_name": "Jorge S."},
+                   named, {})["creator"] == "Jorge S."
+    assert _credit({**base, "demo_owner": "x@ptc.com"}, named, {})["creator"] == "x@ptc.com"
+    assert _credit(dict(base), named, {})["creator"] == "Chen, Liwei"

@@ -151,6 +151,7 @@ COLUMNS = {
     # Who submitted a video made through the Hub (upload_targets.SUBMITTED_COLUMN).
     "submitted_by": ("submitted_by",),
     "demo_owner": ("DemoOwner",),
+    "demo_owner_name": ("DemoOwnerName",),
     "product_version": ("Product_x0020_Version",),
 }
 
@@ -255,6 +256,7 @@ def build_assets(items: list[dict], library: VideoLibrary = DEMO_VIDEO,
             long_description=m.clean_text(_field(fields, "long_description")),
             submitted_by=(m.clean_text(_field(fields, "submitted_by")) or "").lower() or None,
             demo_owner=(m.clean_text(_field(fields, "demo_owner")) or "").lower() or None,
+            demo_owner_name=m.clean_text(_field(fields, "demo_owner_name")),
             product_version=m.clean_text(_field(fields, "product_version")),
         )
         stated[name] = (m.as_bool(_field(fields, "customer_facing")),

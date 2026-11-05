@@ -231,7 +231,7 @@ def content_to_review(user: CurrentUser = Depends(_reviewer),
             "date_stated": a.date_stated,
             "age_band": a.age_band,
             "last_used": (last_used.get(a.id) or "")[:10] or None,
-            "owner": a.demo_owner or a.submitted_by or a.creator,
+            "owner": a.creator,           # the Demo Owner's name first (json_repo._credit)
             "mine": _is_mine(a, user, my_segments),
             "in_sharepoint": moves(a),
             "still_current_until": str(a.still_current_until) if a.still_current_until

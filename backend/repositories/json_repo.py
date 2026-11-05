@@ -97,7 +97,7 @@ _MIRROR_FIELDS = (
     "external_views",
     # Who made it (sharepoint_mapping.content_creator, 2026-10-14), and who
     # submitted it through the Hub (submitted_by column, 2026-10-21).
-    "creator", "submitted_by", "demo_owner", "product_version",
+    "creator", "submitted_by", "demo_owner", "demo_owner_name", "product_version",
     # A Demo Video's Video Subtype, for Content to review (2026-10-28).
     "video_subtype",
     # VM pages only. Public by construction: credentials are sealed out of it
@@ -380,6 +380,27 @@ def _name_of(email: str, names: dict[str, str]) -> str:
     return names.get(email.lower()) or readable(email)
 
 
+def _credit(r: dict, named: dict[str, str], made_by: dict[str, str]) -> dict:
+    """The name a demo is credited to (`creator`).
+
+    The Demo Owner first (A4): the name stated for them (DemoOwnerName,
+    2026-11-05), else the name they sign in with, else their address -- never
+    the folder's creator, who is often someone uploading for them. Then
+    SharePoint's submitted_by for a demo made through the Hub, whose files
+    name the Hub's app as creator (2026-10-21), then this slot's upload
+    record (2026-10-20); else SharePoint's own creator stays."""
+    owner = r.get("demo_owner")
+    if owner:
+        return {**r, "creator": r.get("demo_owner_name") or named.get(owner.lower()) or owner}
+    if r.get("demo_owner_name"):
+        return {**r, "creator": r["demo_owner_name"]}
+    if r.get("submitted_by"):
+        return {**r, "creator": _name_of(r["submitted_by"], named)}
+    if r.get("source_item_id") in made_by:
+        return {**r, "creator": made_by[r["source_item_id"]]}
+    return r
+
+
 def _upload_people(records) -> dict[str, str]:
     """SharePoint folder id -> who made the demo, for demos created through
     the Hub (services/uploads.py `person`)."""
@@ -547,25 +568,13 @@ class JsonAssetRepository(AssetRepository):
         dates = self._load("publish_dates") or {}
         review = self._load("upload_review") or {}
         made_by = _upload_people(self._load("uploads"))
-        named = _person_names() if made_by or any(r.get("submitted_by") or r.get("demo_owner")
-                                                   for r in rows) else {}
-        if dates or review or made_by or named:
+        if dates or review:
             def stamp(r: dict) -> dict:
                 key = r.get("source_item_id")
                 if key in dates:
                     r = {**r, "uploaded_at": dates[key], "date_stated": True}
                 if key in review:
                     r = {**r, "upload_review": review[key].get("status")}
-                # SharePoint names the Hub's app as the files' creator of a
-                # demo made through the Hub: its submitted_by column says who it was
-                # (2026-10-21), else this slot's upload record (2026-10-20).
-                # The Demo Owner column, where someone filled it (A4), first.
-                if r.get("demo_owner"):
-                    r = {**r, "creator": _name_of(r["demo_owner"], named)}
-                elif r.get("submitted_by"):
-                    r = {**r, "creator": _name_of(r["submitted_by"], named)}
-                elif key in made_by:
-                    r = {**r, "creator": made_by[key]}
                 return r
             rows = [stamp(r) for r in rows]
         # Edited on the Details card and not synced yet (A1): shown now.
@@ -574,6 +583,12 @@ class JsonAssetRepository(AssetRepository):
             from backend.services.metadata_edit import apply_edits
             rows = apply_edits(rows, edits, {
                 s: self._synced_at(s) for s in ("sharepoint", "demo_video", *GXC_SOURCES)})
+        # Who it is credited to -- after the edits, or an owner just set on the
+        # Details card showed the folder creator's name beside the new owner's
+        # address until the next sync (Liwei, 2026-11-05).
+        named = _person_names() if made_by or any(r.get("submitted_by") or r.get("demo_owner")
+                                                   for r in rows) else {}
+        rows = [_credit(r, named, made_by) for r in rows]
         # Hidden from the Hub on the Admin page (owned/hidden.json): out of
         # every read here, at the funnel, like a retired item.
         hidden = self._load("hidden") or {}
@@ -1921,6 +1936,7 @@ class JsonAssetRepository(AssetRepository):
             has_main_video=bool(record.get("main_video")),
             creator=record.get("creator"),
             demo_owner=record.get("demo_owner"),
+            demo_owner_name=record.get("demo_owner_name"),
             product_version=record.get("product_version"),
             archived_at=record.get("archived_at"),
             products=record.get("products") or [],

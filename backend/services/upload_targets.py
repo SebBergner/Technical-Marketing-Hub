@@ -322,6 +322,10 @@ SUBMITTED_COLUMN = "submitted_by"     # as Liwei created it in both libraries
 #: Who to ask about a demo (A4, 2026-10-26): a single line of text holding an
 #: email address, in both libraries. The uploader, on upload.
 OWNER_COLUMN = "DemoOwner"
+#: The owner's name as it should show (Liwei, 2026-11-05): text, added to
+#: all three libraries. Without it the name came from whoever signed in with
+#: that address, or else the folder's creator -- Liwei's name on Jorge's demo.
+OWNER_NAME_COLUMN = "DemoOwnerName"
 #: A picture chosen for the demo's tile (B5, 2026-10-26): a Yes/No column on
 #: files, ticked on the one image the demo's card shows.
 THUMBNAIL_COLUMN = "HubThumbnail"

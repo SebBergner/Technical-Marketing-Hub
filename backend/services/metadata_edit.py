@@ -40,9 +40,16 @@ from backend.services import upload_targets as ut
 #: Fields of the upload form an edit never offers.
 NOT_EDITED = {"title"}
 #: The Demo Owner, edited with the rest though no upload form asks for it.
-OWNER = ut.FieldSpec("demo_owner", "Demo owner", ut.TEXT, column=ut.OWNER_COLUMN,
+OWNER = ut.FieldSpec("demo_owner", "Demo owner email", ut.TEXT, column=ut.OWNER_COLUMN,
                      max_length=200, help="The PTC email address of the person to ask "
                                           "about this demo.")
+#: ...and the name shown for them (2026-11-05): the folder's creator is often
+#: whoever uploaded it for them, so the name is said, not guessed.
+OWNER_NAME = ut.FieldSpec("demo_owner_name", "Demo owner name", ut.TEXT,
+                          column=ut.OWNER_NAME_COLUMN, max_length=200,
+                          help="As it should show, e.g. Suarez, Jorge. Empty: the name "
+                               "they sign in to the Hub with, else the email.")
+_OWNER_KEYS = {"demo_owner", "demo_owner_name"}
 #: Pictures a card may show (B5): what a browser can draw.
 IMAGE_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -76,7 +83,7 @@ def target_key(record: dict) -> str:
 
 
 def edit_fields(spec: ut.TargetSpec) -> list[ut.FieldSpec]:
-    return [f for f in spec.fields if f.key not in NOT_EDITED] + [OWNER]
+    return [f for f in spec.fields if f.key not in NOT_EDITED] + [OWNER_NAME, OWNER]
 
 
 def _spec_with_owner(spec: ut.TargetSpec) -> ut.TargetSpec:
@@ -191,11 +198,13 @@ def write(client: GraphClient, target: uw.Target, folder_id: str, changed: dict,
     if etag and now_etag and etag != now_etag:
         raise EditConflict("Someone changed this demo in SharePoint since you opened the "
                            "editor. Reload it and make your change again.")
-    values = {k: v for k, v in changed.items() if k != "demo_owner"}
+    values = {k: v for k, v in changed.items() if k not in _OWNER_KEYS}
     fields, note = uw.metadata_fields(target, target.spec.kinds[0], values)
     fields.pop("Demo_x0020_Type", None)        # an edit never changes the type
     if "demo_owner" in changed and target.has_demo_owner:
         fields[ut.OWNER_COLUMN] = changed["demo_owner"] or ""
+    if "demo_owner_name" in changed and target.has_demo_owner_name:
+        fields[ut.OWNER_NAME_COLUMN] = changed["demo_owner_name"] or ""
     if fields:
         client.update_list_item_fields(target.drive_id, folder_id, fields, etag=now_etag)
     if note:
@@ -291,8 +300,8 @@ def hub_values(key: str, changed: dict) -> dict:
             out["uploaded_at"], out["date_stated"] = v, True
         elif k in ("product_version", "named_customer", "long_description"):
             out[k] = v or None
-        elif k == "demo_owner":
-            out["demo_owner"] = v or None
+        elif k in _OWNER_KEYS:
+            out[k] = v or None
         elif k == "video_type":
             from backend.models import video_type
             out["content_depth"] = video_type(v)

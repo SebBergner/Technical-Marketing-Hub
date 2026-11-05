@@ -65,6 +65,7 @@ class Target:
     has_submitted_by: bool = False
     #: ...and DemoOwner (A4) and HubThumbnail (B5), likewise.
     has_demo_owner: bool = False
+    has_demo_owner_name: bool = False
     has_thumbnail_flag: bool = False
 
 
@@ -159,6 +160,7 @@ def resolve(client: GraphClient, spec: ut.TargetSpec, *, fresh: bool = False) ->
                     choices=choices, terms=terms, skipped=skipped,
                     has_submitted_by=ut.SUBMITTED_COLUMN in columns,
                     has_demo_owner=ut.OWNER_COLUMN in columns,
+                    has_demo_owner_name=ut.OWNER_NAME_COLUMN in columns,
                     has_thumbnail_flag=ut.THUMBNAIL_COLUMN in columns)
     with _lock:
         _cache[spec.key] = (now, target)

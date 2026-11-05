@@ -183,6 +183,12 @@ def changes(spec: ut.TargetSpec, target: uw.Target, sent: dict, current: dict) -
     if "original_publish_date" in out and not out["original_publish_date"]:
         # Graph cannot clear a date column (null is ignored).
         raise ut.UploadInvalid("Original publish date cannot be removed, only changed.")
+    if "products" in out and not out["products"] and spec.product_terms:
+        # A managed-metadata column: clearing it through Graph is untested
+        # (2026-11-05), so it is done in SharePoint. Choice columns
+        # (Demo Video, GXC Video) clear here.
+        raise ut.UploadInvalid("Products of a demo kit cannot be emptied here; "
+                               "clear them in SharePoint.")
     unknown = uw.unknown_products(target, out.get("products") or [])
     if unknown:
         raise ut.UploadInvalid("Not in SharePoint's Product list: " + ", ".join(unknown)

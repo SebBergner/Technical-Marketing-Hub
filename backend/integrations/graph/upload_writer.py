@@ -320,7 +320,9 @@ def metadata_fields(target: Target, kind: ut.KindSpec, values: dict) -> tuple[di
             and spec.publish_date_column not in target.skipped):
         fields[spec.publish_date_column] = values["original_publish_date"] + "T00:00:00Z"
     products = values.get("products") or []
-    if spec.product_choice_column and products             and spec.product_choice_column not in target.skipped:
+    # Written when given, empty included: an edit may clear them (2026-11-05).
+    if (spec.product_choice_column and "products" in values
+            and spec.product_choice_column not in target.skipped):
         fields[f"{spec.product_choice_column}@odata.type"] = "Collection(Edm.String)"
         fields[spec.product_choice_column] = products
     note = {}

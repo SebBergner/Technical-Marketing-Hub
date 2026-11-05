@@ -113,9 +113,16 @@ def upload_all(client, sp, record, who=MAKER):
 def test_metadata_is_required_before_anything_is_created(client, sp):
     r = start(client, values={**KIT, "description": "", "segment": [], "customer_facing": None})
     assert r.status_code == 422
-    for word in ("Description", "Segment", "Customer facing"):
+    for word in ("Description", "Customer facing"):
         assert word in r.json()["detail"]
+    # Product and Segment are optional (Serge, 2026-11-05).
+    assert "Segment" not in r.json()["detail"]
     assert sp.created == [], "no folder for an incomplete form"
+
+
+def test_a_demo_may_have_no_product_or_segment(client, sp):
+    r = start(client, values={**KIT, "products": [], "segment": []})
+    assert r.status_code < 300, r.text
 
 
 def test_choices_come_from_the_library_and_dates_cannot_be_future(client, sp):

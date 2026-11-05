@@ -26,7 +26,7 @@ import { closeActivity } from "./activity.js";
  * be bookmarked, and Back from a demo opened here returns to the results.
  */
 var ADV_PAGE_SIZE = 30;
-var advState = { q: "", type: "", items: [], total: 0, seq: 0 };
+var advState = { q: "", type: "", partial: false, items: [], total: 0, seq: 0 };
 
 function advancedHash(q) { return "#/search/" + encodeURIComponent(q || ""); }
 
@@ -36,28 +36,38 @@ function queryTerms(q) {
   return ((q || "").toLowerCase().match(/[\p{L}\p{N}]+/gu) || []);
 }
 
+/* One query word as a pattern, matched the way the server matches it
+ * (services/relevance.py, 2026-11-05): a whole word, plurals included, unless
+ * "Match part of words" is on; one or two letters always whole; Chinese,
+ * Japanese and Korean anywhere, as they have no spaces. */
+var CJK = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uf900-\ufaff]/;
+function termPattern(t, partial) {
+  var esc = function (x) { return x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); };
+  if (CJK.test(t)) return esc(t);
+  var word = t.length > 3 && t.charAt(t.length - 1) === "y"
+    ? esc(t.slice(0, -1)) + "(?:y|ies)" : esc(t) + "(?:s|es)?";
+  var whole = "(?<![\\p{L}\\p{N}])" + word + "(?![\\p{L}\\p{N}])";
+  return partial && t.length > 2 ? "(?:" + esc(t) + "|" + whole + ")" : whole;
+}
+
 /* Text with every query term marked. Split on the raw text and escape each
  * piece, so nothing from the catalogue is ever inserted as HTML. */
 function highlightHtml(text, q) {
   var ts = queryTerms(q).sort(function (a, b) { return b.length - a.length; });
   if (!text || !ts.length) return escapeHtml(text || "");
-  // Words of one or two letters only as whole words, as the server
-  // matches them (relevance.SHORT_TERM): "e" from "E&HT" must not light up
-  // every "e" on the page.
   var re = new RegExp("(" + ts.map(function (t) {
-    var esc = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return t.length <= 2 ? "(?<![\\p{L}\\p{N}])" + esc + "(?![\\p{L}\\p{N}])" : esc;
+    return termPattern(t, advState.partial);
   }).join("|") + ")", "giu");
+  // One capturing group (the patterns' own groups are (?:...)), so the
+  // pieces alternate: text, match, text...
   return text.split(re).map(function (part, i) {
     return i % 2 ? '<mark class="hub-hl">' + escapeHtml(part) + "</mark>" : escapeHtml(part);
   }).join("");
 }
 
 function mentions(text, q) {
-  var words = queryTerms(text);
-  var joined = " " + words.join(" ") + " ";
   return queryTerms(q).some(function (w) {
-    return w.length <= 2 ? joined.indexOf(" " + w + " ") !== -1 : joined.indexOf(w) !== -1;
+    return new RegExp(termPattern(w, advState.partial), "iu").test(text || "");
   });
 }
 
@@ -85,6 +95,8 @@ function buildAdvancedPage() {
     +     ' placeholder="Search titles, descriptions, tags and file names…"></div>'
     +   '<label class="filter-pill">Asset Type: <select id="hubAdvType">' + typeOptions + '</select>'
     +     '<svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg></label>'
+    +   '<label class="hub-adv__partial" title="Off: whole words only, so CAM does not find Camera">'
+    +     '<input type="checkbox" id="hubAdvPartial"> Match part of words</label>'
     + '</form>'
     + '<div class="hub-adv__summary" id="hubAdvSummary"></div>'
     + '<div class="hub-adv__list" id="hubAdvList"></div>'
@@ -112,6 +124,10 @@ function buildAdvancedPage() {
   });
   page.querySelector("#hubAdvType").addEventListener("change", function () {
     advState.type = this.value;
+    runAdvancedSearch(input.value.trim(), false);
+  });
+  page.querySelector("#hubAdvPartial").addEventListener("change", function () {
+    advState.partial = this.checked;
     runAdvancedSearch(input.value.trim(), false);
   });
   page.querySelector("#hubAdvMore").addEventListener("click", function () {
@@ -174,6 +190,7 @@ async function runAdvancedSearch(q, more) {
   var params = new URLSearchParams({ q: q, limit: ADV_PAGE_SIZE,
                                      offset: advState.items.length });
   if (advState.type) params.append("type", advState.type);
+  if (advState.partial) params.append("partial", "true");
   var page;
   try {
     page = await getJSON("/api/assets/advanced-search?" + params.toString());
@@ -380,7 +397,7 @@ function renderSuggestions(query) {
   var q = (query || "").trim();
   if (queryTerms(q).join("").length >= 2) {
     items = items.concat([{ page: true,
-      text: "Try Advanced Search for “" + q + "” — also searches file names",
+      text: "Try Advanced Search for “" + q + "” — also file names, and parts of words",
       run: function () { location.hash = advancedHash(q); } }]);
   }
   if (!items.length) { host.style.display = "none"; host.innerHTML = ""; return; }

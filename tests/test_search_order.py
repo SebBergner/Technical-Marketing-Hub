@@ -68,10 +68,40 @@ def test_a_short_word_only_matches_a_whole_word(tmp_path):
     assert titles(repo, "ai") == ["Windchill AI Assistant"]
 
 
-def test_a_longer_word_still_matches_inside_words():
-    assert relevance.score("wind", "Windchill PDMLink") > 0
+def test_a_word_is_whole_unless_part_of_words_is_asked_for():
+    """Seb, 2026-11-05: "CAM" found every Camera demo."""
+    assert relevance.score("cam", "Creo Camera Integration") == 0
+    assert relevance.score("cam", "CAD/CAM Machining Overview") > 0
+    assert relevance.score("wind", "Windchill PDMLink") == 0
+    assert relevance.score("windchill", "Windchill PDMLink") > 0
     assert relevance.score("creo 11", "Creo 11.0 Overview") > 0
+    # Advanced Search's "Match part of words": inside words, as before.
+    assert relevance.score("cam", "Creo Camera Integration", partial=True) > 0
+    assert relevance.score("wind", "Windchill PDMLink", partial=True) > 0
     assert relevance.names("e&ht", "E&HT_ADAS.mp4") and not relevance.names("ht", "Bobcat_Light.mp4")
+    assert relevance.names("ht", "Bobcat_Light.mp4", partial=True) is False   # short stays whole
+
+
+def test_a_whole_word_still_finds_its_plural():
+    assert relevance.score("demo", "Demos of Creo") > 0
+    assert relevance.score("process", "Manufacturing Processes") > 0
+    assert relevance.score("assembly", "Large Assemblies") > 0
+    assert relevance.score("vm", "Windchill VMs") > 0
+    assert relevance.score("assembly", "Large Assemblies", partial=True) > 0
+
+
+def test_chinese_japanese_korean_match_inside_a_title():
+    """No spaces between words there, so "whole word" cannot apply."""
+    assert relevance.score("概要", "Creo概要紹介") > 0
+
+
+def test_advanced_search_part_of_words(tmp_path):
+    repo = repo_with(tmp_path, [("Creo Camera Integration", "2025-01-01", None),
+                                ("CAD/CAM Machining Overview", "2025-01-02", None)])
+    whole = repo.advanced_search(AssetQuery(text="cam"))
+    part = repo.advanced_search(AssetQuery(text="cam", partial=True))
+    assert [h.asset.title for h in whole.items] == ["CAD/CAM Machining Overview"]
+    assert len(part.items) == 2
 
 
 def test_and_and_ampersand_are_the_same_word(tmp_path):

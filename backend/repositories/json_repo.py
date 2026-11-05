@@ -1056,9 +1056,10 @@ class JsonAssetRepository(AssetRepository):
                 " ".join(record.get("value_drivers") or []),
                 record.get("segment"), record.get("content_depth"),
                 record.get("industry")) if x)
-            own = relevance.score(query.text, title, details)
+            partial = query.partial
+            own = relevance.score(query.text, title, details, partial)
             files = [f for f in (record.get("resources") or [])
-                     if relevance.names(query.text, f.get("name"))]
+                     if relevance.names(query.text, f.get("name"), partial)]
             if not own and not files:
                 continue
             matched_in = []
@@ -1068,7 +1069,7 @@ class JsonAssetRepository(AssetRepository):
                 matched_in.append("details")
             key = relevance.advanced_order_key(
                 query.text, title, details, len(files),
-                _as_date(record.get("uploaded_at")) or date.min)
+                _as_date(record.get("uploaded_at")) or date.min, partial)
             hits.append((key, record, matched_in, files))
 
         hits.sort(key=lambda h: h[0], reverse=True)

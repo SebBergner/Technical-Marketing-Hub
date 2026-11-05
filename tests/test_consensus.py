@@ -271,7 +271,11 @@ def test_genuine_matches_survive_the_new_disqualifiers(asset_title, demo_title, 
     ("Something Else", relevance.NO_MATCH),
 ])
 def test_title_match_tiers(title, expected):
-    assert relevance.score("windchill", title) == expected
+    # Inside a word only with "Match part of words" (2026-11-05).
+    partial = expected == relevance.TITLE_SUBSTRING
+    assert relevance.score("windchill", title, partial=partial) == expected
+    if partial:
+        assert relevance.score("windchill", title) == relevance.NO_MATCH
 
 
 def test_a_description_match_still_counts_but_ranks_last():

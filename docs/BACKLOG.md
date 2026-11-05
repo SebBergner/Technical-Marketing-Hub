@@ -655,6 +655,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 | C7. 命名、版本和分类规范 | 团队（Summit 后续任务） | 如 Jetstream 有些视频标题和时长几乎一样，分不清。规范定了以后：Hub 按规范显示版本、上传时校验命名 |
 | C8. Release Notes 怎么关联 | 团队 | 继续作为 SharePoint 文档链接，还是在 Hub 里自动关联到对应产品版本的 demo |
 | C9. LDK 用视频还是脚本 | 团队向一线调查 | 结果影响 A10 的模板（脚本节、视频节）；AI 从视频生成脚本是远期方向 |
+| C10. 导航栏加更多产品 logo（Serge 11/05，如 Servigistics；已转给 Elio、Seb） | Marketing 提供 logo 文件（SVG 或透明 PNG），以及哪些产品要上导航栏 | 加进导航栏；每个产品点进去是它的列表，和现在的 Windchill、Creo 一样。发布后做 |
 
 ---
 
@@ -682,6 +683,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 | D18. 周五压力测试前的速度和并发写（11/06，Serge 安排 10–20 人同时用） | **11/04 已做，11/05 已上 staging（`4ad184f`、`22c02ec`）**。11/04 在 staging 量：一个人打开 Home 要 8.4 秒才全部载完；目录 9 页一页接一页地拉（约 2.9 MB，2.3 秒），拉完才开始载缩略图；Hub 缩略图平均 91 KB，Brightcove 封面 1280×720 约 93 KB；每个列表请求都从 Azure Files 重新读一遍整个目录（本地 55 ms，单个资源 70 ms）。多个 gunicorn worker 同时写一个文件时，都用同一个 `<file>.tmp`，锁只在自己的进程内有效，可能丢更新，或者把文件读成空的再写回，丢掉所有记录：登录名单、活跃记录，以及 GXC 个人链接的代码（丢了，那个人发出去的链接全部失效） | ① 目录每个 worker 建一次，所有请求共用，按文件的修改时间和大小判断要不要重建（`json_repo._load_mirror`，本地列表 55→4 ms，单个资源 70→3 ms）；GXC 仍按人过滤。② 写文件都用各自的临时文件名，替换时遇到另一个进程正在读就重试；登录名单、活跃记录、GXC 链接文件改为跨进程加锁（O_EXCL 锁文件，和自动同步的锁同一做法，`backend/file_safety.py`）；GXC 链接文件读不出来时报错，不再当成空的。③ 首次加载：目录各页同时拉；列表和筛选计数同时请求。④ 列表一次 48 张卡片（原来 200），下面有 Load more；卡片的封面滚到附近才载。⑤ Hub 缩略图转成最长 640 px 的 JPEG（有透明的保持 PNG），平均 91→19 KB（Pillow，新依赖），已缓存的在第一次被读到时转换；超过一周的图先给旧的，后台再取新的；Brightcove 封面用 640×360（93→36 KB）。⑥ GXC 卡片的个人链接一个请求只读一次文件 完成，已上 staging；压力测试实测见 `docs/stress-test-2026-11-06.md` |
 | D19. 11/05 用户视角走查发现的问题 | 见 `docs/hub-user-walkthrough-2026-11-05.md`：侧栏换列表后按后退，地址变了页面不变；从 demo 返回列表回到顶部；表格 Views 列和 Most viewed 排序读的是只有 Consensus 分享才写的计数，全是 0；"tips and techniques" 3 条、"tips & techniques" 62 条；普通搜索不查产品名（"ProENGINEER Wildfire" 0 条，实际 240）；Tiles/Table 切换回到前 48 条；卡片和详情页显示 Consensus 自带的 views；New 标记给一年内的所有内容（249 个） | ① 侧栏、标签、VM 入口换列表时新加一步历史，筛选和输入仍替换；后退/前进按地址重画列表，监听 popstate（之前的 hashchange 在只有查询串变化时不触发）。② 打开 demo 前记下列表的滚动位置，后退或点 Back 时恢复，已加载的卡片不重载。③ 表格去掉 Views，换成 Length（视频时长，kit 文件数），排序去掉 Most viewed。④ 搜索把 "and" 当作 "&"（查询和标题都去掉）；产品名算进普通搜索，排在标题命中之后。⑤ 切换 Tiles/Table 用已加载的结果重画。⑥ 不再显示 Consensus 的 views。⑦ New 只给 120 天内的内容（Published 筛选的 Under 1 year 不变）。IoT/AR 仍不进 Segment 筛选（Liwei 定） 完成，11/05 已上 staging（v2026.3.177，staging 上验证过） |
 | D20. 64 张卡片图片拿不到 | 11/05 在 staging 跑 `scripts/warm_thumbnails.js`（只读）：509 张 Hub 图片中 445 张正常，64 张 404，卡片显示生成的封面。本地同样 64 张，日志：其中 48 张在 `SiteAssets/CAD Model`，Graph 走 /shares 读时返回 403（原因未查明：同一站点的其它图片能读），其余约 16 张是 `getpreview.ashx` 预览链接，Graph 解析不了 | CAD Model：先查 403 的原因（SiteAssets 的权限，或换成按 drive item 读），不行就把图片放进 demo 文件夹；getpreview 链接：Data Clean 时在 SharePoint 换成真实图片 | 发布后，不影响 swap |
+| D21. 11/05 Seb、Serge 的两个需求（swap 前做） | Seb：搜 "CAM" 出来一堆 Camera 的 demo。Serge：Create New Demo 强制选 Product 和 Segment，GXC Promo 视频只好填了 Creo 和 CAD | ① 普通搜索按整词匹配，复数算命中（demo/demos、process/processes、assembly/assemblies）；一两个字母的词照旧整词；中日韩文字照旧任意位置匹配（没有空格分词）。Advanced Search 加 "Match part of words"，默认不勾，勾上就是原来的部分匹配。② Product、Segment 改为选填（三个库的 SharePoint 列都不是必填，11/05 只读查过）；Edit 可以清空 Segment 和视频的 Hub Products；demo kit 的 Product 是 managed metadata，清空没验证过，Edit 里不让清空，要去 SharePoint 改 | 完成，待上 staging |
 
 ---
 

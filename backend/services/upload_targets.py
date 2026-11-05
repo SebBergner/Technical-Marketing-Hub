@@ -97,10 +97,13 @@ def _common(*, description_help: str) -> list[FieldSpec]:
                        "renaming later breaks shared links."),
         FieldSpec("description", "Description", LONGTEXT, required=True,
                   column="DocumentSetDescription", max_length=2000, help=description_help),
-        FieldSpec("products", "Products", MULTI, required=True, choices_from="products",
-                  help="Every product the demo shows."),
-        FieldSpec("segment", "Segment", MULTI, required=True, column="Segment",
-                  choices_from="Segment"),
+        # Optional (Serge, 2026-11-05): the GXC promo video shows no one
+        # product, and the form made him pick Creo and CAD. SharePoint does
+        # not require either column in any library (checked that day).
+        FieldSpec("products", "Products", MULTI, choices_from="products",
+                  help="Every product the demo shows. Leave empty if none applies."),
+        FieldSpec("segment", "Segment", MULTI, column="Segment",
+                  choices_from="Segment", help="Leave empty if none applies."),
         FieldSpec("customer_facing", "Customer facing", YESNO, required=True,
                   column="Customer_x0020_Facing",
                   help="Can it be shown to customers as it is?"),
@@ -230,6 +233,8 @@ def clean_fields(spec: TargetSpec, raw: dict, choices: dict[str, list[str]], *,
                 problems.append(f"{f.label} is required.")
             elif partial and f.kind in (TEXT, LONGTEXT) and not f.required:
                 out[f.key] = ""            # cleared on purpose
+            elif partial and f.kind == MULTI and not f.required:
+                out[f.key] = []            # cleared on purpose
             elif partial and f.required:
                 problems.append(f"{f.label} cannot be empty.")
             continue

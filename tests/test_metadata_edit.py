@@ -128,11 +128,20 @@ def test_a_stale_form_or_a_bad_value_is_refused(client, fake):
                    json={"etag": '"1"', "values": {"description": "x"}})
     assert r.status_code == 409 and not fake.writes
     for values, says in (({"segment": ["Space"]}, "not an option"),
-                         ({"segment": []}, "cannot be empty"),
+                         ({"products": []}, "clear them in SharePoint"),
                          ({"demo_owner": "p@partner.it"}, "PTC email")):
         r = client.put("/api/assets/kit/metadata", headers=EDITOR, json={"values": values})
         assert r.status_code == 422 and says in r.json()["detail"], (values, r.text)
     assert not fake.writes
+
+
+def test_segment_may_be_cleared(client, fake):
+    """Serge, 2026-11-05: Product and Segment are optional, so an edit may
+    empty them (a multi-choice column clears with an empty collection)."""
+    r = client.put("/api/assets/kit/metadata", headers=EDITOR, json={"values": {"segment": []}})
+    assert r.status_code == 200, r.text
+    (_, fields, _), = fake.writes
+    assert fields["Segment"] == [] and fields["Segment@odata.type"] == "Collection(Edm.String)"
 
 
 def test_the_preview_video_is_one_tick(client, fake):

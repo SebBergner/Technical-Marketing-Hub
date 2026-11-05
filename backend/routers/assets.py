@@ -156,6 +156,8 @@ def advanced_search(
     type: list[str] = Query(default=[]),
     limit: int = Query(default=30, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    partial: bool = Query(default=False, description="match part of words too "
+                          "(\"cam\" finds \"Camera\"); off, every word is whole"),
     repo: AssetRepository = Depends(get_repo),
     user: CurrentUser = Depends(get_current_user),
 ):
@@ -164,7 +166,8 @@ def advanced_search(
     the files that matched. Declared before `/{asset_id}`, which would
     otherwise take "advanced-search" for an id."""
     try:
-        page = repo.advanced_search(AssetQuery(text=q, types=type, limit=limit, offset=offset))
+        page = repo.advanced_search(AssetQuery(text=q, types=type, limit=limit,
+                                               offset=offset, partial=partial))
     except NotImplementedError:
         raise HTTPException(status_code=501,
                             detail="Advanced Search needs the file-backed catalogue")

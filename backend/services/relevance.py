@@ -59,41 +59,79 @@ _JOINERS = frozenset({"and"})
 #: A word this short only counts as a whole word (Liwei, 2026-10-01).
 #: Searching "E&HT" split into "e" and "ht", and "e" is inside nearly every
 #: title, so the query returned 176 results instead of the one E&HT demo;
-#: "ai" likewise matched "maintenance" and "chain". Longer words still match
-#: inside words, so "wind" keeps finding "Windchill".
+#: "ai" likewise matched "maintenance" and "chain".
 SHORT_TERM = 2
+
+#: Whole words by default (Seb, 2026-11-05): searching "CAM" found every
+#: "Camera" demo, and he wanted the CAM ones. A word still matches its plural
+#: ("demo" finds "demos", "cam" finds "CAMs"). Advanced Search can ask for
+#: part of a word instead (`partial=True`), which is how every word longer
+#: than SHORT_TERM matched before: "wind" finding "Windchill".
+#:
+#: Chinese, Japanese and Korean are written without spaces, so a title there
+#: is one long token and a word inside it is never "whole": those terms
+#: always match anywhere.
+_CJK = re.compile("[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uf900-\ufaff]")
+_PLURAL = r"(?:s|es)?"
 
 
 def _is_short(term: str) -> bool:
     return len(term) <= SHORT_TERM
 
 
-def _bounded(phrase: str, wanted: list[str]) -> str:
-    """The phrase as a pattern, with a word boundary on any end that is a
-    short word. Normalised text is single-space-separated tokens, so a
-    boundary is "not next to a non-space"."""
-    start = r"(?<!\S)" if _is_short(wanted[0]) else ""
-    end = r"(?!\S)" if _is_short(wanted[-1]) else ""
-    return start + re.escape(phrase) + end
+def _anywhere(term: str, partial: bool) -> bool:
+    """Whether `term` may match inside a word."""
+    if _CJK.search(term):
+        return True
+    return partial and not _is_short(term)
 
 
-def _has(text: str, term: str) -> bool:
-    """One query word in normalised text, by the short-word rule."""
-    if _is_short(term):
-        return f" {term} " in f" {text} "
-    return term in text
+def _term_pattern(term: str, partial: bool) -> str:
+    if _CJK.search(term):
+        return re.escape(term)
+    if _anywhere(term, partial):
+        # Anywhere, and its whole-word plurals too, so "part of words" finds
+        # everything whole-word search does ("assembly" -> "Assemblies").
+        return "(?:" + re.escape(term) + "|" + _term_pattern(term, False) + ")"
+    # Partial search keeps a short word exact, as before; whole-word search
+    # lets every word take a plural ending.
+    return r"(?<!\S)" + _word(term, partial) + r"(?!\S)"
 
 
-def _find_end(text: str, term: str) -> int:
+def _word(term: str, partial: bool) -> str:
+    """The word, and in whole-word search its plurals too: "demo" ->
+    "demos", "process" -> "processes", "assembly" -> "assemblies"."""
+    if partial:
+        return re.escape(term)
+    if len(term) > 3 and term.endswith("y"):
+        return re.escape(term[:-1]) + r"(?:y|ies)"
+    return re.escape(term) + _PLURAL
+
+
+def _bounded(phrase: str, wanted: list[str], partial: bool = False) -> str:
+    """The phrase as a pattern, bounded on each end the way its first and
+    last word are (_term_pattern). Normalised text is single-space-separated
+    tokens, so a boundary is "not next to a non-space"."""
+    start = "" if _anywhere(wanted[0], partial) else r"(?<!\S)"
+    if _anywhere(wanted[-1], partial):
+        return start + re.escape(phrase)
+    head = phrase[: len(phrase) - len(wanted[-1])]
+    return start + re.escape(head) + _word(wanted[-1], partial) + r"(?!\S)"
+
+
+def _has(text: str, term: str, partial: bool = False) -> bool:
+    """One query word in normalised text."""
+    return re.search(_term_pattern(term, partial), text) is not None
+
+
+def _find_end(text: str, term: str, partial: bool = False) -> int:
     """Where the first occurrence of `term` ends in `text`, or -1."""
-    if _is_short(term):
-        m = re.search(rf"(?<!\S){re.escape(term)}(?!\S)", text)
-        return m.end() if m else -1
-    at = text.find(term)
-    return at + len(term) if at >= 0 else -1
+    m = re.search(_term_pattern(term, partial), text)
+    return m.end() if m else -1
 
 
-def score(text: str | None, title: str | None, description: str | None = None) -> int:
+def score(text: str | None, title: str | None, description: str | None = None,
+          partial: bool = False) -> int:
     """How well one record answers a query. 0 means it does not.
 
     A contiguous phrase match always outranks the same words scattered, so
@@ -108,7 +146,7 @@ def score(text: str | None, title: str | None, description: str | None = None) -
     normalised_title = " ".join(terms(name))
 
     wanted = terms(text)
-    pattern = _bounded(phrase, wanted)
+    pattern = _bounded(phrase, wanted, partial)
     if normalised_title == phrase:
         return EXACT_TITLE
     if re.match(pattern, normalised_title):
@@ -121,10 +159,10 @@ def score(text: str | None, title: str | None, description: str | None = None) -
     if re.search(pattern, normalised_title):
         return TITLE_SUBSTRING
 
-    if all(_has(normalised_title, t) for t in wanted):
+    if all(_has(normalised_title, t, partial) for t in wanted):
         return TITLE_ALL_TERMS
     haystack = f"{normalised_title} {' '.join(terms(description))}"
-    if all(_has(haystack, t) for t in wanted):
+    if all(_has(haystack, t, partial) for t in wanted):
         return ANY_FIELD
     return NO_MATCH
 
@@ -134,7 +172,7 @@ def score(text: str | None, title: str | None, description: str | None = None) -
 _NO_SPAN = 10_000
 
 
-def span(text: str | None, title: str | None) -> int:
+def span(text: str | None, title: str | None, partial: bool = False) -> int:
     """How far into the title you must read before every term has appeared.
 
     The tiers alone barely discriminate on multi-word queries: "Creo overview"
@@ -153,7 +191,7 @@ def span(text: str | None, title: str | None) -> int:
         return _NO_SPAN
     furthest = 0
     for term in wanted:
-        end = _find_end(name, term)
+        end = _find_end(name, term, partial)
         if end < 0:
             return _NO_SPAN
         furthest = max(furthest, end)
@@ -161,13 +199,13 @@ def span(text: str | None, title: str | None) -> int:
 
 
 def ranking(text: str | None, title: str | None,
-            description: str | None = None) -> tuple[int, int]:
+            description: str | None = None, partial: bool = False) -> tuple[int, int]:
     """Sort key for one record, best first when sorted descending.
 
     Tier decides; span breaks ties inside it. Callers append their own final
     tiebreak — recency — so equally-good matches keep a stable order.
     """
-    return (score(text, title, description), -span(text, title))
+    return (score(text, title, description, partial), -span(text, title, partial))
 
 
 #: How search results are ORDERED, coarser than the tiers on purpose.
@@ -193,15 +231,15 @@ def order_key(text: str | None, title: str | None, description: str | None,
 
 
 def matches(text: str | None, title: str | None,
-            description: str | None = None) -> bool:
+            description: str | None = None, partial: bool = False) -> bool:
     """Whether a record belongs in the results at all.
 
     Defined as "scores above zero" so membership and ranking cannot disagree.
     """
-    return score(text, title, description) > NO_MATCH
+    return score(text, title, description, partial) > NO_MATCH
 
 
-def names(text: str | None, name: str | None) -> bool:
+def names(text: str | None, name: str | None, partial: bool = False) -> bool:
     """Whether every term of the query is in a file name.
 
     File names are written for machines -- "Bobcat_03_Engineering.mp4" --
@@ -213,7 +251,7 @@ def names(text: str | None, name: str | None) -> bool:
     if not wanted:
         return False
     haystack = " ".join(terms(name))
-    return all(_has(haystack, t) for t in wanted)
+    return all(_has(haystack, t, partial) for t in wanted)
 
 
 #: Advanced Search's order. A file-name hit is a stronger answer than a word
@@ -224,10 +262,11 @@ FILE_NAME_BAND = 2
 
 
 def advanced_order_key(text: str | None, title: str | None,
-                       description: str | None, file_hits: int, recency) -> tuple:
+                       description: str | None, file_hits: int, recency,
+                       partial: bool = False) -> tuple:
     """Sort key for Advanced Search, best first when sorted descending:
     band (title > file name > description), then publish date, then span."""
-    band = _ADVANCED_BAND.get(score(text, title, description), 0)
+    band = _ADVANCED_BAND.get(score(text, title, description, partial), 0)
     if file_hits:
         band = max(band, FILE_NAME_BAND)
-    return (band, recency, -span(text, title))
+    return (band, recency, -span(text, title, partial))

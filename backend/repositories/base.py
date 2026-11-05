@@ -25,6 +25,9 @@ SortKey = Literal["relevance", "recent", "oldest", "most_viewed", "title",
 @dataclass
 class AssetQuery:
     text: str | None = None
+    #: Advanced Search's "Match part of words" (2026-11-05): `text` may match
+    #: inside a word. Off, every word must be whole (services/relevance.py).
+    partial: bool = False
     types: list[str] = field(default_factory=list)
     products: list[str] = field(default_factory=list)
     funnel_stages: list[str] = field(default_factory=list)

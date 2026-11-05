@@ -28,24 +28,63 @@ function syncButton(source, label) {
     b.disabled = true;
     var original = b.textContent;
     b.textContent = "Syncing…";
-    // No timeout on purpose: a full SharePoint sync genuinely takes minutes,
-    // and a spinner that gives up first would teach people to distrust it.
-    fetch(source === "SharePoint" ? "/api/graph/sync" : "/api/consensus/sync",
-          { method: "POST" })
-      .then(function (r) {
-        return r.json().catch(function () { return {}; }).then(function (body) {
-          if (!r.ok) throw new Error(body.detail || ("HTTP " + r.status));
-          return body;
-        });
-      })
-      .then(function () { load(); })
-      .catch(function (err) {
-        b.disabled = false;
-        b.textContent = original;
-        window.alert("Sync failed:\n\n" + err.message);
-      });
+    function failed(err) {
+      b.disabled = false;
+      b.textContent = original;
+      window.alert("Sync failed:\n\n" + err.message);
+    }
+    if (source === "SharePoint") { sharePointSync().then(function () { load(); }, failed); return; }
+    // No timeout on purpose: a sync genuinely takes minutes, and a spinner
+    // that gives up first would teach people to distrust it.
+    postJson("/api/consensus/sync").then(function () { load(); }).catch(failed);
   });
   return b;
+}
+
+function postJson(url) {
+  return fetch(url, { method: "POST" }).then(function (r) {
+    return r.json().catch(function () { return {}; }).then(function (body) {
+      if (!r.ok) throw new Error(body.detail || ("HTTP " + r.status));
+      return body;
+    });
+  });
+}
+
+function syncState() {
+  return fetch("/api/graph/sync/state").then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  });
+}
+
+/* D17 (2026-11-05): the SharePoint sync runs in the background and the
+ * request returns at once; holding it open for minutes ended in HTTP 499
+ * from Azure's front end while the sync itself succeeded. So: note the last
+ * attempt, queue the sync, and ask every five seconds until a newer attempt
+ * is recorded and nothing is running. */
+function sharePointSync() {
+  return syncState().then(function (before) {
+    return postJson("/api/graph/sync").then(function () {
+      return new Promise(function (resolve, reject) {
+        var tries = 0;
+        (function poll() {
+          setTimeout(function () {
+            tries += 1;
+            syncState().then(function (now) {
+              if (!now.running && now.last_attempt_at && now.last_attempt_at !== before.last_attempt_at) {
+                if (now.last_attempt_ok === false) reject(new Error(now.last_error || "see Last attempt"));
+                else resolve(now);
+              } else if (tries >= 720) {           // an hour
+                reject(new Error("still running after an hour; check the sync history"));
+              } else {
+                poll();
+              }
+            }, function () { if (tries < 720) poll(); else reject(new Error("lost contact")); });
+          }, 5000);
+        })();
+      });
+    });
+  });
 }
 
 function detailLink(source) {

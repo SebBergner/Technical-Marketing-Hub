@@ -1,9 +1,9 @@
 # Slot swap checklist (staging → production)
 
-Updated 2026-11-04 for the swap before Friday's stress test (2026-11-06,
+Updated 2026-11-04, and again 2026-11-05, for the swap before Friday's stress test (2026-11-06,
 10–20 people at once, `docs/stress-test-2026-11-06.md`): production goes from
-**v2026.3.123** (2026-10-20, `6cdd300`) to the staging build (**v2026.3.174**
-or later, with D18). Written first for the 10/16 swap (v72 → v100), then
+**v2026.3.123** (2026-10-20, `6cdd300`) to the staging build (**v2026.3.178**
+or later, with D17, D18, D19 and pinned dependencies). Written first for the 10/16 swap (v72 → v100), then
 for 10/30. Reusable for later swaps; update the version numbers and the
 "what is new" list each time.
 
@@ -73,7 +73,9 @@ Everything built since 2026-10-20 is new on production:
   BRIGHTCOVE_* settings, and `HUB_TASKS_LIST` on staging (empty, so trials
   there do not reach the team's list). **Everything else moves with the code.**
 - **New dependency:** Pillow (thumbnails). The deploy installs it; the Hub
-  serves pictures as they are if it is missing.
+  serves pictures as they are if it is missing. **Every dependency is pinned**
+  (2026-11-05) to what CI installed for v2026.3.177, so production runs the
+  library versions staging was tested with.
 - **New settings since v2026.3.123:** `GRAPH_GXC_LIBRARY` and
   `MIGRATION_GXC_LIBRARY`, both defaulting to "GXC Video". Nothing to set.
   **`GXC_ID_KEY`** (B10, 2026-11-03): the key GXC videos' ids are made with.
@@ -185,12 +187,26 @@ Everything built since 2026-10-20 is new on production:
     Maintain content.
 13. **Admin → Overview → Sync SharePoint now**, then **Sync Consensus now**.
     The SharePoint run is a full rebuild this once (MAPPING_VERSION 5); expect
-    it to take longer. Afterwards:
+    it to take longer. The page polls until it is done (D17): a closed tab
+    does not stop it, and a second click while it runs just adds one more run
+    after it. Afterwards:
     - Sync history shows every part succeeded: Demo Catalog, Demo Video, GXC
       Video, pages, VMs, partner downloads;
     - Content dashboard totals close to staging's;
     - a few demo pages show Demo Owner and product version where SharePoint
       has them.
+13a. **Warm the card pictures** (read-only, 2026-11-05), once step 13's
+    SharePoint sync has finished. The Sync button now returns at once and the
+    page waits for the sync itself (D17), so wait until "Syncing…" is gone.
+    Signed in on `tmh.ptcxc.com`, open the DevTools console, paste
+    `scripts/warm_thumbnails.js`, press Enter. It reads the catalogue (which
+    also builds each worker's copy) and GETs every Hub picture, four at a
+    time, so pictures cached by the old code are shrunk now and not while
+    twenty people open Home. It ends with `done in N s: {ok, busy, missing,
+    error}`; busy pictures are retried one at a time, and if `busy` is still
+    above zero, run it again. On staging (2026-11-05, 82 s): 509 pictures,
+    445 ok, 64 missing (D20: SharePoint will not give them; those cards show
+    their generated cover, as they do today), 0 busy. Expect about the same.
 14. **Automatic sync**: Overview → on, two times a day (if not already).
 15. **Consensus licences** (Users & groups): upload Elio's CSV again (October
     2026 version, 263 people, 19 partners). Without it nobody sees Create

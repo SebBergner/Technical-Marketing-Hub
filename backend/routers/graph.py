@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from contextlib import contextmanager
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -72,49 +73,91 @@ def verify(user: CurrentUser = Depends(require_authenticated),
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
-@router.post("/sync")
+@router.post("/sync", status_code=202)
 def sync(full: bool = False, repo: AssetRepository = Depends(get_repo),
          actor: str = Depends(require_perm(Perm.RUN_SYNC)),
          client: GraphClient = Depends(require_client)):
-    """Pull the Demo Catalog and replace the mirror.
+    """Pull the Demo Catalog and replace the mirror -- in the background.
 
     Needs the curator role, or an Admin sign-in (2026-09-21 — see
     backend/admin_auth.py for why a shared credential is allowed to refresh a
     rebuildable mirror and nothing else). Portal-owned data — stable slugs,
     curation, the Value Roadmap index, counters — is untouched either way.
+
+    Returns at once (D17, 2026-11-05). Reading three libraries and the
+    Brightcove posters outlasts Azure's front end, which dropped the request
+    (HTTP 499) while the sync went on to succeed, so the page said "failed"
+    and invited a second click. The Admin page now polls /sync/state; the
+    outcome is the Last attempt it already shows.
     """
-    try:
-        return run_sync(client, repo, actor, full=full)
-    except GraphPermissionError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
-    except GraphError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    already = sync_running()
+    sync_soon(repo, actor, full=full)
+    return {"queued": True, "was_running": already}
+
+
+@router.get("/sync/state", dependencies=[RUN_SYNC])
+def sync_state(repo: AssetRepository = Depends(get_repo)):
+    """For the Admin page while it waits: running yet, and the last attempt."""
+    state = repo.sync_state(SOURCE_SYSTEM) if hasattr(repo, "sync_state") else {}
+    return {"running": sync_running(repo),
+            "last_attempt_at": state.get("last_attempt_at"),
+            "last_attempt_ok": state.get("last_attempt_ok"),
+            "last_error": state.get("last_error")}
 
 
 #: One SharePoint sync at a time, whoever starts it -- the button, the daily
 #: schedule, a new demo (2026-10-15). Two at once each replace the mirror
 #: with what they read, and the later finisher's view wins.
+#:
+#: Across workers too (2026-11-05): the threading lock covers one gunicorn
+#: worker, and the button, the schedule and a new demo can land in different
+#: ones. So the run also holds a lock file on the shared data directory, the
+#: way auto_sync does. A sync takes minutes, so the file counts as left by a
+#: dead worker only after SYNC_STALE_SECONDS, and a second sync waits for
+#: the first rather than giving up.
 _run_lock = threading.Lock()
-_queue = {"requested": False, "worker": False, "actor": None}
+_queue = {"requested": False, "worker": False, "actor": None, "full": False}
 _queue_lock = threading.Lock()
+LOCK_NAME = "sharepoint_sync"
+SYNC_STALE_SECONDS = 3 * 3600
+SYNC_WAIT_SECONDS = 3 * 3600
 
 
-def sync_running() -> bool:
-    """A sync is running or waiting to run (for "indexing…" on the page)."""
+def _lock_path(repo: AssetRepository | None) -> str:
+    import os
+    owned = getattr(repo, "owned_dir", None) or os.path.join(settings.data_dir, "owned")
+    return os.path.join(owned, LOCK_NAME)
+
+
+@contextmanager
+def _exclusive(repo: AssetRepository):
+    """This worker's turn, then every worker's."""
+    from backend.file_safety import locked
+    with _run_lock, locked(_lock_path(repo), wait=SYNC_WAIT_SECONDS,
+                           stale=SYNC_STALE_SECONDS):
+        yield
+
+
+def sync_running(repo: AssetRepository | None = None) -> bool:
+    """A sync is running or waiting to run, in this worker or another
+    (for "indexing…" on the page)."""
+    from backend.file_safety import held
     with _queue_lock:
-        return _run_lock.locked() or _queue["worker"]
+        if _run_lock.locked() or _queue["worker"]:
+            return True
+    return held(_lock_path(repo), SYNC_STALE_SECONDS)
 
 
-def sync_soon(repo: AssetRepository, actor: str) -> None:
+def sync_soon(repo: AssetRepository, actor: str, full: bool = False) -> None:
     """Index soon, in the background, and never drop the request.
 
     Started at once when nothing is running. When a sync is running -- which
     began before whatever the caller just created, so cannot see it -- one
-    more follows it. Requests made meanwhile share that one follow-up."""
+    more follows it. Requests made meanwhile share that one follow-up, which
+    is a full sync if any of them asked for one."""
     with _queue_lock:
         _queue["requested"], _queue["actor"] = True, actor
+        _queue["full"] = _queue["full"] or full
         if _queue["worker"]:
             return
         _queue["worker"] = True
@@ -123,31 +166,46 @@ def sync_soon(repo: AssetRepository, actor: str) -> None:
         while True:
             # The turn first, then the request: whatever was asked while the
             # running sync went on is answered by this one run.
-            with _run_lock:
+            ran = False
+            try:
+                with _exclusive(repo):
+                    with _queue_lock:
+                        if not _queue["requested"]:
+                            _queue["worker"] = False
+                            return
+                        _queue["requested"] = False
+                        who, everything = _queue["actor"], _queue["full"]
+                        _queue["full"] = False
+                    client = get_graph_client()
+                    if client is not None:
+                        _run_sync(client, repo, f"queued for {who}", everything)
+                        ran = True
+            except Exception:                                # noqa: BLE001
+                log.exception("queued sync failed; the next one picks the change up")
                 with _queue_lock:
                     if not _queue["requested"]:
                         _queue["worker"] = False
                         return
-                    _queue["requested"] = False
-                    who = _queue["actor"]
-                try:
-                    client = get_graph_client()
-                    if client is not None:
-                        _run_sync(client, repo, f"queued for {who}")
-                except Exception:                            # noqa: BLE001
-                    log.exception("queued sync failed; the next one picks the change up")
+            if ran:
+                _after(repo)
 
     threading.Thread(target=worker, daemon=True, name="hub-sync-soon").start()
 
 
 def run_sync(client: GraphClient, repo: AssetRepository, actor: str,
              full: bool = False) -> dict:
-    """The sync itself, shared by the button and the daily schedule
+    """The sync itself, shared by the queue and the daily schedule
     (backend/auto_sync.py), so the two can never drift apart. Records the
     attempt either way and re-raises a failure for the caller to report.
-    One at a time (_run_lock): a second caller waits for the first."""
-    with _run_lock:
+    One at a time (_exclusive): a second caller waits for the first."""
+    with _exclusive(repo):
         result = _run_sync(client, repo, actor, full)
+    _after(repo)
+    return result
+
+
+def _after(repo: AssetRepository) -> None:
+    """What follows a successful sync, outside the lock."""
     # Rows the Hub Tasks list missed (Graph was down) go again now.
     from backend.integrations.graph import hub_tasks
     hub_tasks.flush_soon(repo)
@@ -157,7 +215,6 @@ def run_sync(client: GraphClient, repo: AssetRepository, actor: str,
     # And Create New Demo's options, ahead of the next person opening it.
     from backend.integrations.graph import upload_writer
     upload_writer.warm_soon()
-    return result
 
 
 def _run_sync(client: GraphClient, repo: AssetRepository, actor: str,

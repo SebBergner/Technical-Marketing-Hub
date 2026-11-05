@@ -87,9 +87,12 @@ def _entry(lock_path: str) -> tuple[threading.RLock, threading.local]:
         return entry
 
 
-def _take(lock_path: str, wait: float) -> None:
+def _take(lock_path: str, wait: float, stale: float = STALE_SECONDS) -> None:
     deadline = time.monotonic() + wait
     pause = 0.005
+    # A lock held for minutes (a sync) is looked at every two seconds, not
+    # ten times a second.
+    longest = 0.1 if stale <= STALE_SECONDS else 2.0
     while True:
         try:
             fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -98,7 +101,7 @@ def _take(lock_path: str, wait: float) -> None:
                 age = time.time() - os.path.getmtime(lock_path)
             except OSError:
                 continue                    # released between the two calls
-            if age > STALE_SECONDS:
+            if age > stale:
                 log.warning("taking over %s, left %.0f s ago", lock_path, age)
                 try:
                     os.remove(lock_path)
@@ -108,7 +111,7 @@ def _take(lock_path: str, wait: float) -> None:
             if time.monotonic() > deadline:
                 raise TimeoutError(f"{lock_path} is held by another worker")
             time.sleep(pause)
-            pause = min(pause * 2, 0.1)
+            pause = min(pause * 2, longest)
             continue
         with os.fdopen(fd, "w") as fh:
             fh.write(f"{os.getpid()}")
@@ -116,18 +119,20 @@ def _take(lock_path: str, wait: float) -> None:
 
 
 @contextmanager
-def locked(path: str, wait: float = WAIT_SECONDS) -> Iterator[None]:
+def locked(path: str, wait: float = WAIT_SECONDS,
+           stale: float = STALE_SECONDS) -> Iterator[None]:
     """Hold `path`'s lock across every worker for a read-modify-write.
 
     Re-entrant within a thread, so a function holding it may call another
-    that takes it too."""
+    that takes it too. `stale`: how old a lock must be before it counts as
+    left by a dead worker; raise it for work that takes longer than a write."""
     lock_path = path + ".lock"
     rlock, local = _entry(lock_path)
     with rlock:
         depth = getattr(local, "depth", 0)
         if depth == 0:
             os.makedirs(os.path.dirname(lock_path) or ".", exist_ok=True)
-            _take(lock_path, wait)
+            _take(lock_path, wait, stale)
         local.depth = depth + 1
         try:
             yield
@@ -138,3 +143,12 @@ def locked(path: str, wait: float = WAIT_SECONDS) -> Iterator[None]:
                     os.remove(lock_path)
                 except OSError:
                     pass
+
+
+def held(path: str, stale: float = STALE_SECONDS) -> bool:
+    """Whether some worker holds `path`'s lock now (a lock older than
+    `stale` does not count: its worker died)."""
+    try:
+        return time.time() - os.path.getmtime(path + ".lock") <= stale
+    except OSError:
+        return False

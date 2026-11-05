@@ -400,9 +400,10 @@ def index_now(upload_id: str, request: Request, repo: AssetRepository = Depends(
 
 
 @router.get("/indexing")
-def indexing(user: CurrentUser = Depends(get_current_user)):
+def indexing(user: CurrentUser = Depends(get_current_user),
+             repo: AssetRepository = Depends(get_repo)):
     from backend.routers.graph import sync_running
-    return {"running": sync_running()}
+    return {"running": sync_running(repo)}
 
 
 @router.post("/{upload_id}/cancel")

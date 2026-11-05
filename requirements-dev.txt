@@ -8,4 +8,8 @@
 # from requirements.txt + this file alone — 387 passed, 3 skipped.
 -r requirements.txt
 
-pytest
+pytest==9.2.0
+iniconfig==2.3.1
+packaging==26.3
+pluggy==1.7.0
+pygments==2.21.0

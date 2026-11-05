@@ -150,6 +150,10 @@ SLOTS = 4
 _slots = threading.BoundedSemaphore(SLOTS)
 
 
+#: Bumped when compact() changes, so pictures cached by an earlier one are
+#: made again (2: opaque PNGs become JPEGs too).
+COMPACT_VERSION = 2
+
 #: The card shows a picture at most ~400 px wide (twice that on a sharp
 #: screen); Graph's "large" is 800 px and 91 KB on average.
 COMPACT_PX = 640
@@ -167,8 +171,12 @@ def compact(data: bytes, ctype: str) -> tuple[bytes, str]:
         image.load()
         image.thumbnail((COMPACT_PX, COMPACT_PX))
         out = io.BytesIO()
-        clear = image.mode in ("RGBA", "LA", "P") and (
-            "transparency" in image.info or image.mode in ("RGBA", "LA"))
+        # Graph's PNGs carry an alpha channel that is almost always fully
+        # opaque (seen on staging 2026-11-04: 100-258 KB PNGs): only a
+        # picture with a pixel actually see-through stays a PNG.
+        if image.mode == "P" and "transparency" in image.info:
+            image = image.convert("RGBA")
+        clear = image.mode in ("RGBA", "LA") and image.getchannel("A").getextrema()[0] < 250
         if clear:
             image.save(out, "PNG", optimize=True)
             kind = "image/png"
@@ -197,7 +205,7 @@ def _compact_cached(data_path: str, meta_path: str, meta: dict,
         replace(tmp, data_path)
         os.utime(data_path, (stamp, stamp))
         replace_with(meta_path, lambda fh: json.dump(
-            {**meta, "content_type": small[1], "compact": True}, fh))
+            {**meta, "content_type": small[1], "compact": COMPACT_VERSION}, fh))
     except OSError as exc:
         log.warning("thumbnail cache not made compact: %s", exc)
     return small
@@ -239,7 +247,7 @@ def get(mirror_dir: str, client, url: str, wait: bool = True) -> tuple[bytes, st
             ctype = meta.get("content_type") or "image/jpeg"
             with open(data_path, "rb") as fh:
                 cached = (fh.read(), ctype)
-            if not meta.get("compact"):
+            if meta.get("compact") != COMPACT_VERSION:
                 cached = _compact_cached(data_path, meta_path, meta, cached)
         except (OSError, ValueError):
             cached = None
@@ -278,7 +286,7 @@ def get(mirror_dir: str, client, url: str, wait: bool = True) -> tuple[bytes, st
             fh.write(fresh[0])
         replace(tmp, data_path)
         replace_with(meta_path, lambda fh: json.dump(
-            {"content_type": fresh[1], "url": url, "compact": True}, fh))
+            {"content_type": fresh[1], "url": url, "compact": COMPACT_VERSION}, fh))
         if os.path.exists(_miss_path(mirror_dir, url)):
             os.remove(_miss_path(mirror_dir, url))
     except OSError as exc:

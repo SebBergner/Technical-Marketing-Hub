@@ -172,13 +172,13 @@ def test_a_caller_sorting_its_rows_leaves_the_cache_alone(catalogue):
 
 
 # ───────────────────────────────────────────────────────────── thumbnails
-def _picture(size=(800, 800), mode="RGB"):
+def _picture(size=(800, 800), mode="RGB", alpha=128):
     """A photo-like picture: noise, which a PNG cannot squeeze."""
     from PIL import Image
     image = Image.merge("RGB", [Image.effect_noise(size, 60 + 10 * i) for i in range(3)])
     if mode == "RGBA":
         image = image.convert("RGBA")
-        image.putalpha(Image.new("L", size, 128))
+        image.putalpha(Image.new("L", size, alpha))
     out = io.BytesIO()
     image.save(out, "PNG")
     return out.getvalue()
@@ -193,6 +193,8 @@ def test_pictures_are_made_small():
     assert max(Image.open(io.BytesIO(small)).size) == thumbnails.COMPACT_PX
     clear, kind = thumbnails.compact(_picture(mode="RGBA"), "image/png")
     assert kind == "image/png", "transparency kept"
+    opaque, kind = thumbnails.compact(_picture(mode="RGBA", alpha=255), "image/png")
+    assert kind == "image/jpeg", "an alpha channel nobody can see through is dropped"
     assert thumbnails.compact(b"not a picture", "image/jpeg") == (b"not a picture", "image/jpeg")
 
 
@@ -212,7 +214,7 @@ def test_a_picture_cached_before_is_made_small_keeping_its_age(tmp_path):
     assert kind == "image/jpeg" and len(got) < len(big)
     assert abs(os.path.getmtime(data_path) - fetched) < 2
     with open(meta_path, encoding="utf-8") as fh:
-        assert json.load(fh)["compact"] is True
+        assert json.load(fh)["compact"] == thumbnails.COMPACT_VERSION
 
 
 def test_a_stale_picture_is_shown_at_once_and_fetched_again_behind_it(tmp_path, monkeypatch):
@@ -223,7 +225,8 @@ def test_a_stale_picture_is_shown_at_once_and_fetched_again_behind_it(tmp_path, 
     with open(data_path, "wb") as fh:
         fh.write(b"old")
     with open(meta_path, "w", encoding="utf-8") as fh:
-        json.dump({"content_type": "image/jpeg", "url": url, "compact": True}, fh)
+        json.dump({"content_type": "image/jpeg", "url": url,
+                   "compact": thumbnails.COMPACT_VERSION}, fh)
     old = time.time() - (thumbnails.CACHE_DAYS + 1) * 86400
     os.utime(data_path, (old, old))
     asked = []

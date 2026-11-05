@@ -2,8 +2,8 @@
 
 Updated 2026-11-04, and again 2026-11-05, for the swap before Friday's stress test (2026-11-06,
 10–20 people at once, `docs/stress-test-2026-11-06.md`): production goes from
-**v2026.3.123** (2026-10-20, `6cdd300`) to the staging build (**v2026.3.178**
-or later, with D17, D18, D19 and pinned dependencies). Written first for the 10/16 swap (v72 → v100), then
+**v2026.3.123** (2026-10-20, `6cdd300`) to the staging build (**v2026.3.180**, with D17–D19, D21 and pinned
+dependencies). Written first for the 10/16 swap (v72 → v100), then
 for 10/30. Reusable for later swaps; update the version numbers and the
 "what is new" list each time.
 
@@ -146,6 +146,9 @@ Everything built since 2026-10-20 is new on production:
    not only in `HUB_ADMIN_EMAILS`: that setting can change with a swap, and staging's
    names only Liwei (Elio and Seb were HUB_ADMIN_EMAILS-only on 2026-10-30). **To do
    on production now:** add `enicolosi@ptc.com` and `sbergner@ptc.com` as members.
+   **Still open on 2026-11-05 15:25 UTC:** production's Administrators lists only
+   `sromano@ptc.com` (staging's lists all three). Without this, Elio and Seb are
+   not administrators on production after the swap.
 7. **Back up production `owned/` again, right before the swap** (Azure Portal → storage
    account → file share `portaldata` → `owned/` → download, and add a snapshot). It is
    the only data a sync cannot rebuild; the swap does not touch it, this is just the
@@ -157,15 +160,18 @@ Everything built since 2026-10-20 is new on production:
    prove it: right before the swap, on `tmh.ptcxc.com`, note Admin → Usage
    "All time" totals (or `GET /api/admin/usage`). Baseline taken read-only
    2026-11-05 14:16 UTC: **views 424, downloads 187, previews 15, searches
-   303, 213 demos touched, 35 days from 2026-09-22.** The 209 demo ids with
+   303, 213 demos touched, 35 days from 2026-09-22**; again at 15:25 UTC:
+   **views 437, downloads 191, previews 15, searches 319, 219 demos.** The 209 demo ids with
    usage on production all exist in staging's new-code catalogue (checked the
    same day), so the first full sync does not orphan any of them; one row,
    31 views, was already "no longer in the catalogue" before the swap.
 
 8a. **Not during the stress test, nor in the hour before.** The first full
-   sync on production (step 13) takes several minutes; the scheduled ones run
-   at 06:00 and 18:00 UTC (18:00 UTC is 1 pm EST): check them against the
-   test's time.
+   sync on production (step 13) takes about six minutes (staging,
+   2026-11-05: 14:21–14:27 UTC). Production's schedule is **06:00 and 00:00
+   UTC** (read 2026-11-05; staging's is 06:00 and 18:00): the first
+   scheduled run on the new code is 00:00 UTC unless step 13 runs first.
+   Check both against the test's time.
 
 ## The swap
 

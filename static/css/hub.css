@@ -1285,7 +1285,12 @@ video.hub-inline-player__media { object-fit: contain; }
 body .hub-seg__fam:hover{border-color:var(--orion-indigo)}
 .hub-adv__bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0 8px}
 .hub-adv__bar .hero-search__field{flex:1 1 320px}
-.hub-adv__partial{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--orion-text-muted,#555);cursor:pointer;white-space:nowrap}
+/* Beside the search field, in the Hub's green, as tall as the Asset Type
+   pill (Liwei, 2026-11-05: at the far right it went unnoticed). */
+.hub-adv__partial{display:inline-flex;gap:7px;align-items:center;padding:9px 13px;border:1px solid var(--orion-indigo);border-radius:var(--orion-radius-sm);background:var(--orion-surface);color:var(--orion-indigo);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;user-select:none}
+.hub-adv__partial:has(input:checked){background:var(--orion-indigo-soft)}
+.hub-adv__partial input{accent-color:var(--orion-indigo);width:15px;height:15px;margin:0}
+.hub-adv__partial:focus-within{outline:2px solid var(--orion-indigo);outline-offset:2px}
 .hub-adv__summary{font-size:12.5px;color:var(--orion-text-3);margin:4px 0 14px;min-height:18px}
 .hub-adv__list{display:flex;flex-direction:column;gap:12px}
 .hub-adv__hit{display:flex;gap:18px;padding:16px 18px;background:var(--orion-surface-2);border:1px solid var(--orion-border);border-radius:var(--orion-radius)}

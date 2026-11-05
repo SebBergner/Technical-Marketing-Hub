@@ -26,7 +26,9 @@ import { closeActivity } from "./activity.js";
  * be bookmarked, and Back from a demo opened here returns to the results.
  */
 var ADV_PAGE_SIZE = 30;
-var advState = { q: "", type: "", partial: false, items: [], total: 0, seq: 0 };
+/* partial: "Match part of words", on by default (Liwei, 2026-11-05) -- what
+ * sets Advanced Search apart from the ordinary box, which is whole words. */
+var advState = { q: "", type: "", partial: true, items: [], total: 0, seq: 0 };
 
 function advancedHash(q) { return "#/search/" + encodeURIComponent(q || ""); }
 
@@ -93,10 +95,10 @@ function buildAdvancedPage() {
     +   '<div class="hero-search__field"><svg class="orion-ico ico-muted"><use href="#i-search"/></svg>'
     +     '<input type="text" id="hubAdvInput" autocomplete="off"'
     +     ' placeholder="Search titles, descriptions, tags and file names…"></div>'
+    +   '<label class="hub-adv__partial" title="On: CAM also finds Camera. Off: whole words only, as in the ordinary search.">'
+    +     '<input type="checkbox" id="hubAdvPartial" checked> Match part of words</label>'
     +   '<label class="filter-pill">Asset Type: <select id="hubAdvType">' + typeOptions + '</select>'
     +     '<svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg></label>'
-    +   '<label class="hub-adv__partial" title="Off: whole words only, so CAM does not find Camera">'
-    +     '<input type="checkbox" id="hubAdvPartial"> Match part of words</label>'
     + '</form>'
     + '<div class="hub-adv__summary" id="hubAdvSummary"></div>'
     + '<div class="hub-adv__list" id="hubAdvList"></div>'

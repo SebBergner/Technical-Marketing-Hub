@@ -73,11 +73,9 @@ def _now() -> str:
 
 
 def _write_json(path: str, data) -> None:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(data, fh, indent=1, ensure_ascii=False, default=str)
-    os.replace(tmp, path)
+    from backend.file_safety import replace_with
+    replace_with(path, lambda fh: json.dump(data, fh, indent=1, ensure_ascii=False,
+                                            default=str))
 
 
 def _read_json(path: str, default=None):

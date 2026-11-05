@@ -47,6 +47,7 @@ import logging
 import os
 import secrets
 import threading
+import time
 
 from backend.config import settings
 from backend.tables import utcnow
@@ -72,8 +73,28 @@ def _owned(name: str) -> str:
 
 
 def _read(name: str, default):
-    from backend.repositories.json_repo import _read as read
-    return read(_owned(name), default)
+    """`default` only when the file does not exist. A file that cannot be
+    read is an error, never "empty": read as empty and written back, it
+    would drop every code and every link with it (2026-11-04)."""
+    path = _owned(name)
+    for attempt in range(3):
+        if not os.path.exists(path):
+            return default
+        try:
+            with open(path, encoding="utf-8") as fh:
+                return json.load(fh)
+        except (OSError, ValueError):
+            if attempt == 2:
+                raise
+            time.sleep(0.05)
+    return default
+
+
+def _locked():
+    """Every change to these files, across all workers (backend/file_safety.py):
+    a lost update here loses a person's code, and every link they sent."""
+    from backend.file_safety import locked
+    return locked(_owned("gxc_shares"))
 
 
 def _write(name: str, payload) -> None:
@@ -135,7 +156,29 @@ def _generation(state: dict, code: str, asset_id: str) -> int:
 def token_for(email: str, asset_id: str) -> str:
     """This person's token for this video: the same every time, until revoked."""
     email = _norm(email)
-    with _lock:
+    code = _people()["by_email"].get(email)
+    if not code:
+        code = _new_code_for(email)
+    state = _read(STATE_FILE, {}) or {}
+    return code + _mac(code, asset_id, _generation(state, code, asset_id))
+
+
+def tokens_for(email: str, asset_ids) -> dict[str, str]:
+    """token_for() for many videos, reading each file once: a page of
+    cards used to read two files per GXC card (2026-11-04)."""
+    email = _norm(email)
+    ids = list(asset_ids)
+    if not ids:
+        return {}
+    code = _people()["by_email"].get(email) or _new_code_for(email)
+    state = _read(STATE_FILE, {}) or {}
+    return {a: code + _mac(code, a, _generation(state, code, a)) for a in ids}
+
+
+def _new_code_for(email: str) -> str:
+    """A person's code, made once: read again under the lock, since
+    another worker may have just made it."""
+    with _locked():
         people = _people()
         code = people["by_email"].get(email)
         if not code:
@@ -143,8 +186,7 @@ def token_for(email: str, asset_id: str) -> str:
             people["codes"][code] = email
             people["by_email"][email] = code
             _write(PEOPLE_FILE, people)
-    state = _read(STATE_FILE, {}) or {}
-    return code + _mac(code, asset_id, _generation(state, code, asset_id))
+        return code
 
 
 def sender_of(token: str | None, asset_id: str) -> str | None:
@@ -184,7 +226,7 @@ def set_group_only(asset_id: str, on: bool, actor: str) -> dict:
     so unmarking later opens nothing by itself."""
     now = _now()
     ended = 0
-    with _lock:
+    with _locked():
         marked = group_only()
         if on:
             marked.setdefault(asset_id, {"by": actor, "at": now})
@@ -226,7 +268,7 @@ def granted_ids(email: str | None) -> frozenset[str]:
 def grant(email: str, asset_id: str, via: str) -> bool:
     """B may see this video, via A's link. False when B already may."""
     email, via = _norm(email), _norm(via)
-    with _lock:
+    with _locked():
         grants = _grants()
         mine = grants.setdefault(email, {})
         current = mine.get(asset_id)
@@ -280,7 +322,7 @@ def revoke(sender: str, asset_id: str | None, actor: str) -> dict:
     everything that came through them. Returns what was revoked."""
     sender = _norm(sender)
     now = _now()
-    with _lock:
+    with _locked():
         people, state, grants = _people(), _read(STATE_FILE, {}) or {}, _grants()
         code = people["by_email"].get(sender)
         if code:

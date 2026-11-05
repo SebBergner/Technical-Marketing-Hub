@@ -501,8 +501,9 @@ def record_sign_in(*, oid: str, email: str | None, username: str | None,
         if _Known(_norm_email(email) or None, _norm_email(username) or None,
                   bool(external)).is_partner:
             return
-        with _lock:
-            users = known_users()
+        from backend.file_safety import locked
+        with _lock, locked(_owned(USERS_FILE)):
+            users = known_users(strict=True)
             by_oid = {u.get("oid"): u for u in users}
             entry = by_oid.get(oid) or {"oid": oid, "first_seen": _now()}
             entry.update(email=_norm_email(email) or None,
@@ -516,21 +517,30 @@ def record_sign_in(*, oid: str, email: str | None, username: str | None,
         log.exception("could not record the sign-in of %s", oid)
 
 
-def known_users() -> list[dict]:
+def known_users(strict: bool = False) -> list[dict]:
+    """Everyone who has signed in. `strict` (before writing it back): a
+    file that exists but cannot be read raises instead of reading as
+    empty, which written back would forget everyone (2026-11-04)."""
+    path = _owned(USERS_FILE)
     try:
-        with open(_owned(USERS_FILE), encoding="utf-8") as fh:
+        with open(path, encoding="utf-8") as fh:
             users = json.load(fh)
         return users if isinstance(users, list) else []
+    except FileNotFoundError:
+        return []
     except (OSError, ValueError):
+        if strict:
+            raise
         return []
 
 
 def forget_partners() -> int:
     """Drop partners recorded before they were left out (2026-10-09); see
     activity.scrub_partners(). Returns how many were dropped."""
+    from backend.file_safety import locked
     from backend.repositories.json_repo import _atomic_write
-    with _lock:
-        users = known_users()
+    with _lock, locked(_owned(USERS_FILE)):
+        users = known_users(strict=True)
         keep = [u for u in users
                 if not _Known(u.get("email"), u.get("username"), bool(u.get("external"))).is_partner]
         if len(keep) != len(users):

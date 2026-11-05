@@ -78,16 +78,24 @@ function bootFailed(message) {
 
 /* ------------------------------------------------------------------ boot */
 
+/* The first page says how many there are; the rest are asked for at once
+ * (2026-11-04: one after another they took ~2.5 s of a first load, and the
+ * thumbnails waited for them). Kept in order, so the pool is the same. */
 async function fetchAllAssets() {
-  var all = [];
-  for (var page = 0; page < MAX_PAGES; page++) {
-    var body = await getJSON("/api/assets?limit=" + PAGE_SIZE
-                           + "&offset=" + (page * PAGE_SIZE));
-    var items = body.items || [];
-    all = all.concat(items);
-    if (all.length >= (body.total || 0) || !items.length) return all;
+  function page(n) {
+    return getJSON("/api/assets?limit=" + PAGE_SIZE + "&offset=" + (n * PAGE_SIZE));
   }
-  console.warn("[hub-api] stopped at the page guard with more to fetch");
+  var first = await page(0);
+  var all = first.items || [];
+  var pages = Math.min(Math.ceil((first.total || 0) / PAGE_SIZE), MAX_PAGES);
+  if (Math.ceil((first.total || 0) / PAGE_SIZE) > MAX_PAGES) {
+    console.warn("[hub-api] stopped at the page guard with more to fetch");
+  }
+  var rest = [];
+  for (var n = 1; n < pages; n++) rest.push(page(n));
+  (await Promise.all(rest)).forEach(function (body) {
+    all = all.concat(body.items || []);
+  });
   return all;
 }
 
@@ -107,8 +115,9 @@ function showTotal(count) {
 async function load() {
   var assets, facets;
   try {
-    assets = await fetchAllAssets();
-    facets = await getJSON("/api/taxonomy");
+    var both = await Promise.all([fetchAllAssets(), getJSON("/api/taxonomy")]);
+    assets = both[0];
+    facets = both[1];
   } catch (err) {
     console.error("[hub-api] could not load the catalogue", err);
     bootFailed("The catalogue could not be loaded: " + err.message);

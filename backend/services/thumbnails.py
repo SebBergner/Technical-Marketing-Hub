@@ -150,6 +150,81 @@ SLOTS = 4
 _slots = threading.BoundedSemaphore(SLOTS)
 
 
+#: The card shows a picture at most ~400 px wide (twice that on a sharp
+#: screen); Graph's "large" is 800 px and 91 KB on average.
+COMPACT_PX = 640
+
+
+def compact(data: bytes, ctype: str) -> tuple[bytes, str]:
+    """The picture at most COMPACT_PX on its longer side: a JPEG, or a PNG
+    when it has transparency. 91 KB -> 19 KB on average, 8 ms each
+    (measured 2026-11-04 on 424 cached pictures): a first Home page loads
+    15 of them at once. The original whenever this fails or is no smaller."""
+    try:
+        import io
+        from PIL import Image
+        image = Image.open(io.BytesIO(data))
+        image.load()
+        image.thumbnail((COMPACT_PX, COMPACT_PX))
+        out = io.BytesIO()
+        clear = image.mode in ("RGBA", "LA", "P") and (
+            "transparency" in image.info or image.mode in ("RGBA", "LA"))
+        if clear:
+            image.save(out, "PNG", optimize=True)
+            kind = "image/png"
+        else:
+            image.convert("RGB").save(out, "JPEG", quality=80, optimize=True,
+                                      progressive=True)
+            kind = "image/jpeg"
+        small = out.getvalue()
+    except Exception as exc:                                    # noqa: BLE001
+        log.info("thumbnail kept as it is: %s", exc)
+        return data, ctype
+    return (small, kind) if small and len(small) < len(data) else (data, ctype)
+
+
+def _compact_cached(data_path: str, meta_path: str, meta: dict,
+                    cached: tuple[bytes, str]) -> tuple[bytes, str]:
+    """A picture cached before COMPACT_PX, made compact once, keeping its
+    age: the week it is fresh for still counts from when it was fetched."""
+    small = compact(*cached)
+    try:
+        from backend.file_safety import replace, replace_with, temp_path
+        stamp = os.path.getmtime(data_path)
+        tmp = temp_path(data_path)
+        with open(tmp, "wb") as fh:
+            fh.write(small[0])
+        replace(tmp, data_path)
+        os.utime(data_path, (stamp, stamp))
+        replace_with(meta_path, lambda fh: json.dump(
+            {**meta, "content_type": small[1], "compact": True}, fh))
+    except OSError as exc:
+        log.warning("thumbnail cache not made compact: %s", exc)
+    return small
+
+
+_refreshing: set[str] = set()
+_refreshing_lock = threading.Lock()
+
+
+def _refresh_soon(mirror_dir: str, client, url: str) -> None:
+    """Fetch a stale picture again in the background, once at a time."""
+    with _refreshing_lock:
+        if url in _refreshing:
+            return
+        _refreshing.add(url)
+
+    def run():
+        try:
+            get(mirror_dir, client, url, wait=True)
+        except Exception as exc:                                # noqa: BLE001
+            log.warning("thumbnail %s not refreshed: %s", url[:120], exc)
+        finally:
+            with _refreshing_lock:
+                _refreshing.discard(url)
+    threading.Thread(target=run, name="thumbnail-refresh", daemon=True).start()
+
+
 def get(mirror_dir: str, client, url: str, wait: bool = True) -> tuple[bytes, str] | None:
     """From the cache while it is fresh, else from SharePoint (and cached).
     A stale copy is still served when SharePoint cannot be reached; a picture
@@ -160,16 +235,29 @@ def get(mirror_dir: str, client, url: str, wait: bool = True) -> tuple[bytes, st
     if os.path.exists(data_path) and os.path.exists(meta_path):
         try:
             with open(meta_path, encoding="utf-8") as fh:
-                ctype = json.load(fh).get("content_type") or "image/jpeg"
+                meta = json.load(fh)
+            ctype = meta.get("content_type") or "image/jpeg"
             with open(data_path, "rb") as fh:
                 cached = (fh.read(), ctype)
+            if not meta.get("compact"):
+                cached = _compact_cached(data_path, meta_path, meta, cached)
         except (OSError, ValueError):
             cached = None
         if cached and _young(data_path, CACHE_DAYS * 86400):
             return cached
     if client is None or _young(_miss_path(mirror_dir, url), MISS_HOURS * 3600):
         return cached
+    if cached is not None and not wait:
+        # A viewer never waits on SharePoint for a picture the Hub already
+        # has: this one now, a fresh one fetched behind it (2026-11-04).
+        _refresh_soon(mirror_dir, client, url)
+        return cached
     if not _slots.acquire(blocking=wait):
+        # A picture past its week is still the right picture: shown while
+        # every slot is busy, not the cover (2026-11-04, before the stress
+        # test -- many viewers at once is exactly when the slots are full).
+        if cached is not None:
+            return cached
         raise Busy()
     try:
         fresh = fetch(client, url)
@@ -183,11 +271,14 @@ def get(mirror_dir: str, client, url: str, wait: bool = True) -> tuple[bytes, st
         if fresh is None:
             open(_miss_path(mirror_dir, url), "w").close()
             return cached
-        with open(data_path + ".tmp", "wb") as fh:
+        fresh = compact(*fresh)
+        from backend.file_safety import replace, replace_with, temp_path
+        tmp = temp_path(data_path)
+        with open(tmp, "wb") as fh:
             fh.write(fresh[0])
-        os.replace(data_path + ".tmp", data_path)
-        with open(meta_path, "w", encoding="utf-8") as fh:
-            json.dump({"content_type": fresh[1], "url": url}, fh)
+        replace(tmp, data_path)
+        replace_with(meta_path, lambda fh: json.dump(
+            {"content_type": fresh[1], "url": url, "compact": True}, fh))
         if os.path.exists(_miss_path(mirror_dir, url)):
             os.remove(_miss_path(mirror_dir, url))
     except OSError as exc:

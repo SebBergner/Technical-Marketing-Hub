@@ -34,6 +34,7 @@ import logging
 import os
 import re
 import threading
+import time
 from collections import Counter
 from dataclasses import replace
 from datetime import date, datetime
@@ -139,13 +140,35 @@ FILTER_TYPES = (
 )
 
 
+#: The Hub's own files the catalogue is built from (`_build_mirror`).
+#: A file it starts reading must be added here, or a change to it made by
+#: another worker shows only after something else changes.
+_CATALOGUE_OWNED = (
+    "identity", "hub_settings", "publish_dates", "upload_review", "uploads",
+    "metadata_edits", "sync_state", "hidden", "archived", "content_review",
+    "content_access", "upload_internal",
+)
+#: data dir -> (key, rows): the catalogue every request in this worker reads.
+_catalogue_cache: dict[str, tuple[tuple, list[dict]]] = {}
+_catalogue_lock = threading.Lock()
+#: Bumped by every write in this process, so its own writes show at once
+#: whatever the file system's clock says.
+_catalogue_generation = [0]
+
+
+def _catalogue_changed() -> None:
+    with _catalogue_lock:
+        _catalogue_generation[0] += 1
+
+
 def _atomic_write(path: str, payload: Any) -> None:
-    """Write via a temp file and rename, so a crash mid-write cannot corrupt."""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = f"{path}.tmp"
-    with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
-        json.dump(payload, fh, indent=2, ensure_ascii=False, default=str)
-    os.replace(tmp, path)
+    """Write via a temp file of its own and rename, so neither a crash nor
+    another worker writing at the same moment can corrupt it
+    (backend/file_safety.py)."""
+    from backend.file_safety import replace_with
+    replace_with(path, lambda fh: json.dump(payload, fh, indent=2, ensure_ascii=False,
+                                            default=str))
+    _catalogue_changed()
 
 
 def _ts(stamp: str | None) -> float:
@@ -157,13 +180,21 @@ def _ts(stamp: str | None) -> float:
 
 
 def _read(path: str, default: Any) -> Any:
-    if not os.path.exists(path):
-        return default
-    try:
-        with open(path, encoding="utf-8") as fh:
-            return json.load(fh)
-    except (ValueError, OSError):
-        return default
+    """`default` for a file that is missing or unreadable. A file another
+    worker is replacing at this instant (Windows and SMB shares refuse it
+    for a few milliseconds) is tried again first: the catalogue is cached
+    per worker, so a read lost here would stay lost until the next change."""
+    for attempt in range(10):
+        if not os.path.exists(path):
+            return default
+        try:
+            with open(path, encoding="utf-8") as fh:
+                return json.load(fh)
+        except PermissionError:
+            time.sleep(0.05)
+        except (ValueError, OSError):
+            return default
+    return default
 
 
 def _as_date(value: Any) -> date | None:
@@ -402,6 +433,53 @@ class JsonAssetRepository(AssetRepository):
         return cached[1]
 
     def _load_mirror(self) -> list[dict]:
+        """The catalogue as this repository's person may see it.
+
+        Built once per worker and shared by every request (2026-11-04,
+        before the stress test): each request used to rebuild it from every
+        file, ~100 ms of CPU locally and more on Azure Files, 26 times for
+        one Home page. Rebuilt when any file it is made from changes
+        (`_catalogue_key`), or when this process writes one of the Hub's
+        files. GXC videos are taken out per person afterwards, as before:
+        for anyone without "Access GXC videos" they do not exist, except
+        those a personal link granted.
+        """
+        rows = self._shared_catalogue()
+        if self.gxc:
+            return list(rows)
+        return [r for r in rows if not r.get("gxc") or r["id"] in self.gxc_granted]
+
+    def _catalogue_key(self) -> tuple:
+        """Everything `_build_mirror` reads, as (name, mtime, size): a write
+        by another worker changes it."""
+        def stamp(path: str):
+            try:
+                st = os.stat(path)
+            except OSError:
+                return None
+            return (st.st_mtime_ns, st.st_size)
+        names = (sorted(n for n in os.listdir(self.mirror_dir) if n.endswith(".json"))
+                 if os.path.isdir(self.mirror_dir) else [])
+        from backend import access
+        paths = [os.path.join(self.mirror_dir, n) for n in names]
+        paths.append(os.path.join(self.mirror_dir, PRIVATE_DIR, PARTNER_ACCESS_FILE))
+        paths += [self._owned_path(n) for n in _CATALOGUE_OWNED]
+        paths.append(access._owned(access.USERS_FILE))
+        return (os.path.abspath(self.dir), _catalogue_generation[0],
+                utcnow().date().isoformat(), tuple((p, stamp(p)) for p in paths))
+
+    def _shared_catalogue(self) -> list[dict]:
+        key = self._catalogue_key()
+        with _catalogue_lock:
+            cached = _catalogue_cache.get(key[0])
+            if cached is not None and cached[0] == key:
+                return cached[1]
+        rows = self._build_mirror()
+        with _catalogue_lock:
+            _catalogue_cache[key[0]] = (key, rows)
+        return rows
+
+    def _build_mirror(self) -> list[dict]:
         """Cached per file.
 
         Without a cache, `get()` re-parsed the whole catalogue on every call —
@@ -446,8 +524,7 @@ class JsonAssetRepository(AssetRepository):
         tagged = [(src, {**r, "gxc": True, "customer_facing": False, "internal": True,
                          "internal_source": "sharepoint"}
                    if src in GXC_SOURCES else r)
-                  for src, r in tagged if self.gxc or src not in GXC_SOURCES
-                  or r["id"] in self.gxc_granted]
+                  for src, r in tagged]
         identity = self._load("identity")
         # Retired items keep their identity row but leave the catalogue.
         live = [(src, r) for src, r in tagged
@@ -549,6 +626,7 @@ class JsonAssetRepository(AssetRepository):
 
     def _invalidate(self, path: str | None = None) -> None:
         """Drop cached mirror data. Never rely on mtime alone to notice a write."""
+        _catalogue_changed()
         if path is None:
             self._mirror_cache.clear()
         else:
@@ -1310,13 +1388,14 @@ class JsonAssetRepository(AssetRepository):
                 if row.get("id") == request_id:
                     row["sharepoint_item_id"] = item_id
                     row["synced"] = True
-            tmp = path + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as fh:
+            from backend.file_safety import replace_with
+
+            def write(fh):
                 for row in rows:
                     fh.write(json.dumps(row, ensure_ascii=False) + "\n")
                 fh.flush()
                 os.fsync(fh.fileno())
-            os.replace(tmp, path)
+            replace_with(path, write)
 
     def unsynced_requests(self) -> list[AssetRequest]:
         """Submissions that never reached SharePoint.
@@ -1443,10 +1522,9 @@ class JsonAssetRepository(AssetRepository):
                     text = fh.read()
                 changed = word.sub(lambda hit: renames[hit.group(1)], text)
                 if changed != text:
-                    tmp = path + ".tmp"
-                    with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
-                        fh.write(changed)
-                    os.replace(tmp, path)
+                    from backend.file_safety import replace_with
+                    replace_with(path, lambda fh, text=changed: fh.write(text))
+                    _catalogue_changed()
             now = utcnow().isoformat(timespec="seconds")
             for old, new in renames.items():
                 row = identity[old]

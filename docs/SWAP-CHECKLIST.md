@@ -1,10 +1,11 @@
 # Slot swap checklist (staging → production)
 
-Updated 2026-10-30 for next week's release, to the team **and other PTC departments**
-(all @ptc.com): production goes from **v2026.3.123** (2026-10-20, `6cdd300`) to the
-staging build (**v2026.3.168** or later, `6703a93`+). The first version of this list
-was written for the 10/16 swap (v72 → v100). Reusable for later swaps; update
-the version numbers and the "what is new" list each time.
+Updated 2026-11-04 for the swap before Friday's stress test (2026-11-06,
+10–20 people at once, `docs/stress-test-2026-11-06.md`): production goes from
+**v2026.3.123** (2026-10-20, `6cdd300`) to the staging build (**v2026.3.174**
+or later, with D18). Written first for the 10/16 swap (v72 → v100), then
+for 10/30. Reusable for later swaps; update the version numbers and the
+"what is new" list each time.
 
 > 中文导读：切换前：请团队外的同事试登录和预览；导入 GXC（先跑 1 个）；把 Elio 和 Seb
 > 加为 Administrators 的成员；确认 /migration 没在跑；备份 production 的 owned/。切换后**马上**
@@ -51,6 +52,15 @@ Everything built since 2026-10-20 is new on production:
   to everyone without Run sync & migration; sharing through Consensus needs a licence.
 - Admin: menu down the left, an icon per tab; Overview links to the Brightcove
   migration page and shows how the slot is set (Configuration).
+- **GXC personal links** (B10, 11/03–11/04): GXC videos have random ids; a
+  GXC group member's link is personal, and anyone at PTC outside the group
+  opens that one video through it (recorded, revocable on Admin → Content
+  access). **GXC group only** videos (the 3 Lamborghini) open for the group
+  alone. IoT/AR: 135 more GXC videos (11/04), so 248 in all.
+- **Faster** (D18, 11/04): the catalogue is built once per worker, grids show
+  48 cards with Load more, card pictures load as they come near the screen
+  and are smaller (Hub pictures 91→19 KB, Brightcove 93→36 KB). Files the Hub
+  writes while people browse are safe with several workers.
 
 ## Facts that shape the swap
 
@@ -62,6 +72,8 @@ Everything built since 2026-10-20 is new on production:
   OIDC_*, SECRET_KEY, HTTPS_ONLY, AUTH_CURATOR_EMAILS, CUSTOM_DOMAIN), the
   BRIGHTCOVE_* settings, and `HUB_TASKS_LIST` on staging (empty, so trials
   there do not reach the team's list). **Everything else moves with the code.**
+- **New dependency:** Pillow (thumbnails). The deploy installs it; the Hub
+  serves pictures as they are if it is missing.
 - **New settings since v2026.3.123:** `GRAPH_GXC_LIBRARY` and
   `MIGRATION_GXC_LIBRARY`, both defaulting to "GXC Video". Nothing to set.
   **`GXC_ID_KEY`** (B10, 2026-11-03): the key GXC videos' ids are made with.
@@ -137,6 +149,11 @@ Everything built since 2026-10-20 is new on production:
    the only data a sync cannot rebuild; the swap does not touch it, this is just the
    safety net. The last one was on 2026-10-30.
 
+8a. **Not during the stress test, nor in the hour before.** The first full
+   sync on production (step 13) takes several minutes; the scheduled ones run
+   at 06:00 and 18:00 UTC (18:00 UTC is 1 pm EST): check them against the
+   test's time.
+
 ## The swap
 
 8. Azure Portal → Technical-Marketing-Hub → Deployment slots → **Swap**
@@ -178,11 +195,16 @@ Everything built since 2026-10-20 is new on production:
 15. **Consensus licences** (Users & groups): upload Elio's CSV again (October
     2026 version, 263 people, 19 partners). Without it nobody sees Create
     DemoBoard.
-16. **GXC**: create a group "GXC" with only Access GXC videos and Liwei's list of 30
+16. **GXC**: check Sync history shows GXC Video succeeded (it fails without
+    `GXC_ID_KEY` on production) and the GXC videos have `gxc-` ids. Create a group "GXC" with only Access GXC videos and Liwei's list of 30
     people (until then only Administrators see GXC). PTC addresses only. The same people
     go into the SharePoint GXC group. Downloads stay off unless decided otherwise
     (Admin → Content access). The list and the full permission table are in Liwei's
     `docs/production-permissions-after-swap.md` (not in git, as it lists people).
+16a. **GXC group only**: Admin → Content access → GXC personal links → mark
+    the 3 Lamborghini GXC videos (Lamborghini Technical Overview, Lamborghini
+    Engineering - Presenter Support, Lamborghini Manufacturing & Service
+    Presenter Support). Marks are per slot; staging's do not cross.
 17. **Report owners**: name each segment's owners and General's, on production; those
     named on staging do not cross. Without them every feedback lands in General and
     nobody is told. There is no email in v1: someone reads Hub Tasks. Then create a group
@@ -194,7 +216,10 @@ Everything built since 2026-10-20 is new on production:
     still shows open access requests to approve or reject. List them for Liwei.
 20. **API tokens** stay per slot: production's existing tokens keep working;
     tokens made on staging do not.
-21. **Spot checks**: search and filters; a demo page (Edit on the Details card,
+21. **Speed** (stress test): sign in, reload Home with the cache empty (Ctrl+F5):
+    the cards fill in within a few seconds; Recently published shows 48 cards and
+    Load 48 more. Azure Portal → Metrics: CPU, memory, HTTP 5xx during the test.
+21a. **Spot checks**: search and filters; a demo page (Edit on the Details card,
     Share feedback, Related demos, Create DemoBoard for a licensed person); Hub
     activity with a creator picked; Admin → Sign-ins → Admin log shows your sync
     and group changes; a partner test account (if you have one) cannot open

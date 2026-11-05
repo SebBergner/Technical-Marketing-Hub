@@ -95,8 +95,10 @@ def _with_share_tokens(page: Page[AssetSummary], user: CurrentUser) -> Page[Asse
         return page
     closed = gxc_shares.group_only()
     share = gxc_shares.may_share(user)
+    tokens = gxc_shares.tokens_for(user.email, [a.id for a in page.items
+                                                if a.gxc and a.id not in closed]) if share else {}
     page.items = [a.model_copy(update={"gxc_group_only": True}) if a.gxc and a.id in closed
-                  else a.model_copy(update={"share_token": gxc_shares.token_for(user.email, a.id)})
+                  else a.model_copy(update={"share_token": tokens[a.id]})
                   if a.gxc and share else a for a in page.items]
     return page
 

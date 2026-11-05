@@ -130,9 +130,9 @@ def _touch(oid: str, email: str | None, name: str | None,
     if not force and clock - _written.get(oid, -1e9) < WRITE_EVERY_SECONDS:
         return
     from backend.repositories.json_repo import _atomic_write
-    with _lock:
+    with _lock, _locked_activity():
         _written[oid] = clock
-        state = _activity()
+        state = _activity(strict=True)
         state[oid] = {"user": (email or "").strip().lower() or None, "name": name,
                       "external": False, "last_active": _iso(now or _now())}
         _atomic_write(access._owned(ACTIVITY_FILE), state)
@@ -144,19 +144,32 @@ def _touch_external(now: datetime | None = None, force: bool = False) -> None:
     if not force and clock - _written.get(EXTERNAL_KEY, -1e9) < EXTERNAL_WRITE_EVERY_SECONDS:
         return
     from backend.repositories.json_repo import _atomic_write
-    with _lock:
+    with _lock, _locked_activity():
         _written[EXTERNAL_KEY] = clock
-        state = _activity()
+        state = _activity(strict=True)
         state[EXTERNAL_KEY] = {"last_active": _iso(now or _now())}
         _atomic_write(access._owned(ACTIVITY_FILE), state)
 
 
-def _activity() -> dict:
+def _locked_activity():
+    """activity.json across all workers (backend/file_safety.py). Waits a
+    second at most: a request is never held up for "last active"."""
+    from backend.file_safety import locked
+    return locked(access._owned(ACTIVITY_FILE), wait=1.0)
+
+
+def _activity(strict: bool = False) -> dict:
+    """`strict` (before writing it back): unreadable raises rather than
+    reading as empty, which written back would forget everyone."""
     try:
         with open(access._owned(ACTIVITY_FILE), encoding="utf-8") as fh:
             state = json.load(fh)
         return state if isinstance(state, dict) else {}
+    except FileNotFoundError:
+        return {}
     except (OSError, ValueError):
+        if strict:
+            raise
         return {}
 
 
@@ -201,11 +214,9 @@ def scrub_partners() -> dict:
                     e = {"at": e.get("at"), "event": e.get("event", "sign_in"), "external": True}
                     done["sign_ins"] += 1
                 clean.append(e)
-            path = access._owned(EVENTS_FILE)
-            tmp = path + ".tmp"
-            with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
-                fh.writelines(json.dumps(e, ensure_ascii=False) + "\n" for e in clean)
-            os.replace(tmp, path)
+            from backend.file_safety import replace_with
+            replace_with(access._owned(EVENTS_FILE), lambda fh: fh.writelines(
+                json.dumps(e, ensure_ascii=False) + "\n" for e in clean))
 
         state = _activity()
         partners = [k for k, v in state.items()

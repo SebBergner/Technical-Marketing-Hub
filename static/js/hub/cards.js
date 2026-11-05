@@ -169,7 +169,10 @@ function cardShell(a) {
   var thumb = document.createElement("div");
   thumb.className = "asset-card__thumb";
   if (a.thumbnail_url) {
-    thumb.style.background = "url(" + JSON.stringify(a.thumbnail_url) + ") center / cover";
+    // The picture itself is set by paintCover(), once the card is near the
+    // screen (2026-11-04): a grid of 48 asked for every picture at once.
+    thumb.style.backgroundPosition = "center";
+    thumb.style.backgroundSize = "cover";
   }
 
   var spec = TYPE_CHIP[a.type] || TYPE_CHIP.video;
@@ -627,8 +630,42 @@ function hueFor(name) {
   return h;
 }
 
+/* Brightcove serves its stills in any size by address; a card is at most
+ * ~400 px wide, and 640x360 is 36 KB against 1280x720's 93 KB (measured
+ * 2026-11-04). Anything else is left as it is. */
+function cardImage(url) {
+  if (!url || !/^https:\/\/cf-images\.[^/]*boltdns\.net\//i.test(url)) return url;
+  return url.replace("/1280x720/", "/640x360/");
+}
+
+/* `run` once `el` comes within a screen of view: pictures far down a grid
+ * are not fetched until someone scrolls to them. */
+var nearScreen = null;
+function whenNearScreen(el, run) {
+  if (!("IntersectionObserver" in window)) { run(); return; }
+  if (!nearScreen) {
+    nearScreen = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        nearScreen.unobserve(e.target);
+        var go = e.target.hubWhenNear;
+        e.target.hubWhenNear = null;
+        if (go) go();
+      });
+    }, { rootMargin: "600px 0px" });
+  }
+  el.hubWhenNear = run;
+  nearScreen.observe(el);
+}
+
 function paintCover(card, a) {
-  paintCoverInto(card.querySelector(".asset-card__thumb"), a);
+  var thumb = card.querySelector(".asset-card__thumb");
+  if (!thumb || !a.thumbnail_url) { paintCoverInto(thumb, a); return; }
+  var url = cardImage(a.thumbnail_url);
+  whenNearScreen(thumb, function () {
+    thumb.style.backgroundImage = "url(" + JSON.stringify(url) + ")";
+    paintCoverInto(thumb, Object.assign({}, a, { thumbnail_url: url }));
+  });
 }
 
 /* The mark itself, split out so both the no-thumbnail case and the
@@ -781,6 +818,6 @@ function renderAgeMark(meta, asset) {
 }
 
 export {
-  assetHref, buildCard, consensusUrl, embedInlinePlayer, gxcPill, paintCoverInto, previewUrl,
+  assetHref, buildCard, cardImage, consensusUrl, embedInlinePlayer, gxcPill, paintCoverInto, previewUrl,
   renderAgeMark, stopInlinePlayer, TYPE_CHIP, videoTypeOf
 };

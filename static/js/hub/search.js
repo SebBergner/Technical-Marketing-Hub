@@ -7,7 +7,7 @@
 import {
   debounce, escapeHtml, getJSON, LANGUAGE_LABEL, pill, TYPE_LABELS
 } from "./util.js";
-import { paintCoverInto, TYPE_CHIP, videoTypeOf } from "./cards.js";
+import { cardImage, paintCoverInto, TYPE_CHIP, videoTypeOf } from "./cards.js";
 import { val } from "./filters.js";
 import { familyDisplayName } from "./nav.js";
 import { buildFileRow, closeFilePreview, fileHash } from "./detail.js";
@@ -228,9 +228,9 @@ function renderAdvancedHit(hit, q) {
   thumb.className = "hub-adv__thumb";
   thumb.href = href;
   thumb.setAttribute("aria-label", a.title);
-  if (a.thumbnail_url) thumb.style.backgroundImage = "url(" + JSON.stringify(a.thumbnail_url) + ")";
+  if (a.thumbnail_url) thumb.style.backgroundImage = "url(" + JSON.stringify(cardImage(a.thumbnail_url)) + ")";
   row.appendChild(thumb);
-  paintCoverInto(thumb, a);
+  paintCoverInto(thumb, Object.assign({}, a, { thumbnail_url: cardImage(a.thumbnail_url) }));
 
   var main = document.createElement("div");
   main.className = "hub-adv__main";

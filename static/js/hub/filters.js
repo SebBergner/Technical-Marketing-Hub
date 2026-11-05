@@ -321,11 +321,11 @@ var CONTROLS = ["hubSearchInput", "hubFilterType", "hubFilterProduct",
                 "hubFilterCf", "hubFilterVideoType", "hubFilterPublished",
                 "hubFilterArchived"];
 var LANDING = ["hubHome"];
-//: One request's ceiling, enforced server-side (`le=200` in assets.py) --
-//: not a UI choice, so raising it here would just get clamped back. A
-//: filter or a search that matches more than this needs a second request,
-//: which is what `loadMoreState` below is for.
-var RESULT_LIMIT = 200;
+//: Cards per page of a grid; "Load more" fetches the next page. 200 until
+//: 2026-11-04 (the server's ceiling, `le=200` in assets.py): nobody looks
+//: through 200 cards, and each one cost its share of the reply and a
+//: picture. Liwei, before the stress test.
+var RESULT_LIMIT = 48;
 var inFlight = 0;
 var baselineFacets = null;     // whole-catalogue counts, for when all clear
 /* The filters that have no control in the filter bar: navigation sets them
@@ -812,8 +812,10 @@ async function applyFilters() {
 
   var page, facets;
   try {
-    page = await getJSON("/api/assets?" + assetParams);
-    facets = await getJSON("/api/taxonomy?" + params);
+    var both = await Promise.all([getJSON("/api/assets?" + assetParams),
+                                  getJSON("/api/taxonomy?" + params)]);
+    page = both[0];
+    facets = both[1];
   } catch (err) {
     console.error("[hub-api] filter request failed", err);
     report("Filtering failed - " + err.message, true);

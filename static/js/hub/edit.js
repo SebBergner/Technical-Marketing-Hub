@@ -213,6 +213,9 @@ function openEditor(asset) {
       msg.textContent = "Saving…";
       call("PUT", base(asset) + "/metadata", { values: values, etag: form.etag })
         .then(function (d) {
+          // The editor closes once SharePoint has it: left open, it stayed on
+          // "Saving…" over the refreshed page (Liwei, 2026-11-04).
+          close();
           report(d.changed.length ? "Saved to SharePoint: " + d.changed.length
                    + (d.changed.length === 1 ? " field." : " fields.") : "Nothing changed.");
           openAssetDetail(asset.id);
@@ -333,7 +336,11 @@ function pictureChooser(asset, form) {
     auto.addEventListener("click", function () {
       state.textContent = "Saving…";
       call("DELETE", base(asset) + "/thumbnail")
-        .then(function () { report("The card uses the automatic picture again."); openAssetDetail(asset.id); })
+        .then(function () {
+          state.textContent = "Automatic: the Hub picks the picture.";
+          report("The card uses the automatic picture again.");
+          openAssetDetail(asset.id);
+        })
         .catch(function (e) { state.textContent = e.message; });
     });
     row.appendChild(auto);
@@ -348,7 +355,11 @@ function sendPicture(asset, blob, state) {
   var data = new FormData();
   data.append("file", blob, blob.name || "frame.jpg");
   call("PUT", base(asset) + "/thumbnail", data)
-    .then(function () { report("The card shows the new picture."); openAssetDetail(asset.id); })
+    .then(function () {
+      state.textContent = "A chosen picture is shown.";
+      report("The card shows the new picture.");
+      openAssetDetail(asset.id);
+    })
     .catch(function (e) { state.textContent = e.message; });
 }
 

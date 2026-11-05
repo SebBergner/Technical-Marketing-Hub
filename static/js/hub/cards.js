@@ -13,12 +13,10 @@ import { openShareFor } from "./share.js";
 /* ---------------------------------------------------------------- mapping */
 
 /* The stats line, assembled from whatever the record actually has.
- * `external_views` is the source platform's count, not ours, and most
- * SharePoint assets have none — so the line is built from the parts that
- * exist rather than printing "0 views" for everything. */
+ * No views: Consensus's own count is not shown since the Hub counts its own
+ * (Liwei, 2026-11-05; Dashboard, Usage). */
 function statsLine(a) {
   var bits = [];
-  if (a.external_views) bits.push(a.external_views + " views");
   if (a.resource_count) bits.push(a.resource_count + " files");
   // The date has its own line under the title (dateLabel, 2026-10-26).
   return bits.join(" · ");
@@ -766,6 +764,17 @@ function friendlyDate(iso) {
     { year: "numeric", month: "short", day: "numeric" });
 }
 
+/* "New" is the last 120 days (Liwei, 2026-11-05). Under a year, as the
+ * "new" band and the Published filter's "Under 1 year" still are, put it on
+ * 249 demos -- most of any recent list -- so it said nothing. Between 120
+ * days and a year a demo shows no badge, like one 1-2 years old. */
+var NEW_DAYS = 120;
+
+function isNew(a) {
+  var d = new Date(String(a.uploaded_at || "").slice(0, 10) + "T00:00:00");
+  return !isNaN(d) && (Date.now() - d.getTime()) / 86400000 <= NEW_DAYS;
+}
+
 /* The badge for one demo, or null (1-2 years old, or no date). */
 function ageBadge(a) {
   var kind, text, icon, title;
@@ -780,7 +789,7 @@ function ageBadge(a) {
     title = "A reviewer confirmed the interface shown still matches today's release"
       + " (until " + friendlyDate(a.still_current_until) + ")."
       + (year ? " Published " + year + "." : "");
-  } else if (a.age_band === "new") {
+  } else if (a.age_band === "new" && isNew(a)) {
     kind = "new"; icon = "spark"; text = "New";
     title = "Recent recording: shows the current software interface.";
   } else if (a.age_band === "aging") {

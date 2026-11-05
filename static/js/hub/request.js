@@ -384,14 +384,8 @@ function duplicateRow(asset) {
   meta.textContent = bits.filter(Boolean).join(" · ");
   row.appendChild(meta);
 
+  // No Consensus play count (Liwei, 2026-11-05): the Hub counts its own.
   var facts = [];
-  // Named for what it is. This is Consensus's own tally on its own
-  // platform, not anything the Hub measured, and calling it "uses" -- as
-  // the placeholder did -- would invent a meaning it does not have.
-  if (asset.external_views) {
-    facts.push(asset.external_views
-      + (asset.external_views === 1 ? " play" : " plays"));
-  }
   if (asset.uploaded_at) facts.push("added " + asset.uploaded_at);
   if (facts.length) {
     var stats = document.createElement("div");

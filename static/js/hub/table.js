@@ -10,7 +10,7 @@
  * filters.js owns the query, the sort state and loading more; it calls
  * renderRows() where it used to append cards. */
 
-import { dateLabel, getJSON, LANGUAGE_LABEL, report } from "./util.js";
+import { dateLabel, durationLabel, getJSON, LANGUAGE_LABEL, report } from "./util.js";
 import { familyDisplayName } from "./nav.js";
 import { openAssetDetail } from "./detail.js";
 import { assetHref, gxcPill, TYPE_CHIP } from "./cards.js";
@@ -19,6 +19,12 @@ var VIEW_KEY = "hub.resultsView";
 
 //: [column, heading, sort it asks the server for]. Date asks for
 //: recent/oldest, which carry their own direction; the rest send `order`.
+//: Length has no sort.
+//:
+//: Length replaced Views (Liwei, 2026-11-05): Views read a counter only
+//: Consensus shares fed, so it was empty on every row. How long a video
+//: runs, or how many files a kit holds, is what someone picking one from a
+//: list wants to know.
 var COLUMNS = [
   ["title", "Title", "title"],
   ["type", "Type", "type"],
@@ -26,7 +32,7 @@ var COLUMNS = [
   ["segment", "Segment", "segment"],
   ["language", "Language", "language"],
   ["date", "Date", null],
-  ["views", "Views", "most_viewed"]
+  ["length", "Length", null]
 ];
 
 function tableView() {
@@ -44,16 +50,16 @@ function sortedColumn(sort, order) {
   if (sort === "relevance") return [null, null];
   for (var i = 0; i < COLUMNS.length; i++) {
     if (COLUMNS[i][2] === sort) {
-      return [COLUMNS[i][0], order || (sort === "most_viewed" ? "desc" : "asc")];
+      return [COLUMNS[i][0], order || "asc"];
     }
   }
   return [null, null];
 }
 
 /* What clicking a column asks for: its natural direction first (newest,
- * most viewed, A to Z), the other way on a second click. */
+ * A to Z), the other way on a second click. */
 function sortFor(column, current) {
-  var natural = column === "date" || column === "views" ? "desc" : "asc";
+  var natural = column === "date" ? "desc" : "asc";
   var dir = current[0] === column ? (current[1] === "asc" ? "desc" : "asc") : natural;
   if (column === "date") return { sort: dir === "desc" ? "recent" : "oldest", order: null };
   var spec = COLUMNS.filter(function (c) { return c[0] === column; })[0];
@@ -68,8 +74,15 @@ function cellValues(a) {
     segment: a.segment || "",
     language: a.language ? (LANGUAGE_LABEL[a.language] || a.language.toUpperCase()) : "",
     date: dateLabel(a),
-    views: (a.stats && a.stats.views) || 0
+    length: lengthLabel(a)
   };
+}
+
+/* A video's running time; a kit's file count. */
+function lengthLabel(a) {
+  if (a.type === "video") return durationLabel(a.duration_seconds);
+  var n = a.resource_count || 0;
+  return n ? n + (n === 1 ? " file" : " files") : "";
 }
 
 function head(onSort, sort, order) {
@@ -80,6 +93,11 @@ function head(onSort, sort, order) {
     var th = document.createElement("th");
     th.scope = "col";
     th.className = "hub-table__th hub-table__th--" + c[0];
+    if (!c[2] && c[0] !== "date") {      // not sortable: a heading, no button
+      th.textContent = c[1];
+      tr.appendChild(th);
+      return;
+    }
     var btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = c[1];
@@ -115,7 +133,7 @@ function row(a) {
         td.appendChild(gxc);
       }
     } else {
-      td.textContent = c[0] === "views" ? (v.views ? String(v.views) : "") : v[c[0]];
+      td.textContent = v[c[0]];
     }
   });
   return tr;
@@ -169,11 +187,11 @@ async function exportCsv(params, button) {
   }
   var base = location.origin + location.pathname;
   var lines = [["Title", "Type", "Products", "Segment", "Language", "Date",
-                "Date (ISO)", "Views", "Link"].join(",")];
+                "Date (ISO)", "Length", "Link"].join(",")];
   rows.forEach(function (a) {
     var v = cellValues(a);
     lines.push([v.title, v.type, v.product, v.segment, v.language, v.date,
-                a.uploaded_at || "", v.views, base + "#/asset/" + encodeURIComponent(a.id)]
+                a.uploaded_at || "", v.length, base + "#/asset/" + encodeURIComponent(a.id)]
       .map(csvCell).join(","));
   });
   // A BOM, so Excel reads the UTF-8 (pure::variants, Chinese titles) right.

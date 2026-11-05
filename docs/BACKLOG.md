@@ -680,6 +680,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 | D16. 刚归档的 demo 显示 "Folder not moved" | **11/03 已修，已上 staging（`ca14146`）**。11/02（两个 Snowmobile 套件，相隔 24 秒）和 11/03（SCPa Medical Device，15:52:21）是同一个原因：归档后 Hub 先记一条临时标记（`sharepoint_archived`），等同步读到文件夹进了 `_Archive` 再丢掉。旧代码拿标记的时间和同步**完成**时间比；一次在归档前就开始读 SharePoint、归档后才完成的同步（几个 gunicorn worker 可能同时在同步），会让标记被当成"已同步"丢掉，而它的 mirror 里文件夹还在原处，于是显示 hub_only，直到下一次定时同步 | 同步在开始读 SharePoint 时记下时间（`sync_state` 的 `last_read_at`，Demo Catalog、Demo Video、GXC Video），临时标记改为和这个时间比。Details 卡片的其他编辑也一样受益。旧数据没有 `last_read_at` 时照旧用完成时间 | 完成 |
 | D17. 手动 Sync 报 HTTP 499 | 11/03 在 staging 连续两次：点 Sync 后浏览器要等同步跑完才有回复，现在要读三个库和 Brightcove 海报，超过 Azure 前端的等待时间就断开（499）。服务器上的同步照常跑完并记为成功（17:33 UTC 查过），只是页面显示失败，容易让人重复点 | Sync 按钮立刻返回，同步交给现有的后台队列（`graph.sync_soon`，归档已在用），页面轮询 Last attempt 直到完成 | 半天，发布后 |
 | D18. 周五压力测试前的速度和并发写（11/06，Serge 安排 10–20 人同时用） | **11/04 已做，本地完成，未上 staging**。11/04 在 staging 量：一个人打开 Home 要 8.4 秒才全部载完；目录 9 页一页接一页地拉（约 2.9 MB，2.3 秒），拉完才开始载缩略图；Hub 缩略图平均 91 KB，Brightcove 封面 1280×720 约 93 KB；每个列表请求都从 Azure Files 重新读一遍整个目录（本地 55 ms，单个资源 70 ms）。多个 gunicorn worker 同时写一个文件时，都用同一个 `<file>.tmp`，锁只在自己的进程内有效，可能丢更新，或者把文件读成空的再写回，丢掉所有记录：登录名单、活跃记录，以及 GXC 个人链接的代码（丢了，那个人发出去的链接全部失效） | ① 目录每个 worker 建一次，所有请求共用，按文件的修改时间和大小判断要不要重建（`json_repo._load_mirror`，本地列表 55→4 ms，单个资源 70→3 ms）；GXC 仍按人过滤。② 写文件都用各自的临时文件名，替换时遇到另一个进程正在读就重试；登录名单、活跃记录、GXC 链接文件改为跨进程加锁（O_EXCL 锁文件，和自动同步的锁同一做法，`backend/file_safety.py`）；GXC 链接文件读不出来时报错，不再当成空的。③ 首次加载：目录各页同时拉；列表和筛选计数同时请求。④ 列表一次 48 张卡片（原来 200），下面有 Load more；卡片的封面滚到附近才载。⑤ Hub 缩略图转成最长 640 px 的 JPEG（有透明的保持 PNG），平均 91→19 KB（Pillow，新依赖），已缓存的在第一次被读到时转换；超过一周的图先给旧的，后台再取新的；Brightcove 封面用 640×360（93→36 KB）。⑥ GXC 卡片的个人链接一个请求只读一次文件 | 完成，待上 staging 实测 |
+| D19. 11/05 用户视角走查发现的问题 | 见 `docs/hub-user-walkthrough-2026-11-05.md`：侧栏换列表后按后退，地址变了页面不变；从 demo 返回列表回到顶部；表格 Views 列和 Most viewed 排序读的是只有 Consensus 分享才写的计数，全是 0；"tips and techniques" 3 条、"tips & techniques" 62 条；普通搜索不查产品名（"ProENGINEER Wildfire" 0 条，实际 240）；Tiles/Table 切换回到前 48 条；卡片和详情页显示 Consensus 自带的 views；New 标记给一年内的所有内容（249 个） | ① 侧栏、标签、VM 入口换列表时新加一步历史，筛选和输入仍替换；后退/前进按地址重画列表，监听 popstate（之前的 hashchange 在只有查询串变化时不触发）。② 打开 demo 前记下列表的滚动位置，后退或点 Back 时恢复，已加载的卡片不重载。③ 表格去掉 Views，换成 Length（视频时长，kit 文件数），排序去掉 Most viewed。④ 搜索把 "and" 当作 "&"（查询和标题都去掉）；产品名算进普通搜索，排在标题命中之后。⑤ 切换 Tiles/Table 用已加载的结果重画。⑥ 不再显示 Consensus 的 views。⑦ New 只给 120 天内的内容（Published 筛选的 Under 1 year 不变）。IoT/AR 仍不进 Segment 筛选（Liwei 定） | 完成，待上 staging |
 
 ---
 
@@ -689,6 +690,20 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - 没有 Demo Type 的文件夹不会出现在 Hub：补 Demo Type。
 - LDK / VDK 标错的文件夹：在 SharePoint 改正 Demo Type（以后由 PM 在上传时标好）。
 - 旧版 Windchill VM、Codebeamer PV：在 SharePoint 删除（Hub 本来只显示最新版本）。
+
+### Data Clean 待办（11/05 用户视角走查新发现，staging v2026.3.176，数字来自 `/api/assets`）
+详见 `docs/hub-user-walkthrough-2026-11-05.md`。
+- [ ] **没有产品：417 个**。SharePoint 视频 330 个（GXC 248，其中 11/04 迁移的 IoT/AR 135；非 GXC 74），Consensus 视频 72，VDK 11，VM 3，LDK 1。没有产品的 demo 从 Browse by product 进不去；Dashboard 的产品 "Not set" 共 678。
+- [ ] **没有 Segment：449 个**。
+- [ ] **没有缩略图：183 个**。LDK 102、VDK 74、VM 7，卡片显示占位封面。
+- [ ] **没有时长：247 个视频**（其中 Consensus 242）。
+- [ ] "Windchill AI - Parts Rationalization VDK" 的 Demo Type 是 LDK，描述也是从 LDK 复制来的；"Windchill AI Assistant LDK" 的描述和 Parts Rationalization 一样。
+- [ ] **14 个重复标题**，例如 Creo AI Automate、Codebeamer Test Coverage、Windchill Next Gen UI - Home Screen（SharePoint 和 Consensus 各一个），Benefits of Mathcad Prime（Consensus 里有 3 个）。和 B2 一起处理。
+- [ ] **5 个 Consensus 内部培训 / 会议录像被标成 customer-facing**，例如 "Consensus Enablement-20250623_100351-Meeting Recording"、"Introduction to Consensus - Demo Video Platform-…-Meeting Recording"。
+- [ ] **同一产品有两种名字**：Jetstream / PTC Jetstream、Orbit / PTC Orbit、Modeler / PTC Modeler。**拼写错误**：产品 "Creo Piping and Cableing"，标签 "Artificial Inteliigence AI"。
+- [ ] Funnel stage 只有 325 / 1,621 个填了，Post-Sale 一个都没有。
+- [ ] 标题像文件名：Honda3Wheeler_EDU、Honda3Wheeler_COMM、CFD and AMX_Heat Exchanger Dataset、Technical Illustrations_Dataset。
+- [ ] Lamborghini - Intelligent Product Lifecycle（VDK）：Demo owner 要改成真正的负责人（Liwei 只是代为上传）。
 
 ---
 

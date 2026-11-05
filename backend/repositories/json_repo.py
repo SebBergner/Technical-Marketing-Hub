@@ -215,11 +215,18 @@ def _searchable(record: dict) -> str | None:
     the VM that has it installed. Public only: sealed content was removed
     before `search_text` was built, so a search cannot be used to probe for a
     password one character at a time.
+
+    Products count too (2026-11-05): "ProENGINEER Wildfire" found none of
+    the 240 datasets that are, because their titles and descriptions never
+    say so; only Advanced Search did. A product name is a word someone
+    searches for, ranked like a description hit -- below any title match.
     """
     text = record.get("description")
     extra = " ".join(x for x in ((record.get("vm") or {}).get("search_text"),
                                  record.get("search_text"),
-                                 record.get("named_customer")) if x)
+                                 record.get("named_customer"),
+                                 " ".join(record.get("products") or []),
+                                 " ".join(record.get("product_families") or [])) if x)
     return f"{text or ''} {extra}" if extra else text
 
 

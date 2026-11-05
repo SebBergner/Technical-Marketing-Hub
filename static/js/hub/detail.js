@@ -16,6 +16,7 @@ import {
   stopInlinePlayer, TYPE_CHIP, videoTypeOf
 } from "./cards.js";
 import { familyDisplayName, openTag } from "./nav.js";
+import { followUrl } from "./filters.js";
 import { renderVmCards, TYPE_LONG } from "./vm.js";
 import { closeActivity, openActivity } from "./activity.js";
 import { closeUpload, openUpload } from "./upload.js";
@@ -192,9 +193,9 @@ async function openAssetDetail(id, fileItemId, linkToken) {
   /* File counts are not here (Liwei, 2026-10-01): the Files tab carries
    * them ("Files (9)", "6 videos \u00b7 2 documents \u00b7 1 other"), and a second,
    * differently worded count under the title only repeated it. */
-  var facts = [];
-  if (asset.external_views) facts.push(asset.external_views + " views");
-  setText("vpStats", facts.join(" \u00b7 "));
+  /* Not Consensus's view count either (Liwei, 2026-11-05): the Hub counts
+   * its own, on the Dashboard. */
+  setText("vpStats", "");
 
   if (!renderStoryIntro(asset)) {
     setText("vpDesc", asset.description || "No description for this one yet.");
@@ -470,6 +471,9 @@ async function openAssetDetail(id, fileItemId, linkToken) {
   if (adv) adv.classList.remove("active");
   var topbar = document.getElementById("mainTopbar");
   var thread = document.getElementById("mainThread");
+  // Where the list was scrolled to, for Back (2026-11-05): the list scrolls
+  // inside #mainThread, and hiding it forgets the position.
+  if (thread && thread.style.display !== "none") listScrollTop = thread.scrollTop;
   if (topbar) topbar.style.display = "none";
   if (thread) thread.style.display = "none";
   // Not setActiveNav(null): Elio's version does getElementById(id).classList
@@ -1653,10 +1657,16 @@ function routeFromHash() {
   var match = /^#\/asset\/(.+)$/.exec(hash);
   if (match) { openAssetDetail(decodeURIComponent(match[1]), null, linkToken); return; }
   closeAdvancedSearch();
-  closeAssetDetail();
+  closeAssetDetail(true);
 }
 
-function closeAssetDetail() {
+//: The catalogue's scroll position when a demo was opened over it.
+var listScrollTop = null;
+
+/* `keepPlace`: going back to the list the demo was opened from, so it opens
+ * where it was left -- same cards, same scroll (Liwei, 2026-11-05). A nav
+ * click leaves without it: a new list starts at the top. */
+function closeAssetDetail(keepPlace) {
   var page = document.getElementById("videoPreviewPage");
   if (page) {
     page.classList.remove("active");
@@ -1671,12 +1681,21 @@ function closeAssetDetail() {
   if (request && request.classList.contains("active")) return;
   var topbar = document.getElementById("mainTopbar");
   var thread = document.getElementById("mainThread");
+  var wasHidden = thread && thread.style.display === "none";
   if (topbar) topbar.style.display = "";
   if (thread) thread.style.display = "";
+  if (wasHidden && keepPlace && listScrollTop !== null) thread.scrollTop = listScrollTop;
+  if (wasHidden) listScrollTop = null;
 }
 
 function wireDetailPage() {
-  window.addEventListener("hashchange", routeFromHash);
+  // popstate, not hashchange (2026-11-05): Back between two lists changes
+  // the query string and not the hash, and hashchange never came, so the
+  // address moved and the page did not. A fragment link fires popstate too.
+  window.addEventListener("popstate", function () {
+    routeFromHash();
+    followUrl();
+  });
   // Elio's Back button clears the view; the hash has to follow, or the page
   // reappears on the next refresh.
   var back = document.querySelector("#videoPreviewPage .vp-back");
@@ -1694,7 +1713,7 @@ function wireDetailPage() {
     if (location.hash.indexOf("#/asset/") === 0) {
       history.pushState(null, "", location.pathname + location.search);
     }
-    closeAssetDetail();
+    closeAssetDetail(true);
   });
   routeFromHash();          // honour a link opened cold
 }

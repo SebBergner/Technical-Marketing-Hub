@@ -45,7 +45,15 @@ def terms(text: str | None) -> list[str]:
     titles and `\\w` under `re.UNICODE` keeps them rather than discarding them
     the way an ASCII class would.
     """
-    return [t.lower() for t in _TOKEN.findall(text or "")]
+    words = [t.lower() for t in _TOKEN.findall(text or "")]
+    # "and" is "&" (Liwei, 2026-11-05): "&" is no word at all, so "tips &
+    # techniques" found 62 and "tips and techniques" 3. Dropped from query
+    # and title alike, so phrases still line up -- unless it is all there is.
+    kept = [w for w in words if w not in _JOINERS]
+    return kept or words
+
+
+_JOINERS = frozenset({"and"})
 
 
 #: A word this short only counts as a whole word (Liwei, 2026-10-01).

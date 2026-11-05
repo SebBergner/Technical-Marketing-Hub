@@ -486,9 +486,10 @@ function updateVmVersionFilter() {
  */
 var PUBLISHED_BANDS = [["new", "Under 1 year"], ["recent", "1\u20132 years"],
                        ["aging", "2\u20134 years"], ["older", "4 years or more"]];
+// No "Most viewed" (2026-11-05): it ranked on a counter only Consensus
+// shares fed, so every demo had 0. The Dashboard ranks what is used.
 var SORTS = [["relevance", "Best match"], ["recent", "Newest first"],
-             ["oldest", "Oldest first"], ["most_viewed", "Most viewed"],
-             ["title", "A\u2013Z"]];
+             ["oldest", "Oldest first"], ["title", "A–Z"]];
 
 function ensurePublishedFilter() {
   var select = document.getElementById("hubFilterPublished");
@@ -625,8 +626,12 @@ function ensureViewToggle() {
         if (!table && COLUMN_ONLY_SORTS.indexOf(navFilter.sort) >= 0) {
           navFilter.sort = null;
           navFilter.order = null;
+          applyFilters();
+          return;
         }
-        applyFilters();
+        // Same results, the other way: what was loaded stays loaded.
+        renderResults(document.getElementById("allAssetsGrid"), shownItems, false);
+        ensureViewToggle();
       });
       seg.appendChild(b);
     });
@@ -658,7 +663,12 @@ function fetchParams(params) {
 }
 
 /* Cards, or rows of the table: fresh, or appended by Load more. */
+//: Every result on screen, Load more included, so switching between tiles
+//: and the table redraws them rather than starting again at 48 (2026-11-05).
+var shownItems = [];
+
 function renderResults(grid, items, append) {
+  shownItems = append ? shownItems.concat(items) : items.slice();
   var table = tableView();
   grid.classList.toggle("is-table", table);
   if (table) {
@@ -711,6 +721,15 @@ var URL_CONTROLS = [["q", "hubSearchInput"], ["type", "hubFilterType"],
                     ["stage", "hubFilterStage"], ["language", "hubFilterLanguage"],
                     ["published", "hubFilterPublished"], ["depth", "hubFilterVideoType"]];
 
+/* A sidebar click is a place to go Back to; a dropdown or a keystroke is
+ * not (Liwei, 2026-11-05: Back after Creo stayed on Creo). exitOverlays()
+ * asks for the next address to be a step of its own. */
+var pushNext = false;
+//: The query string the list on screen was drawn for.
+var appliedSearch = null;
+
+function pushNextUrl() { pushNext = true; }
+
 function writeUrl(params) {
   var p = new URLSearchParams(params);
   p.delete("archived");             // a permission, not something to pass on
@@ -720,8 +739,24 @@ function writeUrl(params) {
   var qs = p.toString();
   var url = location.pathname + (qs ? "?" + qs : "") + location.hash;
   if (url !== location.pathname + location.search + location.hash) {
-    history.replaceState(history.state, "", url);
+    if (pushNext) history.pushState(null, "", url);
+    else history.replaceState(history.state, "", url);
   }
+  pushNext = false;
+  appliedSearch = location.search;
+}
+
+/* Back or Forward onto another list: draw the list that address names.
+ * Nothing to do when only the hash moved (leaving a demo), so the list
+ * underneath keeps its cards and its place. */
+function followUrl() {
+  if (appliedSearch === null || location.search === appliedSearch) return;
+  CONTROLS.forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  navFilter.sort = navFilter.order = navFilter.umbrella = navFilter.tag = null;
+  if (!restoreFiltersFromUrl()) applyFilters();
 }
 
 /* A link opened cold: put its filters on the controls and show them.
@@ -1150,6 +1185,7 @@ function clearAll() {
 
 export {
   applyFilters, clearAll, CONTROLS, enhanceSearchableSelect, fillPublished,
-  fillSelect, fillSidebarCounts, HIDDEN_SEGMENTS, navFilter, restoreFiltersFromUrl,
+  fillSelect, fillSidebarCounts, followUrl, HIDDEN_SEGMENTS, navFilter, pushNextUrl,
+  restoreFiltersFromUrl,
   takeOverControls, val, wireFilterBar
 };

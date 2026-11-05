@@ -72,3 +72,29 @@ def test_a_longer_word_still_matches_inside_words():
     assert relevance.score("wind", "Windchill PDMLink") > 0
     assert relevance.score("creo 11", "Creo 11.0 Overview") > 0
     assert relevance.names("e&ht", "E&HT_ADAS.mp4") and not relevance.names("ht", "Bobcat_Light.mp4")
+
+
+def test_and_and_ampersand_are_the_same_word(tmp_path):
+    """Liwei, 2026-11-05: "tips and techniques" found 3, "tips & techniques" 62."""
+    repo = repo_with(tmp_path, [("Sheetmetal Design: Tips & Techniques", "2025-01-01", None),
+                                ("Tips and Techniques Landing Page", "2024-01-01", None),
+                                ("Standard Parts", "2024-01-01", None)])
+    both = {"Sheetmetal Design: Tips & Techniques", "Tips and Techniques Landing Page"}
+    assert set(titles(repo, "tips and techniques")) == both
+    assert set(titles(repo, "tips & techniques")) == both
+    assert relevance.terms("and") == ["and"], "a query of only the joiner still searches"
+
+
+def test_a_product_name_finds_what_is_tagged_with_it(tmp_path):
+    """The 240 ProENGINEER Wildfire datasets never say so in their titles."""
+    (tmp_path / "mirror").mkdir()
+    (tmp_path / "mirror" / "sharepoint.json").write_text(json.dumps([
+        {"id": "a", "type": "cad_model", "title": "EFX Steel Building", "uploaded_at": "2018-01-01",
+         "products": ["ProENGINEER Wildfire"]},
+        {"id": "b", "type": "video", "title": "Wildfire Tips", "uploaded_at": "2017-01-01"},
+        {"id": "c", "type": "video", "title": "Something Else", "uploaded_at": "2026-01-01"},
+    ]), encoding="utf-8")
+    repo = JsonAssetRepository(str(tmp_path))
+    assert titles(repo, "proengineer wildfire") == ["EFX Steel Building"]
+    assert titles(repo, "wildfire") == ["Wildfire Tips", "EFX Steel Building"], \
+        "a title match still comes first"

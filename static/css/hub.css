@@ -1536,7 +1536,7 @@ a.hub-up__title:hover{text-decoration:underline}
 .hub-table__td--title a:hover { color: var(--orion-link); }
 .hub-table__pill { margin-left: 8px; vertical-align: 1px; }
 .hub-table__td--date, .hub-table__td--type, .hub-table__td--language { white-space: nowrap; }
-.hub-table__td--views, .hub-table__th--views button { text-align: right; }
+.hub-table__td--length, .hub-table__th--length { text-align: right; white-space: nowrap; }
 
 /* ── Content to review (A6, 2026-10-28; static/js/hub/review.js) ── */
 .hub-rvw { display: flex; flex-direction: column; gap: 12px; }

@@ -6,7 +6,7 @@
  * 2026-10-14; static/js/hub/main.js loads it. */
 
 import { escapeHtml } from "./util.js";
-import { applyFilters, clearAll, CONTROLS, navFilter } from "./filters.js";
+import { applyFilters, clearAll, CONTROLS, navFilter, pushNextUrl } from "./filters.js";
 import { closeAssetDetail, closeFilePreview } from "./detail.js";
 import { addActivityNav, closeActivity } from "./activity.js";
 import { addReviewNav, closeReview } from "./review.js";
@@ -133,7 +133,11 @@ function exitOverlays() {
   // The hash has to follow, or a refresh reopens the page we just left.
   if (/^#\/(asset|search|activity|review|help|upload)/.test(location.hash || "")) {
     history.pushState(null, "", location.pathname + location.search);
+    return;
   }
+  // Already on the catalogue: the list this leads to is a step of its own,
+  // so Back returns to the one before (2026-11-05).
+  pushNextUrl();
 }
 
 /* The sidebar's newest-first item (2026-10-01): a kit's date is its last

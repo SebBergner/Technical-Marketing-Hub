@@ -151,6 +151,17 @@ Everything built since 2026-10-20 is new on production:
    the only data a sync cannot rebuild; the swap does not touch it, this is just the
    safety net. The last one was on 2026-10-30.
 
+7a. **Usage baseline (Serge watches these numbers).** Usage lives in
+   production's own `owned/usage_events.jsonl`, the same file and format in
+   the old and new code, and the swap does not move shares, so it stays. To
+   prove it: right before the swap, on `tmh.ptcxc.com`, note Admin → Usage
+   "All time" totals (or `GET /api/admin/usage`). Baseline taken read-only
+   2026-11-05 14:16 UTC: **views 424, downloads 187, previews 15, searches
+   303, 213 demos touched, 35 days from 2026-09-22.** The 209 demo ids with
+   usage on production all exist in staging's new-code catalogue (checked the
+   same day), so the first full sync does not orphan any of them; one row,
+   31 views, was already "no longer in the catalogue" before the swap.
+
 8a. **Not during the stress test, nor in the hour before.** The first full
    sync on production (step 13) takes several minutes; the scheduled ones run
    at 06:00 and 18:00 UTC (18:00 UTC is 1 pm EST): check them against the
@@ -207,6 +218,11 @@ Everything built since 2026-10-20 is new on production:
     above zero, run it again. On staging (2026-11-05, 82 s): 509 pictures,
     445 ok, 64 missing (D20: SharePoint will not give them; those cards show
     their generated cover, as they do today), 0 busy. Expect about the same.
+13b. **Usage is all there**: Admin → Usage, All time. Every total is at
+    least the baseline of step 7a (more if people used production since);
+    the first day is still 2026-09-22; Dashboard → Usage lists demos as
+    before. If a total is lower, stop and restore `owned/usage_events.jsonl`
+    from step 7's backup.
 14. **Automatic sync**: Overview → on, two times a day (if not already).
 15. **Consensus licences** (Users & groups): upload Elio's CSV again (October
     2026 version, 263 people, 19 partners). Without it nobody sees Create

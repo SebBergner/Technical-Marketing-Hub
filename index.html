@@ -1005,24 +1005,26 @@ a:hover { text-decoration: underline; }
         </div>
 
         <div class="section" style="margin-bottom:0;">
-          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-flag"/></svg> Buyer's journey stage <span class="section-head__sub">select all that apply</span></div>
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-send"/></svg> Distribution plan <span class="section-head__sub">select all that apply</span></div>
           <div class="form-section">
             <div class="form-row">
-              <label>Where in the buyer's journey will this be used?</label>
-              <div class="stage-row" id="journeyStageRow">
-                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Awareness</span>
-                <span class="stage-pill stage-pill--active" onclick="pillToggle(this); computeKindOfDemo()">Consideration</span>
-                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Decision</span>
-                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Post-Sale</span>
+              <label>Where do you want to use this video?</label>
+              <div class="stage-row" id="distributionRow">
+                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Social</span>
+                <span class="stage-pill stage-pill--active" onclick="pillToggle(this); computeKindOfDemo()">PTC.com</span>
+                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Marketing Campaign</span>
+                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Sales Play</span>
+                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Launch Kit</span>
+                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Event/Trade Show</span>
               </div>
             </div>
           </div>
         </div>
 
         <div class="section" style="margin-bottom:0;">
-          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-target"/></svg> Video types needed <span class="section-head__sub">based on the buyer's journey stage</span></div>
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-target"/></svg> Video types needed <span class="section-head__sub">based on your distribution plan</span></div>
           <div class="form-section">
-            <div class="field-hint">Different stages usually call for different cuts — a short teaser for Awareness isn't the same asset as a full walkthrough for Decision. Here's what your picks above suggest.</div>
+            <div class="field-hint">Different destinations usually call for different cuts — a short teaser for Social isn't the same asset as a full walkthrough for a Sales Play. Here's what your picks above suggest.</div>
             <div id="kindOfDemoList" style="display:flex; flex-direction:column; gap:10px;"></div>
           </div>
         </div>
@@ -1475,11 +1477,13 @@ var VIDEO_LEVEL_HINT = {
   'Technical Demo Overview': 'What it is & why it matters — usually 3–5 min',
   'Technical Demo Walkthrough': 'Full step-by-step detail — usually 10+ min'
 };
-var STAGE_TO_LEVEL = {
-  'Awareness': 'Technical Demo Teaser',
-  'Consideration': 'Technical Demo Overview',
-  'Decision': 'Technical Demo Walkthrough',
-  'Post-Sale': 'Technical Demo Walkthrough'
+var CHANNEL_TO_LEVEL = {
+  'Social': 'Technical Demo Teaser',
+  'Marketing Campaign': 'Technical Demo Teaser',
+  'Event/Trade Show': 'Technical Demo Teaser',
+  'PTC.com': 'Technical Demo Overview',
+  'Launch Kit': 'Technical Demo Overview',
+  'Sales Play': 'Technical Demo Walkthrough'
 };
 var STYLE_EXAMPLES = {
   'Technical Demo Teaser': {
@@ -1540,18 +1544,18 @@ function closeStyleExampleModal() {
   videoTag.pause();
 }
 function computeKindOfDemo() {
-  var activePills = Array.from(document.querySelectorAll('#journeyStageRow .stage-pill--active'));
+  var activePills = Array.from(document.querySelectorAll('#distributionRow .stage-pill--active'));
   var listEl = document.getElementById('kindOfDemoList');
   if (!activePills.length) {
-    listEl.innerHTML = '<div class="field-hint">Pick the buyer\'s journey stage(s) above to see what you\'ll need.</div>';
+    listEl.innerHTML = '<div class="field-hint">Pick where you\'ll use this video above to see what you\'ll need.</div>';
     return;
   }
   var groups = {};
   activePills.forEach(function(p) {
-    var stage = p.textContent.trim();
-    var level = STAGE_TO_LEVEL[stage] || 'Technical Demo Overview';
+    var channel = p.textContent.trim();
+    var level = CHANNEL_TO_LEVEL[channel] || 'Technical Demo Overview';
     if (!groups[level]) groups[level] = [];
-    groups[level].push(stage);
+    groups[level].push(channel);
   });
   var levelsPresent = VIDEO_LEVELS.filter(function(l) { return groups[l]; });
   listEl.innerHTML = levelsPresent.map(function(level, i) {

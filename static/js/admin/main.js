@@ -18,7 +18,7 @@ import { contentState, loadContent } from "./content.js";
 import { loadReview } from "./review.js";
 import { loadOwners } from "./owners.js";
 import { loadContentAccess, loadHidden } from "./access.js";
-import { loadAccess, loadLicences, loadTokens } from "./users.js";
+import { loadAccess, loadDisclaimer, loadLicences, loadTokens } from "./users.js";
 import { loadActivity, renderActRanges } from "./signins.js";
 
 /* ── when the session runs out with the page open ─────────────────────
@@ -77,7 +77,7 @@ function showTab(name) {
   if (first && first.textContent.trim().toLowerCase()
       === $("pageTitle").textContent.toLowerCase()) first.hidden = true;
   if (name === "content" && !contentState.loaded) loadContent();
-  if (name === "access") { loadAccess(); loadLicences(); loadTokens(); }
+  if (name === "access") { loadAccess(); loadLicences(); loadDisclaimer(); loadTokens(); }
   if (name === "internal") loadContentAccess();
   if (name === "review") loadReview();
   if (name === "reports") loadOwners();

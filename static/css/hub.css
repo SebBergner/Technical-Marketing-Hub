@@ -1800,3 +1800,21 @@ textarea.hub-edit__input{resize:vertical}
   .video-preview-page{padding-left:16px;padding-right:16px}
   .vp-back{margin-right:48px}
 }
+
+/* The Customer Data Disclaimer (Elio, 2026-11-05; static/js/hub/disclaimer.js):
+   above everything, the page behind it dimmed and not scrollable. */
+body.hub-disclaimer-open{overflow:hidden}
+.hub-disclaimer{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(15,23,42,.55)}
+.hub-disclaimer__dialog{display:flex;flex-direction:column;width:min(860px,100%);max-height:calc(100vh - 32px);background:var(--orion-surface,#fff);color:var(--orion-text,#1f2937);border-radius:var(--orion-radius-md,10px);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.hub-disclaimer__title{margin:0;padding:22px 26px 6px;font-size:20px;font-weight:600;letter-spacing:.02em;text-transform:uppercase}
+.hub-disclaimer__body{overflow-y:auto;padding:8px 26px 4px;font-size:14px;line-height:1.55}
+.hub-disclaimer__body p{margin:0 0 12px}
+.hub-disclaimer__body ul{margin:0 0 8px;padding-left:22px}
+.hub-disclaimer__body li{margin:0 0 6px}
+.hub-disclaimer__foot{display:flex;align-items:center;justify-content:flex-end;gap:14px;padding:14px 26px 22px}
+.hub-disclaimer__status{font-size:12.5px;color:var(--orion-text-3,#6b7280)}
+.hub-disclaimer__accept{min-width:110px;padding:10px 22px;border:0;border-radius:var(--orion-radius-sm,6px);background:var(--orion-indigo,#00890B);color:#fff;font:inherit;font-size:15px;font-weight:600;cursor:pointer}
+.hub-disclaimer__accept:hover{background:var(--orion-indigo-strong,#00650A)}
+.hub-disclaimer__accept:focus-visible{outline:2px solid var(--orion-indigo,#00890B);outline-offset:3px}
+.hub-disclaimer__accept:disabled{opacity:.6;cursor:default}
+@media (max-width:600px){.hub-disclaimer__title{font-size:17px;padding:18px 18px 4px}.hub-disclaimer__body{padding:6px 18px 4px;font-size:13.5px}.hub-disclaimer__foot{padding:12px 18px 18px}}

@@ -356,6 +356,8 @@
   .err{color:var(--red);font-size:13px;min-height:18px}
   .cl-bar{display:flex;align-items:center;gap:12px;margin:10px 0}
   #clBody input[type=search]{margin:6px 0 10px;width:min(320px,100%)}
+  #dcBody input[type=search]{margin:6px 0 10px;width:min(320px,100%)}
+  #dcBody .dc-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
   [hidden]{display:none !important}
 
   /* usage -------------------------------------------------------------- */
@@ -742,6 +744,14 @@
         (CSV) as Elio exports it; each upload replaces the whole list. A stopgap until the
         Hub can ask Consensus itself.</p>
       <div class="card" id="clBody"></div>
+    </section>
+    <!-- Who accepted the Customer Data Disclaimer (backend/disclaimer.py, Elio 2026-11-05). -->
+    <section>
+      <div class="section-head"><h2>Customer Data Disclaimer</h2></div>
+      <p class="muted" style="margin:-6px 0 14px">Everyone accepts it before using the Hub, and
+        again twelve months after their last Accept. Recorded against the sign-in, so one row
+        per person.</p>
+      <div class="card" id="dcBody"></div>
     </section>
     <!-- Programs using the API (backend/api_tokens.py, 2026-10-15). -->
     <section>

@@ -1161,6 +1161,33 @@ def export_admin_log(since: str | None = None, until: str | None = None, q: str 
                               f'attachment; filename="hub-admin-log-{stamp}.csv"'})
 
 
+# ─────────────────────────── Customer Data Disclaimer (Elio, 2026-11-05)
+@router.get("/disclaimer", dependencies=[VIEW_ADMIN])
+def get_disclaimer_acceptances():
+    """Who accepted the disclaimer, when, and when they are asked again."""
+    from backend import disclaimer
+    return {**disclaimer.text(), "people": disclaimer.listing()}
+
+
+@router.get("/disclaimer.csv", dependencies=[VIEW_ADMIN])
+def disclaimer_acceptances_csv():
+    import csv
+    import io
+    from backend import disclaimer
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["Name", "Email", "Accepted", "First accepted", "Times", "Text version",
+                "Asked again"])
+    for r in disclaimer.listing():
+        w.writerow([r.get("name") or "", r.get("email") or r.get("key"), r.get("accepted_at"),
+                    r.get("first_accepted_at"), r.get("times"), r.get("version"),
+                    r.get("due_again_at") or ""])
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return Response(content=out.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition":
+                             f'attachment; filename="hub-disclaimer-acceptances-{stamp}.csv"'})
+
+
 # ───────────────────────────────────── Consensus licences (2026-10-28)
 @router.get("/consensus-licenses", dependencies=[VIEW_ADMIN])
 def get_consensus_licenses():

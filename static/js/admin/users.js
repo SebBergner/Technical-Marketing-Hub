@@ -245,6 +245,69 @@ function renderLicences(message, isError) {
   draw();
 }
 
+/* ── Customer Data Disclaimer (backend/disclaimer.py, Elio 2026-11-05) ──
+ * Who accepted it, when, and when they are asked again. */
+var dc = { data: null, filter: "" };
+
+function loadDisclaimer() {
+  return fetch("/api/admin/disclaimer")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { if (d) { dc.data = d; renderDisclaimer(); } });
+}
+
+function renderDisclaimer() {
+  var host = $("dcBody");
+  if (!host) return;
+  host.innerHTML = "";
+  var d = dc.data, people = d.people || [];
+  var current = people.filter(function (p) { return p.current; }).length;
+  var bar = el("div", "dc-bar");
+  var due = people.length - current;
+  bar.appendChild(el("span", null, people.length
+    ? current + (current === 1 ? " person has" : " people have")
+      + " accepted the current text (version " + d.version + ")."
+      + (due ? " " + due + (due === 1 ? " is" : " are") + " due to accept again." : "")
+    : "Nobody has accepted yet. It is asked the first time each person opens the Hub."));
+  if (people.length) {
+    var csv = el("a", "btn-small", "Download CSV");
+    csv.href = "/api/admin/disclaimer.csv";
+    bar.appendChild(csv);
+  }
+  host.appendChild(bar);
+  if (!people.length) return;
+  var find = el("input");
+  find.type = "search";
+  find.placeholder = "Find a name or email…";
+  find.value = dc.filter;
+  find.setAttribute("aria-label", "Find someone who accepted");
+  host.appendChild(find);
+  var list = el("div", "tablewrap");
+  host.appendChild(list);
+  var draw = function () {
+    var q = dc.filter.trim().toLowerCase();
+    var hits = people.filter(function (p) {
+      return !q || ((p.email || p.key) + " " + (p.name || "")).toLowerCase().indexOf(q) >= 0; });
+    list.innerHTML = "";
+    var t = el("table");
+    var head = el("tr");
+    ["Name", "Email", "Accepted", "Times", "Asked again"].forEach(function (h) {
+      head.appendChild(el("th", null, h)); });
+    t.appendChild(head);
+    hits.slice(0, 100).forEach(function (p) {
+      var tr = el("tr");
+      [p.name || "—", p.email || p.key, when(p.accepted_at), String(p.times || 1),
+       p.current ? (p.due_again_at || "").slice(0, 10) : "due now"].forEach(function (v) {
+        tr.appendChild(el("td", null, v)); });
+      t.appendChild(tr);
+    });
+    list.appendChild(t);
+    if (hits.length > 100) list.appendChild(el("p", "faint", "Showing 100 of " + hits.length
+                                                + ". Type to narrow the list, or download the CSV."));
+  };
+  find.addEventListener("input", function () { dc.filter = find.value; draw(); });
+  draw();
+}
+
 function canManageUsers() {
   return (session.permissions || []).indexOf("manage_users") >= 0;
 }
@@ -765,5 +828,5 @@ function renderAudit(entries) {
 }
 
 export {
-  groupNames, loadAccess, loadLicences, loadTokens, ug
+  groupNames, loadAccess, loadDisclaimer, loadLicences, loadTokens, ug
 };

@@ -928,6 +928,7 @@ a:hover { text-decoration: underline; }
             <div class="stage-row" id="assetTypeRow">
               <span class="stage-pill stage-pill--active" data-value="video" onclick="pillSelect(this); onAssetTypeChange(this)"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg> Video</span>
               <span class="stage-pill" data-value="ldk" onclick="pillSelect(this); onAssetTypeChange(this)"><svg class="orion-ico--sm orion-ico"><use href="#i-box"/></svg> LDK <span class="orion-subtle" style="font-size:11px;">Live Demo Kit</span></span>
+              <span class="stage-pill" data-value="vdk" onclick="pillSelect(this); onAssetTypeChange(this)"><svg class="orion-ico--sm orion-ico"><use href="#i-monitor"/></svg> VDK <span class="orion-subtle" style="font-size:11px;">Video Demo Kit</span></span>
             </div>
           </div>
         </div>
@@ -938,8 +939,13 @@ a:hover { text-decoration: underline; }
             <div class="stage-row" id="productScopeRow">
               <span class="stage-pill stage-pill--active" data-value="Windchill" onclick="pillToggle(this); computeProductScope()">Windchill</span>
               <span class="stage-pill" data-value="Creo" onclick="pillToggle(this); computeProductScope()">Creo</span>
+              <span class="stage-pill" data-value="Onshape" onclick="pillToggle(this); computeProductScope()">Onshape</span>
+              <span class="stage-pill" data-value="Arena" onclick="pillToggle(this); computeProductScope()">Arena</span>
               <span class="stage-pill" data-value="ServiceMax" onclick="pillToggle(this); computeProductScope()">ServiceMax</span>
+              <span class="stage-pill" data-value="Servigistics" onclick="pillToggle(this); computeProductScope()">Servigistics</span>
+              <span class="stage-pill" data-value="Arbortext" onclick="pillToggle(this); computeProductScope()">Arbortext</span>
               <span class="stage-pill" data-value="Codebeamer" onclick="pillToggle(this); computeProductScope()">Codebeamer</span>
+              <span class="stage-pill" data-value="Vuforia" onclick="pillToggle(this); computeProductScope()">Vuforia</span>
               <span class="stage-pill" data-value="Other" onclick="pillToggle(this); computeProductScope()">Other</span>
             </div>
             <div class="derived-output" id="productScopeResult">
@@ -1001,29 +1007,24 @@ a:hover { text-decoration: underline; }
         </div>
 
         <div class="section" style="margin-bottom:0;">
-          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-send"/></svg> Distribution plan <span class="section-head__sub">select all that apply</span></div>
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-flag"/></svg> Buyer's journey stage <span class="section-head__sub">select all that apply</span></div>
           <div class="form-section">
             <div class="form-row">
-              <label>Where do you want to use this video?</label>
-              <div class="stage-row" id="distributionRow">
-                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Social (LinkedIn / YouTube)</span>
-                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Web (PTC.com)</span>
-                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">eStore</span>
-                <span class="stage-pill stage-pill--active" onclick="pillToggle(this); computeKindOfDemo()">Share with a prospect</span>
-                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Share with an existing customer</span>
-                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Internal sales enablement</span>
-                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Event / trade show</span>
-                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Internal Hub only</span>
-                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()"><svg class="orion-ico--sm orion-ico"><use href="#logo-seismic"/></svg> Push to PTC Velocity</span>
+              <label>Where in the buyer's journey will this be used?</label>
+              <div class="stage-row" id="journeyStageRow">
+                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Awareness</span>
+                <span class="stage-pill stage-pill--active" onclick="pillToggle(this); computeKindOfDemo()">Consideration</span>
+                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Decision</span>
+                <span class="stage-pill" onclick="pillToggle(this); computeKindOfDemo()">Post-Sale</span>
               </div>
             </div>
           </div>
         </div>
 
         <div class="section" style="margin-bottom:0;">
-          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-target"/></svg> Video types needed <span class="section-head__sub">based on your distribution plan</span></div>
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-target"/></svg> Video types needed <span class="section-head__sub">based on the buyer's journey stage</span></div>
           <div class="form-section">
-            <div class="field-hint">Different destinations usually call for different cuts — a short teaser for social isn't the same asset as a longer one for a prospect send. Here's what your picks above suggest, from quick hook to full walkthrough.</div>
+            <div class="field-hint">Different stages usually call for different cuts — a short teaser for Awareness isn't the same asset as a full walkthrough for Decision. Here's what your picks above suggest.</div>
             <div id="kindOfDemoList" style="display:flex; flex-direction:column; gap:10px;"></div>
           </div>
         </div>
@@ -1470,44 +1471,32 @@ function onAssetTypeChange(el) {
 function onCustomerChange(el) {
   document.getElementById('customerDataNote').style.display = el.dataset.value === 'none' ? 'none' : '';
 }
-var VIDEO_LEVELS = ['Teaser', 'Overview', 'Explainer', 'Walkthrough'];
+var VIDEO_LEVELS = ['Technical Demo Teaser', 'Technical Demo Overview', 'Technical Demo Walkthrough'];
 var VIDEO_LEVEL_HINT = {
-  Teaser: 'Hook them fast — usually under 3 min',
-  Overview: 'What it is & why it matters — usually 3–5 min',
-  Explainer: 'A bit more depth for an active conversation — usually 5–10 min',
-  Walkthrough: 'Full step-by-step detail — usually 10+ min'
+  'Technical Demo Teaser': 'Hook them fast — usually under 3 min',
+  'Technical Demo Overview': 'What it is & why it matters — usually 3–5 min',
+  'Technical Demo Walkthrough': 'Full step-by-step detail — usually 10+ min'
 };
-var CHANNEL_TO_LEVEL = {
-  'Social (LinkedIn / YouTube)': 'Teaser',
-  'Event / trade show': 'Teaser',
-  'Web (PTC.com)': 'Overview',
-  'eStore': 'Overview',
-  'Share with a prospect': 'Explainer',
-  'Share with an existing customer': 'Explainer',
-  'Push to PTC Velocity': 'Explainer',
-  'Internal sales enablement': 'Walkthrough',
-  'Internal Hub only': 'Walkthrough'
+var STAGE_TO_LEVEL = {
+  'Awareness': 'Technical Demo Teaser',
+  'Consideration': 'Technical Demo Overview',
+  'Decision': 'Technical Demo Walkthrough',
+  'Post-Sale': 'Technical Demo Walkthrough'
 };
 var STYLE_EXAMPLES = {
-  Teaser: {
+  'Technical Demo Teaser': {
     ref: 'Creo 13 Teaser',
     duration: '1:30',
     videoUrl: null,
     desc: 'Fast pacing, high production polish, opens with a clear hook, and highlights business value at a glance — built to earn a click, not explain everything.'
   },
-  Overview: {
+  'Technical Demo Overview': {
     ref: 'The Digital Thread Powered by Creo',
     duration: '11:00',
     videoUrl: null,
     desc: 'Explains what the solution is and why it matters, connecting capabilities to business value — without walking through the software step by step.'
   },
-  Explainer: {
-    ref: null,
-    duration: null,
-    videoUrl: null,
-    desc: 'A bit more depth than an Overview for an active conversation — gets into the "why" with more specificity, while stopping short of a full how-to.'
-  },
-  Walkthrough: {
+  'Technical Demo Walkthrough': {
     ref: 'Bobcat Engineering',
     duration: '18:00',
     videoUrl: null,
@@ -1553,18 +1542,18 @@ function closeStyleExampleModal() {
   videoTag.pause();
 }
 function computeKindOfDemo() {
-  var activePills = Array.from(document.querySelectorAll('#distributionRow .stage-pill--active'));
+  var activePills = Array.from(document.querySelectorAll('#journeyStageRow .stage-pill--active'));
   var listEl = document.getElementById('kindOfDemoList');
   if (!activePills.length) {
-    listEl.innerHTML = '<div class="field-hint">Pick where you\'ll use this video above to see what you\'ll need.</div>';
+    listEl.innerHTML = '<div class="field-hint">Pick the buyer\'s journey stage(s) above to see what you\'ll need.</div>';
     return;
   }
   var groups = {};
   activePills.forEach(function(p) {
-    var channel = p.textContent.trim();
-    var level = CHANNEL_TO_LEVEL[channel] || 'Overview';
+    var stage = p.textContent.trim();
+    var level = STAGE_TO_LEVEL[stage] || 'Technical Demo Overview';
     if (!groups[level]) groups[level] = [];
-    groups[level].push(channel);
+    groups[level].push(stage);
   });
   var levelsPresent = VIDEO_LEVELS.filter(function(l) { return groups[l]; });
   listEl.innerHTML = levelsPresent.map(function(level, i) {
@@ -1574,77 +1563,9 @@ function computeKindOfDemo() {
       '<div class="field-hint" style="margin-top:4px;">' + VIDEO_LEVEL_HINT[level] + '</div>' +
       '<div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">' +
         '<button class="btn-ghost" style="flex:none; padding:6px 12px;" onclick="openStyleExampleModal(\'' + level + '\')"><svg class="orion-ico--sm orion-ico"><use href="#i-play"/></svg>See an example of this style</button>' +
-        '<button class="btn-ghost" style="flex:none; padding:6px 12px;" onclick="checkExistingAsset(this, \'' + level + '\')"><svg class="orion-ico--sm orion-ico"><use href="#i-search"/></svg>Check Consensus for something similar</button>' +
       '</div>' +
-      '<div id="existingCheck-' + level + '" style="display:none; margin-top:10px;"></div>' +
       '</div>';
   }).join('');
-}
-var EXISTING_ASSET_MATCHES = {
-  'Windchill|Teaser': {
-    title: 'Windchill Launch',
-    subtitle: 'Windchill 13 Launch Sizzle Video',
-    meta: 'Single video · Windchill · Teaser',
-    stats: '38 uses · 38 DemoBoards',
-    updated: 'Updated Nov 4, 2025',
-    owner: 'Elio Nicolosi'
-  },
-  'Windchill|Overview': {
-    title: 'Windchill AI Parts Rationalization',
-    subtitle: 'PLM | Windchill | Overview | 4:48',
-    meta: 'Single video · Windchill · Overview',
-    stats: '27 uses · 22 DemoBoards · 5 public link views',
-    updated: 'Updated Feb 23, 2026',
-    owner: 'Elio Nicolosi'
-  },
-  'Windchill|Walkthrough': {
-    title: 'Windchill PDM Overview',
-    subtitle: 'PLM | Windchill | Walkthrough | 12:29',
-    meta: 'Single video · Windchill · Walkthrough',
-    stats: '27 uses · 26 DemoBoards · 1 public link view',
-    updated: 'Updated Jul 3, 2025',
-    owner: 'Cody Wiltrout'
-  }
-};
-function checkExistingAsset(btn, level) {
-  btn.disabled = true;
-  btn.style.opacity = '.6';
-  btn.textContent = 'Checking Consensus…';
-  var resultEl = document.getElementById('existingCheck-' + level);
-  var products = Array.from(document.querySelectorAll('#productScopeRow .stage-pill--active')).map(function(p) { return p.dataset.value; });
-  var key = (products[0] || 'Other') + '|' + level;
-  setTimeout(function() {
-    var match = EXISTING_ASSET_MATCHES[key];
-    btn.style.display = 'none';
-    resultEl.style.display = '';
-    if (match) {
-      resultEl.innerHTML =
-        '<div class="modal__note" style="align-items:flex-start; background:var(--orion-warn-bg);">' +
-          '<svg class="orion-ico orion-ico--sm" style="color:var(--orion-warn-ink); margin-top:2px;"><use href="#i-info"/></svg>' +
-          '<div>' +
-            '<div style="font-weight:700; margin-bottom:4px; color:var(--orion-warn-ink);">Found something similar in Consensus</div>' +
-            '<div style="font-weight:600;">' + match.title + '</div>' +
-            '<div class="orion-subtle" style="margin:2px 0 6px; font-size:12px;">' + match.subtitle + '</div>' +
-            '<div style="font-size:12px; color:var(--orion-text-2);">' + match.meta + ' · ' + match.stats + '<br>' + match.updated + ' · owner ' + match.owner + '</div>' +
-            '<div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">' +
-              '<button class="btn-ghost" style="flex:none; padding:6px 12px;" onclick="recordAssetDecision(\'' + level + '\', \'use-as-is\')">Use as-is</button>' +
-              '<button class="btn-ghost" style="flex:none; padding:6px 12px;" onclick="recordAssetDecision(\'' + level + '\', \'refresh\')">Needs a quick refresh</button>' +
-              '<button class="btn-primary-sm" style="flex:none; padding:6px 12px;" onclick="recordAssetDecision(\'' + level + '\', \'new\')">Create new anyway</button>' +
-            '</div>' +
-          '</div>' +
-        '</div>';
-    } else {
-      resultEl.innerHTML =
-        '<div class="modal__note"><svg class="orion-ico orion-ico--sm" style="color:var(--orion-green-ink);"><use href="#i-check"/></svg>' +
-        '<span>No similar asset found in Consensus for this product and style — clear to create something new.</span></div>';
-    }
-  }, 700);
-}
-function recordAssetDecision(level, decision) {
-  var resultEl = document.getElementById('existingCheck-' + level);
-  var labels = { 'use-as-is': 'Use the existing asset as-is', 'refresh': 'Refresh the existing asset', 'new': 'Create a new asset anyway' };
-  resultEl.innerHTML = '<div class="share-result"><div class="share-result__label"><svg class="orion-ico orion-ico--sm"><use href="#i-check"/></svg>Decision recorded</div>' +
-    '<div class="share-result__meta">' + labels[decision] + ' — the content team will see this when they review your request.</div></div>';
 }
 function computeProductScope() {
   var active = Array.from(document.querySelectorAll('#productScopeRow .stage-pill--active')).map(function(p) { return p.dataset.value; });

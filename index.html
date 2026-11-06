@@ -926,9 +926,9 @@ a:hover { text-decoration: underline; }
           <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-hex"/></svg> Asset type</div>
           <div class="form-section">
             <div class="stage-row" id="assetTypeRow">
-              <span class="stage-pill stage-pill--active" data-value="video" onclick="pillSelect(this); onAssetTypeChange(this)"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg> Video</span>
-              <span class="stage-pill" data-value="ldk" onclick="pillSelect(this); onAssetTypeChange(this)"><svg class="orion-ico--sm orion-ico"><use href="#i-box"/></svg> LDK <span class="orion-subtle" style="font-size:11px;">Live Demo Kit</span></span>
+              <span class="stage-pill stage-pill--active" data-value="video" onclick="pillSelect(this); onAssetTypeChange(this)"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg> Technical Demo Video</span>
               <span class="stage-pill" data-value="vdk" onclick="pillSelect(this); onAssetTypeChange(this)"><svg class="orion-ico--sm orion-ico"><use href="#i-monitor"/></svg> VDK <span class="orion-subtle" style="font-size:11px;">Video Demo Kit</span></span>
+              <span class="stage-pill" data-value="ldk" onclick="pillSelect(this); onAssetTypeChange(this)"><svg class="orion-ico--sm orion-ico"><use href="#i-box"/></svg> LDK <span class="orion-subtle" style="font-size:11px;">Live Demo Kit</span></span>
             </div>
           </div>
         </div>
@@ -937,15 +937,13 @@ a:hover { text-decoration: underline; }
           <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-layers"/></svg> Product scope <span class="section-head__sub">select all products involved</span></div>
           <div class="form-section">
             <div class="stage-row" id="productScopeRow">
-              <span class="stage-pill stage-pill--active" data-value="Windchill" onclick="pillToggle(this); computeProductScope()">Windchill</span>
               <span class="stage-pill" data-value="Creo" onclick="pillToggle(this); computeProductScope()">Creo</span>
-              <span class="stage-pill" data-value="Onshape" onclick="pillToggle(this); computeProductScope()">Onshape</span>
-              <span class="stage-pill" data-value="Arena" onclick="pillToggle(this); computeProductScope()">Arena</span>
-              <span class="stage-pill" data-value="ServiceMax" onclick="pillToggle(this); computeProductScope()">ServiceMax</span>
-              <span class="stage-pill" data-value="Servigistics" onclick="pillToggle(this); computeProductScope()">Servigistics</span>
-              <span class="stage-pill" data-value="Arbortext" onclick="pillToggle(this); computeProductScope()">Arbortext</span>
               <span class="stage-pill" data-value="Codebeamer" onclick="pillToggle(this); computeProductScope()">Codebeamer</span>
-              <span class="stage-pill" data-value="Vuforia" onclick="pillToggle(this); computeProductScope()">Vuforia</span>
+              <span class="stage-pill stage-pill--active" data-value="Windchill" onclick="pillToggle(this); computeProductScope()">Windchill</span>
+              <span class="stage-pill" data-value="PTC Jetstream" onclick="pillToggle(this); computeProductScope()">PTC Jetstream</span>
+              <span class="stage-pill" data-value="PTC Ignition" onclick="pillToggle(this); computeProductScope()">PTC Ignition</span>
+              <span class="stage-pill" data-value="ServiceMax" onclick="pillToggle(this); computeProductScope()">ServiceMax</span>
+              <span class="stage-pill" data-value="PTC Orbit" onclick="pillToggle(this); computeProductScope()">PTC Orbit</span>
               <span class="stage-pill" data-value="Other" onclick="pillToggle(this); computeProductScope()">Other</span>
             </div>
             <div class="derived-output" id="productScopeResult">

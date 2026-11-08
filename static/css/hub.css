@@ -1900,10 +1900,15 @@ body.hub-disclaimer-open{overflow:hidden}
   .hub-guide__title { font-size: 25px; }
   .hub-guide__quick, .hub-guide__steps { grid-template-columns: 1fr; }
 }
-.hub-guide-btn { position: fixed; top: 14px; right: 18px; z-index: 900; width: 32px; height: 32px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; text-decoration: none;
+.hub-guide-btn { position: fixed; top: 14px; right: 18px; z-index: 900; height: 34px; padding: 0 14px 0 11px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 13px; text-decoration: none;
   color: var(--orion-indigo); background: var(--orion-surface); border: 1px solid var(--orion-border-md);
   box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
+.hub-guide-btn__ico { width: 17px; height: 17px; flex: none; }
+@media (max-width: 760px) {
+  .hub-guide-btn { width: 34px; padding: 0; justify-content: center; }
+  .hub-guide-btn__label { display: none; }
+}
 .hub-guide-btn:hover, .hub-guide-btn.is-on { background: var(--orion-indigo); color: #fff; border-color: var(--orion-indigo); }
 
 /* The welcome pop-up (2026-11-08; welcome.js): once per person, after the disclaimer */
@@ -1936,7 +1941,8 @@ body.hub-disclaimer-open{overflow:hidden}
   background: var(--orion-indigo-soft); color: var(--orion-text-2); }
 .hub-welcome__guide b { color: var(--orion-text); }
 .hub-welcome__q { flex: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  font-weight: 700; color: #fff; background: var(--orion-indigo); }
+  color: #fff; background: var(--orion-indigo); }
+.hub-welcome__q .hub-guide-btn__ico { width: 16px; height: 16px; }
 .hub-welcome__foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
 .hub-welcome__foot .btn-ghost, .hub-welcome__foot .btn-primary-sm { flex: none; text-decoration: none; }
 @keyframes hubWelcomeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -1947,7 +1953,7 @@ body.hub-disclaimer-open{overflow:hidden}
 @keyframes hubGuidePulse {
   0% { box-shadow: 0 0 0 0 rgba(0, 137, 11, .55); }
   100% { box-shadow: 0 0 0 16px rgba(0, 137, 11, 0); } }
-.hub-guide-tip { position: fixed; top: 18px; right: 60px; z-index: 900; padding: 6px 12px; border-radius: 8px;
+.hub-guide-tip { position: fixed; transform: translateY(-50%); z-index: 900; padding: 6px 12px; border-radius: 8px;
   font-size: 13px; font-weight: 600; color: #fff; background: var(--orion-indigo);
   box-shadow: 0 6px 18px rgba(0, 0, 0, .18); animation: hubWelcomeIn .2s ease; transition: opacity .3s ease; }
 .hub-guide-tip::after { content: ""; position: absolute; right: -6px; top: 50%; margin-top: -6px;

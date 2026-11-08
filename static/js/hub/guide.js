@@ -1,4 +1,4 @@
-/* How to use the Hub (#/guide), opened from the "?" button that stays in
+/* How to use the Hub (#/guide), opened from the "User guide" button that stays in
  * the top right corner (Elio, Liwei, 2026-11-06; built 2026-11-08). The
  * welcome video goes in the frame at the top once Elio has made it.
  *
@@ -168,7 +168,7 @@ function buildPage() {
   wrap.appendChild(quickActions());
   wrap.appendChild(steps());
   wrap.appendChild(el("p", "hub-guide__foot",
-    icon("i-info", "orion-ico--sm") + "Come back here any time with the <b>?</b> in the top right corner."));
+    icon("i-info", "orion-ico--sm") + "Come back here any time with <b>User guide</b> in the top right corner."));
   page.appendChild(wrap);
   var anchor = document.getElementById("videoPreviewPage");
   if (anchor) anchor.parentNode.insertBefore(page, anchor);
@@ -207,11 +207,18 @@ function closeGuide() {
   if (thread) thread.style.display = "";
 }
 
-/* The "?" in the top right corner, on every page of the Hub. */
+/* A book, not a "?" (Liwei, 2026-11-08): the "?" read as Get help, which
+ * stays at the foot of the menu for reporting a problem. */
+var BOOK = '<svg class="hub-guide-btn__ico" viewBox="0 0 16 16" aria-hidden="true" focusable="false">'
+  + '<path d="M8 3.6C6.6 2.6 4.7 2.2 2.2 2.3v9.6c2.5-.1 4.4.3 5.8 1.3 1.4-1 3.3-1.4 5.8-1.3V2.3C11.3 2.2 9.4 2.6 8 3.6z"'
+  + ' fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>'
+  + '<path d="M8 3.6v9.6" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>';
+
+/* "User guide" in the top right corner, on every page of the Hub. */
 function addGuideButton() {
   hubPermissions.then(function (granted) {
     if (granted.indexOf("view_hub") < 0 || document.getElementById("hubGuideBtn")) return;
-    var b = el("a", "hub-guide-btn", "?");
+    var b = el("a", "hub-guide-btn", BOOK + '<span class="hub-guide-btn__label">User guide</span>');
     b.id = "hubGuideBtn";
     b.href = "#/guide";
     b.title = "How to use the Hub";
@@ -226,4 +233,4 @@ function markButton(on) {
   if (b) b.classList.toggle("is-on", on);
 }
 
-export { addGuideButton, closeGuide, openGuide };
+export { addGuideButton, BOOK, closeGuide, openGuide };

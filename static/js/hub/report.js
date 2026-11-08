@@ -349,11 +349,13 @@ function addHelpNav() {
     item.href = "#/help";
     item.title = "When the Hub itself is not working";
     item.innerHTML =
+        // A speech bubble, not a "?" (2026-11-08): "User guide" in the top
+        // right corner is the help to read; this is the one to write to.
         '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">'
-      + '<circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.3"/>'
-      + '<path d="M6.3 6.3a1.8 1.8 0 1 1 2.5 1.6c-.5.2-.8.6-.8 1.1v.4" fill="none"'
-      + ' stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>'
-      + '<circle cx="8" cy="11.4" r=".8" fill="currentColor"/></svg>'
+      + '<path d="M2.5 3.5h11v7.2H7.2L4.4 13v-2.3H2.5z" fill="none" stroke="currentColor"'
+      + ' stroke-width="1.3" stroke-linejoin="round"/>'
+      + '<path d="M5.2 6.3h5.6M5.2 8.3h3.6" fill="none" stroke="currentColor" stroke-width="1.3"'
+      + ' stroke-linecap="round"/></svg>'
       + "<span>Get help</span>";
     foot.insertBefore(item, foot.firstChild);
     if (location.hash === "#/help") markNav(true);

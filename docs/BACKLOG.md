@@ -55,6 +55,7 @@ Serge 11/11（周三）会向 CK 和各部门负责人介绍 Hub：既是找现�
 ### 欢迎弹窗（Liwei 11/08，已做）
 - 每个人第一次打开 Hub、接受 Customer Data Disclaimer 之后，弹出一个简短的欢迎页。内容：Hub 能做什么（找、打开和分享、申请），以及使用说明在右上角的 "?"。按钮是 "Open the user guide" 和 "Get started"，也可以用 X、Esc 或点外面关掉。关掉后右上角的 "?" 闪动 6 秒，旁边出现 "The user guide is here"。
 - 按 SSO 账号记录在服务器上（`owned/welcome_seen.json`，`backend/welcome.py`），所以只弹一次，换浏览器、换设备也不会再弹。
+- 11/08 区分两个帮助入口（Liwei：两个功能分开，左下角 Get help 位置不变）：右上角改成带书本图标的 "User guide" 按钮，手机宽度下只显示图标；左下角 Get help 的图标从 "?" 换成对话气泡。欢迎弹窗里写明："User guide" 用来查看使用说明，报告问题用 Get help。
 - **以后有大更新时**：改 `backend/welcome.VERSION`，在 `WHATS_NEW` 里写几条更新内容。看过旧版的人会再弹一次，标题是 "What's new in the Hub"；新用户仍然看到欢迎页。
 
 ### CK review 之后做（11/08 定）

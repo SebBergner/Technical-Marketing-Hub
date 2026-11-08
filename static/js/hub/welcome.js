@@ -1,13 +1,14 @@
 /* The welcome pop-up (Liwei, 2026-11-08; backend/welcome.py).
  *
  * Once per person, after the Customer Data Disclaimer: a short welcome and
- * where the user guide is (the "?" in the top right corner, #/guide). Shown
+ * where the user guide is ("User guide", top right corner, #/guide). Shown
  * again only after a big update, then as "What's new". Unlike the
  * disclaimer it can be closed any way at all -- X, Escape, a click outside
- * -- and closing it is what counts as seen. As it closes, the "?" pulses
+ * -- and closing it is what counts as seen. As it closes, "User guide" pulses
  * and says what it is, so the way back is found by looking, not reading. */
 
 import { escapeHtml } from "./util.js";
+import { BOOK } from "./guide.js";
 
 var POINTS = [
   ["i-search", "Find", "Search or browse every video, VDK, LDK, CAD dataset and VM."],
@@ -65,9 +66,9 @@ function show(d) {
     +   "</div>"
     +   '<div class="hub-welcome__content">'
     +     body(d)
-    +     '<div class="hub-welcome__guide"><span class="hub-welcome__q">?</span>'
-    +       "<span>The <b>user guide</b> is always one click away: the <b>?</b> in the "
-    +       "top right corner.</span></div>"
+    +     '<div class="hub-welcome__guide"><span class="hub-welcome__q">' + BOOK + "</span>"
+    +       "<span>The <b>User guide</b> button in the top right corner opens it any time. "
+    +       "To report a problem, use <b>Get help</b> at the bottom of the menu.</span></div>"
     +     '<div class="hub-welcome__foot">'
     +       '<a class="btn-ghost hub-welcome__open" href="#/guide">Open the user guide</a>'
     +       '<button type="button" class="btn-primary-sm hub-welcome__go">Get started</button>'
@@ -96,7 +97,7 @@ function show(d) {
   overlay.querySelector(".hub-welcome__go").focus();
 }
 
-/* The "?" pulses for a few seconds with a label beside it. */
+/* "User guide" pulses for a few seconds with a label beside it. */
 function pointAtGuide() {
   var btn = document.getElementById("hubGuideBtn");
   if (!btn) return;
@@ -104,6 +105,9 @@ function pointAtGuide() {
   var tip = document.createElement("div");
   tip.className = "hub-guide-tip";
   tip.textContent = "The user guide is here";
+  var r = btn.getBoundingClientRect();
+  tip.style.top = (r.top + r.height / 2) + "px";
+  tip.style.right = (window.innerWidth - r.left + 10) + "px";
   document.body.appendChild(tip);
   setTimeout(function () {
     btn.classList.remove("hub-guide-btn--pulse");

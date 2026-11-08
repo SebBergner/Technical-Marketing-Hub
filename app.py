@@ -131,6 +131,7 @@ app.include_router(vms.router)
 app.include_router(support.router)
 app.include_router(support.admin_router)
 app.include_router(disclaimer.router)
+app.include_router(disclaimer.welcome_router)
 
 # Middleware, innermost first. Starlette wraps each new one around the ones
 # already added, so the order below is the reverse of the order a request

@@ -8,6 +8,8 @@
 
 import { escapeHtml } from "./util.js";
 
+/* Resolves once the person may use the Hub: at once if nothing is due,
+ * else on Accept. The welcome pop-up (welcome.js) waits for it. */
 export async function askDisclaimerIfDue() {
   var d;
   try {
@@ -18,10 +20,10 @@ export async function askDisclaimerIfDue() {
     return;
   }
   if (!d.required) return;
-  show(d);
+  await new Promise(function (done) { show(d, done); });
 }
 
-function show(d) {
+function show(d, done) {
   var overlay = document.createElement("div");
   overlay.className = "hub-disclaimer";
   overlay.innerHTML =
@@ -55,6 +57,7 @@ function show(d) {
         if (!r.ok) throw new Error("HTTP " + r.status);
         overlay.remove();
         document.body.classList.remove("hub-disclaimer-open");
+        if (done) done();
       })
       .catch(function (err) {
         button.disabled = false;

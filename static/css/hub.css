@@ -1905,3 +1905,51 @@ body.hub-disclaimer-open{overflow:hidden}
   color: var(--orion-indigo); background: var(--orion-surface); border: 1px solid var(--orion-border-md);
   box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
 .hub-guide-btn:hover, .hub-guide-btn.is-on { background: var(--orion-indigo); color: #fff; border-color: var(--orion-indigo); }
+
+/* The welcome pop-up (2026-11-08; welcome.js): once per person, after the disclaimer */
+.hub-welcome { position: fixed; inset: 0; z-index: 9990; display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(15, 23, 42, .5); animation: hubWelcomeIn .18s ease; }
+.hub-welcome.is-leaving { opacity: 0; transition: opacity .15s ease; }
+.hub-welcome__dialog { position: relative; width: min(520px, 100%); max-height: calc(100vh - 32px); overflow: auto;
+  background: var(--orion-surface); color: var(--orion-text); border-radius: 16px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .32); animation: hubWelcomeUp .22s ease; }
+.hub-welcome__x { position: absolute; top: 10px; right: 10px; z-index: 1; width: 32px; height: 32px; border-radius: 50%;
+  border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, .7); color: var(--orion-text-2); }
+.hub-welcome__x:hover { background: var(--orion-surface); color: var(--orion-text); }
+.hub-welcome__band { height: 96px; display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(70% 120% at 85% 0%, rgba(64, 170, 29, .55) 0%, transparent 60%),
+    linear-gradient(135deg, #00650A 0%, #00890B 55%, #40AA1D 100%); }
+.hub-welcome__spark { width: 46px; height: 46px; color: #fff; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .2)); }
+.hub-welcome__content { padding: 22px 26px 22px; }
+.hub-welcome__eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--orion-indigo); }
+.hub-welcome__title { margin: 4px 0 6px; font-size: 22px; line-height: 1.2; letter-spacing: -.01em; }
+.hub-welcome__lead { margin: 0 0 14px; font-size: 14px; color: var(--orion-text-2); }
+.hub-welcome__points { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.hub-welcome__point { display: flex; align-items: flex-start; gap: 12px; font-size: 13.5px; line-height: 1.45; color: var(--orion-text-2); }
+.hub-welcome__point b { display: block; color: var(--orion-text); font-weight: 650; }
+.hub-welcome__ico { flex: none; width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  background: var(--orion-indigo-soft); color: var(--orion-indigo); }
+.hub-welcome__new { margin: 6px 0 16px; padding-left: 18px; font-size: 14px; line-height: 1.55; color: var(--orion-text-2); }
+.hub-welcome__guide { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; font-size: 13.5px;
+  background: var(--orion-indigo-soft); color: var(--orion-text-2); }
+.hub-welcome__guide b { color: var(--orion-text); }
+.hub-welcome__q { flex: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-weight: 700; color: #fff; background: var(--orion-indigo); }
+.hub-welcome__foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.hub-welcome__foot .btn-ghost, .hub-welcome__foot .btn-primary-sm { flex: none; text-decoration: none; }
+@keyframes hubWelcomeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hubWelcomeUp { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
+
+/* The "?" pointing at itself once the welcome closes */
+.hub-guide-btn--pulse { animation: hubGuidePulse 1.2s ease-out 5; }
+@keyframes hubGuidePulse {
+  0% { box-shadow: 0 0 0 0 rgba(0, 137, 11, .55); }
+  100% { box-shadow: 0 0 0 16px rgba(0, 137, 11, 0); } }
+.hub-guide-tip { position: fixed; top: 18px; right: 60px; z-index: 900; padding: 6px 12px; border-radius: 8px;
+  font-size: 13px; font-weight: 600; color: #fff; background: var(--orion-indigo);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .18); animation: hubWelcomeIn .2s ease; transition: opacity .3s ease; }
+.hub-guide-tip::after { content: ""; position: absolute; right: -6px; top: 50%; margin-top: -6px;
+  border: 6px solid transparent; border-right: 0; border-left-color: var(--orion-indigo); }
+.hub-guide-tip.is-leaving { opacity: 0; }

@@ -52,6 +52,11 @@ Serge 11/11（周三）会向 CK 和各部门负责人介绍 Hub：既是找现�
 | 10 | GXC only 筛选（#5 Nadia） | **先不做**：开会确认 |
 | 11 | 表格视图加缩略图（#25 Serge） | **已做**：第一列是 64×36 的小图，行不会变高；鼠标放上去在旁边弹出 256×144 的放大图（浮在页面上层，不会被表格裁掉）；点小图打开 demo。没有图片的显示和卡片一样的封面。CSV 导出不变 |
 
+### 欢迎弹窗（Liwei 11/08，已做）
+- 每个人第一次打开 Hub、接受 Customer Data Disclaimer 之后，弹出一个简短的欢迎页。内容：Hub 能做什么（找、打开和分享、申请），以及使用说明在右上角的 "?"。按钮是 "Open the user guide" 和 "Get started"，也可以用 X、Esc 或点外面关掉。关掉后右上角的 "?" 闪动 6 秒，旁边出现 "The user guide is here"。
+- 按 SSO 账号记录在服务器上（`owned/welcome_seen.json`，`backend/welcome.py`），所以只弹一次，换浏览器、换设备也不会再弹。
+- **以后有大更新时**：改 `backend/welcome.VERSION`，在 `WHATS_NEW` 里写几条更新内容。看过旧版的人会再弹一次，标题是 "What's new in the Hub"；新用户仍然看到欢迎页。
+
 ### CK review 之后做（11/08 定）
 - 申请表的 "Video types needed"（按用途推荐剪辑风格），Elio 认为现在太复杂。
 - 申请表的查重提示（A12：提交前列出最多 5 个相似的已有 demo），约 1 天。

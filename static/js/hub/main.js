@@ -35,6 +35,7 @@ import { addUploadNav } from "./upload.js";
 import { addHelpNav } from "./report.js";
 import { addGuideButton } from "./guide.js";
 import { askDisclaimerIfDue } from "./disclaimer.js";
+import { askWelcomeIfDue } from "./welcome.js";
 
 /* ── when the session runs out with the page open ─────────────────────
  *
@@ -189,7 +190,8 @@ async function load() {
 
 applyPermissions();
 // At once, beside the catalogue load: nothing waits for it, it waits for nothing.
-askDisclaimerIfDue();
+// The welcome (first visit, or after a big update) follows the disclaimer.
+askDisclaimerIfDue().then(askWelcomeIfDue);
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", load);

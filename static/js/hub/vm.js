@@ -409,9 +409,13 @@ function vmDocumentsCard(asset) {
     name.rel = "noopener noreferrer";
     row.appendChild(name);
     if (d.asset_id && d.item_id) {
-      var dl = vmEl("a", "vp-file__download hub-vm-dl", "Download");
-      dl.href = fileDownloadUrl(d.asset_id, d.item_id);
-      row.appendChild(dl);
+      // "View", not "Download" (Elio, Liwei, 2026-11-06): a release note
+      // is read, not kept, so it opens in the Hub's viewer like its name.
+      var view = vmEl("a", "vp-file__download hub-vm-dl", "View");
+      view.href = filePreviewUrl(d.asset_id, d.item_id);
+      view.target = "_blank";
+      view.rel = "noopener noreferrer";
+      row.appendChild(view);
     }
     list.appendChild(row);
   });

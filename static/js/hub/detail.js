@@ -271,6 +271,9 @@ async function openAssetDetail(id, fileItemId, linkToken) {
     // Files locked for this person (an Internal demo, 2026-10-07): no
     // Download Kit either -- it is the same files, one page further on.
     if (asset.files_locked && asset.source !== "consensus") platformHref = null;
+    // A VM has no kit to download: its page (vm.js) carries its own links
+    // to the environment and the SharePoint page (stress test, 2026-11-06).
+    if (asset.type === "vm") platformHref = null;
     if (platformHref) {
       actions.insertBefore(
         linkButton("btn-primary-sm vp-platform",

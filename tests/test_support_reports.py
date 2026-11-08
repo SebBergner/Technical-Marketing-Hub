@@ -149,3 +149,20 @@ def test_report_owners_says_whether_feedback_reaches_hub_tasks(client, monkeypat
         "on": False, "list": "", "unsent": 0, "error": None}
     monkeypatch.setattr(settings, "hub_tasks_list", "Hub Tasks")
     assert client.get(url, headers=BOSS).json()["hub_tasks"]["on"] is True
+
+
+def test_the_sender_may_withdraw_an_open_report_and_nobody_else(client, monkeypatch):
+    """Serge #24, Liwei 2026-11-08: a Withdraw button on your own reports."""
+    rid = report(client, ANN, "cad").json()["id"]
+    url = f"/api/support/reports/{rid}/withdraw"
+    assert client.post(url, headers=BOSS).status_code == 409, "not boss's report"
+    r = client.post(url, headers=ANN)
+    assert r.status_code == 200 and r.json()["status"] == "Withdrawn"
+    assert client.rows[-1]["TaskStatus"] == "Withdrawn", "the Hub Tasks row follows"
+    [own] = client.get("/api/support/reports/mine", headers=ANN).json()["items"]
+    assert own["status"] == "Withdrawn"
+    assert client.post(url, headers=ANN).status_code == 409, "only while Open"
+    # Already handled in SharePoint: no longer withdrawn from here.
+    rid2 = report(client, ANN, "plm").json()["id"]
+    monkeypatch.setattr(hub_tasks, "read_statuses", lambda prefix: {rid2: "Done"})
+    assert client.post(f"/api/support/reports/{rid2}/withdraw", headers=ANN).status_code == 409

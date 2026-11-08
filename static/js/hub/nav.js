@@ -11,6 +11,7 @@ import { closeAssetDetail, closeFilePreview } from "./detail.js";
 import { addActivityNav, closeActivity } from "./activity.js";
 import { addReviewNav, closeReview } from "./review.js";
 import { closeHelp } from "./report.js";
+import { closeGuide } from "./guide.js";
 import { closeAdvancedSearch } from "./search.js";
 import { closeUpload } from "./upload.js";
 
@@ -129,9 +130,10 @@ function exitOverlays() {
   closeActivity();
   closeReview();
   closeHelp();
+  closeGuide();
   closeUpload();
   // The hash has to follow, or a refresh reopens the page we just left.
-  if (/^#\/(asset|search|activity|review|help|upload)/.test(location.hash || "")) {
+  if (/^#\/(asset|search|activity|review|help|guide|upload)/.test(location.hash || "")) {
     history.pushState(null, "", location.pathname + location.search);
     return;
   }

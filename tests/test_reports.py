@@ -62,6 +62,12 @@ def test_the_page_says_from_when_people_are_counted_by_name(tmp_path, monkeypatc
     two_days = reports.hub_activity(since=(NOW - timedelta(days=2)).isoformat(), until=None,
                                     top=10, repo=repo)
     assert two_days["named_since"] is None
+    # #22 (2026-11-08): the two days before began before anyone was named,
+    # so the people count is not compared; the day before one day was.
+    assert two_days["previous_named"] is False and two_days["named_from"] == events[1]["at"][:10]
+    one_day = reports.hub_activity(since=(NOW - timedelta(days=1)).isoformat(), until=None,
+                                   top=10, repo=repo)
+    assert one_day["previous_named"] is True
 
 
 def test_teams_are_hub_groups_with_their_totals():

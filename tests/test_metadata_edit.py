@@ -301,3 +301,27 @@ def test_credit_order():
                    named, {})["creator"] == "Jorge S."
     assert _credit({**base, "demo_owner": "x@ptc.com"}, named, {})["creator"] == "x@ptc.com"
     assert _credit(dict(base), named, {})["creator"] == "Chen, Liwei"
+
+
+def test_a_kit_may_switch_between_ldk_and_vdk_only(client, fake):
+    """Liwei, 2026-11-08: PMs often pick the wrong Demo Type. A kit always
+    lives in Demo Catalog, so LDK <-> VDK is safe; a video's type is not
+    offered, and neither is the library's "AR Experience"."""
+    fake.fields["Demo_x0020_Type"] = "Live Demo Kit"
+    form = client.get("/api/assets/kit/metadata", headers=EDITOR).json()
+    field = next(f for f in form["fields"] if f["key"] == "demo_type")
+    assert field["choices"] == ["Live Demo Kit", "Virtual Demo Kit"]
+    assert form["values"]["demo_type"] == "Live Demo Kit"
+    r = client.put("/api/assets/kit/metadata", headers=EDITOR, json={"etag": '"1"', "values": {
+        "demo_type": "AR Experience"}})
+    assert r.status_code == 422
+    r = client.put("/api/assets/kit/metadata", headers=EDITOR, json={"etag": '"1"', "values": {
+        "demo_type": "Virtual Demo Kit"}})
+    assert r.status_code == 200, r.text
+    assert fake.writes[-1][1] == {"Demo_x0020_Type": "Virtual Demo Kit"}
+    assert client.get("/api/assets/kit", headers=ANN).json()["type"] == "vdk", "at once"
+
+
+def test_a_video_has_no_type_to_change():
+    assert "demo_type" not in [f.key for f in me.edit_fields(ut.DEMO_VIDEO)]
+    assert "demo_type" not in [f.key for f in me.edit_fields(ut.GXC_VIDEO)]

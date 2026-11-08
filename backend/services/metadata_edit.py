@@ -50,6 +50,15 @@ OWNER_NAME = ut.FieldSpec("demo_owner_name", "Demo owner name", ut.TEXT,
                           help="As it should show, e.g. Suarez, Jorge. Empty: the name "
                                "they sign in to the Hub with, else the email.")
 _OWNER_KEYS = {"demo_owner", "demo_owner_name"}
+
+#: A kit's type, Live Demo Kit or Virtual Demo Kit (Liwei, 2026-11-08): PMs
+#: often pick the wrong one. Only these two -- a kit always lives in Demo
+#: Catalog, while a video lives in other libraries too, so a video's type is
+#: never changed here. The library also offers "AR Experience", not offered.
+KIT_TYPES = ["Live Demo Kit", "Virtual Demo Kit"]
+DEMO_TYPE = ut.FieldSpec("demo_type", "Demo type", ut.CHOICE, required=True,
+                         column="Demo_x0020_Type", choices_from="kit_types",
+                         help="Live Demo Kit (LDK) or Virtual Demo Kit (VDK).")
 #: Pictures a card may show (B5): what a browser can draw.
 IMAGE_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -83,7 +92,12 @@ def target_key(record: dict) -> str:
 
 
 def edit_fields(spec: ut.TargetSpec) -> list[ut.FieldSpec]:
-    return [f for f in spec.fields if f.key not in NOT_EDITED] + [OWNER_NAME, OWNER]
+    kit = [DEMO_TYPE] if spec.key == "demo_catalog" else []
+    return kit + [f for f in spec.fields if f.key not in NOT_EDITED] + [OWNER_NAME, OWNER]
+
+
+def _choices(target: uw.Target) -> dict:
+    return {**(target.choices or {}), "kit_types": KIT_TYPES}
 
 
 def _spec_with_owner(spec: ut.TargetSpec) -> ut.TargetSpec:
@@ -122,7 +136,7 @@ def values_of(spec: ut.TargetSpec, fields: dict) -> dict:
 
 def form(spec: ut.TargetSpec, target: uw.Target) -> list[dict]:
     """The editor's fields, as the upload form draws them, minus the title."""
-    full = ut.form(_spec_with_owner(spec), target.choices, target.skipped)
+    full = ut.form(_spec_with_owner(spec), _choices(target), target.skipped)
     return full["fields"]
 
 
@@ -149,7 +163,7 @@ def changes(spec: ut.TargetSpec, target: uw.Target, sent: dict, current: dict) -
     keys = {f.key for f in edit_fields(spec)}
     sent = {k: v for k, v in (sent or {}).items()
             if k in keys and not _same(v, current.get(k))}
-    cleaned = ut.clean_fields(_spec_with_owner(spec), sent, target.choices, partial=True)
+    cleaned = ut.clean_fields(_spec_with_owner(spec), sent, _choices(target), partial=True)
     owner = cleaned.get("demo_owner")
     if owner:
         from backend.access import _is_internal_address
@@ -206,7 +220,11 @@ def write(client: GraphClient, target: uw.Target, folder_id: str, changed: dict,
                            "editor. Reload it and make your change again.")
     values = {k: v for k, v in changed.items() if k not in _OWNER_KEYS}
     fields, note = uw.metadata_fields(target, target.spec.kinds[0], values)
-    fields.pop("Demo_x0020_Type", None)        # an edit never changes the type
+    # metadata_fields() stamps the first kind's type, which an edit never
+    # means; only a kit's own change of type (DEMO_TYPE) is written.
+    fields.pop("Demo_x0020_Type", None)
+    if changed.get("demo_type") in KIT_TYPES:
+        fields["Demo_x0020_Type"] = changed["demo_type"]
     if "demo_owner" in changed and target.has_demo_owner:
         fields[ut.OWNER_COLUMN] = changed["demo_owner"] or ""
     if "demo_owner_name" in changed and target.has_demo_owner_name:
@@ -308,6 +326,8 @@ def hub_values(key: str, changed: dict) -> dict:
             out[k] = v or None
         elif k in _OWNER_KEYS:
             out[k] = v or None
+        elif k == "demo_type" and m.TYPE_MAP.get(v):
+            out["type"] = m.TYPE_MAP[v]
         elif k == "video_type":
             from backend.models import video_type
             out["content_depth"] = video_type(v)

@@ -95,6 +95,11 @@ def hub_activity(since: str | None = None, until: str | None = None,
         before = activity.leaderboard(events, since=(lo - (hi - lo)).isoformat(),
                                       until=lo.isoformat(), top=1)
         out["previous"] = before["totals"]
+    # Whether the span before was counted by name all through (#22, 2026-11-08):
+    # if not, its people are too few to compare with, and the page says so.
+    first_at = activity._parse(first) if first else None
+    out["named_from"] = first[:10] if first else None
+    out["previous_named"] = bool(first_at and lo and lo - (hi - lo) >= first_at)
     return out
 
 

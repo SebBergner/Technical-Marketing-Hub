@@ -30,20 +30,20 @@ Serge 11/11（周三）会向 CK 和各部门负责人介绍 Hub：既是找现�
 4. 上线后请 Nadia 再打开一次 Windchill release note（#7）。
 5. Elio 发现的那条标错类型的培训视频：在 SharePoint 里改正 Demo Type。需要的话，Claude 可以只读帮你找出是哪一条。
 
-### 要 Liwei 拍板的
-| # | 问题 | 选项 / 现状 | 和谁定 |
-|---|---|---|---|
-| 1 | Illustrate 合并（#8 Nadia） | production 上 "Creo Illustrate" 有 23 条（算在 Creo 族下），"PTC Illustrate" 有 4 条（自成一族）。合并后放在 Creo、单独的 PTC Illustrate，还是 Windchill 下？11/08 定先不做 | Liwei / Elio |
-| 2 | 资产类型修改控件 | 在 LDK 和 VDK 之间改，只要写回 Demo Type 列，容易做。要不要支持改成 "Video"？Video 在另一个库，要搬文件夹，或者给 Demo Type 加一个 "Training video" 选项 | Liwei / Elio |
-| 3 | 欢迎视频和帮助按钮 | 视频由 Elio 提供。要不要先上 "?" 按钮，里面暂时只放文档链接？ | Elio |
-| 4 | 申请提交后的提醒 | 用 Power Automate，还是 Seb 已经做好的邮箱？发给谁？ | Liwei / Seb |
-| 5 | 缩写搜索（#15 PLE、#17 IPE，Neal） | 建议做一张短表，十几个常用缩写，不做通用的同义词功能。缩写清单要团队给 | 团队 |
-| 6 | 导航加产品 logo（#26 Serge、#16 Shreyak，C10） | 要加哪些产品？logo 文件由 marketing 提供。Onshape 有 26 条内容，但大多没标 Product，要先补 | Elio / Seb / marketing |
-| 7 | 旧的 ThingWorx 视频还显示吗（#20 Enrique） | 保留，还是归档 | Elio |
-| 8 | 撤回反馈（#24 Serge） | 只做 "撤回"（把 Hub Tasks 里那一行标成 Withdrawn），还是暂时由团队在 SharePoint 里手动改状态 | Liwei |
-| 9 | "PTC people who used the Hub" 没有百分比（#22） | 上一时段是 0（10/16 之前的记录没有人名），所以没有百分比。改成显示 "0 → N"，还是加一句说明 | Liwei |
-| 10 | GXC only 搜不到（#5 Nadia） | 这是一个标记，不是文字。要不要在 Advanced Search 里加一个 GXC only 筛选？能看到 GXC 内容的人很少 | Liwei |
-| 11 | 表格视图加缩略图（#25 Serge） | 优先级低：会让表格变慢，而表格本来就是给想看文字列表的人用的 | Liwei / Serge |
+### Liwei 11/08 的决定
+| # | 问题 | 决定 / 结果 |
+|---|---|---|
+| 1 | Illustrate 合并（#8 Nadia）："Creo Illustrate" 23 条（算在 Creo 族下）、"PTC Illustrate" 4 条（自成一族） | **先不做**：下周开会确认放在哪个族下 |
+| 2 | 资产类型修改 | **已做**：Edit 表单最上面加了 "Demo type"，只对 Demo Catalog 的 kit 显示，只能在 Live Demo Kit 和 Virtual Demo Kit 之间改（kit 只在 Demo Catalog；视频分在几个库里，不能改）。库里还有一个 "AR Experience" 选项，不提供。写回 Demo_x0020_Type，Hub 上立即显示，权限和 Edit 相同。**PM 忘了填 Demo Type 的文件夹不会出现在 Hub**，所以这个功能救不了它们：11/08 只读查了，Demo Catalog 顶层 753 个文件夹里 297 个没有 Demo Type，名字里带 VDK/LDK 的有 9 个，由 Liwei 或 PM 在 SharePoint 补：DEX VDK v.2、Onshape Vision - VDK、Creo Advanced Assembly Extension - VDK、Creo Advanced Assembly Extension - LDK、What's New in Mathcad Prime 11.0 - LDK v.1、What's New in Mathcad Prime 11.0 - VDK v.1、Creo Mechanism MDX and MDO Overview VDK v.1、EZ Tolerance Analysis VDK v.1、Creo Mold Analysis Overview VDK v.1 |
+| 3 | 欢迎视频和帮助按钮 | **已做帮助部分**：右上角常驻 "?" 按钮，打开单独的使用说明页（#/guide），有 6 段：找内容、打开 demo、列表和表格、申请新内容、反馈问题、客户数据。和 Get help（#/help，报告问题）分开。欢迎视频等 Elio 提供，到时放在这一页的最上面 |
+| 4 | 申请提交后的提醒 | **Liwei 以后做**（Power Automate 或 Seb 的邮箱） |
+| 5 | 缩写搜索（#15 PLE、#17 IPE，Neal） | **先不做**：开会确认缩写清单 |
+| 6 | 导航加产品 logo（#26、#16，C10） | **先不做**：还没拿到 logo |
+| 7 | 旧的 ThingWorx 视频（#20 Enrique） | **保留** |
+| 8 | 撤回反馈（#24 Serge） | **已做**：Get help → My feedback 里，自己的、状态还是 Open 的反馈有 Withdraw 按钮（会先确认）。Hub Tasks 里那一行改成 Withdrawn，Hub 立即显示为 Withdrawn。团队已经处理过（不是 Open）的不能撤回 |
+| 9 | "PTC people who used the Hub" 没有百分比（#22） | **已做（Claude 判断）**：原因是默认 30 天的"上一时段"在 10/16 之前，那时的记录没有人名，人数是 0，所以只显示 "new"。现在上一时段只要有一部分早于开始记录人名的那天，就不比较，写明 "No comparison: counted by name since Oct 16, 2026"；其他数字上一时段是 0 时显示 "from 0"，不再显示 "new" |
+| 10 | GXC only 筛选（#5 Nadia） | **先不做**：开会确认 |
+| 11 | 表格视图加缩略图（#25 Serge） | **已做**：第一列是 64×36 的小图，行不会变高；鼠标放上去在旁边弹出 256×144 的放大图（浮在页面上层，不会被表格裁掉）；点小图打开 demo。没有图片的显示和卡片一样的封面。CSV 导出不变 |
 
 ### CK review 之后做（11/08 定）
 - 申请表的 "Video types needed"（按用途推荐剪辑风格），Elio 认为现在太复杂。

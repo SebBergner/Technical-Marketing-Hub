@@ -299,6 +299,8 @@ function loadMine() {
       var st = el("td");
       st.appendChild(el("span", "hub-rpt__status hub-rpt__status--"
         + (STATUS_CLASS[r.status] || "open"), r.status || "Open"));
+      // Your own, while still open (Serge #24, 2026-11-08).
+      if ((r.status || "Open") === "Open") st.appendChild(withdrawButton(r));
       tr.appendChild(st);
       body.appendChild(tr);
     });
@@ -311,6 +313,29 @@ function loadMine() {
     host.textContent = "";
     complain("Could not load your reports: " + err.message, true);
   });
+}
+
+function withdrawButton(r) {
+  var b = el("button", "btn-ghost hub-rpt__withdraw", "Withdraw");
+  b.type = "button";
+  b.title = "Take this back: it is closed as Withdrawn";
+  b.addEventListener("click", function () {
+    if (!window.confirm("Withdraw this report? It is closed as Withdrawn and "
+                        + "nobody needs to act on it.")) return;
+    b.disabled = true;
+    fetch("/api/support/reports/" + encodeURIComponent(r.id) + "/withdraw", { method: "POST" })
+      .then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (d) {
+          if (!res.ok) throw new Error(d.detail || "HTTP " + res.status);
+        });
+      })
+      .then(loadMine)
+      .catch(function (err) {
+        b.disabled = false;
+        complain("Could not withdraw it: " + err.message, true);
+      });
+  });
+  return b;
 }
 
 /* ── at the top of the sidebar's foot (2026-10-28) ───────────────────── */

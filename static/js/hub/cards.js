@@ -828,5 +828,5 @@ function renderAgeMark(meta, asset) {
 
 export {
   assetHref, buildCard, cardImage, consensusUrl, embedInlinePlayer, gxcPill, paintCoverInto, previewUrl,
-  renderAgeMark, stopInlinePlayer, TYPE_CHIP, videoTypeOf
+  renderAgeMark, stopInlinePlayer, TYPE_CHIP, videoTypeOf, whenNearScreen
 };

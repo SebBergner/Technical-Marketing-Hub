@@ -171,6 +171,31 @@ def submit(repo, user, *, category: str, details: str, asset=None) -> dict:
     return record
 
 
+def withdraw(repo, user, report_id: str) -> dict:
+    """The person who sent a report takes it back while it is still Open
+    (Serge #24, Liwei 2026-11-08). Its Hub Tasks row becomes Withdrawn."""
+    key = reporter_key(user)
+    status = statuses(repo, fresh=True)
+    with _lock:
+        items = _load(repo, REPORTS, [])
+        record = next((r for r in items if r.get("id") == report_id
+                       and r.get("reporter") == key), None)
+        if record is None:
+            raise ReportError("No such report of yours.")
+        if _status_of(record, status) != "Open":
+            raise ReportError("Only an open report can be withdrawn.")
+        record["withdrawn_at"] = _now()
+        _save(repo, REPORTS, items)
+    from backend.integrations.graph import hub_tasks
+    hub_tasks.note_report(repo, record)
+    return record
+
+
+def _status_of(record: dict, status: dict[str, str]) -> str:
+    """Withdrawn here wins: the list may not have caught up yet."""
+    return "Withdrawn" if record.get("withdrawn_at") else status.get(record["id"], "Open")
+
+
 def listing(repo) -> list[dict]:
     """Newest first."""
     return sorted(_load(repo, REPORTS, []), key=lambda r: r.get("at") or "", reverse=True)
@@ -197,7 +222,7 @@ def statuses(repo, fresh: bool = False) -> dict[str, str]:
 def _view(record: dict, status: dict[str, str], *, for_owner: bool) -> dict:
     out = {k: record.get(k) for k in ("id", "at", "category", "details", "asset_id", "title",
                                       "segment", "fell_back")}
-    out["status"] = status.get(record["id"], "Open")
+    out["status"] = _status_of(record, status)
     if for_owner:
         out["reported_by"] = record.get("reported_by")
         out["notify_to"] = record.get("notify_to") or []
@@ -227,6 +252,6 @@ def counts(repo) -> dict[str, dict]:
     for r in listing(repo):
         c = out.get(r.get("segment")) or out[GENERAL]
         c["total"] += 1
-        c["open"] += status.get(r["id"], "Open") == "Open"
+        c["open"] += _status_of(r, status) == "Open"
         c["last_30"] += (r.get("at") or "") >= month
     return out

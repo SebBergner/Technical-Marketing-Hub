@@ -22,6 +22,7 @@ import { closeActivity, openActivity } from "./activity.js";
 import { closeUpload, openUpload } from "./upload.js";
 import { closeReview, openReview } from "./review.js";
 import { closeHelp, openHelp, openReportModal } from "./report.js";
+import { closeGuide, openGuide } from "./guide.js";
 import {
   advancedHash, advState, closeAdvancedSearch, fileTotalsText,
   openAdvancedSearch
@@ -1612,6 +1613,17 @@ function routeFromHash() {
       && typeof window.closeRequestView === "function") {
     window.closeRequestView();
   }
+  if (hash === "#/guide") {
+    closeFilePreview(false);
+    closeAssetDetail();
+    closeUpload();
+    closeActivity();
+    closeReview();
+    closeHelp();
+    openGuide();
+    return;
+  }
+  closeGuide();
   if (hash === "#/help") {
     closeFilePreview(false);
     closeAssetDetail();

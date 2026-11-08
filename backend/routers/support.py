@@ -62,6 +62,19 @@ def mine(repo: AssetRepository = Depends(get_repo),
     return {"items": sr.mine(repo, user)}
 
 
+@router.post("/reports/{report_id}/withdraw",
+             dependencies=[Depends(require_perm(Perm.VIEW_HUB))])
+def withdraw(report_id: str, repo: AssetRepository = Depends(get_repo),
+             user: CurrentUser = Depends(get_current_user)):
+    """Take back a report you sent, while it is still Open (Serge #24)."""
+    try:
+        sr.withdraw(repo, user, report_id)
+    except sr.ReportError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    log.info("report %s withdrawn by its sender", report_id)
+    return {"id": report_id, "status": "Withdrawn"}
+
+
 # ─────────────────────────────────────────────── Admin -> Report owners
 class Owner(BaseModel):
     name: str = ""

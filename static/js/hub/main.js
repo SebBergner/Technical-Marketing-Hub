@@ -33,6 +33,7 @@ import {
 import { wireShareModal } from "./share.js";
 import { addUploadNav } from "./upload.js";
 import { addHelpNav } from "./report.js";
+import { addGuideButton } from "./guide.js";
 import { askDisclaimerIfDue } from "./disclaimer.js";
 
 /* ── when the session runs out with the page open ─────────────────────
@@ -166,6 +167,7 @@ async function load() {
   buildSidebarFoot();
   addUploadNav();
   addHelpNav();
+  addGuideButton();
   // A shared link's filters (/?family=Creo&type=video): last, once every
   // control has its options.
   restoreFiltersFromUrl();

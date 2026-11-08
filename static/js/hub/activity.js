@@ -198,7 +198,8 @@ function delta(now, before) {
   var arrow, text, kind;
   if (!before) {
     if (!now) return el;
-    kind = "up"; arrow = "↑"; text = "new";
+    // "from 0" says what happened; "new" read as a missing number (#22).
+    kind = "up"; arrow = "↑"; text = "from 0";
   } else {
     var pct = Math.round((now - before) / before * 100);
     kind = pct > 0 ? "up" : pct < 0 ? "down" : "flat";
@@ -274,7 +275,14 @@ function renderActivityPage(d) {
   var hero = actEl("div", "hub-act__card hub-act__hero");
   hero.appendChild(actEl("div", "hub-act__label", "PTC people who used the Hub"));
   hero.appendChild(actEl("div", "hub-act__hero-n", compact(t.active_people)));
-  hero.appendChild(delta(t.active_people, d.previous ? prev.active_people : null));
+  // Not compared with a span from before people were counted by name
+  // (2026-10-16): it would show growth that is only the log starting (#22).
+  if (d.previous && d.previous_named === false && d.named_from) {
+    hero.appendChild(actEl("div", "hub-act__delta hub-act__delta--flat",
+      "No comparison: " + namedNote(d.named_from).replace("Counted", "counted")));
+  } else {
+    hero.appendChild(delta(t.active_people, d.previous ? prev.active_people : null));
+  }
   hero.appendChild(actEl("div", "hub-act__sub", "in the last " + periodWord()));
   if (d.named_since) hero.appendChild(actEl("div", "hub-act__sub", namedNote(d.named_since)));
   top.appendChild(hero);

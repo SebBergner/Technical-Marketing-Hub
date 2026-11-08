@@ -173,7 +173,9 @@ def report_fields(record: dict) -> dict:
     link = (f"{_base()}/#/asset/{quote(record['asset_id'], safe='')}" if record.get("asset_id")
             else f"{_base()}/admin#reports")
     return {"Title": (f"Report: {about}" if about else f"Help: {record.get('category')}")[:255],
-            "TaskType": "Support request", "TaskStatus": "Open",
+            "TaskType": "Support request",
+            # Taken back by its sender (Serge #24, 2026-11-08).
+            "TaskStatus": "Withdrawn" if record.get("withdrawn_at") else "Open",
             "Category": record.get("category"),
             "Segment": record.get("segment"),
             "NotifyTo": "; ".join(record.get("notify_to") or []),

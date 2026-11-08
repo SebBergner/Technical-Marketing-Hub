@@ -24,7 +24,7 @@ Serge 11/11（周三）会向 CK 和各部门负责人介绍 Hub：既是找现�
 ### staging 验证（11/08，v2026.3.182，Liwei 授权 Claude 写测试数据）
 - Demo Requests 列表：AssetType 列已加上 "VDK"，选项现在是 Video、LDK、VDK。DistributionChannels 列加 Elio 的 7 个选项时被权限拦下，没有加；这一列允许填写其他值，所以不加也能写入。
 - 测试申请 REQ-20261108-D86B7E 写进了 Demo Requests 第 154 行：AssetType 是 VDK，DistributionChannels 是 "Social"。之后已改为 Declined，TriageNotes 注明是测试，可以删除。
-  - 发现：选 VDK/LDK 时表单隐藏了 Video details，但仍然提交了默认的 DesiredLength（"1–3 min"）。
+  - 发现：选 VDK/LDK 时表单隐藏了 Video details，但仍然提交了默认的 DesiredLength（"1–3 min"）。11/08 已修：只有视频才提交时长和客户这两项。
 - Get help 测试反馈 88d960b62157：发出后撤回，Hub 里显示 Withdrawn。staging 没有接 Hub Tasks（`hub_tasks.on = false`），所以没有写进 Hub Tasks，也没有通知任何人。写 Hub Tasks 的部分只有单元测试，上 production 后才会真正写。
 - Elio 发现的那条 "Windchill Arbortext Overview Presentation (VDK)"：用 Edit 从 Live Demo Kit 改成了 Virtual Demo Kit。SharePoint 里已生效（16:56 UTC），production 下次同步后也会显示为 VDK。
 

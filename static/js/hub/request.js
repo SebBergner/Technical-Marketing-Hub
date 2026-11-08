@@ -253,6 +253,13 @@ function collectRequest() {
     requester_email: fieldValue("reqEmail"),
     notes: fieldValue("reqNotes")
   };
+  // Video details are hidden for a VDK or an LDK, and their pills keep a
+  // default ("1–3 min"); not sent, or a kit request reads as a video length
+  // (found on staging, 2026-11-08).
+  if (body.asset_type !== "video") {
+    body.target_length = null;
+    body.customer_involvement = null;
+  }
   // The starting-materials pills are ours to label; the list column expects
   // the words a person would read.
   var materials = { have: "Have materials", liberty: "Team has creative liberty" };

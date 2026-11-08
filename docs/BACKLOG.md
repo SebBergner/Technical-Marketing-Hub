@@ -21,14 +21,21 @@ Serge 11/11（周三）会向 CK 和各部门负责人介绍 Hub：既是找现�
 - `0e27f1e`：VM 页面去掉 "Download Kit"；release note 的 "Download" 改成 "View"；浏览器标签页用 PTC 标志做图标（Hub、Admin、Migration 三个页面）。
 - `a5bc5a0`：申请表重新开放，名称是 New Asset Inquiry，所有 PTC 员工都能提交，详见 A12；VM 页面的 "Open the full page in SharePoint" 改名为 "VM details"，只有维护内容的人能看到；"Download Cloud Portal Release Notes" 改为 "View ..."，用 Hub 预览打开同一个 PDF。原来的 SharePoint 分享链接就是 Nadia（#7）打不开的那个。
 
+### staging 验证（11/08，v2026.3.182，Liwei 授权 Claude 写测试数据）
+- Demo Requests 列表：AssetType 列已加上 "VDK"，选项现在是 Video、LDK、VDK。DistributionChannels 列加 Elio 的 7 个选项时被权限拦下，没有加；这一列允许填写其他值，所以不加也能写入。
+- 测试申请 REQ-20261108-D86B7E 写进了 Demo Requests 第 154 行：AssetType 是 VDK，DistributionChannels 是 "Social"。之后已改为 Declined，TriageNotes 注明是测试，可以删除。
+  - 发现：选 VDK/LDK 时表单隐藏了 Video details，但仍然提交了默认的 DesiredLength（"1–3 min"）。
+- Get help 测试反馈 88d960b62157：发出后撤回，Hub 里显示 Withdrawn。staging 没有接 Hub Tasks（`hub_tasks.on = false`），所以没有写进 Hub Tasks，也没有通知任何人。写 Hub Tasks 的部分只有单元测试，上 production 后才会真正写。
+- Elio 发现的那条 "Windchill Arbortext Overview Presentation (VDK)"：用 Edit 从 Live Demo Kit 改成了 Virtual Demo Kit。SharePoint 里已生效（16:56 UTC），production 下次同步后也会显示为 VDK。
+
 ### 周三前 Liwei 要做的
 1. SharePoint 的 Demo Requests 列表：
-   - AssetType 列加 "VDK" 选项（必须做）；
+   - ~~AssetType 列加 "VDK" 选项~~（11/08 已加）；
    - DistributionChannels 列加 Elio 的 7 个选项（建议做，不加也能写进去）。
 2. Admin 里关掉 "Demos with only a SharePoint page"。这样 22 个没有文件的 VDK/LDK 就不会显示（13 个 VDK、9 个 LDK，Avi 报的 #10–#13）。
 3. 说 "Push to staging" 之后，在 staging 上提交一条测试申请，确认它写进了 Demo Requests 列表（本地没有测过提交）。
 4. 上线后请 Nadia 再打开一次 Windchill release note（#7）。
-5. Elio 发现的那条标错类型的培训视频：在 SharePoint 里改正 Demo Type。需要的话，Claude 可以只读帮你找出是哪一条。
+5. ~~Elio 发现的那条标错类型的培训视频~~（11/08 已改为 VDK）。
 
 ### Liwei 11/08 的决定
 | # | 问题 | 决定 / 结果 |

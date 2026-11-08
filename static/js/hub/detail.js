@@ -1583,7 +1583,9 @@ function linkButton(className, label, href, icon, title) {
 
 /* Arriving on a link someone shared, and the back button, are the same
  * thing: read the hash and show whatever it names. */
-var REQUEST_FORM_HIDDEN = true;
+// Back for every PTC employee (Liwei, 2026-11-08): Serge presents the Hub
+// as the place to request new content.
+var REQUEST_FORM_HIDDEN = false;
 
 function routeFromHash() {
   var hash = location.hash || "";

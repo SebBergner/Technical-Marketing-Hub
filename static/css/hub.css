@@ -1207,7 +1207,7 @@ video.hub-inline-player__media { object-fit: contain; }
 /* ── Controls hidden by permission (html.hub-no-*) (was PERMISSION_CSS in hub-api.js) ── */
 .hub-no-download a[href$='/download']{display:none !important}
 .hub-no-preview a[href$='/preview']{display:none !important}
-.hub-no-create_demo #navRequestAsset{display:none !important}
+
 
 /* ── A demo's page (was DETAIL_CSS in hub-api.js) ── */
 .hub-vp-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,380px);gap:20px;align-items:start;margin-bottom:22px}

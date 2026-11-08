@@ -8,7 +8,8 @@ import { getJSON } from "./util.js";
 import { TYPE_CHIP } from "./cards.js";
 import { applyFilters, CONTROLS, navFilter } from "./filters.js";
 import { exitOverlays } from "./nav.js";
-import { fileDownloadUrl, filePreviewUrl, openAssetDetail } from "./detail.js";
+import { hubPermissions } from "./permissions.js";
+import { filePreviewUrl, openAssetDetail } from "./detail.js";
 
 /* ── virtual machines ─────────────────────────────────────────────────
  *
@@ -95,6 +96,20 @@ function renderVmCards(page, asset) {
   });
 }
 
+/* The mirrored document an action's link points at, matched by file name
+ * (the link and the document's own address are spelt differently). */
+function mirroredDoc(docs, url) {
+  var name = function (u) {
+    try { return decodeURIComponent(new URL(u).pathname.split("/").pop()).toLowerCase(); }
+    catch (e) { return ""; }
+  };
+  var wanted = name(url);
+  if (!wanted) return null;
+  return docs.filter(function (d) {
+    return d.asset_id && d.item_id && (d.name || "").toLowerCase() === wanted;
+  })[0] || null;
+}
+
 function vmActionsCard(asset) {
   var vm = asset.vm;
   var c = vmCard("i-monitor", "Get this environment");
@@ -102,18 +117,35 @@ function vmActionsCard(asset) {
   (vm.actions || []).forEach(function (a) {
     var href = safeHref(a.url);
     if (!href) return;
-    var btn = vmEl("a", a.kind === "cloud_portal" ? "btn-primary-sm" : "btn-ghost", a.label);
+    var label = a.label;
+    // A file the Hub mirrors (the release notes) opens in the Hub's own
+    // viewer, labelled "View" (Elio, Liwei, 2026-11-06): read, not kept,
+    // and counted in the Hub's analytics. The page's own link is a
+    // SharePoint sharing link (".../:b:/r/..."), which Nadia could not open.
+    var doc = a.kind === "download" && mirroredDoc(vm.documents || [], a.url);
+    if (doc) {
+      href = filePreviewUrl(doc.asset_id, doc.item_id);
+      label = label.replace(/^Download\b/i, "View");
+    }
+    var btn = vmEl("a", a.kind === "cloud_portal" ? "btn-primary-sm" : "btn-ghost", label);
     btn.href = href;
     btn.target = "_blank";
     btn.rel = "noopener noreferrer";
     row.appendChild(btn);
   });
+  // "VM details", for those who maintain content only (Elio, Liwei,
+  // 2026-11-06): what is done on the SharePoint page never reaches the
+  // Hub's analytics, and this page already shows what it holds.
   if (safeHref(asset.web_url)) {
-    var page = vmEl("a", "btn-ghost", "Open the full page in SharePoint");
-    page.href = asset.web_url;
-    page.target = "_blank";
-    page.rel = "noopener noreferrer";
-    row.appendChild(page);
+    hubPermissions.then(function (granted) {
+      if (granted.indexOf("maintain_content") < 0) return;
+      var page = vmEl("a", "btn-ghost", "VM details");
+      page.title = "Open the VM's page in SharePoint";
+      page.href = asset.web_url;
+      page.target = "_blank";
+      page.rel = "noopener noreferrer";
+      row.appendChild(page);
+    });
   }
   c.box.appendChild(row);
 

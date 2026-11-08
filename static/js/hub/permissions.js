@@ -30,6 +30,20 @@ function applyPermissions() {
       if (d.consensus_licensed) granted.push("consensus_licensed");
       // Nor is being a partner, which renames Share Internally (2026-10-29).
       if (d.user.is_partner) granted.push("is_partner");
+      // New Asset Inquiry: any PTC employee, not partners (Liwei,
+      // 2026-11-08; backend/routers/requests.py may_submit). Its name and
+      // email start as the signed-in person's.
+      if (!d.user.is_partner) {
+        ["navRequestAsset", "navContribute"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.hidden = false;
+        });
+        var who = { reqName: d.user.name, reqEmail: d.user.email };
+        Object.keys(who).forEach(function (id) {
+          var input = document.getElementById(id);
+          if (input && who[id] && !input.value) input.value = who[id];
+        });
+      }
       ["download", "preview", "create_demo"].forEach(function (p) {
         document.documentElement.classList.toggle("hub-no-" + p, granted.indexOf(p) < 0);
       });

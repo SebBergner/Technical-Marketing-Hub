@@ -123,12 +123,13 @@
       <svg class="orion-ico ico-muted"><use href="#i-panel"/></svg>
     </div>
     <div class="orion-side__body">
-      <!-- Request New Asset is hidden for the first release (Elio, Seb,
-           2026-10-28; REQUEST_FORM_HIDDEN in detail.js), so the group shows
-           only once Create New Demo is added to it (upload.js). -->
+      <!-- Hidden until the page knows who is here: New Asset Inquiry is
+           shown to PTC staff, not partners (permissions.js; Liwei
+           2026-11-08), and Create New Demo to whoever may upload
+           (upload.js). The group shows when either does. -->
       <div id="navContribute" hidden>
       <div class="orion-group">Contribute</div>
-      <div class="orion-navitem" id="navRequestAsset" data-action="open-request" hidden><span class="label"><svg class="orion-ico orion-ico--sm ico-indigo"><use href="#i-plus"/></svg> Request New Asset</span></div>
+      <div class="orion-navitem" id="navRequestAsset" data-action="open-request" hidden><span class="label"><svg class="orion-ico orion-ico--sm ico-indigo"><use href="#i-plus"/></svg> New Asset Inquiry</span></div>
       <div class="orion-divider"></div>
       </div>
 
@@ -352,8 +353,12 @@
 
       <div class="vp-head">
         <div>
-          <div class="vp-title">Request a New Asset</div>
-          <div class="orion-subtle">Tell us what you need — a video or an LDK — and the team will scope, produce, and route it to the right distribution channel.</div>
+          <div class="vp-title">New Asset Inquiry</div>
+          <div class="orion-subtle">Tell us what you need — a technical demo video, a VDK or an LDK.</div>
+          <div class="modal__note" style="margin-top:10px;">
+            <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-info"/></svg>
+            <span>Your inquiry goes into the team's queue. We review inquiries regularly, but can't promise every asset will be made.</span>
+          </div>
         </div>
       </div>
 
@@ -364,9 +369,9 @@
           <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-hex"/></svg> Asset type</div>
           <div class="form-section">
             <div class="stage-row" id="assetTypeRow">
-              <span class="stage-pill stage-pill--active" data-value="video" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg> Video</span>
-              <span class="stage-pill" data-value="ldk" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-box"/></svg> LDK <span class="orion-subtle" style="font-size:11px;">Live Demo Kit</span></span>
+              <span class="stage-pill stage-pill--active" data-value="video" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg> Technical Demo Video</span>
               <span class="stage-pill" data-value="vdk" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-monitor"/></svg> VDK <span class="orion-subtle" style="font-size:11px;">Video Demo Kit</span></span>
+              <span class="stage-pill" data-value="ldk" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-box"/></svg> LDK <span class="orion-subtle" style="font-size:11px;">Live Demo Kit</span></span>
             </div>
           </div>
         </div>
@@ -443,26 +448,20 @@
           <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-send"/></svg> Distribution plan <span class="section-head__sub">select all that apply</span></div>
           <div class="form-section">
             <div class="form-row">
-              <label>Where do you want to use this video?</label>
+              <label>Where will you use it?</label>
+              <!-- Elio's options (concept, 2026-11-06). "Video types needed"
+                   is left out until after the CK review: too complex for
+                   now (Elio, Liwei, 2026-11-06). -->
               <div class="stage-row" id="distributionRow">
-                <span class="stage-pill" data-action="pill-toggle-kind">Social (LinkedIn / YouTube)</span>
-                <span class="stage-pill" data-action="pill-toggle-kind">Web (PTC.com)</span>
-                <span class="stage-pill stage-pill--active" data-action="pill-toggle-kind">Share with a prospect</span>
-                <span class="stage-pill" data-action="pill-toggle-kind">Share with an existing customer</span>
-                <span class="stage-pill" data-action="pill-toggle-kind">Internal sales enablement</span>
-                <span class="stage-pill" data-action="pill-toggle-kind">Event / trade show</span>
-                <span class="stage-pill" data-action="pill-toggle-kind">Internal Hub only</span>
-                <span class="stage-pill" data-action="pill-toggle-kind"><svg class="orion-ico--sm orion-ico"><use href="#logo-seismic"/></svg> Push to PTC Velocity</span>
+                <span class="stage-pill" data-action="pill-toggle">Social</span>
+                <span class="stage-pill" data-action="pill-toggle">PTC.com</span>
+                <span class="stage-pill" data-action="pill-toggle">Product Launch Kit</span>
+                <span class="stage-pill" data-action="pill-toggle">Marketing Campaign</span>
+                <span class="stage-pill" data-action="pill-toggle">Sales Play</span>
+                <span class="stage-pill" data-action="pill-toggle">Technical Sales Asset</span>
+                <span class="stage-pill" data-action="pill-toggle">Event/Trade Show</span>
               </div>
             </div>
-          </div>
-        </div>
-
-        <div class="section" style="margin-bottom:0;">
-          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-target"/></svg> Video types needed <span class="section-head__sub">based on your distribution plan</span></div>
-          <div class="form-section">
-            <div class="field-hint">Different destinations usually call for different cuts — a short teaser for social isn't the same asset as a longer one for a prospect send. Here's what your picks above suggest, from quick hook to full walkthrough.</div>
-            <div id="kindOfDemoList" style="display:flex; flex-direction:column; gap:10px;"></div>
           </div>
         </div>
 

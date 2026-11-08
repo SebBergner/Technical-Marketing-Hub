@@ -158,3 +158,9 @@ def test_the_size_limit_is_the_one_graph_can_actually_take():
     assert attachment_rejection("big.mp4", MAX_ATTACHMENT_BYTES + 1)
     assert attachment_rejection("ok.mp4", MAX_ATTACHMENT_BYTES) is None
     assert attachment_rejection("empty.txt", 0), "an empty file is a mistake"
+
+
+def test_each_asset_type_is_written_as_its_own_choice():
+    """A VDK was written as "LDK" until 2026-11-08."""
+    assert [build_fields(make(asset_type=t), request_id="REQ-1")["AssetType"]
+            for t in (AssetType.VIDEO, AssetType.VDK, AssetType.LDK)] == ["Video", "VDK", "LDK"]

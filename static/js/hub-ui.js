@@ -286,6 +286,9 @@ function closeStyleExampleModal() {
 function computeKindOfDemo() {
   var activePills = Array.from(document.querySelectorAll('#distributionRow .stage-pill--active'));
   var listEl = document.getElementById('kindOfDemoList');
+  // "Video types needed" is off the form until after the CK review
+  // (Elio, Liwei, 2026-11-06); nothing to fill.
+  if (!listEl) return;
   if (!activePills.length) {
     listEl.innerHTML = '<div class="field-hint">Pick where you\'ll use this video above to see what you\'ll need.</div>';
     return;
@@ -423,6 +426,7 @@ var HUB_ASSET_POOL = null;
 var HUB_ACTIONS = {
   "pill-select": function (el) { pillSelect(el); },
   "pill-toggle-kind": function (el) { pillToggle(el); computeKindOfDemo(); },
+  "pill-toggle": function (el) { pillToggle(el); },
   "pill-toggle-scope": function (el) { pillToggle(el); computeProductScope(); },
   "pill-customer": function (el) { pillSelect(el); onCustomerChange(el); },
   "pill-asset-type": function (el) { pillSelect(el); onAssetTypeChange(el); },

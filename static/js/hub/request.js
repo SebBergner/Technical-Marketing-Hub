@@ -62,7 +62,16 @@ function wireScopeState() {
 function fillProductPills(facets) {
   var row = document.getElementById("productScopeRow");
   if (!row) return;
-  var families = (facets.product_families || []).slice()
+  var families = (facets.product_families || []).slice();
+  // The priority families are always offered, even with nothing in the
+  // catalogue yet: PTC Ignition (IPE) is on Elio's form exactly because
+  // its content is still to be made (2026-11-08).
+  PRODUCT_SCOPE_PRIORITY.forEach(function (name) {
+    if (!families.some(function (f) { return f.value === name; })) {
+      families.push({ value: name, count: 0 });
+    }
+  });
+  families = families
     .filter(function (f) { return PRODUCT_SCOPE_EXCLUDED.indexOf(f.value) === -1; })
     .sort(function (a, b) {
       var pa = PRODUCT_SCOPE_PRIORITY.indexOf(a.value);
@@ -86,7 +95,8 @@ function fillProductPills(facets) {
     // rename (§8.6). See FAMILY_DISPLAY above.
     pill.dataset.value = f.value;
     pill.textContent = familyDisplayName(f.value);
-    pill.title = f.count + " asset" + (f.count === 1 ? "" : "s") + " today";
+    pill.title = f.count ? f.count + " asset" + (f.count === 1 ? "" : "s") + " today"
+                         : "Nothing in the Hub yet";
     row.appendChild(pill);
   });
   // "Other" is not a family and has no count; it is the honest home for a

@@ -405,6 +405,9 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   inquiries regularly, but can't promise every asset will be made."；查重只提示：列出最多 5 个相似的 demo
   （"这些是否已经满足需要？"），下面是 "No, submit anyway"，不强制确认。
 - **工作量**：改名和说明 1 小时；查重 1 天。
+- **11/08 已做（为周三 Serge 向 CK 汇报，Elio、Liwei 11/06 会议定）**：表单重新开放，所有 PTC 员工都能提交，partner 不能（不再看 Create demos 权限）；改名 "New Asset Inquiry"，顶部加队列说明；类型按 Elio 的 concept 写作 Technical Demo Video、VDK、LDK；产品始终列出 Creo、Codebeamer、Windchill、PTC Jetstream、PTC Ignition、ServiceMax、PTC Orbit（Ignition 还没有内容也列出）；Distribution plan 换成 Elio 的 7 个选项（Social、PTC.com、Product Launch Kit、Marketing Campaign、Sales Play、Technical Sales Asset、Event/Trade Show）；去掉 "Video types needed"（太复杂，CK review 之后再做）；姓名和邮箱用登录账号预填。修了一个旧错误：申请 VDK 时 SharePoint 的 AssetType 写成了 "LDK"。本地没有提交测试（会写进真实的 Demo Requests 列表）。
+  - **Liwei 要在 SharePoint 的 Demo Requests 列表里改**：AssetType 列加 "VDK" 选项（11/08 只读查过，现在只有 Video、LDK，不允许填写其他值，不加的话 VDK 申请只存在 Hub 本地）；DistributionChannels 列允许填写其他值，Elio 的新选项能写进去，但最好也加进选项里，方便筛选。
+  - 还没做：查重提示（1 天）；提交后通知（以后用 Power Automate 或 Seb 的邮箱）。
 
 ### A13. 相关推荐（Summit）
 - **来源**：Summit：demo 页显示"你可能也需要"。

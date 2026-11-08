@@ -244,9 +244,13 @@ def test_auth_me_lists_the_permissions_the_pages_use(client):
     assert body["user"]["permissions"] == ["download", "preview", "view_hub"]
 
 
-def test_a_group_without_create_demo_cannot_submit_a_request(client):
+def test_any_ptc_employee_may_submit_an_inquiry_and_a_partner_may_not(client):
+    """Liwei, 2026-11-08: no longer tied to "Create new demo"."""
     access.update_group(EMPLOYEES, "a", permissions=["view_hub"])
+    # Past the permission check: refused only for the empty body.
     r = client.post("/api/requests", headers=easyauth_headers("someone@ptc.com"), json={})
+    assert r.status_code == 422
+    r = client.post("/api/requests", headers=easyauth_headers("p@partner.it"), json={})
     assert r.status_code == 403
 
 

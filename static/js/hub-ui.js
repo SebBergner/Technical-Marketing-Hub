@@ -198,6 +198,12 @@ function pillToggle(el) {
 }
 function onAssetTypeChange(el) {
   document.getElementById('videoDetailsSection').style.display = el.dataset.value === 'video' ? '' : 'none';
+  // "Other" (Elio, 2026-11-09): the brief is the only place that says what
+  // is asked for, so it is required then.
+  var sub = document.getElementById('reqBriefSub');
+  if (sub) sub.textContent = el.dataset.value === 'other'
+    ? 'required for Other: say what kind of asset you need'
+    : 'optional, but the more context the better';
 }
 function onCustomerChange(el) {
   document.getElementById('customerDataNote').style.display = el.dataset.value === 'none' ? 'none' : '';

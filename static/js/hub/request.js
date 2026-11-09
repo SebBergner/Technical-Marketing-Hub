@@ -253,7 +253,7 @@ function collectRequest() {
     requester_email: fieldValue("reqEmail"),
     notes: fieldValue("reqNotes")
   };
-  // Video details are hidden for a VDK or an LDK, and their pills keep a
+  // Video details are hidden for a VDK, an LDK or Other, and their pills keep a
   // default ("1–3 min"); not sent, or a kit request reads as a video length
   // (found on staging, 2026-11-08).
   if (body.asset_type !== "video") {
@@ -285,6 +285,11 @@ async function submitRequest(event) {
   if (!body.products.length) {
     requestProblem("Choose at least one product. It is what routes the request "
                  + "to the person who can scope it.");
+    return;
+  }
+  if (body.asset_type === "other" && !body.brief) {
+    requestProblem("Say in the brief what kind of asset you need. For Other it is "
+                 + "the only thing that tells the team what you are asking for.");
     return;
   }
 

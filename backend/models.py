@@ -697,8 +697,18 @@ class RecommendedAsset(BaseModel):
     decision: str | None = None               # use-as-is | refresh | new
 
 
+class RequestAssetType(str, Enum):
+    """What a New Asset Inquiry asks for: the form's four choices. Apart
+    from AssetType, which is what the catalogue holds -- "Other" is a
+    request, never a kind of demo (Elio, 2026-11-09)."""
+    VIDEO = "video"
+    VDK = "vdk"
+    LDK = "ldk"
+    OTHER = "other"
+
+
 class AssetRequestCreate(BaseModel):
-    asset_type: AssetType
+    asset_type: RequestAssetType
     products: list[str] = Field(default_factory=list)
     brief: str | None = None
     narrative: str | None = None

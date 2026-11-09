@@ -110,6 +110,11 @@ async def submit_request_with_files(
 
 
 async def _submit(body: AssetRequestCreate, files: list, repo, user) -> RequestAccepted:
+    # "Other" says nothing about what is wanted; the brief has to (Elio,
+    # Liwei, 2026-11-09). The form checks it too; this is for any caller.
+    if body.asset_type == "other" and not (body.brief or "").strip():
+        raise HTTPException(status_code=422,
+                            detail="For Other, say in the brief what kind of asset you need.")
     now = datetime.now(timezone.utc)
     # Readable in the list and sortable by eye: the date, then enough randomness
     # that two people submitting in the same second cannot collide.

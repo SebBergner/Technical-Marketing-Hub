@@ -15,7 +15,7 @@ from datetime import date
 import pytest
 
 from backend.integrations.graph.requests_list import build_fields
-from backend.models import AssetRequest, AssetType
+from backend.models import AssetRequest, AssetType, RequestAssetType
 
 
 def make(**kw) -> AssetRequest:
@@ -163,4 +163,41 @@ def test_the_size_limit_is_the_one_graph_can_actually_take():
 def test_each_asset_type_is_written_as_its_own_choice():
     """A VDK was written as "LDK" until 2026-11-08."""
     assert [build_fields(make(asset_type=t), request_id="REQ-1")["AssetType"]
-            for t in (AssetType.VIDEO, AssetType.VDK, AssetType.LDK)] == ["Video", "VDK", "LDK"]
+            for t in ("video", "vdk", "ldk", "other")] == ["Video", "VDK", "LDK", "Other"]
+
+
+def test_other_is_a_request_type_and_never_a_kind_of_demo():
+    """Elio, 2026-11-09: "Other" on the form only."""
+    assert RequestAssetType("other") is RequestAssetType.OTHER
+    assert "other" not in {t.value for t in AssetType}
+    fields = build_fields(make(asset_type="other", brief="A configurator"),
+                          request_id="REQ-1")
+    assert fields["Title"] == "OTHER"
+
+
+@pytest.fixture
+def client(tmp_path):
+    """Anonymous (sign-in not enforced here), against a store of its own."""
+    from fastapi.testclient import TestClient
+
+    from app import app
+    from backend.deps import get_repo
+    from backend.repositories.json_repo import JsonAssetRepository
+    repo = JsonAssetRepository(str(tmp_path))
+    app.dependency_overrides[get_repo] = lambda: repo
+    try:
+        yield TestClient(app, base_url="http://localhost")
+    finally:
+        app.dependency_overrides.pop(get_repo, None)
+
+
+def test_other_needs_a_brief_and_a_catalogue_type_is_refused(client):
+    r = client.post("/api/requests", json={"asset_type": "other", "products": ["Creo"]})
+    assert r.status_code == 422 and "brief" in r.json()["detail"]
+    r = client.post("/api/requests", json={"asset_type": "other", "brief": "   "})
+    assert r.status_code == 422
+    r = client.post("/api/requests", json={"asset_type": "vm"})
+    assert r.status_code == 422, "the form never offers a VM"
+    r = client.post("/api/requests", json={"asset_type": "other",
+                                           "brief": "An interactive configurator"})
+    assert r.status_code == 201 and r.json()["asset_type"] == "other"

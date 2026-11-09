@@ -23,7 +23,7 @@ var KINDS = [
 //: Quick actions: [icon, title, text, href or action].
 var QUICK = [
   ["i-search", "Search the Hub", "Find a demo by product, keyword or persona.", "search"],
-  ["i-plus", "Ask for a new asset", "A video, VDK or LDK that is not here yet.", "#/request"],
+  ["i-plus", "Ask for a new asset", "A video, VDK, LDK or anything else that is not here yet.", "#/request"],
   ["i-message-square", "Get help", "Something not working? Tell the Hub team.", "#/help"]
 ];
 
@@ -46,7 +46,7 @@ var STEPS = [
     "<b>Export CSV</b> saves everything the filters match."
   ]],
   ["i-plus", "Ask for something new", [
-    "Missing a video, VDK or LDK? Open <b>New Asset Inquiry</b> in the menu.",
+    "Missing a video, VDK, LDK or something else? Open <b>New Asset Inquiry</b> in the menu.",
     "Say which products, what it should show, and by when.",
     "It goes into the team's queue."
   ]],

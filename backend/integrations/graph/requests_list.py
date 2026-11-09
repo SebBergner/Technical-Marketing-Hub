@@ -59,6 +59,9 @@ MULTI_CHOICE = ("DistributionChannels", "StartingMaterials")
 #: than at each call site.
 LIST_SEPARATOR = "; "
 
+#: The form's asset types as the AssetType column's choices read.
+ASSET_TYPE_CHOICES = {"video": "Video", "vdk": "VDK", "ldk": "LDK", "other": "Other"}
+
 
 class RequestWriteError(RuntimeError):
     """The request is safe locally but did not reach SharePoint."""
@@ -91,9 +94,10 @@ def build_fields(request: Any, *, request_id: str) -> dict[str, Any]:
         # Every request starts unclaimed. The team moves it from here.
         "Status": "New",
         # A VDK used to be written as "LDK" (the column had only Video and
-        # LDK). Needs "VDK" among the column's choices (2026-11-08).
-        "AssetType": {"video": "Video", "vdk": "VDK"}.get(
-            str(getattr(request.asset_type, "value", request.asset_type)), "LDK"),
+        # LDK). Each needs its choice in the column: "VDK" added 2026-11-08,
+        # "Other" (Elio, 2026-11-09) by Liwei in SharePoint.
+        "AssetType": ASSET_TYPE_CHOICES[
+            str(getattr(request.asset_type, "value", request.asset_type))],
         "Products": _as_text(request.products),
         "Brief": _as_text(request.brief),
         "NarrativeAngle": _as_text(request.narrative),

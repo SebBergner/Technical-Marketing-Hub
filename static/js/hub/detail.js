@@ -12,7 +12,8 @@ import {
 import { hubPermissions } from "./permissions.js";
 import { editButton } from "./edit.js";
 import {
-  buildCard, consensusUrl, embedInlinePlayer, paintCoverInto, previewUrl, renderAgeMark,
+  buildCard, consensusUrl, embedInlinePlayer, noteConsensusPreview, paintCoverInto, previewUrl,
+  renderAgeMark,
   stopInlinePlayer, TYPE_CHIP, videoTypeOf
 } from "./cards.js";
 import { familyDisplayName, openTag } from "./nav.js";
@@ -462,8 +463,12 @@ async function openAssetDetail(id, fileItemId, linkToken) {
       play.style.display = canPlay ? "" : "none";
       play.title = canPlay ? "Play preview" : "";
       play.onclick = canPlay ? function () {
-        if (consensusSrc) embedInlinePlayer(player, consensusSrc, "iframe");
-        else embedInlinePlayer(player, fileDownloadUrl(asset.id, pick.item_id), "video");
+        if (consensusSrc) {
+          embedInlinePlayer(player, consensusSrc, "iframe");
+          noteConsensusPreview(asset.id);
+        }
+        // A play is a preview, not a download (Liwei, 2026-11-09).
+        else embedInlinePlayer(player, filePlayUrl(asset.id, pick.item_id), "video");
       } : null;
     }
   }
@@ -698,6 +703,12 @@ function fileSize(bytes) {
 function fileDownloadUrl(assetId, itemId) {
   return "/api/assets/" + encodeURIComponent(assetId) + "/files/"
        + encodeURIComponent(itemId) + "/download";
+}
+
+/* The video in the page's header: the file itself, counted as a preview. */
+function filePlayUrl(assetId, itemId) {
+  return "/api/assets/" + encodeURIComponent(assetId) + "/files/"
+       + encodeURIComponent(itemId) + "/play";
 }
 
 /* Same free-form URL trick as fileDownloadUrl(): the endpoint itself does

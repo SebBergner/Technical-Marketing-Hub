@@ -270,6 +270,21 @@ def test_without_download_the_file_is_refused(client, tmp_path, monkeypatch):
         r = client.get("/api/assets/bobcat/files/I-2/download",
                        headers=easyauth_headers("someone@ptc.com"), follow_redirects=False)
         assert r.status_code == 403
+        # Playing the page's video is a preview (2026-11-09): past the
+        # permission check, on to Graph -- here a stand-in that fails.
+        from fastapi import HTTPException
+
+        class NoGraph:
+            def resolve_site(self, *a, **k):
+                raise HTTPException(status_code=502, detail="no Graph in tests")
+        app.dependency_overrides[require_client] = lambda: NoGraph()
+        r = client.get("/api/assets/bobcat/files/I-2/play",
+                       headers=easyauth_headers("someone@ptc.com"), follow_redirects=False)
+        assert r.status_code == 502
+        access.update_group(EMPLOYEES, "a", permissions=["view_hub", "download"])
+        r = client.get("/api/assets/bobcat/files/I-2/play",
+                       headers=easyauth_headers("someone@ptc.com"), follow_redirects=False)
+        assert r.status_code == 403
     finally:
         app.dependency_overrides.clear()
 

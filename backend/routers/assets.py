@@ -355,6 +355,19 @@ def record_search(body: SearchEventIn, repo: AssetRepository = Depends(get_repo)
     _record(repo, "search", None, user, q=query[:120], results=max(0, body.results))
 
 
+@router.post("/{asset_id}/consensus-preview", status_code=204)
+def record_consensus_preview(asset_id: str, repo: AssetRepository = Depends(get_repo),
+                             user: CurrentUser = Depends(get_current_user)):
+    """A Consensus demo played in the Hub (the card's Preview, the demo
+    page's player). It plays Consensus's own page in a frame, so nothing
+    passes through the Hub to count it; the page says so instead (Liwei,
+    2026-11-09: these were not counted at all)."""
+    asset = repo.get(asset_id)
+    if asset is None:
+        raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
+    _record(repo, "preview", asset_id, user, source="consensus")
+
+
 @router.post("/{asset_id}/view", status_code=204)
 def record_view(asset_id: str, repo: AssetRepository = Depends(get_repo),
                 user: CurrentUser = Depends(get_current_user)):
@@ -534,6 +547,24 @@ def asset_thumbnail(asset_id: str, repo: AssetRepository = Depends(get_repo),
                     headers={"Cache-Control": "private, max-age=86400"})
 
 
+def _signed_file_url(client: GraphClient, asset_id: str, item_id: str) -> str:
+    """Graph's pre-authenticated URL for one file, minted on demand.
+
+    It expires in about an hour, so it is never stored. 502 when Graph fails
+    or returns none -- before anything is recorded, so an error is never
+    counted as a use."""
+    try:
+        drive = _asset_drive(client, asset_id)
+        url = client.download_url(drive.drive_id, item_id)
+    except GraphError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    if not url:
+        raise HTTPException(
+            status_code=502,
+            detail="SharePoint did not return a download link for this file")
+    return url
+
+
 @router.get("/{asset_id}/files/{item_id}/download")
 def download_file(asset_id: str, item_id: str,
                   repo: AssetRepository = Depends(get_repo),
@@ -551,28 +582,40 @@ def download_file(asset_id: str, item_id: str,
     _require_listed_file(asset_id, item_id, repo)
     _require_partner_access(asset_id, repo, user)
     _require_gxc_download(asset_id, repo)
-    try:
-        drive = _asset_drive(client, asset_id)
-        url = client.download_url(drive.drive_id, item_id)
-    except GraphError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    url = _signed_file_url(client, asset_id, item_id)
 
-    if not url:
-        raise HTTPException(
-            status_code=502,
-            detail="SharePoint did not return a download link for this file")
-
-    # Recorded here rather than at the top: a Graph failure above is not a
-    # download, and counting before the work would inflate the figure with
-    # every error. What this measures is "a download link was handed out" --
-    # the redirect means we never learn whether the bytes arrived, so it is a
-    # floor on real downloads, not an exact count.
+    # Recorded after the URL is in hand: a Graph failure is not a download.
+    # What this measures is "a download link was handed out" -- the redirect
+    # means we never learn whether the bytes arrived, so it is a floor on
+    # real downloads, not an exact count.
     #
     # The file's own name and kind travel with the event (2026-09-21, Liwei:
     # "点击下载的又是什么"). An asset-level counter could say a kit was
     # downloaded forty times and never say whether people took the talk track
     # or the .mp4 -- which is the part that tells you what to make more of.
     _record(repo, "download", asset_id, user, **_file_facts(repo, asset_id, item_id))
+    return RedirectResponse(url, status_code=302)
+
+
+@router.get("/{asset_id}/files/{item_id}/play")
+def play_file(asset_id: str, item_id: str,
+              repo: AssetRepository = Depends(get_repo),
+              client: GraphClient = Depends(require_client),
+              user: CurrentUser = Depends(get_current_user)):
+    """The video playing in a demo page's header (its play button).
+
+    The same signed file URL as download_file(), since a <video> needs the
+    file itself, not Graph's viewer page. But watching is a preview: until
+    2026-11-09 the player used /download, so every play was counted as a
+    download and needed Download (Liwei). Preview permission, a preview
+    event; GXC's download switch does not apply, as for any preview. The
+    browser fetches this once and plays and seeks on the signed URL, so one
+    play is one event (checked 2026-11-09)."""
+    _require_perm(user, Perm.PREVIEW)
+    _require_listed_file(asset_id, item_id, repo)
+    _require_partner_access(asset_id, repo, user)
+    url = _signed_file_url(client, asset_id, item_id)
+    _record(repo, "preview", asset_id, user, **_file_facts(repo, asset_id, item_id))
     return RedirectResponse(url, status_code=302)
 
 

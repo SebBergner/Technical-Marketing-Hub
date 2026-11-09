@@ -361,6 +361,7 @@ function openPreview(a) {
   document.getElementById("hubPreviewTitle").textContent = a.title || "";
   document.getElementById("hubPreviewFrame").src = url;
   backdrop.classList.add("open");
+  noteConsensusPreview(a.id);
 }
 
 /* Distribution platforms an asset can be acted on, keyed by the field that
@@ -511,6 +512,15 @@ function buildCard(a) {
 // marketing "performed poorly" after ten days live. This mirrors
 // sales_view() in consensus_sync.py; if this parameter changes a third
 // time, it is worth reading from one place instead of two.
+/* A Consensus demo plays Consensus's own page in a frame, so nothing
+ * passes through the Hub to count it: the page reports it (Liwei,
+ * 2026-11-09: these previews were not counted at all). */
+function noteConsensusPreview(assetId) {
+  if (!assetId) return;
+  fetch("/api/assets/" + encodeURIComponent(assetId) + "/consensus-preview", { method: "POST" })
+    .catch(function (err) { console.debug("[hub-api] preview not counted", err); });
+}
+
 function previewUrl(a) {
   if (a.source === "consensus") return a.web_url;
   return a.consensus_uuid
@@ -827,6 +837,6 @@ function renderAgeMark(meta, asset) {
 }
 
 export {
-  assetHref, buildCard, cardImage, consensusUrl, embedInlinePlayer, gxcPill, paintCoverInto, previewUrl,
-  renderAgeMark, stopInlinePlayer, TYPE_CHIP, videoTypeOf, whenNearScreen
+  assetHref, buildCard, cardImage, consensusUrl, embedInlinePlayer, gxcPill, noteConsensusPreview,
+  paintCoverInto, previewUrl, renderAgeMark, stopInlinePlayer, TYPE_CHIP, videoTypeOf, whenNearScreen
 };

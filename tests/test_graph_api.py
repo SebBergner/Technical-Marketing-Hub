@@ -296,6 +296,39 @@ def test_download_without_graph_configured_is_503(client, repo_with_a_file):
     assert response.status_code == 503
 
 
+def test_playing_the_header_video_is_a_preview_not_a_download(client, repo_with_a_file):
+    """Liwei, 2026-11-09: the demo page's player used /download, so every
+    play was counted as a download. /play hands out the same file and
+    records a preview."""
+    with_graph(download_handler())
+
+    response = client.get(f"/api/assets/a-kit/files/{FILE_ITEM_ID}/play",
+                          follow_redirects=False)
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "https://contoso.sharepoint.com/signed?x=1"
+    events = repo_with_a_file.usage_events()
+    assert [(e["event"], e["file"]) for e in events] == [("preview", "Overview.mp4")]
+
+
+def test_a_failed_play_is_not_recorded_and_an_unlisted_file_is_refused(client, repo_with_a_file):
+    with_graph(download_handler(download_url=None))
+    assert client.get(f"/api/assets/a-kit/files/{FILE_ITEM_ID}/play",
+                      follow_redirects=False).status_code == 502
+    assert client.get("/api/assets/a-kit/files/not-a-real-item/play",
+                      follow_redirects=False).status_code == 404
+    assert repo_with_a_file.usage_events() == []
+
+
+def test_a_consensus_preview_is_counted(client, repo_with_a_file):
+    """Consensus plays in a frame, so the page reports it (2026-11-09)."""
+    assert client.post("/api/assets/a-kit/consensus-preview").status_code == 204
+    events = repo_with_a_file.usage_events()
+    assert [(e["event"], e["asset_id"], e.get("source")) for e in events] == [
+        ("preview", "a-kit", "consensus")]
+    assert client.post("/api/assets/no-such-asset/consensus-preview").status_code == 404
+
+
 # ════════════════════════════════ file preview ═════════════════════════════
 def preview_handler(*, preview_url="https://contoso.sharepoint.com/embed?x=1"):
     """Answers exactly what preview_file() calls: resolve the site, find the

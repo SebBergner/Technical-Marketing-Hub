@@ -32,8 +32,9 @@ Serge 11/11（周三）会向 CK 和各部门负责人介绍 Hub：既是找现�
 1. SharePoint 的 Demo Requests 列表：
    - ~~AssetType 列加 "VDK" 选项~~（11/08 已加）；
    - DistributionChannels 列加 Elio 的 7 个选项（建议做，不加也能写进去）。
-2. Admin 里关掉 "Demos with only a SharePoint page"。这样 22 个没有文件的 VDK/LDK 就不会显示（13 个 VDK、9 个 LDK，Avi 报的 #10–#13）。
-3. 说 "Push to staging" 之后，在 staging 上提交一条测试申请，确认它写进了 Demo Requests 列表（本地没有测过提交）。
+2. ~~Admin 里关掉 "Demos with only a SharePoint page"~~（11/08 Liwei 已关）。这样 22 个没有文件的 VDK/LDK 就不会显示（13 个 VDK、9 个 LDK，Avi 报的 #10–#13）。
+3. ~~在 staging 上提交一条测试申请~~（11/08 已测，第 154 行，可删除）。
+6. ~~在 staging 上看欢迎弹窗、User guide、表格缩略图~~（11/08 Liwei 已看）。没有 Demo Type 的 9 个 kit 暂时不管。
 4. 上线后请 Nadia 再打开一次 Windchill release note（#7）。
 5. ~~Elio 发现的那条标错类型的培训视频~~（11/08 已改为 VDK）。
 

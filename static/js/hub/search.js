@@ -8,7 +8,7 @@ import {
   debounce, escapeHtml, getJSON, LANGUAGE_LABEL, pill, TYPE_LABELS
 } from "./util.js";
 import { cardImage, paintCoverInto, TYPE_CHIP, videoTypeOf } from "./cards.js";
-import { val } from "./filters.js";
+import { noteSearch, val } from "./filters.js";
 import { familyDisplayName } from "./nav.js";
 import { buildFileRow, closeFilePreview, fileHash } from "./detail.js";
 import { closeActivity } from "./activity.js";
@@ -208,6 +208,10 @@ async function runAdvancedSearch(q, more) {
   }
   if (seq !== advState.seq) return;
   advState.total = page.total;
+  // Counted like the ordinary search, once typing settles (Liwei,
+  // 2026-11-09: Advanced Search was never counted, so the usage contest
+  // under-counted whoever used it). "Show more" is the same search.
+  if (!more) noteSearch(q, page.total);
   page.items.forEach(function (hit) {
     advState.items.push(hit);
     list.appendChild(renderAdvancedHit(hit, q));

@@ -1185,7 +1185,7 @@ function clearAll() {
 
 export {
   applyFilters, clearAll, CONTROLS, enhanceSearchableSelect, fillPublished,
-  fillSelect, fillSidebarCounts, followUrl, HIDDEN_SEGMENTS, navFilter, pushNextUrl,
+  fillSelect, fillSidebarCounts, followUrl, HIDDEN_SEGMENTS, navFilter, noteSearch, pushNextUrl,
   restoreFiltersFromUrl,
   takeOverControls, val, wireFilterBar
 };

@@ -258,7 +258,20 @@ function openGuide() {
   markButton(true);
 }
 
+// The training video stops when the guide is left (Liwei, 2026-11-10: it
+// played on behind the home page). Some ways out hide the guide without
+// closeGuide(), so a hash change away from #/guide pauses it too.
+function pauseGuideVideo() {
+  var player = document.querySelector("#hubGuidePage video.hub-guide__player");
+  if (player && !player.paused) player.pause();
+}
+
+window.addEventListener("hashchange", function () {
+  if (location.hash !== "#/guide") pauseGuideVideo();
+});
+
 function closeGuide() {
+  pauseGuideVideo();
   var page = document.getElementById("hubGuidePage");
   if (!page || !page.classList.contains("active")) return;
   page.classList.remove("active");

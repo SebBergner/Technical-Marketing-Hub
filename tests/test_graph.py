@@ -776,3 +776,21 @@ def test_values_the_hub_infers_are_marked_assumed():
     stated = build_assets([folder("Kit v.1", Customer_x0020_Facing=False, Language="English")])[0][0]
     assert "customer_facing" not in stated.assumed and "language" not in stated.assumed
     assert stated.customer_facing is False
+
+
+def test_an_empty_folder_is_dated_by_its_creation_not_its_last_edit():
+    """2026-11-10: the CAD Product edit made the empty "Aircraft Bulkhead"
+    read as published that day and top Recently published. A folder's last
+    modification is any column edit; its creation is when it arrived."""
+    edited = {"createdDateTime": "2024-03-25T08:00:00Z",
+              "lastModifiedDateTime": "2026-11-10T15:00:00Z"}
+    items = [{**folder("Aircraft Bulkhead", demo_type=None, ContentType="CAD Model"), **edited},
+             {**folder("Empty Kit"), **edited}]
+    assets, _ = build_assets(items)
+    assert {a.title: str(a.uploaded_at) for a in assets} == {
+        "Aircraft Bulkhead": "2024-03-25", "Empty Kit": "2024-03-25"}
+
+
+def test_a_folder_without_a_creation_date_falls_back_to_its_last_edit():
+    assets, _ = build_assets([folder("Old Kit")])
+    assert str(assets[0].uploaded_at) == "2025-07-21"

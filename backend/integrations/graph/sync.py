@@ -180,6 +180,14 @@ def _relative_path(item: dict, drive_root_marker: str = "/root:") -> str:
 ARCHIVE_FOLDER = "_Archive"
 
 
+def folder_date(item: dict):
+    """A folder's own date, for when nothing better is known: when it was
+    created. Its last modification is any edit to its columns, so a metadata
+    change would make an old demo read as new (2026-11-10)."""
+    return (m.as_date(item.get("createdDateTime"))
+            or m.as_date(item.get("lastModifiedDateTime")))
+
+
 def lift_archive(items: list[dict]) -> tuple[list[dict], str | None]:
     """Read the demos in _Archive as if they were at the top of the library,
     marked `hub_archived` (A8, 2026-10-28): an archived demo stays the same
@@ -270,12 +278,15 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
                 brightcove_id=m.clean_text(_field(fields, "brightcove_id")),
                 thumbnail_url=m.parse_url(_field(fields, "thumbnail_url")),
                 # The content's own date when the folder states one. Otherwise
-                # the folder's last edit, but only until the files are in:
+                # the folder's creation, but only until the files are in:
                 # see content_date below. Without this every migrated Gallery
                 # video would read as uploaded on the day of the migration
-                # and flood Latest Uploads (HLR-A8).
+                # and flood Latest Uploads (HLR-A8). Created, not last
+                # modified (2026-11-10): a metadata edit changes the folder,
+                # and an empty one then jumped to the top of Recently
+                # published (Aircraft Bulkhead, after the CAD Product edit).
                 uploaded_at=(m.as_date(_field(fields, "original_publish_date"))
-                             or m.as_date(item.get("lastModifiedDateTime"))),
+                             or folder_date(item)),
                 web_url=item.get("webUrl"),
                 source_item_id=item.get("id"),
                 submitted_by=(m.clean_text(_field(fields, "submitted_by")) or "").lower() or None,
@@ -301,7 +312,7 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
                 products=m.parse_lookup(_field(fields, "cad_product")),
                 thumbnail_url=m.absolutize_url(_field(fields, "cad_thumbnail"),
                                                settings.graph_site_url),
-                uploaded_at=m.as_date(item.get("lastModifiedDateTime")),
+                uploaded_at=folder_date(item),      # until its files are in, as above
                 web_url=item.get("webUrl"),
                 source_item_id=item.get("id"),
             )

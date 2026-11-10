@@ -86,16 +86,58 @@ function hero() {
   box.appendChild(text);
 
   // The training video (Liwei, 2026-11-10). Nothing is fetched until play is
-  // pressed: the file is 136 MB and most visits only read the steps.
-  var video = el("button", "hub-guide__video");
+  // pressed: the file is 136 MB and most visits only read the steps. The card
+  // shows SharePoint's still of the video and its length (same day: the plain
+  // card did not make anyone want to click).
+  var video = el("button", "hub-guide__video hub-guide__video--tour");
   video.type = "button";
-  video.setAttribute("aria-label", "Play the Hub training video");
-  video.appendChild(el("span", "hub-guide__play", icon("i-play")));
-  video.appendChild(el("span", "hub-guide__video-label", "Hub training video"));
-  video.appendChild(el("span", "hub-guide__soon", "Watch"));
+  video.setAttribute("aria-label", "Play the Hub tour video");
+  video.innerHTML =
+    '<span class="hub-guide__cover" aria-hidden="true"></span>'
+    + '<span class="hub-guide__shade" aria-hidden="true"></span>'
+    + '<span class="hub-guide__tag">' + icon("i-video", "orion-ico--sm") + "Quick tour</span>"
+    + '<span class="hub-guide__play">' + icon("i-play") + "</span>"
+    + '<span class="hub-guide__caption">'
+    +   '<b class="hub-guide__video-title">See the Hub in action</b>'
+    +   "<span>Find, preview, share and request demo content</span>"
+    + "</span>"
+    + '<span class="hub-guide__length" hidden></span>';
   video.addEventListener("click", function () { playGuideVideo(video); });
+  dressGuideVideo(video);
   box.appendChild(video);
   return box;
+}
+
+function minutes(seconds) {
+  var m = Math.max(1, Math.round(seconds / 60));
+  return m + (m === 1 ? " minute" : " minutes");
+}
+
+function clock(seconds) {
+  var s = Math.round(seconds);
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+// The cover and the length, if SharePoint has them; the card works without.
+function dressGuideVideo(card) {
+  var cover = new Image();
+  cover.onload = function () {
+    card.querySelector(".hub-guide__cover").style.backgroundImage = "url(" + cover.src + ")";
+    card.classList.add("has-cover");
+  };
+  cover.src = "/api/welcome/video/poster";
+  fetch("/api/welcome/video/info", { credentials: "same-origin" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (info) {
+      if (!info || !info.duration_seconds) return;
+      card.querySelector(".hub-guide__video-title").textContent =
+        "See the Hub in " + minutes(info.duration_seconds);
+      var len = card.querySelector(".hub-guide__length");
+      len.textContent = clock(info.duration_seconds);
+      len.hidden = false;
+      card.setAttribute("aria-label", "Play the Hub tour video, " + minutes(info.duration_seconds));
+    })
+    .catch(function () {});
 }
 
 function playGuideVideo(frame) {
@@ -104,6 +146,7 @@ function playGuideVideo(frame) {
   player.controls = true;
   player.autoplay = true;
   player.playsInline = true;
+  player.poster = "/api/welcome/video/poster";
   player.src = "/api/welcome/video";
   player.addEventListener("error", function () {
     var off = el("div", "hub-guide__video");

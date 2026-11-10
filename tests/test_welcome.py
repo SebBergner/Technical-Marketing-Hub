@@ -51,7 +51,7 @@ class FakeGraph:
             {"id": "OLD", "name": "a.mp4", "file": {"mimeType": "video/mp4"},
              "lastModifiedDateTime": "2026-11-01T00:00:00Z"},
             {"id": "NEW", "name": "b.mp4", "file": {"mimeType": "video/mp4"},
-             "lastModifiedDateTime": "2026-11-10T00:00:00Z"},
+             "lastModifiedDateTime": "2026-11-10T00:00:00Z", "video": {"duration": 182066}},
             {"id": "DOC", "name": "notes.docx", "file": {"mimeType": "application/msword"},
              "lastModifiedDateTime": "2026-11-11T00:00:00Z"}]
         self.folder, self.url, self.asked = folder, url, []
@@ -69,6 +69,12 @@ class FakeGraph:
         if item_id == "root":
             return [{"id": "F", "name": settings.guide_video_folder, "folder": {}}] if self.folder else []
         return self.files
+
+    thumbs = [{"large": {"url": "https://thumb.example/large.jpg"}}]
+
+    def thumbnails(self, drive_id, item_id):
+        self.asked.append("thumb:" + item_id)
+        return self.thumbs
 
     def download_url(self, drive_id, item_id):
         self.asked.append(item_id)
@@ -108,3 +114,19 @@ def test_training_video_needs_sign_in(client, graph):
     r = client.get("/api/welcome/video", follow_redirects=False)
     assert r.status_code in (401, 403)
     assert graph.asked == []
+
+
+def test_training_video_card_shows_its_length(client, graph):
+    r = client.get("/api/welcome/video/info", headers=easyauth_headers("ann@ptc.com"))
+    assert r.json() == {"duration_seconds": 182}
+
+
+def test_training_video_cover_is_sharepoints_still(client, graph):
+    h = easyauth_headers("ann@ptc.com")
+    r = client.get("/api/welcome/video/poster", headers=h, follow_redirects=False)
+    assert r.status_code == 302
+    assert r.headers["location"] == "https://thumb.example/large.jpg"
+    assert graph.asked == ["thumb:NEW"]
+    graph.thumbs = []
+    assert client.get("/api/welcome/video/poster", headers=h,
+                      follow_redirects=False).status_code == 404

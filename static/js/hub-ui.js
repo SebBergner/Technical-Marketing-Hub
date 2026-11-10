@@ -197,13 +197,16 @@ function pillToggle(el) {
   el.classList.toggle('stage-pill--active');
 }
 function onAssetTypeChange(el) {
-  document.getElementById('videoDetailsSection').style.display = el.dataset.value === 'video' ? '' : 'none';
-  // "Other" (Elio, 2026-11-09): the brief is the only place that says what
-  // is asked for, so it is required then.
+  // Nothing is picked until the requester picks (Elio, 2026-11-10: Asset
+  // type is required), so `el` may be null after a reset.
+  var type = el ? el.dataset.value : null;
+  document.getElementById('videoDetailsSection').style.display = type === 'video' ? '' : 'none';
+  // The brief is always required now; for Other it is the only place that
+  // says what is asked for (Elio, 2026-11-09).
   var sub = document.getElementById('reqBriefSub');
-  if (sub) sub.textContent = el.dataset.value === 'other'
-    ? 'required for Other: say what kind of asset you need'
-    : 'optional, but the more context the better';
+  if (sub) sub.innerHTML = '<span class="req-required">required</span> · ' + (type === 'other'
+    ? 'say what kind of asset you need'
+    : 'the more context the better');
 }
 function onCustomerChange(el) {
   document.getElementById('customerDataNote').style.display = el.dataset.value === 'none' ? 'none' : '';

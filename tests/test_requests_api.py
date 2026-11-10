@@ -198,6 +198,21 @@ def test_other_needs_a_brief_and_a_catalogue_type_is_refused(client):
     assert r.status_code == 422
     r = client.post("/api/requests", json={"asset_type": "vm"})
     assert r.status_code == 422, "the form never offers a VM"
-    r = client.post("/api/requests", json={"asset_type": "other",
+    r = client.post("/api/requests", json={"asset_type": "other", "products": ["Creo"],
                                            "brief": "An interactive configurator"})
     assert r.status_code == 201 and r.json()["asset_type"] == "other"
+
+
+def test_type_products_and_brief_are_required_for_every_request(client):
+    """Elio, 2026-11-10: the form will not submit without them, and neither
+    will the API -- a bare {"asset_type": "video"} once made empty rows."""
+    ok = {"asset_type": "vdk", "products": ["Windchill"], "brief": "Change management story"}
+    assert client.post("/api/requests", json={k: v for k, v in ok.items()
+                                              if k != "asset_type"}).status_code == 422
+    r = client.post("/api/requests", json={**ok, "products": []})
+    assert r.status_code == 422 and "product" in r.json()["detail"]
+    r = client.post("/api/requests", json={**ok, "products": ["  "]})
+    assert r.status_code == 422
+    r = client.post("/api/requests", json={**ok, "brief": " "})
+    assert r.status_code == 422 and "brief" in r.json()["detail"]
+    assert client.post("/api/requests", json=ok).status_code == 201

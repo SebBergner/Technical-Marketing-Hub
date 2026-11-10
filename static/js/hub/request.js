@@ -59,6 +59,48 @@ function wireScopeState() {
   mark();
 }
 
+/* Asset type, Product scope and Brief are required (Elio, 2026-11-10):
+ * Submit stays disabled until all three are filled, and the line beside it
+ * says what is still missing. Watches the form itself rather than each
+ * handler, since Elio's pill handlers, Reset all and the product row's
+ * rebuild all change it. */
+function requestMissing() {
+  var missing = [];
+  if (!document.querySelector("#assetTypeRow .stage-pill--active")) missing.push("an asset type");
+  if (!document.querySelector("#productScopeRow .stage-pill--active")) missing.push("a product");
+  var brief = document.getElementById("reqBrief");
+  if (!brief || !brief.value.trim()) missing.push("a brief");
+  return missing;
+}
+
+function updateSubmitState() {
+  var button = document.querySelector('[data-action="submit-request"]');
+  var note = document.getElementById("reqMissing");
+  if (!button || button.textContent.indexOf("Submitting") >= 0) return;
+  var missing = requestMissing();
+  var text = missing.length
+    ? "To submit, add " + missing.join(", ").replace(/, ([^,]*)$/, " and $1") + "."
+    : "";
+  // Only what changed is written: the note sits inside the observed form,
+  // so rewriting it unchanged would wake the observer again, without end.
+  if (button.disabled !== (missing.length > 0)) button.disabled = missing.length > 0;
+  if (button.title !== (missing.length ? "Still needed: " + missing.join(", ") : "")) {
+    button.title = missing.length ? "Still needed: " + missing.join(", ") : "";
+  }
+  if (note && note.textContent !== text) note.textContent = text;
+}
+
+function wireSubmitState() {
+  var card = document.getElementById("requestFormCard");
+  if (!card || card.hubSubmitWired) return;
+  card.hubSubmitWired = true;
+  new MutationObserver(updateSubmitState).observe(card, {
+    subtree: true, childList: true, attributes: true, attributeFilter: ["class"]
+  });
+  card.addEventListener("input", updateSubmitState);
+  updateSubmitState();
+}
+
 function fillProductPills(facets) {
   var row = document.getElementById("productScopeRow");
   if (!row) return;
@@ -239,7 +281,7 @@ function fieldValue(id) {
 
 function collectRequest() {
   var body = {
-    asset_type: pillValues(REQ_ROWS.asset_type)[0] || "video",
+    asset_type: pillValues(REQ_ROWS.asset_type)[0] || null,
     products: pillValues(REQ_ROWS.products),
     brief: fieldValue("reqBrief"),
     narrative: pillValues(REQ_ROWS.narrative)[0] || null,
@@ -282,14 +324,20 @@ async function submitRequest(event) {
   requestProblem("");
 
   var body = collectRequest();
+  if (!body.asset_type) {
+    requestProblem("Choose an asset type.");
+    return;
+  }
   if (!body.products.length) {
     requestProblem("Choose at least one product. It is what routes the request "
                  + "to the person who can scope it.");
     return;
   }
-  if (body.asset_type === "other" && !body.brief) {
-    requestProblem("Say in the brief what kind of asset you need. For Other it is "
-                 + "the only thing that tells the team what you are asking for.");
+  if (!body.brief) {
+    requestProblem(body.asset_type === "other"
+      ? "Say in the brief what kind of asset you need. For Other it is the only "
+        + "thing that tells the team what you are asking for."
+      : "Write a short brief: what should the audience walk away understanding?");
     return;
   }
 
@@ -351,6 +399,7 @@ async function submitRequest(event) {
                  + ". Nothing was submitted, so nothing was lost — try again.");
   } finally {
     if (button) { button.disabled = false; button.innerHTML = restore; }
+    updateSubmitState();
   }
 }
 
@@ -360,6 +409,7 @@ async function submitRequest(event) {
 function wireRequestForm() {
   window.submitAssetRequest = submitRequest;
   window.handleAttachmentFiles = takeAttachments;
+  wireSubmitState();
 }
 
 /* ── the duplicate check on the request form ──────────────────

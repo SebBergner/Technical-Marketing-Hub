@@ -1992,3 +1992,9 @@ button.hub-guide__video--tour:hover .hub-guide__play { transform: scale(1.08); }
 .hub-guide-tip::after { content: ""; position: absolute; right: -6px; top: 50%; margin-top: -6px;
   border: 6px solid transparent; border-right: 0; border-left-color: var(--orion-indigo); }
 .hub-guide-tip.is-leaving { opacity: 0; }
+
+/* New Asset Inquiry: Asset type, Product scope and Brief are required
+   (Elio, 2026-11-10). Submit waits until they are filled. */
+.req-required { color: #c0392b; font-weight: 650; }
+.req-missing { align-self: center; font-size: 12.5px; }
+[data-action="submit-request"]:disabled { opacity: .5; cursor: not-allowed; }

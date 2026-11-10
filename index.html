@@ -366,10 +366,10 @@
       <div id="requestFormCard" style="display:flex; flex-direction:column; gap:22px; margin-top:18px;">
 
         <div class="section" style="margin-bottom:0;">
-          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-hex"/></svg> Asset type</div>
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-hex"/></svg> Asset type <span class="section-head__sub req-required">required</span></div>
           <div class="form-section">
             <div class="stage-row" id="assetTypeRow">
-              <span class="stage-pill stage-pill--active" data-value="video" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg> Technical Demo Video</span>
+              <span class="stage-pill" data-value="video" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg> Technical Demo Video</span>
               <span class="stage-pill" data-value="vdk" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-monitor"/></svg> VDK <span class="orion-subtle" style="font-size:11px;">Video Demo Kit</span></span>
               <span class="stage-pill" data-value="ldk" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-box"/></svg> LDK <span class="orion-subtle" style="font-size:11px;">Live Demo Kit</span></span>
               <span class="stage-pill" data-value="other" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-grid"/></svg> Other</span>
@@ -378,10 +378,10 @@
         </div>
 
         <div class="section" style="margin-bottom:0;">
-          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-layers"/></svg> Product scope <span class="section-head__sub">select all products involved</span></div>
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-layers"/></svg> Product scope <span class="section-head__sub"><span class="req-required">required</span> · select all products involved</span></div>
           <div class="form-section">
             <div class="stage-row" id="productScopeRow">
-              <span class="stage-pill stage-pill--active" data-value="Windchill" data-action="pill-toggle-scope">Windchill</span>
+              <span class="stage-pill" data-value="Windchill" data-action="pill-toggle-scope">Windchill</span>
               <span class="stage-pill" data-value="Creo" data-action="pill-toggle-scope">Creo</span>
               <span class="stage-pill" data-value="ServiceMax" data-action="pill-toggle-scope">ServiceMax</span>
               <span class="stage-pill" data-value="Codebeamer" data-action="pill-toggle-scope">Codebeamer</span>
@@ -395,7 +395,7 @@
         </div>
 
         <div class="section" style="margin-bottom:0;">
-          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-info"/></svg> Quick brief <span class="section-head__sub" id="reqBriefSub">optional, but the more context the better</span></div>
+          <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-info"/></svg> Quick brief <span class="section-head__sub" id="reqBriefSub"><span class="req-required">required</span> · the more context the better</span></div>
           <div class="form-section">
             <div class="form-row">
               <label for="reqBrief">Tell us more about what you have in mind</label>
@@ -415,7 +415,7 @@
           </div>
         </div>
 
-        <div class="section" id="videoDetailsSection" style="margin-bottom:0;">
+        <div class="section" id="videoDetailsSection" style="margin-bottom:0; display:none;">
           <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-play"/></svg> Video details</div>
           <div class="form-section">
             <div class="form-row">
@@ -525,7 +525,8 @@
         <div style="display:flex; justify-content:flex-end; gap:10px;">
           <button class="btn-ghost" style="flex:none; margin-right:auto;" data-action="reset-request">Reset all</button>
           <button class="btn-ghost" style="flex:none;" data-action="close-request">Cancel</button>
-          <button class="btn-primary-sm" style="flex:none;" data-action="submit-request"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Submit Request</button>
+          <span class="req-missing orion-subtle" id="reqMissing" aria-live="polite"></span>
+          <button class="btn-primary-sm" style="flex:none;" data-action="submit-request" disabled><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Submit Request</button>
         </div>
       </div>
 

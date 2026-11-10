@@ -194,7 +194,8 @@ def test_asset_requests_are_the_deliberate_exception(enforcing, client):
     Would fail against the old code, which depended on require_authenticated
     here and 401'd exactly like the endpoints above.
     """
-    response = client.post("/api/requests", json={"asset_type": "video"})
+    response = client.post("/api/requests", json={"asset_type": "video", "products": ["Creo"],
+                                                  "brief": "A short overview"})
     assert response.status_code == 201
     assert response.json()["requester_email"] is None
 

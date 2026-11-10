@@ -115,6 +115,14 @@ async def _submit(body: AssetRequestCreate, files: list, repo, user) -> RequestA
     if body.asset_type == "other" and not (body.brief or "").strip():
         raise HTTPException(status_code=422,
                             detail="For Other, say in the brief what kind of asset you need.")
+    # Product scope and the brief are required for every type (Elio,
+    # 2026-11-10); the form will not submit without them either. Before
+    # this, a bare {"asset_type": "video"} made an empty row in Demo Requests.
+    if not [p for p in body.products if (p or "").strip()]:
+        raise HTTPException(status_code=422, detail="Choose at least one product.")
+    if not (body.brief or "").strip():
+        raise HTTPException(status_code=422,
+                            detail="Write a short brief: what should the audience walk away understanding?")
     now = datetime.now(timezone.utc)
     # Readable in the list and sortable by eye: the date, then enough randomness
     # that two people submitting in the same second cannot collide.

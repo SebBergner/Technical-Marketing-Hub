@@ -43,7 +43,7 @@ Serge 11/11（周三）会向 CK 和各部门负责人介绍 Hub：既是找现�
 |---|---|---|
 | 1 | Illustrate 合并（#8 Nadia）："Creo Illustrate" 23 条（算在 Creo 族下）、"PTC Illustrate" 4 条（自成一族） | **先不做**：下周开会确认放在哪个族下 |
 | 2 | 资产类型修改 | **已做**：Edit 表单最上面加了 "Demo type"，只对 Demo Catalog 的 kit 显示，只能在 Live Demo Kit 和 Virtual Demo Kit 之间改（kit 只在 Demo Catalog；视频分在几个库里，不能改）。库里还有一个 "AR Experience" 选项，不提供。写回 Demo_x0020_Type，Hub 上立即显示，权限和 Edit 相同。**PM 忘了填 Demo Type 的文件夹不会出现在 Hub**，所以这个功能救不了它们：11/08 只读查了，Demo Catalog 顶层 753 个文件夹里 297 个没有 Demo Type，名字里带 VDK/LDK 的有 9 个，由 Liwei 或 PM 在 SharePoint 补：DEX VDK v.2、Onshape Vision - VDK、Creo Advanced Assembly Extension - VDK、Creo Advanced Assembly Extension - LDK、What's New in Mathcad Prime 11.0 - LDK v.1、What's New in Mathcad Prime 11.0 - VDK v.1、Creo Mechanism MDX and MDO Overview VDK v.1、EZ Tolerance Analysis VDK v.1、Creo Mold Analysis Overview VDK v.1 |
-| 3 | 欢迎视频和帮助按钮 | **已做帮助部分**：右上角常驻 "?" 按钮，打开单独的使用说明页（#/guide），有 6 段：找内容、打开 demo、列表和表格、申请新内容、反馈问题、客户数据。和 Get help（#/help，报告问题）分开。欢迎视频等 Elio 提供，到时放在这一页的最上面 |
+| 3 | 欢迎视频和帮助按钮 | **已做帮助部分**：右上角常驻 "?" 按钮，打开单独的使用说明页（#/guide），有 6 段：找内容、打开 demo、列表和表格、申请新内容、反馈问题、客户数据。和 Get help（#/help，报告问题）分开。11/10 已加上培训视频：放在 SharePoint Demo Video 库的 "TMH Training Video" 文件夹（没有 Demo Type，所以不会被同步成 demo），这一页最上面点播放才加载，播放文件夹里最新的视频；换视频只要在 SharePoint 里替换文件，不用部署。不计入 usage |
 | 4 | 申请提交后的提醒 | **Liwei 以后做**（Power Automate 或 Seb 的邮箱） |
 | 5 | 缩写搜索（#15 PLE、#17 IPE，Neal） | **先不做**：开会确认缩写清单 |
 | 6 | 导航加产品 logo（#26、#16，C10） | **先不做**：还没拿到 logo |

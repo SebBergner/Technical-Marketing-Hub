@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     #: source of its own (backend/integrations/graph/video_sync.py). It rides
     #: along with every SharePoint sync. Blank switches it off.
     graph_video_library: str = "Demo Video"
+    #: The Hub's own training video, shown at the top of the user guide
+    #: (#/guide): the newest video file in this folder of the Demo Video
+    #: library (Liwei, 2026-11-10). It has no Demo Type, so the sync never
+    #: lists it as a demo. Replace the file there to change the video.
+    guide_video_folder: str = "TMH Training Video"
     #: The GXC Gallery's videos (Liwei, 2026-10-29): the same kind of library,
     #: indexed the same way, but its demos exist on the Hub only for "View
     #: GXC videos". SharePoint restricts the library itself. Blank switches

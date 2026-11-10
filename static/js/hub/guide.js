@@ -1,6 +1,7 @@
 /* How to use the Hub (#/guide), opened from the "User guide" button that stays in
  * the top right corner (Elio, Liwei, 2026-11-06; built 2026-11-08). The
- * welcome video goes in the frame at the top once Elio has made it.
+ * Hub's training video plays in the frame at the top (2026-11-10): it lives
+ * in SharePoint and is fetched only when someone presses play.
  *
  * Its own page, apart from Get help (#/help), which is for reporting a
  * problem (Liwei's call, 2026-11-08). Redesigned the same day (Liwei: the
@@ -84,14 +85,34 @@ function hero() {
   text.appendChild(kinds);
   box.appendChild(text);
 
-  // The welcome video's place (Elio is making it).
-  var video = el("div", "hub-guide__video");
-  video.setAttribute("aria-label", "Welcome video, coming soon");
+  // The training video (Liwei, 2026-11-10). Nothing is fetched until play is
+  // pressed: the file is 136 MB and most visits only read the steps.
+  var video = el("button", "hub-guide__video");
+  video.type = "button";
+  video.setAttribute("aria-label", "Play the Hub training video");
   video.appendChild(el("span", "hub-guide__play", icon("i-play")));
-  video.appendChild(el("span", "hub-guide__video-label", "Welcome video"));
-  video.appendChild(el("span", "hub-guide__soon", "Coming soon"));
+  video.appendChild(el("span", "hub-guide__video-label", "Hub training video"));
+  video.appendChild(el("span", "hub-guide__soon", "Watch"));
+  video.addEventListener("click", function () { playGuideVideo(video); });
   box.appendChild(video);
   return box;
+}
+
+function playGuideVideo(frame) {
+  var player = document.createElement("video");
+  player.className = "hub-guide__player";
+  player.controls = true;
+  player.autoplay = true;
+  player.playsInline = true;
+  player.src = "/api/welcome/video";
+  player.addEventListener("error", function () {
+    var off = el("div", "hub-guide__video");
+    off.appendChild(el("span", "hub-guide__video-label", "The video could not be loaded"));
+    off.appendChild(el("span", "hub-guide__soon", "Try again later"));
+    player.replaceWith(off);
+  });
+  frame.replaceWith(player);
+  player.focus();
 }
 
 function quickActions() {

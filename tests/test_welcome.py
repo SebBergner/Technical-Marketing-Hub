@@ -85,10 +85,13 @@ class FakeGraph:
 def graph(monkeypatch):
     from app import app
     from backend.routers.graph import require_client
+    from backend.routers import disclaimer as routes
+    routes._guide_cache.clear()
     fake = FakeGraph()
     app.dependency_overrides[require_client] = lambda: fake
     yield fake
     app.dependency_overrides.pop(require_client, None)
+    routes._guide_cache.clear()
 
 
 def test_training_video_plays_the_newest_video_in_the_folder(client, graph):
@@ -127,6 +130,36 @@ def test_training_video_cover_is_sharepoints_still(client, graph):
     assert r.status_code == 302
     assert r.headers["location"] == "https://thumb.example/large.jpg"
     assert graph.asked == ["thumb:NEW"]
+    from backend.routers import disclaimer as routes
+    routes._guide_cache.clear()               # a fresh lookup, as after ten minutes
     graph.thumbs = []
     assert client.get("/api/welcome/video/poster", headers=h,
                       follow_redirects=False).status_code == 404
+
+
+def test_training_video_lookup_and_cover_are_reused(client, graph, monkeypatch):
+    """2026-11-11: four Graph calls per visit made the card's cover and length
+    arrive 4-5 s late on production. They are reused for ten minutes."""
+    from backend.routers import disclaimer as routes
+    h = easyauth_headers("ann@ptc.com")
+    calls = []
+    real = graph.list_children
+    monkeypatch.setattr(graph, "list_children", lambda *a, **k: calls.append(a) or real(*a, **k))
+    for _ in range(3):
+        assert client.get("/api/welcome/video/info", headers=h).json() == {"duration_seconds": 182}
+        assert client.get("/api/welcome/video/poster", headers=h,
+                          follow_redirects=False).status_code == 302
+    assert len(calls) == 2                      # root, then the folder: once
+    assert graph.asked == ["thumb:NEW"]         # the cover asked once
+    # Past the ten minutes, looked up again.
+    monkeypatch.setattr(routes.time, "monotonic", lambda: 10 ** 9)
+    client.get("/api/welcome/video/info", headers=h)
+    assert len(calls) == 4
+
+
+def test_a_missing_training_video_is_not_remembered(client, graph):
+    h = easyauth_headers("ann@ptc.com")
+    graph.folder = False
+    assert client.get("/api/welcome/video/info", headers=h).status_code == 404
+    graph.folder = True
+    assert client.get("/api/welcome/video/info", headers=h).status_code == 200

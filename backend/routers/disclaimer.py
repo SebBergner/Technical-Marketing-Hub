@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
@@ -51,10 +52,32 @@ def welcome_seen(user: CurrentUser = Depends(get_current_user)):
     return row
 
 
+#: How long the video's lookup and cover are reused (2026-11-11): finding the
+#: file takes four Graph calls, about 4-5 s on production, so the card's cover
+#: and length came in late on every visit. A replaced video shows within this.
+GUIDE_CACHE_SECONDS = 600
+_guide_cache: dict[str, tuple[float, object]] = {}
+
+
+def _cached(key: str, make):
+    hit = _guide_cache.get(key)
+    if hit and time.monotonic() - hit[0] < GUIDE_CACHE_SECONDS:
+        return hit[1]
+    value = make()
+    if value:                 # a missing cover is asked again next time
+        _guide_cache[key] = (time.monotonic(), value)
+    return value
+
+
 def _guide_video(client: GraphClient) -> tuple[str, dict]:
     """The drive id and item of the training video: the newest video file in
-    `settings.guide_video_folder` of the Demo Video library. 404 when the
-    folder or a video in it is missing; GraphError is the caller's."""
+    `settings.guide_video_folder` of the Demo Video library, reused for
+    GUIDE_CACHE_SECONDS. 404 when the folder or a video in it is missing (not
+    cached, so a new upload shows at once); GraphError is the caller's."""
+    return _cached("video", lambda: _find_guide_video(client))
+
+
+def _find_guide_video(client: GraphClient) -> tuple[str, dict]:
     site = client.resolve_site()
     drive = client.find_drive(site.site_id, settings.graph_video_library)
     if drive is None:
@@ -110,11 +133,14 @@ def guide_video_poster(user: CurrentUser = Depends(require_authenticated),
     plain background."""
     try:
         drive_id, item = _guide_video(client)
-        thumbs = client.thumbnails(drive_id, item["id"])
+
+        def cover():
+            thumbs = client.thumbnails(drive_id, item["id"])
+            return next((s.get("url") for t in thumbs for s in [t.get("large") or {}]
+                         if s.get("url")), None)
+        url = _cached("poster:" + item["id"], cover)
     except GraphError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    url = next((s.get("url") for t in thumbs for s in [t.get("large") or {}] if s.get("url")),
-               None)
     if not url:
         raise HTTPException(status_code=404, detail="No cover for the training video")
     return RedirectResponse(url, status_code=302)

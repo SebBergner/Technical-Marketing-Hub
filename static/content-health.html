@@ -48,6 +48,9 @@
   .sr-alldetails > summary::-webkit-details-marker { display: none; }
   .sr-alldetails > summary h2::before { content: "▸ "; } .sr-alldetails[open] > summary h2::before { content: "▾ "; }
   .sr-chart { height: 170px; }
+  .sr-status { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 12.5px; margin: -4px 0 8px; }
+  .sr-refresh { font-size: 12.5px; padding: 3px 12px; }
+  .sr-refreshing { color: #0c447c; background: #e6f1fb; border-radius: 99px; padding: 2px 10px; }
 </style>
 </head>
 <body>
@@ -168,6 +171,7 @@
           find, and what is rising, compared with the period before. Counts of people, never who.</p>
         <div class="ranges" id="srRanges"></div>
       </div>
+      <div class="sr-status" id="srStatus"></div>
       <p class="faint" id="srIntro" style="margin:0 0 14px;font-size:12.5px"></p>
       <div class="tiles" id="srTiles"></div>
       <div class="card" style="margin-top:12px"><div id="srChart"></div></div>

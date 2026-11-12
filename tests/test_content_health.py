@@ -24,10 +24,6 @@ def _res(name, sub=None):
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     from app import app
-    from backend.routers import content_health
-    from backend.services import search_insights
-    content_health._daily.clear()
-    search_insights._lookup_cache.clear()
     monkeypatch.setattr(settings, "data_dir", str(tmp_path))
     monkeypatch.setattr(settings, "auth_mode", AuthMode.EASYAUTH.value)
     monkeypatch.setattr(settings, "admin_username", "")
@@ -83,6 +79,9 @@ def test_the_checks(client):
 
 
 def test_searches_that_found_little(client):
+    from backend.services import search_insights_store as store
+    assert client.get("/api/content-health/searches", headers=KEEPER).json()["pending"] is True
+    store.compute_all()
     d = client.get("/api/content-health/searches", headers=KEEPER).json()
     assert d["totals"]["recorded"] == 6 and d["totals"]["typing"] == 0
     rows = {(r["q"].lower(), r["filters"]): r for r in d["rows"]}
@@ -126,11 +125,24 @@ def test_the_hub_says_when_a_search_was_filtered(client, tmp_path):
     assert [e.get("filters") for e in events] == [{"type": ["vm"], "family": ["x" * 60]}, None]
 
 
-def test_searches_are_worked_out_once_a_day(client, tmp_path):
+def test_searches_are_worked_out_ahead_and_refreshed_at_most_hourly(client, monkeypatch):
+    from backend.services import search_insights_store as store
+    ran = []
+    monkeypatch.setattr(store.threading, "Thread",
+                        lambda target, args, **kw: type("T", (), {"start": lambda self: (
+                            ran.append(args), target(*args))})())
+    store.compute_all()
     first = client.get("/api/content-health/searches?days=30", headers=KEEPER).json()
-    JsonAssetRepository(str(tmp_path)).record_usage_event("search", q="new word", results=0,
-                                                          user="q@ptc.com")
+    JsonAssetRepository(str(store.settings.data_dir)).record_usage_event(
+        "search", q="new word", results=0, user="q@ptc.com")
     again = client.get("/api/content-health/searches?days=30", headers=KEEPER).json()
-    assert again == first and again["computed_at"], "kept for the rest of the day"
-    other = client.get("/api/content-health/searches?days=7", headers=KEEPER).json()
-    assert other["totals"]["recorded"] == first["totals"]["recorded"] + 1, "its own day's answer"
+    assert again["totals"] == first["totals"], "a page load never works it out"
+    assert again["refresh"]["available"] is True
+    r = client.post("/api/content-health/searches/refresh", headers=KEEPER)
+    assert r.status_code == 202 and ran, r.text
+    after = client.get("/api/content-health/searches?days=30", headers=KEEPER).json()
+    assert after["totals"]["recorded"] == first["totals"]["recorded"] + 1
+    assert after["refresh"]["available"] is False and after["refresh"]["available_at"]
+    again = client.post("/api/content-health/searches/refresh", headers=KEEPER)
+    assert again.status_code == 429 and "available again at" in again.json()["detail"]
+    assert client.post("/api/content-health/searches/refresh", headers=VIEWER).status_code == 403

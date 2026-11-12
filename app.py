@@ -91,6 +91,10 @@ async def lifespan(app: FastAPI):
         import asyncio
         from backend import auto_sync
         task = asyncio.create_task(auto_sync.scheduler())
+        # Content health -> Searches, worked out at 04:00 Boston time
+        # (services/search_insights_store.py).
+        from backend.services import search_insights_store
+        insights_task = asyncio.create_task(search_insights_store.scheduler())
     # A migration run started from /migration and interrupted by a restart
     # carries on from its batch log (backend/services/migration_jobs.py).
     # Only where runs are enabled; it returns at once and runs in a thread.
@@ -105,6 +109,7 @@ async def lifespan(app: FastAPI):
     yield
     if task:
         task.cancel()
+        insights_task.cancel()
 
 
 app = FastAPI(

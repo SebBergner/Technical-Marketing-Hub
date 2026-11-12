@@ -24,7 +24,6 @@ Everything is counted per person, never shown by name.
 from __future__ import annotations
 
 import re
-import time
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
@@ -42,12 +41,9 @@ TREND_MIN_PEOPLE = 3
 #: Below this many people searching in both periods together, no trend is
 #: claimed at all.
 TREND_MIN_TOTAL_PEOPLE = 10
-#: How many words get "finds now" (a catalogue search each, ~40 ms).
+#: How many words get "finds now" (a catalogue search each).
 MAX_LOOKUPS = 150
-LOOKUP_CACHE_SECONDS = 600
 OPEN_EVENTS = ("view", "preview", "download")
-
-_lookup_cache: dict[tuple, tuple[float, int | None]] = {}
 
 
 # ───────────────────────────────────────────────────────────── words
@@ -249,19 +245,15 @@ def insights(events: list[dict], since: datetime | None, until: datetime,
 
     now_terms, prev_terms = by_term(current), by_term(previous)
 
-    lookups = {"n": 0}
+    looked: dict[tuple, int | None] = {}
 
     def lookup(q: str, key: tuple = ()) -> int | None:
-        cache_key = (q, key)
-        hit = _lookup_cache.get(cache_key)
-        if hit and time.monotonic() - hit[0] < LOOKUP_CACHE_SECONDS:
-            return hit[1]
-        if lookups["n"] >= MAX_LOOKUPS:
+        if (q, key) in looked:
+            return looked[(q, key)]
+        if len(looked) >= MAX_LOOKUPS:
             return None
-        lookups["n"] += 1
-        value = finds_now(q, key)
-        _lookup_cache[cache_key] = (time.monotonic(), value)
-        return value
+        looked[(q, key)] = finds_now(q, key)
+        return looked[(q, key)]
 
     top = []
     for t, info in sorted(now_terms.items(), key=lambda kv: (-len(kv[1]["people"]),
@@ -383,3 +375,47 @@ def insights(events: list[dict], since: datetime | None, until: datetime,
         "trending": {"enough_data": bool(enough), "rising": rising[:10], "new": new[:10]},
         "rows": table,
     }
+
+
+# ───────────────────────────────────────── filters, and what a search finds
+#: A recorded search's filters: (query parameter, AssetQuery field, words).
+_FILTERS = (("type", "types", "Type"), ("umbrella", "umbrella_families", "Product"),
+            ("family", "product_families", "Product"), ("segment", "segments", "Segment"),
+            ("stage", "funnel_stages", "Funnel stage"), ("language", "languages", "Language"),
+            ("published", "published", "Published"), ("depth", "content_depths", "Video type"),
+            ("tag", "tags", "Tag"), ("customer_facing", None, "Customer facing"),
+            ("archived", None, "Archived"))
+_TYPE_WORDS = {"video": "Video", "ldk": "LDK", "vdk": "VDK", "vm": "Virtual Machine",
+               "cad_model": "CAD Dataset"}
+
+
+def filters_words(key: tuple) -> str | None:
+    """{"type": ["vm"], "family": ["Windchill"]} -> "Type: Virtual Machine ·
+    Product: Windchill"; None for a plain search."""
+    words = dict((k, w) for k, _, w in _FILTERS)
+    parts = []
+    for k, values in key:
+        shown = [_TYPE_WORDS.get(v, v) if k == "type" else v for v in values]
+        parts.append(f"{words.get(k, k)}: {', '.join(shown)}")
+    return " · ".join(parts) or None
+
+
+def finds_now(repo, q: str, key: tuple) -> int | None:
+    """What the same words and filters find today."""
+    from backend.repositories.base import AssetQuery
+    from backend.models import video_type_filter
+    query = AssetQuery(text=q, limit=1)
+    fields = {k: f for k, f, _ in _FILTERS}
+    for k, values in key:
+        field_name = fields.get(k)
+        if k == "customer_facing":
+            query.customer_facing = values[0] == "true"
+        elif k == "depth":
+            query.content_depths = video_type_filter(list(values))
+        elif field_name:
+            setattr(query, field_name, list(values))
+    try:
+        counter = getattr(repo, "count", None)
+        return counter(query) if counter else repo.list(query).total
+    except Exception:                                      # noqa: BLE001
+        return None

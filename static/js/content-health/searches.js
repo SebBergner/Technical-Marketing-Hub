@@ -385,15 +385,79 @@ function renderAll(d) {
   host.appendChild(wrap);
 }
 
+function when(iso) {
+  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+function at(iso) {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
+/* The figures are worked out every day at 04:00 Boston time, or when
+ * someone presses Refresh -- after which nobody can for an hour
+ * (services/search_insights_store.py). While it runs, the page asks again
+ * every fifteen seconds and shows the new figures when they are in. */
+var polling = null;
+
+function renderStatus(d) {
+  var host = $("srStatus");
+  host.innerHTML = "";
+  var r = d.refresh;
+  var line = el("span", "faint");
+  line.textContent = (d.computed_at ? "As of " + when(d.computed_at) : "Not worked out yet")
+    + " · next update " + when(r.next_scheduled_at) + " (04:00 Boston)";
+  host.appendChild(line);
+  if (r.running) {
+    host.appendChild(el("span", "sr-refreshing", "Working out new figures… this takes a minute"));
+  } else if (r.available) {
+    var b = el("button", "sr-refresh", "Refresh now");
+    b.type = "button";
+    b.title = "Work the figures out again now. After that, nobody can refresh for an hour.";
+    b.addEventListener("click", function () {
+      b.disabled = true;
+      fetch("/api/content-health/searches/refresh", { method: "POST" })
+        .then(function (resp) {
+          return resp.json().then(function (body) {
+            if (!resp.ok) throw new Error(body.detail || ("HTTP " + resp.status));
+          });
+        })
+        .then(loadSearches)
+        .catch(function (err) { b.disabled = false; window.alert(err.message); });
+    });
+    host.appendChild(b);
+  } else if (r.available_at) {
+    host.appendChild(el("span", "faint", "Refreshed at " + at(r.last_at)
+      + "; it can be refreshed again at " + at(r.available_at) + "."));
+  }
+  clearTimeout(polling);
+  if (r.running || d.pending) {
+    var before = d.computed_at;
+    polling = setTimeout(function () {
+      if ($("tabSearches").hidden) return;
+      fetch("/api/content-health/searches" + (days() ? "?days=" + days() : ""))
+        .then(function (resp) { return resp.json(); })
+        .then(function (next) {
+          if (next.computed_at !== before) { render(next); } else { renderStatus(next); }
+        });
+    }, 15000);
+  }
+}
+
 function render(d) {
+  renderStatus(d);
+  var parts = ["srTiles", "srChart", "srProblems", "srTop", "srTrending", "srAll"];
+  if (d.pending) {
+    $("srIntro").textContent = "The figures have not been worked out yet. They will be shortly, "
+      + "without anyone waiting on this page, or now with Refresh.";
+    parts.forEach(function (id) { $(id).innerHTML = ""; });
+    $("srAllCount").textContent = "";
+    return;
+  }
   $("srIntro").textContent = d.totals.searches.toLocaleString() + " searches by "
     + d.totals.people + " people"
     + (d.totals.typing ? "; " + d.totals.typing + " more were someone still typing and are "
        + "left out" : "")
-    + ". Variants of a word (lambo, Lamborghini) count as one under Most searched. "
-    + "Worked out once a day; this is as of "
-    + new Date(d.computed_at).toLocaleString(undefined, { dateStyle: "medium",
-                                                          timeStyle: "short" }) + ".";
+    + ". Variants of a word (lambo, Lamborghini) count as one under Most searched.";
   renderTiles(d);
   renderChart(d);
   renderProblems(d);
@@ -404,7 +468,6 @@ function render(d) {
 
 function loadSearches() {
   renderRanges();
-  $("srIntro").textContent = "Loading…";
   var d = days();
   return fetch("/api/content-health/searches" + (d ? "?days=" + d : ""))
     .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })

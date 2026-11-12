@@ -122,103 +122,34 @@ def checks(repo: AssetRepository = Depends(get_repo)):
 
 
 # ───────────────────────────────────────────────────────────── searches
-#: A recorded search's filters: (query parameter, AssetQuery field, words).
-_FILTERS = (("type", "types", "Type"), ("umbrella", "umbrella_families", "Product"),
-            ("family", "product_families", "Product"), ("segment", "segments", "Segment"),
-            ("stage", "funnel_stages", "Funnel stage"), ("language", "languages", "Language"),
-            ("published", "published", "Published"), ("depth", "content_depths", "Video type"),
-            ("tag", "tags", "Tag"), ("customer_facing", None, "Customer facing"),
-            ("archived", None, "Archived"))
-_TYPE_WORDS = {"video": "Video", "ldk": "LDK", "vdk": "VDK", "vm": "Virtual Machine",
-               "cad_model": "CAD Dataset"}
-
-
-def _filters_key(filters: dict | None) -> tuple:
-    return tuple(sorted((k, tuple(sorted(v))) for k, v in (filters or {}).items() if v))
-
-
-def _filters_words(key: tuple) -> str | None:
-    """{"type": ["vm"], "family": ["Windchill"]} -> "Type: Virtual Machine ·
-    Product: Windchill"; None for a plain search."""
-    words = dict((k, w) for k, _, w in _FILTERS)
-    parts = []
-    for k, values in key:
-        shown = [_TYPE_WORDS.get(v, v) if k == "type" else v for v in values]
-        parts.append(f"{words.get(k, k)}: {', '.join(shown)}")
-    return " · ".join(parts) or None
-
-
-def _finds_now(repo: AssetRepository, q: str, key: tuple) -> int | None:
-    """What the same words and filters find today."""
-    from backend.repositories.base import AssetQuery
-    from backend.models import video_type_filter
-    query = AssetQuery(text=q, limit=1)
-    fields = {k: f for k, f, _ in _FILTERS}
-    for k, values in key:
-        field_name = fields.get(k)
-        if k == "customer_facing":
-            query.customer_facing = values[0] == "true"
-        elif k == "depth":
-            query.content_depths = video_type_filter(list(values))
-        elif field_name:
-            setattr(query, field_name, list(values))
-    try:
-        counter = getattr(repo, "count", None)
-        return counter(query) if counter else repo.list(query).total
-    except Exception:                                      # noqa: BLE001
-        return None
-
-
-#: Searches, worked out once a day (Liwei, 2026-11-12: "no need for live
-#: data"): {(days, gxc): (the day, the answer)}. Per worker, so each worker
-#: works it out on its first request of the day; a few seconds each.
-_daily: dict[tuple, tuple[str, dict]] = {}
-
-
 @router.get("/searches")
 def searches(days: int | None = Query(None, ge=1, le=3650),
-             since: str | None = None, until: str | None = None,
              repo: AssetRepository = Depends(get_repo)):
-    """Content health -> Searches (2026-11-12): what people search for,
-    what they do not find, and what is rising, in the last `days` and
-    against the days before -- worked out by services/search_insights.py,
-    which says how. Counts of people, never who.
+    """Content health -> Searches: what people search for, what they do not
+    find, and what is rising, in the last `days` (none: all time) and
+    against the days before. Worked out ahead of time, every day at 04:00 in
+    Boston, or when someone presses Refresh (services/search_insights_store.py),
+    never on a page load. `pending` until the first time; `refresh` says
+    whether Refresh may be pressed. Counts of people, never who."""
+    from backend.services import search_insights_store as store
+    state = store.load()
+    gxc = bool(getattr(repo, "gxc", True))
+    answer = (state.get("results") or {}).get(store.period_key(days, gxc))
+    out = dict(answer) if answer else {"pending": True}
+    out["computed_at"] = state.get("computed_at") if answer else None
+    out["refresh"] = store.refresh_view(state)
+    return out
 
-    By `days` (or none: all time), the answer is worked out on the first
-    request of a UTC day and kept for the rest of it; `computed_at` says
-    when. `since`/`until` ask for an exact window, worked out each time."""
-    from datetime import datetime, timedelta, timezone
-    from backend.services import search_insights as si
-    from backend.services.usage import events as _events
 
-    def when(value: str | None):
-        if not value:
-            return None
-        try:
-            d = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except ValueError:
-            raise HTTPException(status_code=422, detail=f"not a date: {value!r}")
-        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
-
-    def work(start, end) -> dict:
-        records = repo.listed_records().values() if hasattr(repo, "listed_records") else []
-        out = si.insights(_events(repo), start, end,
-                          finds_now=lambda q, key: _finds_now(repo, q, key),
-                          vocab=si.vocabulary(records), filters_words=_filters_words)
-        out["computed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        return out
-
-    if since or until:
-        return work(when(since), when(until) or datetime.now(timezone.utc))
-    now = datetime.now(timezone.utc)
-    today = now.date().isoformat()
-    key = (days, bool(getattr(repo, "gxc", True)))
-    hit = _daily.get(key)
-    if hit and hit[0] == today:
-        return hit[1]
-    answer = work(now - timedelta(days=days) if days else None, now)
-    _daily[key] = (today, answer)
-    return answer
+@router.post("/searches/refresh", status_code=202)
+def refresh_searches(actor: str = Depends(require_perm(Perm.MAINTAIN))):
+    """Work Searches out again now, in the background. Then not again, by
+    anyone, for an hour; 429 says until when."""
+    from backend.services import search_insights_store as store
+    try:
+        return store.request_refresh(actor)
+    except store.Cooldown as exc:
+        raise HTTPException(status_code=429, detail=f"Refresh is {exc}.")
 
 
 # ─────────────────────────────────────────────────────── content review

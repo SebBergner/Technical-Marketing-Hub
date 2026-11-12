@@ -59,6 +59,7 @@ ACTIONS: dict[tuple[str, str], str] = {
     ("POST", "/api/assets/{asset_id}/access-requests/{request_id}/withdraw"):
         "Withdrew an access request",
     ("POST", "/api/admin/access-requests/{request_id}/decision"): "Decided an access request",
+    ("POST", "/api/content-health/searches/refresh"): "Refreshed the search figures",
     ("POST", "/api/content-health/hidden"): "Hid a demo",
     ("DELETE", "/api/content-health/hidden/{asset_id}"): "Unhid a demo",
     ("POST", "/api/content-health/access-requests/{request_id}/decision"):
@@ -97,7 +98,7 @@ ACTIONS: dict[tuple[str, str], str] = {
 #: Reads worth a line: about one person, not about the catalogue.
 _LOGGED_READS = {route for (method, route) in ACTIONS if method == "GET"}
 WATCHED = re.compile(r"^/api/(admin|graph|consensus/(sync|oauth)|curation/proposals|migration)/"
-                     r"|^/api/content-health/(hidden|access-requests)(/|$)"
+                     r"|^/api/content-health/(hidden|access-requests|searches/refresh)(/|$)"
                      r"|^/api/assets/[^/]+/(access|still-current|archive"
                      r"|metadata|preview-video|thumbnail)$"
                      r"|^/api/assets/[^/]+/(related|not-related)/[^/]+$"

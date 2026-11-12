@@ -46,6 +46,13 @@ var openMenu = null;
 function closeMenu() {
   if (openMenu) { openMenu.remove(); openMenu = null; }
   document.removeEventListener("click", outside, true);
+  document.removeEventListener("scroll", closeOnScroll, true);
+}
+
+/* Scrolling the page moves the button away from a menu fixed on screen;
+ * scrolling the menu's own list of playlists does not count. */
+function closeOnScroll(e) {
+  if (openMenu && !openMenu.contains(e.target)) closeMenu();
 }
 
 function outside(e) {
@@ -103,12 +110,31 @@ function drawMenu(menu, assetId) {
   menu.appendChild(add);
 }
 
-/* Under the button, but never past the window's right edge (2026-11-12:
- * full screen, the menu ran off the page). */
+/* Under the button, never cut off (2026-11-12): the menu hangs from the
+ * page itself, placed where the button is on screen, so the content
+ * area's own edge (it scrolls, and is narrower than the window) cannot
+ * clip it; then kept inside both that area and the window, and above the
+ * button when there is no room below. */
+function clipRight(node) {
+  var right = window.innerWidth;
+  for (var n = node.parentElement; n && n !== document.body; n = n.parentElement) {
+    var s = getComputedStyle(n);
+    if (/(auto|scroll|hidden)/.test(s.overflowX + s.overflow)) {
+      right = Math.min(right, n.getBoundingClientRect().left + n.clientWidth);
+    }
+  }
+  return right;
+}
+
 function place(menu, button) {
-  menu.style.left = button.offsetLeft + "px";
-  var over = menu.getBoundingClientRect().right - (window.innerWidth - 12);
-  if (over > 0) menu.style.left = Math.max(0, button.offsetLeft - over) + "px";
+  var r = button.getBoundingClientRect();
+  var width = menu.offsetWidth, height = menu.offsetHeight;
+  var right = clipRight(button) - 10;
+  var left = Math.max(8, Math.min(r.left, right - width));
+  var top = r.bottom + 6;
+  if (top + height > window.innerHeight - 8 && r.top - height - 6 > 8) top = r.top - height - 6;
+  menu.style.left = Math.round(left) + "px";
+  menu.style.top = Math.round(top) + "px";
 }
 
 /* The Save button; reads the demo on show from `current()`, since the
@@ -127,11 +153,17 @@ function saveButton(current) {
     var menu = el("div", "hub-save");
     menu.setAttribute("role", "dialog");
     menu.setAttribute("aria-label", "Save to");
-    b.parentNode.insertBefore(menu, b.nextSibling);
+    document.body.appendChild(menu);
     openMenu = menu;
     drawMenu(menu, asset.id);
     place(menu, b);
-    setTimeout(function () { document.addEventListener("click", outside, true); }, 0);
+    // Its height grows once the playlists are in: place it again then.
+    setTimeout(function () { if (openMenu === menu) place(menu, b); }, 400);
+    setTimeout(function () {
+      document.addEventListener("click", outside, true);
+      window.addEventListener("resize", closeMenu, { once: true });
+      document.addEventListener("scroll", closeOnScroll, true);
+    }, 0);
   });
   return b;
 }

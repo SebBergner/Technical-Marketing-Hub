@@ -2042,7 +2042,7 @@ button.hub-guide__video--tour:hover .hub-guide__play { transform: scale(1.08); }
 @media (max-width:768px){.hub-me__req{flex-direction:column}.hub-me__reqside{align-items:flex-start;flex-basis:auto}.hub-me__reqnote{text-align:left}}
 
 /* Playlists (My Hub phase 2, 2026-11-12). */
-.hub-save{position:absolute;z-index:40;margin-top:40px;min-width:260px;max-width:320px;background:var(--orion-surface);border:1px solid var(--orion-border-md);border-radius:10px;box-shadow:0 8px 24px rgba(16,24,40,.14);padding:10px 12px}
+.hub-save{position:fixed;z-index:1000;min-width:260px;max-width:320px;background:var(--orion-surface);border:1px solid var(--orion-border-md);border-radius:10px;box-shadow:0 8px 24px rgba(16,24,40,.14);padding:10px 12px}
 .vp-actions{position:relative}
 .hub-save__h{font-size:12px;font-weight:700;color:var(--orion-text-3,#6b7280);text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px}
 .hub-save__opt{display:flex;align-items:center;gap:8px;padding:5px 2px;font-size:13.5px;cursor:pointer}

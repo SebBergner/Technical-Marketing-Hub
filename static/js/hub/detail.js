@@ -26,7 +26,9 @@ import { closeReview, openReview } from "./review.js";
 import { closeHelp, openHelp, openReportModal } from "./report.js";
 import { closeGuide, openGuide } from "./guide.js";
 import { closeMyHub, openMyHub } from "./me.js";
-import { closePlaylist, closeSaveMenu, openPlaylist, saveButton } from "./playlists.js";
+import {
+  closePlaylist, closeSaveMenu, openPlaylist, refreshSaved, saveButton
+} from "./playlists.js";
 import {
   advancedHash, advState, closeAdvancedSearch, fileTotalsText,
   openAdvancedSearch
@@ -403,6 +405,7 @@ async function openAssetDetail(id, fileItemId, linkToken) {
     var after = document.getElementById("vpCopyLink");
     actions.insertBefore(save, after ? after.nextSibling : null);
   }
+  refreshSaved(asset.id);
   // GXC group only (B10): no link to pass on, so no Share Internally.
   var copyBtn = document.getElementById("vpCopyLink");
   if (copyBtn) copyBtn.style.display = asset.gxc_group_only ? "none" : "";

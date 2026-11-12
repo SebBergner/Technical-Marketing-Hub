@@ -2082,3 +2082,7 @@ button.hub-guide__video--tour:hover .hub-guide__play { transform: scale(1.08); }
 .hub-pl__hitinfo{flex:1 1 auto;min-width:0}
 .hub-pl__hittitle{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hub-pl__addbtn{flex:0 0 auto;padding:4px 14px}
+.hub-save__status{margin-top:8px;padding:7px 9px;border-radius:6px;background:#e6f4e9;font-size:12.5px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.hub-save__ok{color:#1d7a35;font-weight:600}
+.hub-save__status a{font-weight:600;white-space:nowrap}
+.btn-ghost.hub-saved{color:#1d7a35;border-color:#b9dfc2;background:#f2faf4}

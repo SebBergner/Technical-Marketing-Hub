@@ -71,11 +71,32 @@ function option(label, checked, onChange) {
   return row;
 }
 
-function drawMenu(menu, assetId) {
+/* What the menu says after each change (Liwei, 2026-11-12: a tick alone
+ * went unnoticed, and people reached for Create instead). */
+function say(status, text, playlistId) {
+  status.innerHTML = "";
+  status.appendChild(el("span", "hub-save__ok", text));
+  if (playlistId) {
+    var open = el("a", null, "Open playlist");
+    open.href = "#/playlist/" + encodeURIComponent(playlistId);
+    open.addEventListener("click", closeMenu);
+    status.appendChild(open);
+  }
+  status.hidden = false;
+}
+
+function drawMenu(menu, assetId, note) {
   menu.innerHTML = "";
   menu.appendChild(el("div", "hub-save__h", "Save to"));
+  var status = el("div", "hub-save__status");
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-live", "polite");
+  status.hidden = true;
   menu.appendChild(option("Favorites", isFavorite(assetId), function (on) {
-    setFavorite(assetId, on);
+    setFavorite(assetId, on).then(function () {
+      say(status, on ? "✓ Added to Favorites" : "Removed from Favorites");
+      refreshSaved(assetId);
+    });
   }));
   var lists = el("div", "hub-save__lists");
   lists.textContent = "Loading your playlists…";
@@ -86,6 +107,11 @@ function drawMenu(menu, assetId) {
       lists.appendChild(option(p.name, p.items.indexOf(assetId) >= 0, function (on, box) {
         api(on ? "PUT" : "DELETE", "/api/me/playlists/" + encodeURIComponent(p.id)
             + "/items/" + encodeURIComponent(assetId))
+          .then(function () {
+            say(status, on ? "✓ Added to " + p.name : "Removed from " + p.name,
+                on ? p.id : null);
+            refreshSaved(assetId);
+          })
           .catch(function (err) { box.checked = !on; report(err.message, true); });
       }));
     });
@@ -104,10 +130,47 @@ function drawMenu(menu, assetId) {
     if (!name.value.trim()) { name.focus(); return; }
     go.disabled = true;
     api("POST", "/api/me/playlists", { name: name.value, items: [assetId] })
-      .then(function () { drawMenu(menu, assetId); })
+      .then(function (p) {
+        drawMenu(menu, assetId, { text: "✓ Created " + p.name + " and added this demo",
+                                  playlist: p.id });
+        refreshSaved(assetId);
+      })
       .catch(function (err) { go.disabled = false; report(err.message, true); });
   });
   menu.appendChild(add);
+  menu.appendChild(status);
+  if (note) say(status, note.text, note.playlist);
+}
+
+/* The Save button says "Saved" while the demo is in Favorites or any of
+ * your playlists, so it shows at a glance, here and next time. */
+var saveBtn = null;
+
+function drawSaveButton(saved) {
+  if (!saveBtn) return;
+  saveBtn.classList.toggle("hub-saved", saved);
+  saveBtn.innerHTML = saved
+    ? '<svg class="orion-ico--sm orion-ico"><use href="#i-check"/></svg>Saved'
+    : '<svg class="orion-ico--sm orion-ico"><use href="#i-plus"/></svg>Save';
+  saveBtn.title = saved
+    ? "In your Favorites or playlists (My Hub). Click to change."
+    : "Save this demo to Favorites or one of your playlists (My Hub)";
+}
+
+// A star changed elsewhere on the page (beside the title, on a card).
+document.addEventListener("hub:favorites", function (e) {
+  if (saveBtn && e.detail && saveBtn.dataset.assetId === e.detail.id) refreshSaved(e.detail.id);
+});
+
+function refreshSaved(assetId) {
+  if (!saveBtn || !assetId) return;
+  saveBtn.dataset.assetId = assetId;
+  api("GET", "/api/me/playlists").then(function (d) {
+    if (saveBtn.dataset.assetId !== assetId) return;      // another demo by now
+    drawSaveButton(isFavorite(assetId) || d.items.some(function (p) {
+      return p.items.indexOf(assetId) >= 0;
+    }));
+  }).catch(function () { drawSaveButton(isFavorite(assetId)); });
 }
 
 /* Under the button, never cut off (2026-11-12): the menu hangs from the
@@ -143,8 +206,8 @@ function saveButton(current) {
   var b = el("button", "btn-ghost");
   b.type = "button";
   b.id = "vpSave";
-  b.title = "Save this demo to Favorites or one of your playlists (My Hub)";
-  b.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-plus"/></svg>Save';
+  saveBtn = b;
+  drawSaveButton(false);
   b.addEventListener("click", function (e) {
     e.stopPropagation();
     if (openMenu) { closeMenu(); return; }
@@ -459,4 +522,7 @@ function closePlaylist() {
   if (thread) thread.style.display = "";
 }
 
-export { closeMenu as closeSaveMenu, closePlaylist, openPlaylist, renderMyPlaylists, saveButton };
+export {
+  closeMenu as closeSaveMenu, closePlaylist, openPlaylist, refreshSaved, renderMyPlaylists,
+  saveButton
+};

@@ -1650,6 +1650,7 @@ function routeFromHash() {
     closeReview();
     closeHelp();
     closeGuide();
+    closePlaylist();     // a playlist's page stayed under My Hub (2026-11-12)
     openMyHub();
     return;
   }

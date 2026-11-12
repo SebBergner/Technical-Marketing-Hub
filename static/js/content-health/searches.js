@@ -170,6 +170,9 @@ function meta(r) {
           r.last_at ? "last " + r.last_at : null].filter(Boolean).join(" · ");
 }
 
+/* How many rows a "what needs doing" card shows before "Show N more". */
+var SHOWN = 8;
+
 /* One of the four "what needs doing" cards. */
 function problemCard(host, tone, title, why, rows, line, empty) {
   var c = el("div", "card sr-card");
@@ -185,15 +188,27 @@ function problemCard(host, tone, title, why, rows, line, empty) {
     c.appendChild(el("div", "faint sr-empty", empty));
   } else {
     var list = el("ul", "sr-list");
-    rows.slice(0, 8).forEach(function (r) {
+    rows.forEach(function (r, i) {
       var li = el("li");
       line(li, r);
+      if (i >= SHOWN) li.hidden = true;
       list.appendChild(li);
     });
     c.appendChild(list);
-    if (rows.length > 8) {
-      c.appendChild(el("div", "faint sr-more", "+ " + (rows.length - 8)
-        + " more under All searches"));
+    if (rows.length > SHOWN) {
+      // The rest open in place (Liwei, 2026-11-12), and close again.
+      var more = el("button", "sr-more", "Show " + (rows.length - SHOWN) + " more");
+      more.type = "button";
+      more.setAttribute("aria-expanded", "false");
+      more.addEventListener("click", function () {
+        var open = more.getAttribute("aria-expanded") !== "true";
+        Array.prototype.forEach.call(list.children, function (li, i) {
+          if (i >= SHOWN) li.hidden = !open;
+        });
+        more.setAttribute("aria-expanded", String(open));
+        more.textContent = open ? "Show fewer" : "Show " + (rows.length - SHOWN) + " more";
+      });
+      c.appendChild(more);
     }
   }
   host.appendChild(c);

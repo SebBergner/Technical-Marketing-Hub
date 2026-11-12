@@ -43,7 +43,7 @@ TREND_MIN_PEOPLE = 3
 #: claimed at all.
 TREND_MIN_TOTAL_PEOPLE = 10
 #: How many words get "finds now" (a catalogue search each, ~40 ms).
-MAX_LOOKUPS = 90
+MAX_LOOKUPS = 150
 LOOKUP_CACHE_SECONDS = 600
 OPEN_EVENTS = ("view", "preview", "download")
 
@@ -377,8 +377,8 @@ def insights(events: list[dict], since: datetime | None, until: datetime,
         "previous": _counts(previous) if since is not None else None,
         "over_time": {"by": "day" if daily else "week",
                       "buckets": [{"start": k, **v} for k, v in sorted(buckets.items())]},
-        "gaps": gaps[:20], "near_misses": misses[:20], "thin": thin[:20],
-        "not_opened": not_opened[:15],
+        # All of them: the page shows eight and opens the rest in place.
+        "gaps": gaps, "near_misses": misses, "thin": thin, "not_opened": not_opened,
         "top": top,
         "trending": {"enough_data": bool(enough), "rising": rising[:10], "new": new[:10]},
         "rows": table,

@@ -12,6 +12,31 @@ SharePoint 里的数据清理（kit 日期、Demo Type、标错的 LDK/VDK、旧
 
 ---
 
+## 团队效率（2026-11-11 Liwei 定）
+
+### 先做
+1. **Swap 后自动冒烟测试**：swap 之后跑一遍只读检查，包括版本号、资产总数和各类型数量、搜索、产品下拉、User guide 视频等，两分钟内出报告。Liwei 提供一个 API token。
+2. **内容管理页**：从 Admin 里分出来，单独成一页，专门放和内容有关的管理工具：
+   - 内容健康检查：没有 Demo Type、缺 Product/Segment、旧产品名、空文件夹、文件放在库的根目录、重复的压缩包，并按 Demo Owner 列出；
+   - 搜不到的报告：结果为 0 或很少的搜索词；
+   - 现在的 Content to review 等。
+
+### 之后再讨论：My page（较大）
+- 合并 "我的申请"：显示状态（New / Triaged / In production / Delivered），交付后附链接。
+- 合并 My feedback（现在在 Get help 下面）。
+- 自建 playlist 等原本在待办中的个人功能。
+- 先把上面两项做完，再回来设计。
+
+### 要先和 IT 沟通
+- **AI 补全 metadata 和搜索**：上传时根据标题、描述和视频转录，建议 Product、Segment、Video Type 和关键词；按视频内容搜索。要先确认公司的 AI 使用政策和数据流向（Azure OpenAI / Copilot）。
+- **Teams 里搜 Hub**：消息扩展或机器人，在对话里输入关键词就返回 demo 卡片。要 IT 允许发布 Teams 应用。
+
+### 暂不做
+- 每周新内容推送：新内容还不多。
+- 内容到期提醒：暂时不需要。
+
+---
+
 ## 压力测试反馈与 11/11 CK 汇报（11/08 整理）
 
 来源：11/06 压力测试时 Hub Tasks 收到的反馈（#3–#26，11/06 只读读取），以及 Elio 和 Liwei 11/06 的会议纪要。

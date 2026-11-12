@@ -103,6 +103,14 @@ function drawMenu(menu, assetId) {
   menu.appendChild(add);
 }
 
+/* Under the button, but never past the window's right edge (2026-11-12:
+ * full screen, the menu ran off the page). */
+function place(menu, button) {
+  menu.style.left = button.offsetLeft + "px";
+  var over = menu.getBoundingClientRect().right - (window.innerWidth - 12);
+  if (over > 0) menu.style.left = Math.max(0, button.offsetLeft - over) + "px";
+}
+
 /* The Save button; reads the demo on show from `current()`, since the
  * demo page's actions row is reused from one demo to the next. */
 function saveButton(current) {
@@ -120,9 +128,9 @@ function saveButton(current) {
     menu.setAttribute("role", "dialog");
     menu.setAttribute("aria-label", "Save to");
     b.parentNode.insertBefore(menu, b.nextSibling);
-    menu.style.left = b.offsetLeft + "px";        // under the button
     openMenu = menu;
     drawMenu(menu, asset.id);
+    place(menu, b);
     setTimeout(function () { document.addEventListener("click", outside, true); }, 0);
   });
   return b;
@@ -253,6 +261,7 @@ function draw(d) {
 
   var body = document.getElementById("plBody");
   body.innerHTML = "";
+  if (d.mine) body.appendChild(addBox(d));
   if (d.unavailable) {
     body.appendChild(el("div", "hub-pl__note", d.unavailable + (d.unavailable === 1
       ? " demo in this playlist is" : " demos in this playlist are")
@@ -304,8 +313,87 @@ function draw(d) {
   body.appendChild(list);
 }
 
-function load(id) {
-  return api("GET", "/api/me/playlists/" + encodeURIComponent(id)).then(draw)
+/* Find demos and add them, without leaving the playlist (Liwei,
+ * 2026-11-12), the way a music app suggests songs under a playlist. The
+ * Hub's own search, so close matches count ("lambo"). */
+function addBox(d) {
+  var box = el("div", "hub-pl__add");
+  var input = el("input");
+  input.type = "search";
+  input.placeholder = "Find demos to add…";
+  input.autocomplete = "off";
+  input.setAttribute("aria-label", "Find demos to add to this playlist");
+  box.appendChild(input);
+  var results = el("div", "hub-pl__results");
+  box.appendChild(results);
+  var inList = {};
+  d.items.forEach(function (a) { inList[a.id] = true; });
+  var timer = null;
+  var seq = 0;
+  input.addEventListener("input", function () {
+    clearTimeout(timer);
+    var q = input.value.trim();
+    timer = setTimeout(function () {
+      var mine = ++seq;
+      results.innerHTML = "";
+      if (q.length < 2) return;
+      api("GET", "/api/assets?limit=8&q=" + encodeURIComponent(q)).then(function (page) {
+        if (mine !== seq) return;
+        results.innerHTML = "";
+        if (!page.items.length) {
+          results.appendChild(el("div", "hub-me__empty", "No demo matches."));
+          return;
+        }
+        page.items.forEach(function (a) {
+          var row = el("div", "hub-pl__hit");
+          var pic = el("div", "hub-pl__hitpic");
+          if (a.thumbnail_url) pic.style.backgroundImage = "url(" + cardImage(a.thumbnail_url) + ")";
+          paintCoverInto(pic, a);
+          row.appendChild(pic);
+          var info = el("div", "hub-pl__hitinfo");
+          info.appendChild(el("div", "hub-pl__hittitle", a.title));
+          info.appendChild(el("div", "hub-pl__count", [TYPE_WORD[a.type] || a.type,
+            (a.product_families || []).join(", ")].filter(Boolean).join(" · ")));
+          row.appendChild(info);
+          var add = action(inList[a.id] ? "Added" : "Add", "btn-ghost hub-pl__addbtn",
+            function () {
+              add.disabled = true;
+              api("PUT", "/api/me/playlists/" + encodeURIComponent(d.id) + "/items/"
+                  + encodeURIComponent(a.id))
+                .then(function () {
+                  inList[a.id] = true;
+                  add.textContent = "Added";
+                  load(d.id, input.value);
+                })
+                .catch(function (err) { add.disabled = false; report(err.message, true); });
+            });
+          add.disabled = !!inList[a.id];
+          row.appendChild(add);
+          results.appendChild(row);
+        });
+      }).catch(function (err) { results.textContent = "Search failed: " + err.message; });
+    }, 250);
+  });
+  return box;
+}
+
+var TYPE_WORD = { video: "Video", ldk: "LDK", vdk: "VDK", vm: "Virtual Machine",
+                  cad_model: "CAD Dataset" };
+
+/* `keepSearch`: after adding from the search box, draw the list again
+ * with the same search still open, so several can be added in a row. */
+function load(id, keepSearch) {
+  return api("GET", "/api/me/playlists/" + encodeURIComponent(id)).then(function (d) {
+    draw(d);
+    if (keepSearch) {
+      var input = document.querySelector("#plBody .hub-pl__add input");
+      if (input) {
+        input.value = keepSearch;
+        input.dispatchEvent(new Event("input"));
+        input.focus();
+      }
+    }
+  })
     .catch(function (err) {
       document.getElementById("plTitle").textContent = "Playlist";
       document.getElementById("plSub").textContent = "";

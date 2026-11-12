@@ -14,6 +14,8 @@ import { closeHelp } from "./report.js";
 import { closeGuide } from "./guide.js";
 import { closeAdvancedSearch } from "./search.js";
 import { closeUpload } from "./upload.js";
+import { closeMyHub } from "./me.js";
+import { closePlaylist } from "./playlists.js";
 
 /* ---------------------------------------------------------- the left nav */
 
@@ -132,8 +134,10 @@ function exitOverlays() {
   closeHelp();
   closeGuide();
   closeUpload();
+  closeMyHub();          // My Hub and a playlist (2026-11-12): Home left half of
+  closePlaylist();       // My Hub showing when these two were missing here
   // The hash has to follow, or a refresh reopens the page we just left.
-  if (/^#\/(asset|search|activity|review|help|guide|upload)/.test(location.hash || "")) {
+  if (/^#\/(asset|search|activity|review|help|guide|upload|me|playlist)/.test(location.hash || "")) {
     history.pushState(null, "", location.pathname + location.search);
     return;
   }

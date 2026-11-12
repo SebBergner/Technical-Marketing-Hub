@@ -55,8 +55,19 @@ def _owner(r: dict) -> str | None:
     return r.get("demo_owner_name") or r.get("demo_owner") or r.get("creator")
 
 
+def _library(asset_id: str) -> str:
+    """Where a SharePoint demo lives, from its id's prefix (sync.py,
+    video_sync.py, demo_pages.py, vm_pages.py)."""
+    for prefix, name in (("gxc-", "GXC Video"), ("video-", "Demo Video"),
+                         ("page-", "Demo page"), ("vm-", "Virtual machines")):
+        if asset_id.startswith(prefix):
+            return name
+    return "Demo Catalog"
+
+
 def _row(r: dict, **extra) -> dict:
     return {"asset_id": r.get("id"), "title": r.get("title"), "type": r.get("type"),
+            "library": _library(r.get("id") or ""),
             "source": r.get("source"), "segment": r.get("segment"),
             "owner": _owner(r), "web_url": r.get("web_url"), **extra}
 
@@ -88,8 +99,10 @@ def checks(repo: AssetRepository = Depends(get_repo)):
     for r in records.values():
         if r.get("source") != "sharepoint":
             continue            # Consensus and the page sources are edited where they live
-        # A VM is a machine to book, not files (vm_pages.py): never "empty".
-        if not r.get("resource_count") and r.get("type") != "vm":
+        # A VM is a machine to book, and a demo known only from its SharePoint
+        # page has no folder (demo_pages.py): neither is ever "empty".
+        library = _library(r.get("id") or "")
+        if not r.get("resource_count") and r.get("type") != "vm"                 and library != "Demo page":
             empty.append(_row(r))
         if not r.get("products"):
             no_product.append(_row(r))
@@ -109,15 +122,68 @@ def checks(repo: AssetRepository = Depends(get_repo)):
 
 
 # ───────────────────────────────────────────────────────────── searches
+#: A recorded search's filters: (query parameter, AssetQuery field, words).
+_FILTERS = (("type", "types", "Type"), ("umbrella", "umbrella_families", "Product"),
+            ("family", "product_families", "Product"), ("segment", "segments", "Segment"),
+            ("stage", "funnel_stages", "Funnel stage"), ("language", "languages", "Language"),
+            ("published", "published", "Published"), ("depth", "content_depths", "Video type"),
+            ("tag", "tags", "Tag"), ("customer_facing", None, "Customer facing"),
+            ("archived", None, "Archived"))
+_TYPE_WORDS = {"video": "Video", "ldk": "LDK", "vdk": "VDK", "vm": "Virtual Machine",
+               "cad_model": "CAD Dataset"}
+
+
+def _filters_key(filters: dict | None) -> tuple:
+    return tuple(sorted((k, tuple(sorted(v))) for k, v in (filters or {}).items() if v))
+
+
+def _filters_words(key: tuple) -> str | None:
+    """{"type": ["vm"], "family": ["Windchill"]} -> "Type: Virtual Machine ·
+    Product: Windchill"; None for a plain search."""
+    words = dict((k, w) for k, _, w in _FILTERS)
+    parts = []
+    for k, values in key:
+        shown = [_TYPE_WORDS.get(v, v) if k == "type" else v for v in values]
+        parts.append(f"{words.get(k, k)}: {', '.join(shown)}")
+    return " · ".join(parts) or None
+
+
+def _finds_now(repo: AssetRepository, q: str, key: tuple) -> int | None:
+    """What the same words and filters find today."""
+    from backend.repositories.base import AssetQuery
+    from backend.models import video_type_filter
+    query = AssetQuery(text=q, limit=1)
+    fields = {k: f for k, f, _ in _FILTERS}
+    for k, values in key:
+        field_name = fields.get(k)
+        if k == "customer_facing":
+            query.customer_facing = values[0] == "true"
+        elif k == "depth":
+            query.content_depths = video_type_filter(list(values))
+        elif field_name:
+            setattr(query, field_name, list(values))
+    try:
+        return repo.list(query).total
+    except Exception:                                      # noqa: BLE001
+        return None
+
+
 @router.get("/searches")
 def searches(since: str | None = None, until: str | None = None,
              repo: AssetRepository = Depends(get_repo)):
     """What people searched for and found nothing or almost nothing, in a
     window -- the most direct evidence of what the catalogue is missing.
-    Grouped by the words as typed, ignoring case and spacing; how many
-    people searched for each, never who."""
+
+    One row per words and filters together (Liwei, 2026-11-12): "Bobcat"
+    finds 11 demos, but nothing under the Virtual Machine type, and that is a
+    different question. Words are grouped ignoring case and spacing; how many
+    people asked, never who. Searches recorded before 2026-11-12 do not say
+    which filters were on, so they read as plain ones, and every row also
+    says what it finds today (`finds_now`): the page sets aside the rows
+    that find plenty now -- a filter was on then, or content came since.
+    """
     from backend.services.usage import events as _events
-    tally: dict[str, dict] = {}
+    tally: dict[tuple, dict] = {}
     total = 0
     for e in _events(repo, since, until):
         if e.get("event") != "search":
@@ -126,15 +192,15 @@ def searches(since: str | None = None, until: str | None = None,
         if not q:
             continue
         total += 1
-        n = e.get("results") or 0
-        row = tally.setdefault(q.lower(), {"q": q, "times": 0, "zero": 0, "few": 0,
-                                           "people": set(), "last_at": "", "best": 0})
+        key = _filters_key(e.get("filters"))
+        row = tally.setdefault((q.lower(), key), {"q": q, "key": key, "times": 0, "zero": 0,
+                                                   "few": 0, "people": set(), "last_at": ""})
         row["times"] += 1
+        n = e.get("results") or 0
         if n == 0:
             row["zero"] += 1
         elif n <= FEW_RESULTS:
             row["few"] += 1
-        row["best"] = max(row["best"], n)
         if e.get("user"):
             row["people"].add(e["user"])
         row["last_at"] = max(row["last_at"], e.get("at") or "")
@@ -142,10 +208,12 @@ def searches(since: str | None = None, until: str | None = None,
     for row in tally.values():
         if row["zero"] + row["few"] == 0:
             continue
-        rows.append({"q": row["q"], "times": row["times"], "zero_results": row["zero"],
-                     "few_results": row["few"], "most_results": row["best"],
+        rows.append({"q": row["q"], "filters": _filters_words(row["key"]),
+                     "times": row["times"], "zero_results": row["zero"],
+                     "few_results": row["few"], "finds_now": _finds_now(repo, row["q"], row["key"]),
                      "people": len(row["people"]), "last_at": row["last_at"][:10] or None})
-    rows.sort(key=lambda r: (-(r["zero_results"] + r["few_results"]), -r["people"], r["q"].lower()))
+    rows.sort(key=lambda r: (-r["zero_results"], -r["few_results"], -r["people"],
+                             r["q"].lower(), r["filters"] or ""))
     return {"searches": total, "few_results_max": FEW_RESULTS, "rows": rows}
 
 

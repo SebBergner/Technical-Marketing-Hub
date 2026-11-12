@@ -33,6 +33,8 @@ def client(tmp_path, monkeypatch):
         {"id": "full", "type": "ldk", "title": "Full Kit", "products": ["Creo Parametric"],
          "segment": "CAD", "resource_count": 2, "demo_owner_name": "Ann Lee",
          "resources": [_res("Foot Bath.zip"), _res("Foot Bath.rar")]},
+        {"id": "page-only", "type": "vdk", "title": "Page Only", "products": ["Creo Parametric"],
+         "segment": "CAD", "resource_count": 0, "resources": []},
         {"id": "empty", "type": "vdk", "title": "Empty Kit", "products": [], "segment": None,
          "resource_count": 0, "resources": []},
         {"id": "cad", "type": "cad_model", "title": "Bracket", "products": ["Creo Parametric"],
@@ -49,6 +51,9 @@ def client(tmp_path, monkeypatch):
         "loose_files": [{"name": "stray.rar"}]})
     for q, n in (("ignition", 0), ("Ignition ", 0), ("ignition", 1), ("creo", 40), ("mbd", 2)):
         repo.record_usage_event("search", q=q, results=n, user="p@ptc.com")
+    # Under a filter: counted, never as finding little (Bobcat, 2026-11-12).
+    repo.record_usage_event("search", q="Full Kit", results=0, filters={"type": ["vm"]},
+                            user="p@ptc.com")
     access.create_group("Keepers", "", ["view_hub", "maintain_content"], ["keeper@ptc.com"], "t")
     access.create_group("Viewers", "", ["view_hub", "view_admin"], ["viewer@ptc.com"], "t")
     return TestClient(app, base_url="http://localhost")
@@ -64,7 +69,8 @@ def test_the_checks(client):
     d = client.get("/api/content-health/checks", headers=KEEPER).json()
     assert [f["name"] for f in d["skipped_folders"]] == ["Many", "Few"], "most files first"
     assert [f["name"] for f in d["loose_files"]] == ["stray.rar"]
-    assert [r["asset_id"] for r in d["empty"]] == ["empty"]
+    assert [r["asset_id"] for r in d["empty"]] == ["empty"], "a page-only demo has no folder"
+    assert d["empty"][0]["library"] == "Demo Catalog"
     assert [r["asset_id"] for r in d["no_product"]] == ["empty"]
     assert [r["asset_id"] for r in d["no_segment"]] == ["empty"], "a CAD dataset has no Segment"
     archives = d["same_name_archives"]
@@ -74,9 +80,13 @@ def test_the_checks(client):
 
 def test_searches_that_found_little(client):
     d = client.get("/api/content-health/searches", headers=KEEPER).json()
-    assert d["searches"] == 5
-    rows = {r["q"].lower(): r for r in d["rows"]}
-    assert set(rows) == {"ignition", "mbd"}, "creo found plenty"
+    assert d["searches"] == 6
+    rows = {(r["q"].lower(), r["filters"]): r for r in d["rows"]}
+    assert set(rows) == {("ignition", None), ("mbd", None),
+                         ("full kit", "Type: Virtual Machine")}, "creo found plenty"
+    assert rows[("ignition", None)]["finds_now"] == 0
+    assert rows[("full kit", "Type: Virtual Machine")]["finds_now"] == 0
+    rows = {r["q"].lower(): r for r in d["rows"] if not r["filters"]}
     assert (rows["ignition"]["times"], rows["ignition"]["zero_results"],
             rows["ignition"]["few_results"], rows["ignition"]["people"]) == (3, 2, 1, 1)
     assert "p@ptc.com" not in json.dumps(d)
@@ -99,3 +109,14 @@ def test_the_admin_page_no_longer_serves_them(client):
 def test_the_page_is_served(client):
     r = client.get("/content-health", headers=KEEPER)
     assert r.status_code == 200 and "Content health" in r.text
+
+
+def test_the_hub_says_when_a_search_was_filtered(client, tmp_path):
+    for body in ({"q": "Bobcat", "results": 0,
+                  "filters": {"type": ["vm"], "sort": ["title"], "family": ["x" * 99]}},
+                 {"q": "Bobcat", "results": 11}):
+        assert client.post("/api/assets/search-event", json=body,
+                           headers=KEEPER).status_code == 204
+    events = [e for e in JsonAssetRepository(str(tmp_path)).usage_events()
+              if e.get("q") == "Bobcat"]
+    assert [e.get("filters") for e in events] == [{"type": ["vm"], "family": ["x" * 60]}, None]

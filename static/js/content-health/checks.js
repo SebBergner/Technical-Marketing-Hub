@@ -22,7 +22,8 @@ var CHECKS = [
    "Move it into its demo's folder; the file keeps its dates."],
   ["empty", "Demos with no files",
    "Listed, but there is nothing to preview or download. Its date falls back to the folder's.",
-   "Upload the files, or archive the demo."],
+   "Upload the files, or archive the demo. Demos known only from a SharePoint page, and "
+   + "virtual machines, are not counted."],
   ["no_product", "No product",
    "Not under any product in the navigation, and never among related demos by product.",
    "Fill in Product in SharePoint (or Edit metadata on the demo's page)."],
@@ -63,7 +64,7 @@ function table(key, rows) {
   var hr = t.createTHead().insertRow();
   var heads = key === "skipped_folders" ? ["Folder", "Files", "Created", "SharePoint"]
     : key === "loose_files" ? ["File", "Size", "Last changed", "SharePoint"]
-    : ["Demo", "Type", "Owner"].concat(key === "same_name_archives" ? ["Files"] : [])
+    : ["Demo", "Type", "Library", "Owner"].concat(key === "same_name_archives" ? ["Files"] : [])
         .concat(["SharePoint"]);
   heads.forEach(function (h) { hr.appendChild(el("th", null, h)); });
   var tb = t.createTBody();
@@ -84,6 +85,7 @@ function table(key, rows) {
     } else {
       tr.insertCell().appendChild(demoLink(r.asset_id, r.title));
       tr.insertCell().textContent = TYPE_WORD[r.type] || r.type || "—";
+      tr.insertCell().textContent = r.library || "—";
       var o = tr.insertCell();
       o.textContent = r.owner || "—";
       if (!r.owner) o.className = "faint";

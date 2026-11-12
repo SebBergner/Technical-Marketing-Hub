@@ -910,7 +910,15 @@ async function applyFilters() {
   var none = document.querySelector(".hub-noresults");
   if (none) none.classList.toggle("show", page.total === 0);
 
-  noteSearch(val("hubSearchInput"), page.total);
+  // What else narrowed it, with the words (Liwei, 2026-11-12: "Bobcat" read
+  // as finding almost nothing because a filter was on; which filter is part
+  // of the question).
+  var filters = {};
+  params.forEach(function (v, k) {
+    if (k === "q" || k === "include_older_vms") return;
+    (filters[k] = filters[k] || []).push(v);
+  });
+  noteSearch(val("hubSearchInput"), page.total, filters);
 }
 
 /* What somebody searched for, once they have stopped typing.
@@ -928,7 +936,7 @@ async function applyFilters() {
 var searchNoteTimer = null;
 var lastNotedSearch = "";
 
-function noteSearch(query, total) {
+function noteSearch(query, total, filters) {
   query = (query || "").trim();
   clearTimeout(searchNoteTimer);
   // Two characters is where the grid itself starts searching; below that
@@ -939,7 +947,7 @@ function noteSearch(query, total) {
     fetch("/api/assets/search-event", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ q: query, results: total }),
+      body: JSON.stringify({ q: query, results: total, filters: filters || {} }),
     }).catch(function (err) {
       console.debug("[hub-api] search not recorded", err);
     });

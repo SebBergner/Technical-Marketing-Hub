@@ -333,6 +333,26 @@ def _record(repo: AssetRepository, event: str, asset_id: str | None = None,
 class SearchEventIn(BaseModel):
     q: str
     results: int
+    #: What else narrowed it (2026-11-12), as the query has it: {"type":
+    #: ["vm"], "family": ["Windchill"]}. Content health -> Searches shows a
+    #: search under filters apart from the plain one: "Bobcat" finds 11, but
+    #: none of them under the VM type.
+    filters: dict[str, list[str]] | None = None
+
+
+#: The filters a search may be recorded with, and no more of each than this.
+SEARCH_FILTER_KEYS = frozenset({"type", "family", "umbrella", "segment", "stage", "language",
+                                "published", "depth", "customer_facing", "tag", "archived"})
+
+
+def _search_filters(raw: dict | None) -> dict | None:
+    out = {}
+    for key, values in (raw or {}).items():
+        if key in SEARCH_FILTER_KEYS:
+            kept = [str(v)[:60] for v in (values or [])[:5] if str(v).strip()]
+            if kept:
+                out[key] = kept
+    return out or None
 
 
 @router.post("/search-event", status_code=204)
@@ -352,7 +372,8 @@ def record_search(body: SearchEventIn, repo: AssetRepository = Depends(get_repo)
     query = (body.q or "").strip()
     if not query:
         return
-    _record(repo, "search", None, user, q=query[:120], results=max(0, body.results))
+    _record(repo, "search", None, user, q=query[:120], results=max(0, body.results),
+            filters=_search_filters(body.filters))
 
 
 @router.post("/{asset_id}/consensus-preview", status_code=204)

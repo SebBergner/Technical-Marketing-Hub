@@ -211,7 +211,7 @@ async function runAdvancedSearch(q, more) {
   // Counted like the ordinary search, once typing settles (Liwei,
   // 2026-11-09: Advanced Search was never counted, so the usage contest
   // under-counted whoever used it). "Show more" is the same search.
-  if (!more) noteSearch(q, page.total);
+  if (!more) noteSearch(q, page.total, advState.type ? { type: [advState.type] } : {});
   page.items.forEach(function (hit) {
     advState.items.push(hit);
     list.appendChild(renderAdvancedHit(hit, q));

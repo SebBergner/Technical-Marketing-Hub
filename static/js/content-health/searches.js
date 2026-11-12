@@ -9,6 +9,8 @@ import { $, el } from "../admin/util.js";
 
 var RANGES = [["30d", "30 days", 30], ["90d", "90 days", 90], ["all", "All time", null]];
 var range = "90d";
+var hideFound = true;          // set aside words that find plenty today
+var last = null;
 
 function since() {
   var r = RANGES.filter(function (x) { return x[0] === range; })[0];
@@ -29,30 +31,41 @@ function renderRanges() {
 }
 
 function render(d) {
+  last = d;
   var host = $("srBody");
   host.innerHTML = "";
+  var max = d.few_results_max;
+  var rows = d.rows.filter(function (r) {
+    return !hideFound || r.finds_now === null || r.finds_now <= max;
+  });
+  var set = d.rows.length - rows.length;
   $("srIntro").textContent = d.searches.toLocaleString() + " searches in this period; "
-    + d.rows.length + " different words found " + d.few_results_max + " demos or fewer at "
-    + "least once. Worth a demo, a better title or description, or a keyword.";
-  if (!d.rows.length) { host.appendChild(el("div", "faint", "Every search found something.")); return; }
+    + d.rows.length + " searches, words with their filters, found " + max + " demos or fewer "
+    + "at least once" + (set ? " (" + set + " of them find more today and are set aside)" : "")
+    + ". Worth a demo, a better title, description or keyword, or a look at how the demos "
+    + "are tagged. Searches before 2026-11-12 did not record their filters.";
+  if (!rows.length) { host.appendChild(el("div", "faint", "Every search found something.")); return; }
   var t = el("table");
   var hr = t.createTHead().insertRow();
-  [["Searched for"], ["Times", "r"], ["Nothing found", "r"], ["1–" + d.few_results_max + " found", "r"],
-   ["People", "r"], ["Last"], [""]].forEach(function (h) {
+  [["Searched for"], ["With filters"], ["Times", "r"], ["Nothing found", "r"], ["1–" + max + " found", "r"],
+   ["Finds today", "r"], ["People", "r"], ["Last"], [""]].forEach(function (h) {
     hr.appendChild(el("th", h[1] || null, h[0]));
   });
   var tb = t.createTBody();
-  d.rows.forEach(function (r) {
+  rows.forEach(function (r) {
     var tr = tb.insertRow();
     tr.insertCell().textContent = r.q;
-    [r.times, r.zero_results, r.few_results, r.people].forEach(function (n) {
+    var f = tr.insertCell();
+    f.textContent = r.filters || "—";
+    if (!r.filters) f.className = "faint";
+    [r.times, r.zero_results, r.few_results, r.finds_now, r.people].forEach(function (n) {
       var c = tr.insertCell();
       c.className = "r num" + (n ? "" : " faint");
-      c.textContent = n;
+      c.textContent = n === null || n === undefined ? "—" : n;
     });
     tr.insertCell().textContent = r.last_at || "—";
     var a = el("a", null, "Try it");
-    a.href = "/#/search/" + encodeURIComponent(r.q);
+    a.href = "/#/search/" + encodeURIComponent(r.q);   // the words; set filters there
     a.target = "_blank";
     a.rel = "noopener";
     a.title = "Search the Hub for this now";
@@ -64,6 +77,12 @@ function render(d) {
 }
 
 function loadSearches() {
+  var box = $("srHideFound");
+  if (box && !box.dataset.wired) {
+    box.dataset.wired = "1";
+    box.checked = hideFound;
+    box.addEventListener("change", function () { hideFound = box.checked; if (last) render(last); });
+  }
   renderRanges();
   var s = since();
   return fetch("/api/content-health/searches" + (s ? "?since=" + encodeURIComponent(s) : ""))

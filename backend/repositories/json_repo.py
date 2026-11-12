@@ -745,6 +745,19 @@ class JsonAssetRepository(AssetRepository):
 
         return [r for r in rows if keep(r)]
 
+    def summaries(self, ids: list[str]) -> list[AssetSummary]:
+        """The cards for these demos, in this order, leaving out any this
+        person cannot see now -- hidden, archived, GXC without access, gone
+        (My Hub, 2026-11-12)."""
+        wanted = {i: n for n, i in enumerate(ids)}
+        rows = [r for r in self._rows(AssetQuery(limit=10 ** 6, include_older_vms=True))
+                if r["id"] in wanted]
+        rows.sort(key=lambda r: wanted[r["id"]])
+        stats = self._load("stats")
+        indexed = set(self._load("roadmap"))
+        return [AssetSummary(**self._common(r, stats), has_roadmap=r["id"] in indexed)
+                for r in rows]
+
     def count(self, query: AssetQuery) -> int:
         """How many demos a query finds, without ordering or building them:
         for counts only (Content health -> Searches, 2026-11-12)."""

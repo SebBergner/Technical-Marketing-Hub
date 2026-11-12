@@ -137,7 +137,7 @@ function sentNote(answer) {
   box.innerHTML = '<svg class="orion-ico orion-ico--sm"><use href="#i-check"/></svg>';
   box.appendChild(el("span", null, "Sent to the " + (answer.segment === "General"
     ? "Hub team" : answer.segment + " owners") + ". "));
-  var a = el("a", null, "See it under My feedback");
+  var a = el("a", null, "See it on My Hub");
   a.href = "#/help";
   box.appendChild(a);
   return box;
@@ -203,8 +203,8 @@ function buildPage() {
     +   'For a problem with one demo, use Share feedback on its page.</div>'
     + '</div></div>'
     + '<div class="hub-rpt"><section class="hub-rpt__card" id="hubHelpForm"></section>'
-    + '<section class="hub-rpt__card"><h2 class="hub-rpt__h">My feedback</h2>'
-    + '<div id="hubMyReports"></div></section></div>';
+    + '<p class="hub-rpt__moved">What you have reported, and where it stands, is on '
+    + '<a href="#/me">My Hub</a>.</p></div>';
   var anchor = document.getElementById("videoPreviewPage");
   if (anchor) anchor.parentNode.insertBefore(page, anchor);
   else document.body.appendChild(page);
@@ -227,7 +227,6 @@ function openHelp() {
   page.classList.add("active");
   markNav(true);
   freshForm();
-  loadMine();
 }
 
 function freshForm() {
@@ -240,7 +239,6 @@ function freshForm() {
     again.type = "button";
     again.addEventListener("click", freshForm);
     host.appendChild(again);
-    loadMine();
   }));
 }
 
@@ -260,8 +258,10 @@ function closeHelp() {
 var STATUS_CLASS = { Open: "open", Done: "done", Rejected: "closed", Withdrawn: "closed",
                      Cancelled: "closed" };
 
-function loadMine() {
-  var host = document.getElementById("hubMyReports");
+/* My feedback (on My Hub since 2026-11-12; under Get help before): what
+ * this person reported and where it stands, into `host`. */
+function renderMyFeedback(host) {
+  if (!host) return;
   if (!host.childNodes.length) host.textContent = "Loading…";
   fetch("/api/support/reports/mine").then(function (r) {
     if (!r.ok) throw new Error("HTTP " + r.status);
@@ -288,7 +288,7 @@ function loadMine() {
       if (r.asset_id) {
         var a = el("a", null, r.title || r.asset_id);
         a.href = "#/asset/" + encodeURIComponent(r.asset_id);
-        a.addEventListener("click", function () { window.hubDetailReturn = "#/help"; });
+        a.addEventListener("click", function () { window.hubDetailReturn = "#/me"; });
         about.appendChild(a);
       } else {
         about.appendChild(el("b", null, "Get help"));
@@ -300,7 +300,7 @@ function loadMine() {
       st.appendChild(el("span", "hub-rpt__status hub-rpt__status--"
         + (STATUS_CLASS[r.status] || "open"), r.status || "Open"));
       // Your own, while still open (Serge #24, 2026-11-08).
-      if ((r.status || "Open") === "Open") st.appendChild(withdrawButton(r));
+      if ((r.status || "Open") === "Open") st.appendChild(withdrawButton(r, host));
       tr.appendChild(st);
       body.appendChild(tr);
     });
@@ -315,7 +315,7 @@ function loadMine() {
   });
 }
 
-function withdrawButton(r) {
+function withdrawButton(r, host) {
   var b = el("button", "btn-ghost hub-rpt__withdraw", "Withdraw");
   b.type = "button";
   b.title = "Take this back: it is closed as Withdrawn";
@@ -329,7 +329,7 @@ function withdrawButton(r) {
           if (!res.ok) throw new Error(d.detail || "HTTP " + res.status);
         });
       })
-      .then(loadMine)
+      .then(function () { renderMyFeedback(host); })
       .catch(function (err) {
         b.disabled = false;
         complain("Could not withdraw it: " + err.message, true);
@@ -370,4 +370,4 @@ function markNav(on) {
     .forEach(function (n) { n.classList.remove("orion-navitem--active", "is-active"); });
 }
 
-export { addHelpNav, closeHelp, openHelp, openReportModal };
+export { addHelpNav, closeHelp, openHelp, openReportModal, renderMyFeedback };

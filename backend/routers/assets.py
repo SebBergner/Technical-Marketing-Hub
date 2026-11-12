@@ -396,6 +396,13 @@ def record_view(asset_id: str, repo: AssetRepository = Depends(get_repo),
     if repo.get(asset_id) is None:
         raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
     _record(repo, "view", asset_id, user)
+    # My Hub's Recently viewed (2026-11-12), partners' too.
+    from backend.services import my_hub
+    if key := my_hub.user_key(user):
+        try:
+            my_hub.note_view(key, asset_id)
+        except OSError:
+            log.warning("could not note a view for My Hub", exc_info=True)
 
 
 def _require_partner_access(asset_id: str, repo: AssetRepository, user: CurrentUser) -> None:

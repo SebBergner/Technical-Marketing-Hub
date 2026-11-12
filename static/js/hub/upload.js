@@ -153,13 +153,33 @@ function render() {
   });
 }
 
-/* ── My uploads ───────────────────────────────────────────────────────── */
+/* ── My demos ─────────────────────────────────────────────────────────
+ * Every demo this person created is listed on My Hub (2026-11-12). This
+ * page keeps only the ones waiting on them -- an upload to continue, one
+ * sent back to fix -- with the buttons that do it; My Hub links here. */
+var ACTIONABLE = { uploading: true, sent_back: true };
+
 function loadMine() {
-  var box = document.getElementById("hubUpMine");
-  api("GET", "/api/uploads?mine=true&limit=20").then(function (items) {
+  renderMyDemos(document.getElementById("hubUpMine"), true);
+}
+
+function renderMyDemos(box, here) {
+  if (!box) return;
+  api("GET", "/api/uploads?mine=true&limit=50").then(function (items) {
     box.innerHTML = "";
-    box.appendChild(el("h3", "hub-up__h", "My demos"));
-    if (!items.length) {
+    if (here) {
+      items = items.filter(function (r) { return ACTIONABLE[r.status]; });
+      box.hidden = !items.length;
+      if (!items.length) return;
+      box.appendChild(el("h3", "hub-up__h", "Waiting on you"));
+      var all = el("p", "hub-up__muted");
+      all.appendChild(document.createTextNode("Everything you created is on "));
+      var link = el("a", null, "My Hub");
+      link.href = "#/me";
+      all.appendChild(link);
+      all.appendChild(document.createTextNode("."));
+      box.appendChild(all);
+    } else if (!items.length) {
       box.appendChild(el("p", "hub-up__muted", "Nothing created yet."));
       return;
     }
@@ -180,17 +200,22 @@ function loadMine() {
       var right = el("div", "hub-up__mineacts");
       right.appendChild(el("span", "hub-up__status hub-up__status--" + r.status,
                            STATUS_WORD[r.status] || r.status));
-      if (r.status === "uploading") {
+      if (!here && ACTIONABLE[r.status]) {
+        var go = el("a", "hub-up__go", r.status === "uploading" ? "Continue" : "Fix and publish");
+        go.href = "#/upload";
+        right.appendChild(go);
+      }
+      if (here && r.status === "uploading") {
         var cont = button("Continue");
         cont.addEventListener("click", function () { continueUpload(r); });
         right.appendChild(cont);
       }
-      if (r.status === "sent_back") {
+      if (here && r.status === "sent_back") {
         var fix = button("Fix and publish");
         fix.addEventListener("click", function () { resubmitForm(r); });
         right.appendChild(fix);
       }
-      if (r.status === "uploading" || r.status === "sent_back") {
+      if (here && (r.status === "uploading" || r.status === "sent_back")) {
         var stop = button("Cancel");
         stop.addEventListener("click", function () {
           if (stop.dataset.armed !== "1") {
@@ -971,4 +996,4 @@ function markNav(on) {
     });
 }
 
-export { addUploadNav, closeUpload, openUpload };
+export { addUploadNav, closeUpload, openUpload, renderMyDemos };

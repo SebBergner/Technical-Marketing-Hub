@@ -33,6 +33,7 @@ import {
 import { wireShareModal } from "./share.js";
 import { addUploadNav } from "./upload.js";
 import { addHelpNav } from "./report.js";
+import { addMyHubNav } from "./me.js";
 import { addGuideButton } from "./guide.js";
 import { askDisclaimerIfDue } from "./disclaimer.js";
 import { askWelcomeIfDue } from "./welcome.js";
@@ -168,6 +169,7 @@ async function load() {
   buildSidebarFoot();
   addUploadNav();
   addHelpNav();
+  addMyHubNav();
   addGuideButton();
   // A shared link's filters (/?family=Creo&type=video): last, once every
   // control has its options.

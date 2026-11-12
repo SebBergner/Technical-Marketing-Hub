@@ -239,3 +239,31 @@ def _library(client: GraphClient, site_id: str, name: str) -> str:
     raise RequestWriteError(
         f"The '{name}' document library was not found on this site, so there "
         f"is nowhere to put attachments.")
+
+
+# ------------------------------------------------------------- reading back
+
+#: The Status column's choices, in the order a request moves through them
+#: (Liwei, 2026-11-12). Declined ends it as Delivered does.
+STATUSES = ("New", "Triaged", "Scoped", "In production", "Delivered", "Declined")
+
+
+def read_requests(client: GraphClient, site_id: str) -> list[dict]:
+    """Every row of the list, as My Hub shows a request: what was asked, its
+    status, and what was delivered. The team sets Status and DeliveredAsset
+    in SharePoint; this only reads them. The list holds a few hundred rows
+    at most, so it is read whole."""
+    list_ref = LIST_NAME.replace(" ", "%20")
+    rows = []
+    for item in client._paged(f"/sites/{site_id}/lists/{list_ref}/items", {
+            "$expand": "fields($select=Title,RequestID,Status,Requester,AssetType,Products,"
+                       "Brief,DeliveredAsset,Created,Modified)",
+            "$select": "id", "$top": "500"}):
+        f = item.get("fields") or {}
+        rows.append({"item_id": item.get("id"), "request_id": f.get("RequestID"),
+                     "title": f.get("Title"), "status": f.get("Status") or "New",
+                     "requester": (f.get("Requester") or "").strip().lower(),
+                     "asset_type": f.get("AssetType"), "products": f.get("Products"),
+                     "brief": f.get("Brief"), "delivered": f.get("DeliveredAsset"),
+                     "created_at": f.get("Created"), "modified_at": f.get("Modified")})
+    return rows

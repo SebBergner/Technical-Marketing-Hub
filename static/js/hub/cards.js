@@ -9,6 +9,7 @@ import { dateLabel, durationLabel, LANGUAGE_LABEL, pill } from "./util.js";
 import { familyDisplayName } from "./nav.js";
 import { openAssetDetail } from "./detail.js";
 import { openShareFor } from "./share.js";
+import { starButton } from "./favorites.js";
 
 /* ---------------------------------------------------------------- mapping */
 
@@ -179,6 +180,8 @@ function cardShell(a) {
   chip.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#' + spec[0] + '"/></svg>';
   chip.appendChild(document.createTextNode(spec[1]));
   thumb.appendChild(chip);
+  // Favourite (A3, 2026-11-12): top right of the picture; listed on My Hub.
+  if (a.id) thumb.appendChild(starButton(a.id, "hub-star--card"));
 
   /* A Consensus record IS a recording, so it plays -- in the Consensus
    * player, where the video lives. A SharePoint kit is a folder of files

@@ -10,6 +10,7 @@ import {
   report, setText
 } from "./util.js";
 import { hubPermissions } from "./permissions.js";
+import { starButton } from "./favorites.js";
 import { editButton } from "./edit.js";
 import {
   buildCard, consensusUrl, embedInlinePlayer, noteConsensusPreview, paintCoverInto, previewUrl,
@@ -24,6 +25,7 @@ import { closeUpload, openUpload } from "./upload.js";
 import { closeReview, openReview } from "./review.js";
 import { closeHelp, openHelp, openReportModal } from "./report.js";
 import { closeGuide, openGuide } from "./guide.js";
+import { closeMyHub, openMyHub } from "./me.js";
 import {
   advancedHash, advState, closeAdvancedSearch, fileTotalsText,
   openAdvancedSearch
@@ -160,6 +162,9 @@ async function openAssetDetail(id, fileItemId, linkToken) {
   if (!page) return;
 
   setText("vpTitle", asset.title);
+  // Beside the title, as on its card (A3, 2026-11-12).
+  var titleEl = document.getElementById("vpTitle");
+  if (titleEl && asset.id) titleEl.appendChild(starButton(asset.id, "hub-star--title"));
   // Same call as the card's duration-chip, same reason to skip it for LDK
   // -- see cardShell().
   setText("vpDuration", asset.type === "ldk" ? "" : durationLabel(asset.duration_seconds));
@@ -1624,6 +1629,19 @@ function routeFromHash() {
       && typeof window.closeRequestView === "function") {
     window.closeRequestView();
   }
+  // My Hub (A3, 2026-11-12).
+  if (hash === "#/me") {
+    closeFilePreview(false);
+    closeAssetDetail();
+    closeUpload();
+    closeActivity();
+    closeReview();
+    closeHelp();
+    closeGuide();
+    openMyHub();
+    return;
+  }
+  closeMyHub();
   if (hash === "#/guide") {
     closeFilePreview(false);
     closeAssetDetail();

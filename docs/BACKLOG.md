@@ -27,11 +27,15 @@ SharePoint 里的数据清理（kit 日期、Demo Type、标错的 LDK/VDK、旧
    - 排序时完全匹配优先；
    - 用 production 的搜索记录对比改动前后的 0 结果比例。
 
-### 之后再讨论：My page（较大）
-- 合并 "我的申请"：显示状态（New / Triaged / In production / Delivered），交付后附链接。
-- 合并 My feedback（现在在 Get help 下面）。
-- 自建 playlist 等原本在待办中的个人功能。
-- 先把上面两项做完，再回来设计。
+### My Hub（11/12 Liwei 定，替代原 A3 / "My page"）
+- **第 1 期（11/12 已做，本地）**：侧边栏最上方新增 "My Hub"（#/me），只有本人能看到。包括：
+  - Recently viewed：最近看过的 20 个，partner 也有；
+  - Favorites：卡片右上角和 demo 页标题旁都有星标；
+  - My requests：从 Demo Requests 列表按 Requester 读回状态，6 个状态依次是 New、Triaged、Scoped、In production、Delivered、Declined；交付后显示 DeliveredAsset；
+  - My feedback：从 Get help 搬过来；
+  - My demos：Create New Demo 页面只保留"等你处理"的条目。
+- **第 2 期**：播放列表。demo 页加 Save 菜单（收藏或加入播放列表），可以新建、改名、排序、删除，Copy link 分享，对方可以 Save a copy。
+- **第 3 期**：设置区，包括 S1 新内容邮件订阅等。
 
 ### 要先和 IT 沟通
 - **AI 补全 metadata 和搜索**：上传时根据标题、描述和视频转录，建议 Product、Segment、Video Type 和关键词；按视频内容搜索。要先确认公司的 AI 使用政策和数据流向（Azure OpenAI / Copilot）。

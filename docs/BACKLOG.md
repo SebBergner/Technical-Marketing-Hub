@@ -39,6 +39,11 @@ SharePoint 里的数据清理（kit 日期、Demo Type、标错的 LDK/VDK、旧
   - My Hub 里的 My playlists，带封面；
   - 播放列表页 #/playlist/…：自己的列表可以改名、排序、移除、删除；Copy link 分享；别人的列表可以 Save a copy；看不到的 demo 只显示数量；
   - partner 和地址不会作为创建者名字显示。
+- **11/12 补充（只上 staging）**：
+  - 表格视图加星标列；
+  - My feedback 在状态还是 Open 时可以 Edit，Hub Tasks 那一行会注明 "Edited by its sender"；
+  - My requests 不能修改（团队可能已经在做），但可以 "Add a note"：写进 Demo Requests 的 Notes 列，带日期和署名，追加在原有内容后面；Delivered 或 Declined 之后不能再加（Liwei 定）；
+  - My demos 不变，在 demo 页用 metadata edit。
 - **第 3 期**：设置区，包括 S1 新内容邮件订阅等。
 
 ### 要先和 IT 沟通

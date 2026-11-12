@@ -75,6 +75,23 @@ def withdraw(report_id: str, repo: AssetRepository = Depends(get_repo),
     return {"id": report_id, "status": "Withdrawn"}
 
 
+class EditIn(BaseModel):
+    details: str
+
+
+@router.patch("/reports/{report_id}", dependencies=[Depends(require_perm(Perm.VIEW_HUB))])
+def edit(report_id: str, body: EditIn, repo: AssetRepository = Depends(get_repo),
+         user: CurrentUser = Depends(get_current_user)):
+    """Change what you wrote, while it is still Open (Serge, 2026-11-12)."""
+    try:
+        record = sr.edit(repo, user, report_id, body.details)
+    except sr.ReportError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    log.info("report %s edited by its sender", report_id)
+    return {"id": report_id, "status": "Open", "details": record["details"],
+            "edited_at": record["edited_at"]}
+
+
 # ─────────────────────────────────────────────── Admin -> Report owners
 class Owner(BaseModel):
     name: str = ""

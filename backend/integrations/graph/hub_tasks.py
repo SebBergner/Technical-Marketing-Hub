@@ -170,6 +170,8 @@ def report_fields(record: dict) -> dict:
     if record.get("fell_back"):
         lines.append(f"Sent to {record.get('segment')}: nobody is notified for "
                      f"{record.get('demo_segment')}.")
+    if record.get("edited_at"):
+        lines.append(f"Edited by its sender on {str(record['edited_at'])[:10]}.")
     link = (f"{_base()}/#/asset/{quote(record['asset_id'], safe='')}" if record.get("asset_id")
             else f"{_base()}/admin#reports")
     return {"Title": (f"Report: {about}" if about else f"Help: {record.get('category')}")[:255],

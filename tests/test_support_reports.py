@@ -166,3 +166,19 @@ def test_the_sender_may_withdraw_an_open_report_and_nobody_else(client, monkeypa
     rid2 = report(client, ANN, "plm").json()["id"]
     monkeypatch.setattr(hub_tasks, "read_statuses", lambda prefix: {rid2: "Done"})
     assert client.post(f"/api/support/reports/{rid2}/withdraw", headers=ANN).status_code == 409
+
+
+def test_the_sender_may_edit_an_open_report_and_nobody_else(client, monkeypatch):
+    """Serge, Liwei 2026-11-12: change what you wrote while nobody has taken it up."""
+    rid = report(client, ANN, "cad").json()["id"]
+    url = f"/api/support/reports/{rid}"
+    assert client.patch(url, headers=BOSS, json={"details": "Not mine to change"}).status_code == 409
+    assert client.patch(url, headers=ANN, json={"details": "  "}).status_code == 409
+    r = client.patch(url, headers=ANN, json={"details": "The second video is the old UI"})
+    assert r.status_code == 200 and r.json()["edited_at"]
+    assert client.rows[-1]["Details"].startswith("The second video is the old UI")
+    assert "Edited by its sender" in client.rows[-1]["Details"], "the team sees it changed"
+    [own] = client.get("/api/support/reports/mine", headers=ANN).json()["items"]
+    assert (own["details"], bool(own["edited_at"])) == ("The second video is the old UI", True)
+    monkeypatch.setattr(hub_tasks, "read_statuses", lambda prefix: {rid: "In progress"})
+    assert client.patch(url, headers=ANN, json={"details": "Changed again"}).status_code == 409

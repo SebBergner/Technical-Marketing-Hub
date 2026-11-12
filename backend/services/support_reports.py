@@ -191,6 +191,34 @@ def withdraw(repo, user, report_id: str) -> dict:
     return record
 
 
+def edit(repo, user, report_id: str, details: str) -> dict:
+    """The person who sent a report changes what it says, while it is still
+    Open (Serge, Liwei 2026-11-12): once the team has taken it up, it stays
+    as they read it. Its Hub Tasks row is written again, saying it was
+    edited and when."""
+    details = (details or "").strip()
+    if len(details) < 5:
+        raise ReportError("Say what is wrong, or what you need.")
+    if len(details) > DETAILS_MAX:
+        raise ReportError(f"At most {DETAILS_MAX} characters.")
+    key = reporter_key(user)
+    status = statuses(repo, fresh=True)
+    with _lock:
+        items = _load(repo, REPORTS, [])
+        record = next((r for r in items if r.get("id") == report_id
+                       and r.get("reporter") == key), None)
+        if record is None:
+            raise ReportError("No such report of yours.")
+        if _status_of(record, status) != "Open":
+            raise ReportError("Only an open report can be changed; the team is on it.")
+        record["details"] = details
+        record["edited_at"] = _now()
+        _save(repo, REPORTS, items)
+    from backend.integrations.graph import hub_tasks
+    hub_tasks.note_report(repo, record)
+    return record
+
+
 def _status_of(record: dict, status: dict[str, str]) -> str:
     """Withdrawn here wins: the list may not have caught up yet."""
     return "Withdrawn" if record.get("withdrawn_at") else status.get(record["id"], "Open")
@@ -221,7 +249,7 @@ def statuses(repo, fresh: bool = False) -> dict[str, str]:
 
 def _view(record: dict, status: dict[str, str], *, for_owner: bool) -> dict:
     out = {k: record.get(k) for k in ("id", "at", "category", "details", "asset_id", "title",
-                                      "segment", "fell_back")}
+                                      "segment", "fell_back", "edited_at")}
     out["status"] = _status_of(record, status)
     if for_owner:
         out["reported_by"] = record.get("reported_by")

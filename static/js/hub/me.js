@@ -156,6 +156,68 @@ function delivered(value) {
   return box;
 }
 
+/* Notes on a request (Liwei, 2026-11-12): what was asked is not changed
+ * once sent -- the team may be making it -- but its requester may add a
+ * note, dated and signed, until it is Delivered or Declined. The team's
+ * own notes in the list show here too. */
+var CLOSED = { "Delivered": true, "Declined": true, "Not sent yet": true };
+
+function notesBlock(r) {
+  var box = el("div", "hub-me__notes");
+  if (r.notes && r.notes.trim()) {
+    var shown = el("details", "hub-me__notelog");
+    shown.appendChild(el("summary", null, "Notes"));
+    shown.appendChild(el("pre", "hub-me__notetext", r.notes.trim()));
+    box.appendChild(shown);
+  }
+  if (CLOSED[r.status]) return box;
+  var add = el("button", "hub-me__addnote", "Add a note");
+  add.type = "button";
+  add.title = "Add to your request: the team sees it in their list. "
+    + "What you asked stays as it was.";
+  add.addEventListener("click", function () {
+    add.hidden = true;
+    var form = el("div", "hub-me__noteform");
+    var area = el("textarea");
+    area.rows = 2;
+    area.maxLength = 1000;
+    area.placeholder = "Something to add: a deadline, a change of audience, a file to look at…";
+    var save = el("button", "btn-primary-sm", "Add note");
+    save.type = "button";
+    var cancel = el("button", "btn-ghost", "Cancel");
+    cancel.type = "button";
+    var acts = el("div", "hub-me__noteacts");
+    acts.appendChild(save);
+    acts.appendChild(cancel);
+    form.appendChild(area);
+    form.appendChild(acts);
+    box.appendChild(form);
+    area.focus();
+    cancel.addEventListener("click", function () { form.remove(); add.hidden = false; });
+    save.addEventListener("click", function () {
+      if (area.value.trim().length < 3) { area.focus(); return; }
+      save.disabled = true;
+      save.textContent = "Adding…";
+      fetch("/api/me/requests/" + encodeURIComponent(r.request_id) + "/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: area.value })
+      }).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (d) {
+          if (!res.ok) throw new Error(d.detail || "HTTP " + res.status);
+        });
+      }).then(loadRequests)
+        .catch(function (err) {
+          save.disabled = false;
+          save.textContent = "Add note";
+          form.appendChild(el("div", "hub-me__noteerr", "Not added: " + err.message));
+        });
+    });
+  });
+  box.appendChild(add);
+  return box;
+}
+
 function loadRequests() {
   var host = document.querySelector("#meRequests .hub-me__body");
   if (document.getElementById("meRequests").hidden) return;
@@ -193,6 +255,7 @@ function loadRequests() {
         .filter(Boolean).join(" · ")));
       var d2 = delivered(r.delivered);
       if (d2) info.appendChild(d2);
+      info.appendChild(notesBlock(r));
       row.appendChild(info);
       var side = el("div", "hub-me__reqside");
       side.appendChild(progress(r.status));

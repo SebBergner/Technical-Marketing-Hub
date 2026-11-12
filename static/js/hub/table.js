@@ -14,6 +14,7 @@ import { dateLabel, durationLabel, getJSON, LANGUAGE_LABEL, report } from "./uti
 import { familyDisplayName } from "./nav.js";
 import { openAssetDetail } from "./detail.js";
 import { assetHref, cardImage, gxcPill, paintCoverInto, TYPE_CHIP, whenNearScreen } from "./cards.js";
+import { starButton } from "./favorites.js";
 
 var VIEW_KEY = "hub.resultsView";
 
@@ -28,7 +29,10 @@ var VIEW_KEY = "hub.resultsView";
 //:
 //: A small picture first (Serge #25, Liwei 2026-11-08): small so rows stay
 //: short, shown larger beside it while the pointer is on it.
+//:
+//: A star first (Liwei, 2026-10-28 and 2026-11-12), as on cards: favourites.
 var COLUMNS = [
+  ["star", "", null],
   ["thumb", "", null],
   ["title", "Title", "title"],
   ["type", "Type", "type"],
@@ -122,7 +126,9 @@ function row(a) {
   COLUMNS.forEach(function (c) {
     var td = tr.insertCell();
     td.className = "hub-table__td hub-table__td--" + c[0];
-    if (c[0] === "thumb") {
+    if (c[0] === "star") {
+      if (a.id) td.appendChild(starButton(a.id, "hub-star--table"));
+    } else if (c[0] === "thumb") {
       td.appendChild(thumbCell(a));
     } else if (c[0] === "title") {
       var link = document.createElement("a");

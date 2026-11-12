@@ -145,3 +145,62 @@ def test_a_playlist_file_holds_no_address_or_object_id(client, tmp_path):
     make(client, ANN)
     text = next((tmp_path / "owned" / "playlists").iterdir()).read_text(encoding="utf-8")
     assert "ann@ptc.com" not in text and "oid-ann" not in text
+
+
+# ─────────────────────────────────────────────── a note on my request
+class FakeList:
+    """The Demo Requests list's Notes column, with its ETag."""
+
+    def __init__(self):
+        self.notes = {"1": "Asked for a 3 minute cut.", "2": ""}
+        self.version = 1
+        self.writes = []
+
+    def resolve_site(self, url=None):
+        return type("S", (), {"site_id": "site"})()
+
+    def _request(self, method, url, params=None, **kw):
+        item = url.rsplit("/", 1)[1]
+        return {"@odata.etag": f'"v{self.version}"', "fields": {"Notes": self.notes[item]}}
+
+    def update_fields(self, site_id, list_id, item_id, fields, etag=None):
+        assert etag == f'"v{self.version}"', "written with the ETag it was read with"
+        self.notes[item_id] = fields["Notes"]
+        self.version += 1
+        self.writes.append(item_id)
+        return {}
+
+
+@pytest.fixture
+def requests_list(monkeypatch):
+    from backend.integrations.graph import client as graph_client
+    fake = FakeList()
+    rows = [
+        {"item_id": "1", "request_id": "REQ-1", "title": "A", "status": "In production",
+         "requester": "ann@ptc.com", "notes": None},
+        {"item_id": "2", "request_id": "REQ-2", "title": "B", "status": "Delivered",
+         "requester": "ann@ptc.com", "notes": None},
+        {"item_id": "3", "request_id": "REQ-3", "title": "C", "status": "New",
+         "requester": "bob@ptc.com", "notes": None},
+    ]
+    monkeypatch.setattr(me_router, "_all_requests", lambda: [dict(r) for r in rows])
+    monkeypatch.setattr(graph_client, "get_graph_client", lambda: fake)
+    return fake
+
+
+def test_a_note_is_added_under_what_was_asked_never_over_it(client, requests_list):
+    r = client.post("/api/me/requests/REQ-1/notes", headers=ANN,
+                    json={"text": "  Please use the Creo 12 UI  "})
+    assert r.status_code == 200, r.text
+    assert requests_list.notes["1"].startswith("Asked for a 3 minute cut.\n\n[")
+    assert requests_list.notes["1"].endswith("ann@ptc.com] Please use the Creo 12 UI")
+
+
+def test_no_notes_on_someone_elses_or_a_finished_request(client, requests_list):
+    assert client.post("/api/me/requests/REQ-3/notes", headers=ANN,
+                       json={"text": "Mine now"}).status_code == 404
+    r = client.post("/api/me/requests/REQ-2/notes", headers=ANN, json={"text": "One more thing"})
+    assert r.status_code == 409 and "Delivered" in r.json()["detail"]
+    assert client.post("/api/me/requests/REQ-1/notes", headers=ANN,
+                       json={"text": " "}).status_code == 422
+    assert requests_list.writes == []

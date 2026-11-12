@@ -293,14 +293,21 @@ function renderMyFeedback(host) {
       } else {
         about.appendChild(el("b", null, "Get help"));
       }
-      about.appendChild(el("div", "hub-rvw__sub hub-rpt__text", r.details || ""));
+      var text = el("div", "hub-rvw__sub hub-rpt__text", r.details || "");
+      about.appendChild(text);
+      if (r.edited_at) {
+        about.appendChild(el("div", "hub-rpt__edited", "Edited " + fullDate(r.edited_at.slice(0, 10))));
+      }
       tr.appendChild(about);
       tr.appendChild(el("td", null, r.category || ""));
       var st = el("td");
       st.appendChild(el("span", "hub-rpt__status hub-rpt__status--"
         + (STATUS_CLASS[r.status] || "open"), r.status || "Open"));
       // Your own, while still open (Serge #24, 2026-11-08).
-      if ((r.status || "Open") === "Open") st.appendChild(withdrawButton(r, host));
+      if ((r.status || "Open") === "Open") {
+        st.appendChild(editButton(r, about, text, host));
+        st.appendChild(withdrawButton(r, host));
+      }
       tr.appendChild(st);
       body.appendChild(tr);
     });
@@ -313,6 +320,53 @@ function renderMyFeedback(host) {
     host.textContent = "";
     complain("Could not load your reports: " + err.message, true);
   });
+}
+
+/* Change what you wrote, while it is still Open (Serge, 2026-11-12): the
+ * text turns into a box in place; Save writes it, and the team's row says
+ * it was edited. */
+function editButton(r, about, text, host) {
+  var b = el("button", "btn-ghost hub-rpt__withdraw", "Edit");
+  b.type = "button";
+  b.title = "Change what you wrote; possible until the team takes it up";
+  b.addEventListener("click", function () {
+    if (about.querySelector(".hub-rpt__editbox")) return;
+    var box = el("div", "hub-rpt__editbox");
+    var area = el("textarea");
+    area.value = r.details || "";
+    area.rows = 3;
+    area.maxLength = 2000;
+    var save = el("button", "btn-primary-sm", "Save");
+    save.type = "button";
+    var cancel = el("button", "btn-ghost", "Cancel");
+    cancel.type = "button";
+    var row = el("div", "hub-rpt__editacts");
+    row.appendChild(save);
+    row.appendChild(cancel);
+    box.appendChild(area);
+    box.appendChild(row);
+    text.hidden = true;
+    about.insertBefore(box, text.nextSibling);
+    area.focus();
+    cancel.addEventListener("click", function () { box.remove(); text.hidden = false; });
+    save.addEventListener("click", function () {
+      save.disabled = true;
+      fetch("/api/support/reports/" + encodeURIComponent(r.id), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ details: area.value })
+      }).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (d) {
+          if (!res.ok) throw new Error(d.detail || "HTTP " + res.status);
+        });
+      }).then(function () { renderMyFeedback(host); })
+        .catch(function (err) {
+          save.disabled = false;
+          complain("Not saved: " + err.message, true);
+        });
+    });
+  });
+  return b;
 }
 
 function withdrawButton(r, host) {

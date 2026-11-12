@@ -257,7 +257,7 @@ def read_requests(client: GraphClient, site_id: str) -> list[dict]:
     rows = []
     for item in client._paged(f"/sites/{site_id}/lists/{list_ref}/items", {
             "$expand": "fields($select=Title,RequestID,Status,Requester,AssetType,Products,"
-                       "Brief,DeliveredAsset,Created,Modified)",
+                       "Brief,DeliveredAsset,Notes,Created,Modified)",
             "$select": "id", "$top": "500"}):
         f = item.get("fields") or {}
         rows.append({"item_id": item.get("id"), "request_id": f.get("RequestID"),
@@ -265,5 +265,34 @@ def read_requests(client: GraphClient, site_id: str) -> list[dict]:
                      "requester": (f.get("Requester") or "").strip().lower(),
                      "asset_type": f.get("AssetType"), "products": f.get("Products"),
                      "brief": f.get("Brief"), "delivered": f.get("DeliveredAsset"),
+                     "notes": f.get("Notes"),
                      "created_at": f.get("Created"), "modified_at": f.get("Modified")})
     return rows
+
+
+#: A request the team has finished takes no more notes.
+CLOSED_STATUSES = ("Delivered", "Declined")
+NOTE_MAX = 1000
+
+
+def append_note(client: GraphClient, site_id: str, item_id: str, note: str) -> str:
+    """Add a dated note under the request's Notes, keeping everything
+    already there (Liwei, 2026-11-12: a request is not changed once sent --
+    the team may be making it -- but its requester may add to it). Read with
+    its ETag and written back with If-Match, so a note added at the same
+    moment by someone else is not overwritten: that write fails and is
+    retried once on the fresh text. Returns the new Notes."""
+    list_ref = LIST_NAME.replace(" ", "%20")
+    for attempt in range(2):
+        item = client._request("GET", f"/sites/{site_id}/lists/{list_ref}/items/{item_id}",
+                               params={"$expand": "fields($select=Notes)"}) or {}
+        before = ((item.get("fields") or {}).get("Notes") or "").rstrip()
+        after = (before + "\n\n" if before else "") + note
+        try:
+            client.update_fields(site_id, list_ref, item_id, {"Notes": after},
+                                 etag=item.get("@odata.etag") or item.get("eTag"))
+            return after
+        except GraphError as exc:
+            if attempt or "412" not in str(exc) and "changed" not in str(exc):
+                raise RequestWriteError(f"The note could not be saved: {exc}") from exc
+    raise RequestWriteError("The note could not be saved.")

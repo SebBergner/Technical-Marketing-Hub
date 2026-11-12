@@ -101,6 +101,53 @@ def _all_requests() -> list[dict] | None:
     return rows
 
 
+class NoteIn(BaseModel):
+    text: str = Field(max_length=2000)
+
+
+@router.post("/requests/{request_id}/notes")
+def add_request_note(request_id: str, body: NoteIn,
+                     user: CurrentUser = Depends(require_authenticated)):
+    """Add a note to one's own request (Liwei, 2026-11-12). What was asked
+    is not changed once sent; a note adds to it, dated and signed, in the
+    Notes column the team reads. Not after Delivered or Declined."""
+    from datetime import date
+    from backend.integrations.graph.client import get_graph_client
+    from backend.integrations.graph.requests_list import (
+        CLOSED_STATUSES, NOTE_MAX, RequestWriteError, append_note)
+    if user.is_partner:
+        raise HTTPException(status_code=403, detail="Requests are for PTC employees.")
+    text = " ".join((body.text or "").split())
+    if len(text) < 3:
+        raise HTTPException(status_code=422, detail="Write the note first.")
+    if len(text) > NOTE_MAX:
+        raise HTTPException(status_code=422, detail=f"At most {NOTE_MAX} characters.")
+    me = (user.email or "").strip().lower()
+    _requests_cache.clear()                     # the status now, not two minutes ago
+    rows = _all_requests()
+    if rows is None:
+        raise HTTPException(status_code=503,
+                            detail="The team's list cannot be reached just now; try again later.")
+    row = next((r for r in rows if r["request_id"] == request_id and me
+                and r["requester"] == me), None)
+    if row is None:
+        raise HTTPException(status_code=404, detail="No such request of yours.")
+    if row["status"] in CLOSED_STATUSES:
+        raise HTTPException(status_code=409,
+                            detail=f"This request is {row['status']}; it takes no more notes.")
+    who = user.name if user.name and "@" not in user.name else me
+    note = f"[{date.today().isoformat()}, {who}] {text}"
+    client = get_graph_client()
+    try:
+        site = client.resolve_site(settings.graph_site_url)
+        notes = append_note(client, site.site_id, row["item_id"], note)
+    except RequestWriteError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    _requests_cache.clear()
+    log.info("note added to request %s by its requester", request_id)
+    return {"request_id": request_id, "notes": notes}
+
+
 @router.get("/requests")
 def my_requests(user: CurrentUser = Depends(require_authenticated),
                 repo: AssetRepository = Depends(get_repo)):

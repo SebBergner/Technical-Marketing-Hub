@@ -35,6 +35,7 @@ only, Seb 2026-11-05).
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 
 #: Higher is better. The gaps carry no meaning; only the order does.
 EXACT_TITLE = 8         # title is the query
@@ -72,6 +73,17 @@ def terms(text: str | None) -> list[str]:
 
 
 _JOINERS = frozenset({"and"})
+
+
+@lru_cache(maxsize=20000)
+def _normal(text: str | None) -> str:
+    """A title or description as space-separated search words, once.
+
+    Every search re-split every demo's title and description (2026-11-12:
+    the Searches tab's 150 counts took 24 s on production); the catalogue's
+    texts are the same strings each time, so the split is kept.
+    """
+    return " ".join(terms(text))
 
 
 #: A word this short only counts as a whole word (Liwei, 2026-10-01).
@@ -137,14 +149,30 @@ def _bounded(phrase: str, wanted: list[str], partial: bool = False) -> str:
     return start + re.escape(head) + _word(wanted[-1], partial) + r"(?!\S)"
 
 
+@lru_cache(maxsize=4096)
+def _term_re(term: str, partial: bool) -> re.Pattern:
+    return re.compile(_term_pattern(term, partial))
+
+
+@lru_cache(maxsize=20000)
+def _words_of(text: str) -> frozenset:
+    return frozenset(text.split())
+
+
+def _stem(term: str) -> str:
+    """What any whole-word or partial match of `term` must contain: the
+    term, less a final "y" that a plural replaces ("assembly", "assemblies")."""
+    return term[:-1] if len(term) > 3 and term.endswith("y") else term
+
+
 def _has(text: str, term: str, partial: bool = False) -> bool:
     """One query word in normalised text."""
-    return re.search(_term_pattern(term, partial), text) is not None
+    return _stem(term) in text and _term_re(term, partial).search(text) is not None
 
 
 def _find_end(text: str, term: str, partial: bool = False) -> int:
     """Where the first occurrence of `term` ends in `text`, or -1."""
-    m = re.search(_term_pattern(term, partial), text)
+    m = _term_re(term, partial).search(text)
     return m.end() if m else -1
 
 
@@ -196,7 +224,7 @@ class Tolerance:
 
 def _close_hit(haystack: str, term: str, tolerance: "Tolerance") -> bool:
     close = tolerance.close_words(term)
-    return bool(close) and not close.isdisjoint(haystack.split())
+    return bool(close) and not close.isdisjoint(_words_of(haystack))
 
 
 def score(text: str | None, title: str | None, description: str | None = None,
@@ -212,9 +240,16 @@ def score(text: str | None, title: str | None, description: str | None = None,
         return NO_MATCH
 
     name = (title or "").strip().lower()
-    normalised_title = " ".join(terms(name))
+    normalised_title = _normal(name)
 
     wanted = terms(text)
+    haystack = f"{normalised_title} {_normal(description)}"
+    # Most demos have none of the words at all: say so before any pattern
+    # is tried (2026-11-12, the Searches tab's counts).
+    for t in wanted:
+        if _stem(t) not in haystack and not (
+                tolerance is not None and _close_hit(haystack, t, tolerance)):
+            return NO_MATCH
     pattern = _bounded(phrase, wanted, partial)
     if normalised_title == phrase:
         return EXACT_TITLE
@@ -230,7 +265,6 @@ def score(text: str | None, title: str | None, description: str | None = None,
 
     if all(_has(normalised_title, t, partial) for t in wanted):
         return TITLE_ALL_TERMS
-    haystack = f"{normalised_title} {' '.join(terms(description))}"
     if all(_has(haystack, t, partial) for t in wanted):
         return ANY_FIELD
     if tolerance is not None:
@@ -263,7 +297,7 @@ def span(text: str | None, title: str | None, partial: bool = False) -> int:
     which also, for free, prefers the tighter title over the padded one.
     """
     wanted = terms(text)
-    name = " ".join(terms(title))
+    name = _normal(title)
     if not wanted or not name:
         return _NO_SPAN
     furthest = 0
@@ -329,7 +363,7 @@ def names(text: str | None, name: str | None, partial: bool = False) -> bool:
     wanted = terms(text)
     if not wanted:
         return False
-    haystack = " ".join(terms(name))
+    haystack = _normal(name)
     return all(_has(haystack, t, partial) for t in wanted)
 
 

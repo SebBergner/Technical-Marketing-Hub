@@ -163,19 +163,31 @@ def _finds_now(repo: AssetRepository, q: str, key: tuple) -> int | None:
         elif field_name:
             setattr(query, field_name, list(values))
     try:
-        return repo.list(query).total
+        counter = getattr(repo, "count", None)
+        return counter(query) if counter else repo.list(query).total
     except Exception:                                      # noqa: BLE001
         return None
 
 
+#: Searches, worked out once a day (Liwei, 2026-11-12: "no need for live
+#: data"): {(days, gxc): (the day, the answer)}. Per worker, so each worker
+#: works it out on its first request of the day; a few seconds each.
+_daily: dict[tuple, tuple[str, dict]] = {}
+
+
 @router.get("/searches")
-def searches(since: str | None = None, until: str | None = None,
+def searches(days: int | None = Query(None, ge=1, le=3650),
+             since: str | None = None, until: str | None = None,
              repo: AssetRepository = Depends(get_repo)):
     """Content health -> Searches (2026-11-12): what people search for,
-    what they do not find, and what is rising, in a window and against the
-    window before it -- worked out by services/search_insights.py, which
-    says how. Counts of people, never who."""
-    from datetime import datetime, timezone
+    what they do not find, and what is rising, in the last `days` and
+    against the days before -- worked out by services/search_insights.py,
+    which says how. Counts of people, never who.
+
+    By `days` (or none: all time), the answer is worked out on the first
+    request of a UTC day and kept for the rest of it; `computed_at` says
+    when. `since`/`until` ask for an exact window, worked out each time."""
+    from datetime import datetime, timedelta, timezone
     from backend.services import search_insights as si
     from backend.services.usage import events as _events
 
@@ -188,11 +200,25 @@ def searches(since: str | None = None, until: str | None = None,
             raise HTTPException(status_code=422, detail=f"not a date: {value!r}")
         return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
 
-    end = when(until) or datetime.now(timezone.utc)
-    records = repo.listed_records().values() if hasattr(repo, "listed_records") else []
-    return si.insights(_events(repo), when(since), end,
-                       finds_now=lambda q, key: _finds_now(repo, q, key),
-                       vocab=si.vocabulary(records), filters_words=_filters_words)
+    def work(start, end) -> dict:
+        records = repo.listed_records().values() if hasattr(repo, "listed_records") else []
+        out = si.insights(_events(repo), start, end,
+                          finds_now=lambda q, key: _finds_now(repo, q, key),
+                          vocab=si.vocabulary(records), filters_words=_filters_words)
+        out["computed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        return out
+
+    if since or until:
+        return work(when(since), when(until) or datetime.now(timezone.utc))
+    now = datetime.now(timezone.utc)
+    today = now.date().isoformat()
+    key = (days, bool(getattr(repo, "gxc", True)))
+    hit = _daily.get(key)
+    if hit and hit[0] == today:
+        return hit[1]
+    answer = work(now - timedelta(days=days) if days else None, now)
+    _daily[key] = (today, answer)
+    return answer
 
 
 # ─────────────────────────────────────────────────────── content review

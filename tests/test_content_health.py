@@ -24,6 +24,10 @@ def _res(name, sub=None):
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     from app import app
+    from backend.routers import content_health
+    from backend.services import search_insights
+    content_health._daily.clear()
+    search_insights._lookup_cache.clear()
     monkeypatch.setattr(settings, "data_dir", str(tmp_path))
     monkeypatch.setattr(settings, "auth_mode", AuthMode.EASYAUTH.value)
     monkeypatch.setattr(settings, "admin_username", "")
@@ -120,3 +124,13 @@ def test_the_hub_says_when_a_search_was_filtered(client, tmp_path):
     events = [e for e in JsonAssetRepository(str(tmp_path)).usage_events()
               if e.get("q") == "Bobcat"]
     assert [e.get("filters") for e in events] == [{"type": ["vm"], "family": ["x" * 60]}, None]
+
+
+def test_searches_are_worked_out_once_a_day(client, tmp_path):
+    first = client.get("/api/content-health/searches?days=30", headers=KEEPER).json()
+    JsonAssetRepository(str(tmp_path)).record_usage_event("search", q="new word", results=0,
+                                                          user="q@ptc.com")
+    again = client.get("/api/content-health/searches?days=30", headers=KEEPER).json()
+    assert again == first and again["computed_at"], "kept for the rest of the day"
+    other = client.get("/api/content-health/searches?days=7", headers=KEEPER).json()
+    assert other["totals"]["recorded"] == first["totals"]["recorded"] + 1, "its own day's answer"

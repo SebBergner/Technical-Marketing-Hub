@@ -27,10 +27,6 @@ function days() {
   return RANGES.filter(function (x) { return x[0] === range; })[0][2];
 }
 
-function since() {
-  var d = days();
-  return d ? new Date(Date.now() - d * 86400000).toISOString() : "";
-}
 
 function renderRanges() {
   var host = $("srRanges");
@@ -394,7 +390,10 @@ function render(d) {
     + d.totals.people + " people"
     + (d.totals.typing ? "; " + d.totals.typing + " more were someone still typing and are "
        + "left out" : "")
-    + ". Variants of a word (lambo, Lamborghini) count as one under Most searched.";
+    + ". Variants of a word (lambo, Lamborghini) count as one under Most searched. "
+    + "Worked out once a day; this is as of "
+    + new Date(d.computed_at).toLocaleString(undefined, { dateStyle: "medium",
+                                                          timeStyle: "short" }) + ".";
   renderTiles(d);
   renderChart(d);
   renderProblems(d);
@@ -406,8 +405,8 @@ function render(d) {
 function loadSearches() {
   renderRanges();
   $("srIntro").textContent = "Loading…";
-  var s = since();
-  return fetch("/api/content-health/searches" + (s ? "?since=" + encodeURIComponent(s) : ""))
+  var d = days();
+  return fetch("/api/content-health/searches" + (d ? "?days=" + d : ""))
     .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then(render)
     .catch(function (err) { $("srIntro").textContent = "Could not load: " + err.message; });

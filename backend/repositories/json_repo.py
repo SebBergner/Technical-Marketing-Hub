@@ -745,6 +745,11 @@ class JsonAssetRepository(AssetRepository):
 
         return [r for r in rows if keep(r)]
 
+    def count(self, query: AssetQuery) -> int:
+        """How many demos a query finds, without ordering or building them:
+        for counts only (Content health -> Searches, 2026-11-12)."""
+        return len(self._rows(query))
+
     def list(self, query: AssetQuery) -> Page[AssetSummary]:
         rows = self._rows(query)
         stats = self._load("stats")

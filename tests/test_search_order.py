@@ -128,3 +128,58 @@ def test_a_product_name_finds_what_is_tagged_with_it(tmp_path):
     assert titles(repo, "proengineer wildfire") == ["EFX Steel Building"]
     assert titles(repo, "wildfire") == ["Wildfire Tips", "EFX Steel Building"], \
         "a title match still comes first"
+
+
+# ─────────────────────────────────── close matches (Liwei, 2026-11-12)
+CLOSE_ROWS = [
+    ("Lamborghini Tech Overview", "2025-01-01", None),
+    ("PTC Jetstream Technical Overview", "2025-01-01", None),
+    ("Associative Patterning for Bolts", "2024-01-01", None),
+    ("Arbortext Content Delivery", "2026-06-01", "associated topics"),
+    ("CAM Machining Overview", "2024-01-01", None),
+    ("Creo Camera Integration", "2026-01-01", None),
+    ("Vestas Wind Turbines", "2023-01-01", None),
+    ("Windchill PDMLink", "2026-01-01", None),
+]
+
+
+def test_a_word_cut_short_finds_the_word_it_begins(tmp_path):
+    repo = repo_with(tmp_path, CLOSE_ROWS)
+    assert titles(repo, "lambo") == ["Lamborghini Tech Overview"]
+    assert titles(repo, "jetstr") == ["PTC Jetstream Technical Overview"]
+
+
+def test_one_wrong_letter_still_finds_it(tmp_path):
+    repo = repo_with(tmp_path, CLOSE_ROWS)
+    assert titles(repo, "jestream") == ["PTC Jetstream Technical Overview"]
+    assert titles(repo, "lamborgini") == ["Lamborghini Tech Overview"]
+
+
+def test_a_close_match_in_the_title_outranks_one_in_the_description(tmp_path):
+    repo = repo_with(tmp_path, CLOSE_ROWS)
+    assert titles(repo, "assoc") == ["Associative Patterning for Bolts",
+                                     "Arbortext Content Delivery"]
+
+
+def test_exact_matches_still_come_first(tmp_path):
+    """"wind" now also finds Windchill, but after the demo that says Wind."""
+    repo = repo_with(tmp_path, CLOSE_ROWS)
+    assert titles(repo, "wind") == ["Vestas Wind Turbines", "Windchill PDMLink"]
+
+
+def test_a_three_letter_word_stays_whole(tmp_path):
+    """Seb, 2026-11-05: CAM must not find Camera."""
+    repo = repo_with(tmp_path, CLOSE_ROWS)
+    assert titles(repo, "cam") == ["CAM Machining Overview"]
+
+
+def test_short_words_are_not_guessed_at(tmp_path):
+    repo = repo_with(tmp_path, CLOSE_ROWS)
+    assert titles(repo, "lam") == []          # three letters: no prefix
+    assert titles(repo, "vesta") == ["Vestas Wind Turbines"]   # a plural, as before
+
+
+def test_every_word_of_a_phrase_must_still_be_there(tmp_path):
+    repo = repo_with(tmp_path, CLOSE_ROWS)
+    assert titles(repo, "lambo overview") == ["Lamborghini Tech Overview"]
+    assert titles(repo, "lambo jetstream") == []

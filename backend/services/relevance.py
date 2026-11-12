@@ -17,23 +17,41 @@ to recency. That is a poor default anywhere, and in a federated catalogue an
 actively biased one: Consensus content is newer than SharePoint's, so recency
 buried one platform.
 
-Deliberately crude — no term weighting, no stemming, no index, no fuzzy
-matching. It answers the actual complaints. A real ranker can replace it when
-there is evidence one is needed.
+Deliberately crude — no term weighting, no stemming, no index. It answers
+the actual complaints. A real ranker can replace it when there is evidence
+one is needed.
+
+**Close matches** (Liwei, 2026-11-12). Content health -> Searches showed many
+searches finding little because the word was cut short or misspelt --
+"lambo" (12 times in a month) for Lamborghini, "Jestream" for Jetstream,
+"assoc" for Associativity -- while the Hub had the content. As search
+products do (Algolia's prefix and typo tolerance), a word now also matches a
+catalogue word it begins (at least PREFIX_MIN letters) or is one letter away
+from (at least TYPO_MIN letters, both words). Such a record ranks below
+every exact one, in tiers of their own (CLOSE_TITLE, CLOSE), so the exact answers still
+come first and "cam" still finds no "Camera" (three letters: whole words
+only, Seb 2026-11-05).
 """
 from __future__ import annotations
 
 import re
 
 #: Higher is better. The gaps carry no meaning; only the order does.
-EXACT_TITLE = 6         # title is the query
-TITLE_PREFIX = 5        # title opens with the query, as typed
-TITLE_WORD = 4          # the query, as typed, starts a word in the title
-TITLE_SUBSTRING = 3     # the query, as typed, appears anywhere in the title
-TITLE_ALL_TERMS = 2     # every term is in the title, but scattered
-ANY_FIELD = 1           # every term is somewhere in title or description
+EXACT_TITLE = 8         # title is the query
+TITLE_PREFIX = 7        # title opens with the query, as typed
+TITLE_WORD = 6          # the query, as typed, starts a word in the title
+TITLE_SUBSTRING = 5     # the query, as typed, appears anywhere in the title
+TITLE_ALL_TERMS = 4     # every term is in the title, but scattered
+ANY_FIELD = 3           # every term is somewhere in title or description
 DESCRIPTION = ANY_FIELD  # retained name; a description-only hit lands here
+CLOSE_TITLE = 2         # every term in the title, some only as a close match
+CLOSE = 1               # every term somewhere, some only as a close match
 NO_MATCH = 0
+
+#: Close matches (module doc): a word this long may stand for a longer
+#: catalogue word it begins; this long, for one a letter away.
+PREFIX_MIN = 4
+TYPO_MIN = 5
 
 _TOKEN = re.compile(r"[^\W_]+", re.UNICODE)
 
@@ -130,8 +148,59 @@ def _find_end(text: str, term: str, partial: bool = False) -> int:
     return m.end() if m else -1
 
 
+def _one_letter_away(a: str, b: str) -> bool:
+    """One letter added, dropped or changed: jestream / jetstream."""
+    if a == b or abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) == len(b):
+        return sum(x != y for x, y in zip(a, b)) == 1
+    if len(a) > len(b):
+        a, b = b, a
+    i = 0
+    while i < len(a) and a[i] == b[i]:
+        i += 1
+    return a[i:] == b[i + 1:]
+
+
+class Tolerance:
+    """The catalogue's words, to find what a query word is close to.
+
+    Built once per catalogue (json_repo caches it), not per record: a query
+    word's close words are looked up once, then each record is a set test.
+    """
+
+    def __init__(self, texts):
+        words: set[str] = set()
+        for text in texts:
+            words.update(w for w in terms(text) if not _CJK.search(w))
+        self.words = frozenset(words)
+        self._close: dict[str, frozenset] = {}
+
+    def close_words(self, term: str) -> frozenset:
+        """Catalogue words `term` may stand for, besides itself and its
+        plurals (which whole-word search already finds)."""
+        if term in self._close:
+            return self._close[term]
+        found = set()
+        if not _CJK.search(term) and len(term) >= PREFIX_MIN:
+            plural = re.compile(_word(term, False) + "$")
+            for w in self.words:
+                if w == term or plural.match(w):
+                    continue
+                if w.startswith(term) or (len(term) >= TYPO_MIN and len(w) >= TYPO_MIN
+                                          and _one_letter_away(term, w)):
+                    found.add(w)
+        self._close[term] = frozenset(found)
+        return self._close[term]
+
+
+def _close_hit(haystack: str, term: str, tolerance: "Tolerance") -> bool:
+    close = tolerance.close_words(term)
+    return bool(close) and not close.isdisjoint(haystack.split())
+
+
 def score(text: str | None, title: str | None, description: str | None = None,
-          partial: bool = False) -> int:
+          partial: bool = False, tolerance: "Tolerance | None" = None) -> int:
     """How well one record answers a query. 0 means it does not.
 
     A contiguous phrase match always outranks the same words scattered, so
@@ -164,6 +233,14 @@ def score(text: str | None, title: str | None, description: str | None = None,
     haystack = f"{normalised_title} {' '.join(terms(description))}"
     if all(_has(haystack, t, partial) for t in wanted):
         return ANY_FIELD
+    if tolerance is not None:
+        def near(text_: str) -> bool:
+            return all(_has(text_, t, partial) or _close_hit(text_, t, tolerance)
+                       for t in wanted)
+        if near(normalised_title):
+            return CLOSE_TITLE
+        if near(haystack):
+            return CLOSE
     return NO_MATCH
 
 
@@ -219,24 +296,26 @@ def ranking(text: str | None, title: str | None,
 #: other way of having the query in the title is one band, newest first;
 #: then titles with the words scattered; then description-only hits. Span
 #: now only orders results published the same day.
-_BAND = {EXACT_TITLE: 3, TITLE_PREFIX: 2, TITLE_WORD: 2, TITLE_SUBSTRING: 2,
-         TITLE_ALL_TERMS: 1, ANY_FIELD: 0}
+_BAND = {EXACT_TITLE: 5, TITLE_PREFIX: 4, TITLE_WORD: 4, TITLE_SUBSTRING: 4,
+         TITLE_ALL_TERMS: 3, ANY_FIELD: 2, CLOSE_TITLE: 1, CLOSE: 0}
 
 
 def order_key(text: str | None, title: str | None, description: str | None,
-              recency) -> tuple:
+              recency, tolerance: "Tolerance | None" = None) -> tuple:
     """Sort key for search results, best first when sorted descending:
-    band, then publish date, then span."""
-    return (_BAND.get(score(text, title, description), -1), recency, -span(text, title))
+    band, then publish date, then span. Close matches come last."""
+    return (_BAND.get(score(text, title, description, tolerance=tolerance), -1), recency,
+            -span(text, title))
 
 
 def matches(text: str | None, title: str | None,
-            description: str | None = None, partial: bool = False) -> bool:
+            description: str | None = None, partial: bool = False,
+            tolerance: "Tolerance | None" = None) -> bool:
     """Whether a record belongs in the results at all.
 
     Defined as "scores above zero" so membership and ranking cannot disagree.
     """
-    return score(text, title, description, partial) > NO_MATCH
+    return score(text, title, description, partial, tolerance) > NO_MATCH
 
 
 def names(text: str | None, name: str | None, partial: bool = False) -> bool:
@@ -257,16 +336,17 @@ def names(text: str | None, name: str | None, partial: bool = False) -> bool:
 #: Advanced Search's order. A file-name hit is a stronger answer than a word
 #: buried in a description, weaker than the demo's own title saying it.
 _ADVANCED_BAND = {EXACT_TITLE: 5, TITLE_PREFIX: 4, TITLE_WORD: 4,
-                  TITLE_SUBSTRING: 4, TITLE_ALL_TERMS: 3, ANY_FIELD: 1}
+                  TITLE_SUBSTRING: 4, TITLE_ALL_TERMS: 3, ANY_FIELD: 1, CLOSE_TITLE: 1,
+                  CLOSE: 0}
 FILE_NAME_BAND = 2
 
 
 def advanced_order_key(text: str | None, title: str | None,
                        description: str | None, file_hits: int, recency,
-                       partial: bool = False) -> tuple:
+                       partial: bool = False, tolerance: "Tolerance | None" = None) -> tuple:
     """Sort key for Advanced Search, best first when sorted descending:
     band (title > file name > description), then publish date, then span."""
-    band = _ADVANCED_BAND.get(score(text, title, description, partial), 0)
+    band = _ADVANCED_BAND.get(score(text, title, description, partial, tolerance), 0)
     if file_hits:
         band = max(band, FILE_NAME_BAND)
     return (band, recency, -span(text, title, partial))

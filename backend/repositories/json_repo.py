@@ -151,6 +151,8 @@ _CATALOGUE_OWNED = (
 #: data dir -> (key, rows): the catalogue every request in this worker reads.
 _catalogue_cache: dict[str, tuple[tuple, list[dict]]] = {}
 _catalogue_lock = threading.Lock()
+#: The catalogue's words for close matches, with the catalogue they came from.
+_tolerance_cache: dict[str, tuple[list[dict], object]] = {}
 #: Bumped by every write in this process, so its own writes show at once
 #: whatever the file system's clock says.
 _catalogue_generation = [0]
@@ -496,6 +498,20 @@ class JsonAssetRepository(AssetRepository):
         return (os.path.abspath(self.dir), _catalogue_generation[0],
                 utcnow().date().isoformat(), tuple((p, stamp(p)) for p in paths))
 
+    def _tolerance(self) -> relevance.Tolerance:
+        """The catalogue's words for close matches (relevance.Tolerance),
+        built once per catalogue the way the catalogue itself is."""
+        rows = self._shared_catalogue()
+        with _catalogue_lock:
+            hit = _tolerance_cache.get("words")
+            if hit is not None and hit[0] is rows:
+                return hit[1]
+        tolerance = relevance.Tolerance(
+            f"{r.get('title') or ''} {_searchable(r) or ''}" for r in rows)
+        with _catalogue_lock:
+            _tolerance_cache["words"] = (rows, tolerance)
+        return tolerance
+
     def _shared_catalogue(self) -> list[dict]:
         key = self._catalogue_key()
         with _catalogue_lock:
@@ -658,6 +674,7 @@ class JsonAssetRepository(AssetRepository):
     def _rows(self, query: AssetQuery) -> list[dict]:
         curation = self._load("curation")
         rows = self._load_mirror()
+        tolerance = self._tolerance() if query.text else None
 
         def keep(record: dict) -> bool:
             # Reachable by id, never met while browsing -- listing.py says why.
@@ -674,7 +691,8 @@ class JsonAssetRepository(AssetRepository):
             # Membership comes from the scorer, so a record can never be
             # excluded by one rule and ranked by another.
             if query.text and not relevance.matches(
-                    query.text, record.get("title"), _searchable(record)):
+                    query.text, record.get("title"), _searchable(record),
+                    tolerance=tolerance):
                 return False
 
             for field, wanted in (("type", query.types),
@@ -742,8 +760,10 @@ class JsonAssetRepository(AssetRepository):
             rows.sort(key=lambda r: (recency(r) == date.min, recency(r)))
         elif query.sort == "relevance" and query.text:
             # Band first, then newest first (relevance.order_key, 2026-09-30).
+            tolerance = self._tolerance()
             rows.sort(key=lambda r: relevance.order_key(query.text, r.get("title"),
-                                                        _searchable(r), recency(r)),
+                                                        _searchable(r), recency(r),
+                                                        tolerance),
                       reverse=True)
         else:
             rows.sort(key=recency, reverse=True)
@@ -1047,6 +1067,7 @@ class JsonAssetRepository(AssetRepository):
         """
         stats = self._load("stats")
         hits = []
+        tolerance = self._tolerance() if query.text else None
         for record in self._rows(replace(query, text=None)):
             title = record.get("title")
             details = " ".join(x for x in (
@@ -1057,19 +1078,19 @@ class JsonAssetRepository(AssetRepository):
                 record.get("segment"), record.get("content_depth"),
                 record.get("industry")) if x)
             partial = query.partial
-            own = relevance.score(query.text, title, details, partial)
+            own = relevance.score(query.text, title, details, partial, tolerance)
             files = [f for f in (record.get("resources") or [])
                      if relevance.names(query.text, f.get("name"), partial)]
             if not own and not files:
                 continue
             matched_in = []
-            if own >= relevance.TITLE_ALL_TERMS:
+            if own >= relevance.TITLE_ALL_TERMS or own == relevance.CLOSE_TITLE:
                 matched_in.append("title")
             elif own:
                 matched_in.append("details")
             key = relevance.advanced_order_key(
                 query.text, title, details, len(files),
-                _as_date(record.get("uploaded_at")) or date.min, partial)
+                _as_date(record.get("uploaded_at")) or date.min, partial, tolerance)
             hits.append((key, record, matched_in, files))
 
         hits.sort(key=lambda h: h[0], reverse=True)

@@ -21,7 +21,7 @@ SharePoint 里的数据清理（kit 日期、Demo Type、标错的 LDK/VDK、旧
    - 搜不到的报告：结果为 0 或很少的搜索词；
    - 现在的 Content to review 等。
 
-3. **Hub 搜索支持前缀和容错**（11/12 Liwei 定，排在待做）：Content health -> Searches 的数据显示，很多"搜不到"其实是词没打完或拼错，比如 lambo（Lamborghini，30 天 12 次）、Jestream（Jetstream）、asso/assoc（Associativity）、automotiv。做法：
+3. ~~**Hub 搜索支持前缀和容错**~~（11/12 已做：按 production 的 586 次搜索计算，0 结果从 25% 降到 15%。以下为原计划）：Content health -> Searches 的数据显示，很多"搜不到"其实是词没打完或拼错，比如 lambo（Lamborghini，30 天 12 次）、Jestream（Jetstream）、asso/assoc（Associativity）、automotiv。做法：
    - 单个词时允许前缀匹配，至少 4 个字母；
    - 允许错一个字母，至少 5 个字母；
    - 排序时完全匹配优先；

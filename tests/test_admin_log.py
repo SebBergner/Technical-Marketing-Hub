@@ -34,20 +34,20 @@ def entries():
 
 def test_a_change_is_recorded_with_who_what_and_the_answer(client):
     boss = easyauth_headers("boss@ptc.com")
-    assert client.post("/api/admin/hidden", json={"asset_id": "bobcat"},
+    assert client.post("/api/content-health/hidden", json={"asset_id": "bobcat"},
                        headers=boss).status_code == 200
     e = entries()[0]
     assert (e["actor"], e["action"], e["status"]) == ("user:boss@ptc.com", "Hid a demo", 200)
     assert e["detail"]["body"] == {"asset_id": "bobcat"}
     assert e["target"] == "bobcat", "from the body when the path does not name it"
-    assert client.delete("/api/admin/hidden/bobcat", headers=boss).status_code == 200
+    assert client.delete("/api/content-health/hidden/bobcat", headers=boss).status_code == 200
     e = entries()[0]
     assert (e["action"], e["target"]) == ("Unhid a demo", "bobcat")
 
 
 def test_a_refused_attempt_is_recorded_too(client):
     someone = easyauth_headers("someone@ptc.com")
-    assert client.post("/api/admin/hidden", json={"asset_id": "bobcat"},
+    assert client.post("/api/content-health/hidden", json={"asset_id": "bobcat"},
                        headers=someone).status_code == 403
     e = entries()[0]
     assert (e["actor"], e["status"]) == ("user:someone@ptc.com", 403)
@@ -68,7 +68,7 @@ def test_the_admin_password_is_never_written(client):
 
 def test_reads_are_not_logged_but_looking_up_a_person_is(client):
     boss = easyauth_headers("boss@ptc.com")
-    client.get("/api/admin/hidden", headers=boss)
+    client.get("/api/content-health/hidden", headers=boss)
     client.get("/api/assets", headers=boss)
     assert entries() == []
     client.get("/api/admin/activity/person?email=p1@ptc.com", headers=boss)
@@ -79,7 +79,7 @@ def test_reads_are_not_logged_but_looking_up_a_person_is(client):
 
 def test_nothing_can_change_or_delete_an_entry(client):
     boss = easyauth_headers("boss@ptc.com")
-    client.post("/api/admin/hidden", json={"asset_id": "bobcat"}, headers=boss)
+    client.post("/api/content-health/hidden", json={"asset_id": "bobcat"}, headers=boss)
     for method in ("delete", "put", "patch", "post"):
         assert getattr(client, method)("/api/admin/admin-log", headers=boss).status_code == 405
     body = client.get("/api/admin/admin-log", headers=boss).json()
@@ -89,9 +89,9 @@ def test_nothing_can_change_or_delete_an_entry(client):
 
 def test_an_edit_to_the_file_breaks_the_chain_where_it_was_made(client):
     boss = easyauth_headers("boss@ptc.com")
-    client.post("/api/admin/hidden", json={"asset_id": "bobcat"}, headers=boss)
-    client.delete("/api/admin/hidden/bobcat", headers=boss)
-    client.post("/api/admin/hidden", json={"asset_id": "bobcat"}, headers=boss)
+    client.post("/api/content-health/hidden", json={"asset_id": "bobcat"}, headers=boss)
+    client.delete("/api/content-health/hidden/bobcat", headers=boss)
+    client.post("/api/content-health/hidden", json={"asset_id": "bobcat"}, headers=boss)
     assert admin_log.verify()["intact"]
     path = admin_log._path()
     lines = open(path, encoding="utf-8").read().splitlines()
@@ -113,7 +113,7 @@ def test_hiding_a_demo_is_content_access_not_the_home_page(client):
     access.create_group("Access editors", "", ["view_admin", "manage_content_access"],
                         ["keeper@ptc.com"], "test")
     hide = {"asset_id": "bobcat"}
-    assert client.post("/api/admin/hidden", json=hide,
+    assert client.post("/api/content-health/hidden", json=hide,
                        headers=easyauth_headers("curator@ptc.com")).status_code == 403
-    assert client.post("/api/admin/hidden", json=hide,
+    assert client.post("/api/content-health/hidden", json=hide,
                        headers=easyauth_headers("keeper@ptc.com")).status_code == 200

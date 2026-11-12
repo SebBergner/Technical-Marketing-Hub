@@ -1,12 +1,11 @@
-/* The Content review tab: new uploads, collecting dust, little used,
- * Still current running out, no longer sold, archived.
+/* Content health -> Content review (Admin -> Content review until
+ * 2026-11-11): new uploads, collecting dust, little used, Still current
+ * running out, no longer sold, archived.
  *
- * Part of the Admin page's script, split out of static/admin.js on
- * 2026-10-15; static/js/admin/main.js loads it. */
+ * Part of the Content health page's script (static/content-health.html). */
 
-import { $, actorWord, demoLink, el, gxcMark, row, session, TYPE_WORD } from "./util.js";
-import { loadChanges } from "./access.js";
-import { act } from "./signins.js";
+import { $, actorWord, demoLink, el, gxcMark, session, TYPE_WORD } from "../admin/util.js";
+import { loadChanges } from "./changes.js";
 
 /* ── Content review (2026-10-14) ──────────────────────────────────────
  * What to look at again: collecting dust (Serge: 7+ years, not confirmed
@@ -156,7 +155,7 @@ function loadUploads() {
 function loadReview() {
   loadUploads();
   loadChanges("rvChanges", "Content review,Uploads");
-  return fetch("/api/admin/content-review")
+  return fetch("/api/content-health/review")
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (d) { if (d) renderReview(d); });
 }

@@ -54,15 +54,13 @@ def client(tmp_path, monkeypatch):
     return TestClient(app, base_url="http://localhost")
 
 
-def test_only_an_admin_session_hides_not_a_curator(client, tmp_path):
+def test_maintain_content_hides_without_the_admin_sign_in(client, tmp_path):
+    """Since Content health (2026-11-11) hiding is Maintain content's alone,
+    which the local principal holds; it no longer also needs View Admin."""
     seed(tmp_path, "bobcat")
-    # ...and still refused: hiding needs the admin sign-in itself.
-    assert client.post("/api/admin/hidden", json={"asset_id": "bobcat"}).status_code == 401
-    assert client.post("/api/admin/login",
-                       json={"username": "admin", "password": "a-test-password"}).status_code == 200
-    assert [i["asset_id"] for i in client.post("/api/admin/hidden", json={"asset_id": "bobcat"}).json()] == ["bobcat"]
+    assert [i["asset_id"] for i in client.post("/api/content-health/hidden", json={"asset_id": "bobcat"}).json()] == ["bobcat"]
     gone = client.get("/api/assets/bobcat")
     assert gone.status_code == 404 and "hidden" in gone.json()["detail"]
-    assert client.post("/api/admin/hidden", json={"asset_id": "nope"}).status_code == 422
-    assert client.delete("/api/admin/hidden/bobcat").json() == []
+    assert client.post("/api/content-health/hidden", json={"asset_id": "nope"}).status_code == 422
+    assert client.delete("/api/content-health/hidden/bobcat").json() == []
     assert client.get("/api/assets/bobcat").status_code == 200

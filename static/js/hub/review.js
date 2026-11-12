@@ -670,7 +670,7 @@ function lastResult() {
   return box;
 }
 
-/* ── the sidebar item, under Dashboard ────────────────────────────────── */
+/* ── the sidebar items, under Dashboard: Content to review, Content health ── */
 function addReviewNav() {
   hubPermissions.then(function (granted) {
     if (granted.indexOf("maintain_content") < 0 || document.getElementById("navReview")) return;
@@ -682,6 +682,13 @@ function addReviewNav() {
       + '<use href="#i-flag"/></svg> Content to review</span>';
     item.addEventListener("click", function () { location.hash = "#/review"; });
     after.insertAdjacentElement("afterend", item);
+    // Content health (2026-11-11): the content tools, its own page.
+    var health = el("a", "orion-navitem");
+    health.id = "navContentHealth";
+    health.href = "/content-health";
+    health.innerHTML = '<span class="label"><svg class="orion-ico orion-ico--sm">'
+      + '<use href="#i-check"/></svg> Content health</span>';
+    item.insertAdjacentElement("afterend", health);
     if (location.hash === "#/review") markNav(true);
   });
 }

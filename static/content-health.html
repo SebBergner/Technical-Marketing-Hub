@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Content health · Technical Marketing Hub</title>
+<link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
+<!--
+  Content health (Liwei, 2026-11-11): the content tools, out of the Admin
+  page, for the people with Maintain content. Its own page like /admin, with
+  the Admin page's stylesheet; index.html stays Elio's.
+-->
+<link rel="stylesheet" href="/static/css/admin.css">
+<style>
+  .hc-card { margin-bottom: 12px; }
+  .hc-card > summary { cursor: pointer; list-style: none; }
+  .hc-card > summary::-webkit-details-marker { display: none; }
+  .hc-card > summary h2::before { content: "▸ "; color: var(--faint, #888); }
+  .hc-card[open] > summary h2::before { content: "▾ "; }
+  .hc-card--ok { opacity: .75; }
+  .hc-why { margin: 2px 0 4px; font-size: 13px; }
+  .hc-fix { margin: 0 0 10px; font-size: 12.5px; }
+  .hc-bar { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin: -6px 0 14px; }
+  .hc-bar label { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="login" id="offView" hidden>
+  <div class="card">
+    <h1>No access to Content health</h1>
+    <p class="muted" style="margin:0">
+      Content health needs the <b>Maintain content</b> permission. Ask a Hub administrator to
+      add you to a group that has it (Admin &rarr; Users &amp; groups).
+    </p>
+    <p style="margin:0"><a href="/">Back to the Hub</a></p>
+  </div>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="a-overview" viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></symbol>
+    <symbol id="a-home" viewBox="0 0 16 16"><path d="M2.5 7.2 8 2.5l5.5 4.7V13a.8.8 0 0 1-.8.8H9.6V10H6.4v3.8H3.3a.8.8 0 0 1-.8-.8z"/></symbol>
+    <symbol id="a-chart" viewBox="0 0 16 16"><path d="M2.5 13.5h11M4.5 11V7.5M8 11V4M11.5 11V8.5"/></symbol>
+    <symbol id="a-review" viewBox="0 0 16 16"><rect x="3" y="2.5" width="10" height="11.5" rx="1.2"/><path d="M5.6 8.4l1.6 1.6 3.2-3.2"/></symbol>
+    <symbol id="a-flag" viewBox="0 0 16 16"><path d="M3.5 14V2.5M3.5 3h8l-1.6 3 1.6 3h-8"/></symbol>
+    <symbol id="a-lock" viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></symbol>
+    <symbol id="a-usage" viewBox="0 0 16 16"><path d="M1.5 8.5h3l2-5 3 9 2-4h3"/></symbol>
+    <symbol id="a-users" viewBox="0 0 16 16"><circle cx="6" cy="5.5" r="2.3"/><path d="M1.8 13.5c.4-2.4 2.1-3.8 4.2-3.8s3.8 1.4 4.2 3.8M10.6 3.4a2.2 2.2 0 0 1 0 4.2M12.2 9.9c1.1.5 1.8 1.7 2 3.6"/></symbol>
+    <symbol id="a-signin" viewBox="0 0 16 16"><path d="M9.5 2.5h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-3M6 5l3 3-3 3M9 8H2.5"/></symbol>
+    <symbol id="a-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></symbol>
+    <symbol id="a-pulse" viewBox="0 0 16 16"><path d="M8 13.5S2.5 10.2 2.5 6.3A2.8 2.8 0 0 1 8 5a2.8 2.8 0 0 1 5.5 1.3C13.5 10.2 8 13.5 8 13.5z"/></symbol>
+    <symbol id="a-back" viewBox="0 0 16 16"><path d="M10 3.5 5.5 8l4.5 4.5"/></symbol>
+    <symbol id="a-refresh" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3"/></symbol>
+  </defs>
+</svg>
+
+<div class="shell" id="dashView" hidden>
+  <aside class="side">
+    <div class="side__brand">
+      <div class="side__title">Content health</div>
+      <div class="faint side__sub">Technical Marketing Hub</div>
+    </div>
+    <a class="side__hub" href="/"><svg class="ico"><use href="#a-back"/></svg>Back to the Hub</a>
+    <a class="side__hub" href="/admin" id="adminLink" hidden><svg class="ico"><use href="#a-overview"/></svg>Admin</a>
+
+    <nav class="tabs" id="chTabs" role="tablist" aria-orientation="vertical" aria-label="Content health">
+      <button type="button" class="tab tab--on" role="tab" data-tab="checks" aria-selected="true"><svg class="ico"><use href="#a-pulse"/></svg><span>Health check</span></button>
+      <button type="button" class="tab" role="tab" data-tab="review" aria-selected="false"><svg class="ico"><use href="#a-review"/></svg><span>Content review</span></button>
+      <button type="button" class="tab" role="tab" data-tab="access" aria-selected="false"><svg class="ico"><use href="#a-lock"/></svg><span>Content access</span></button>
+      <button type="button" class="tab" role="tab" data-tab="searches" aria-selected="false"><svg class="ico"><use href="#a-search"/></svg><span>Searches</span></button>
+    </nav>
+
+    <div class="side__foot">
+      <div class="faint side__loaded" id="loadedAt"></div>
+      <div class="side__buttons">
+        <button id="refreshBtn"><svg class="ico"><use href="#a-refresh"/></svg>Refresh</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+  <header class="page">
+    <h1 id="pageTitle">Health check</h1>
+  </header>
+
+  <!-- What in SharePoint keeps a demo out of the Hub or out of its place. -->
+  <div id="tabChecks" role="tabpanel">
+    <section>
+      <div class="hc-bar">
+        <p class="muted" style="margin:0;flex:1 1 320px">Problems in SharePoint the Hub can see.
+          Open a check for its list; fix each one in SharePoint, and it goes after the next sync.</p>
+        <label><input type="checkbox" id="hcMine"> Only demos I own</label>
+      </div>
+      <p class="faint" id="hcIntro" style="margin:0 0 14px;font-size:12.5px"></p>
+      <div id="hcBody"></div>
+    </section>
+  </div>
+
+  <!-- What to look at again: dust, idle, Still current running out, archived (2026-10-14). -->
+  <div id="tabReview" role="tabpanel" hidden>
+    <section>
+      <p class="muted" style="margin:-6px 0 6px">Demos worth another look. Still current
+        confirms the interface shown matches today's release, in the Hub only. Archive takes a
+        demo out of the Hub's lists and moves its SharePoint folder into _Archive, which only
+        the team can open; Restore moves it back.</p>
+      <p class="faint" id="rvIntro" style="margin:0 0 14px;font-size:12.5px"></p>
+      <div class="card" id="rvUploads" style="margin-bottom:12px"></div>
+      <div id="rvBody"></div>
+    </section>
+    <section>
+      <div class="section-head"><h2>Recent changes</h2></div>
+      <div class="card tablewrap" id="rvChanges"></div>
+    </section>
+  </div>
+
+  <!-- PTC Only demos, requests and hidden demos (2026-10-07/14). -->
+  <div id="tabAccess" role="tabpanel" hidden>
+    <section>
+      <p class="muted" style="margin:-6px 0 14px">A <b>PTC Only</b> demo shows its card, description and
+        details to everyone, but its files open only for people whose groups have <b>Access PTC
+        Only content</b> (PTC employees by default, never Partners). A demo is PTC Only when its SharePoint folder is closed to
+        partners, or when it is marked here or on its own page. The mark is kept in the Hub;
+        marking a SharePoint demo also sets its Customer facing column to No, since a PTC Only
+        demo is never customer facing. GXC videos are on Admin.</p>
+      <div class="card" id="caRequests" style="margin-bottom:12px"></div>
+      <div class="card" id="caList"></div>
+      <div class="card" id="hiddenDemos" style="margin-top:12px"></div>
+    </section>
+    <section>
+      <div class="section-head"><h2>Recent changes</h2></div>
+      <div class="card tablewrap" id="caChanges"></div>
+    </section>
+  </div>
+
+  <!-- Searches that found little or nothing (Admin -> Hub usage until 2026-11-11). -->
+  <div id="tabSearches" role="tabpanel" hidden>
+    <section>
+      <div class="hc-bar">
+        <p class="muted" style="margin:0;flex:1 1 320px">What people looked for and did not find,
+          in their own words: the most direct evidence of what the catalogue is missing.</p>
+        <div class="ranges" id="srRanges"></div>
+      </div>
+      <p class="faint" id="srIntro" style="margin:0 0 14px;font-size:12.5px"></p>
+      <div class="card" id="srBody"></div>
+    </section>
+  </div>
+  </main>
+</div>
+
+<script type="module" src="/static/js/content-health/main.js"></script>
+</body>
+</html>

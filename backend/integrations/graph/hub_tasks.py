@@ -135,7 +135,7 @@ def upload_fields(record: dict) -> dict | None:
             "TaskType": "Upload review", "TaskStatus": status,
             # The person an API upload is for, when its token named one.
             "RequestedBy": record.get("submitted_by") or _who(record.get("uploaded_by")),
-            "HubLink": f"{_base()}/admin#review",
+            "HubLink": f"{_base()}/content-health#review",
             "Details": "\n".join(lines),
             "DecidedBy": _who(record.get("reviewed_by") if record.get("status") != "cancelled"
                               else record.get("uploaded_by")) if decided else None,

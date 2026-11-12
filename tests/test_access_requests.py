@@ -72,18 +72,18 @@ def test_one_left_from_before_is_approved_and_applied(client):
     pending = ask(client).json()["pending"]
     assert client.get("/api/assets/bobcat", headers=ANN).json()["internal"] is False, \
         "nothing changes until someone decides"
-    decided = client.post(f"/api/admin/access-requests/{pending['id']}/decision",
+    decided = client.post(f"/api/content-health/access-requests/{pending['id']}/decision",
                           json={"approve": True, "note": "Agreed"}, headers=BOSS).json()
     assert (decided["status"], decided["decided_by"]) == ("approved", "user:boss@ptc.com")
     assert client.get("/api/assets/bobcat", headers=ANN).json()["internal"] is True
-    mark = next(i for i in client.get("/api/admin/content-access", headers=BOSS).json()
+    mark = next(i for i in client.get("/api/content-health/access", headers=BOSS).json()
                 if i["asset_id"] == "bobcat")
     assert mark["reason"] == "Requested by ann@ptc.com: Customer data in the recording"
 
 
 def test_a_rejection_changes_nothing_and_says_why(client):
     rid = ask(client).json()["pending"]["id"]
-    client.post(f"/api/admin/access-requests/{rid}/decision",
+    client.post(f"/api/content-health/access-requests/{rid}/decision",
                 json={"approve": False, "note": "Public material"}, headers=BOSS)
     view = client.get("/api/assets/bobcat/access-requests", headers=BOSS).json()
     assert view["pending"] is None
@@ -93,17 +93,17 @@ def test_a_rejection_changes_nothing_and_says_why(client):
 
 def test_only_a_manager_decides(client):
     rid = ask(client).json()["pending"]["id"]
-    assert client.post(f"/api/admin/access-requests/{rid}/decision",
+    assert client.post(f"/api/content-health/access-requests/{rid}/decision",
                        json={"approve": True}, headers=BO).status_code == 403
-    assert client.post(f"/api/admin/access-requests/{rid}/decision",
+    assert client.post(f"/api/content-health/access-requests/{rid}/decision",
                        json={"approve": True}, headers=BOSS).status_code == 200
-    assert client.post(f"/api/admin/access-requests/{rid}/decision",
+    assert client.post(f"/api/content-health/access-requests/{rid}/decision",
                        json={"approve": True}, headers=BOSS).status_code == 422, "already settled"
 
 
 def test_every_step_is_in_the_admin_log_under_content_access(client):
     rid = ask(client).json()["pending"]["id"]
-    client.post(f"/api/admin/access-requests/{rid}/decision", json={"approve": True},
+    client.post(f"/api/content-health/access-requests/{rid}/decision", json={"approve": True},
                 headers=BOSS)
     client.put("/api/assets/bobcat/still-current", json={"still_current": True}, headers=BOSS)
     log = client.get("/api/admin/admin-log?category=Content access", headers=BOSS).json()

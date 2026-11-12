@@ -1,7 +1,7 @@
 /* The Admin page's script (static/admin.html).
  *
  * Each file in static/js/admin/ is one tab or shared part -- util, overview,
- * usage, home, content, review, owners, access, users, signins -- and imports what
+ * usage, home, owners, access, users, signins -- and imports what
  * it uses from the others; until 2026-10-15 they were one 3,600-line
  * static/admin.js. This file holds the tabs and boots the page: the
  * sign-in watch on fetch, who is signed in, then the Overview.
@@ -14,10 +14,8 @@ import {
 } from "./overview.js";
 import { loadUsage, renderDims, renderRanges } from "./usage.js";
 import { loadHubSettings, loadPromoted } from "./home.js";
-import { contentState, loadContent } from "./content.js";
-import { loadReview } from "./review.js";
 import { loadOwners } from "./owners.js";
-import { loadContentAccess, loadHidden } from "./access.js";
+import { loadGxcTab } from "./access.js";
 import { loadAccess, loadDisclaimer, loadLicences, loadTokens } from "./users.js";
 import { loadActivity, renderActRanges } from "./signins.js";
 
@@ -49,11 +47,11 @@ import { loadActivity, renderActRanges } from "./signins.js";
   window.fetch = watched;
 })();
 
-/* Overview | Content dashboard | Users & groups. The tab is in the
- * address (#content, #access), so a refresh or a shared link opens the
+/* The tabs down the left. The tab is in the
+ * address (#usage, #access), so a refresh or a shared link opens the
  * same one. */
-var PANELS = { overview: "tabOverview", home: "tabHome", content: "tabContent",
-               review: "tabReview", reports: "tabReports", internal: "tabInternal", usage: "tabUsage",
+var PANELS = { overview: "tabOverview", home: "tabHome",
+               reports: "tabReports", internal: "tabInternal", usage: "tabUsage",
                access: "tabAccess", activity: "tabActivity" };
 
 function tabFromHash() {
@@ -76,10 +74,8 @@ function showTab(name) {
   var first = $(PANELS[name]).querySelector("section .section-head h2");
   if (first && first.textContent.trim().toLowerCase()
       === $("pageTitle").textContent.toLowerCase()) first.hidden = true;
-  if (name === "content" && !contentState.loaded) loadContent();
   if (name === "access") { loadAccess(); loadLicences(); loadDisclaimer(); loadTokens(); }
-  if (name === "internal") loadContentAccess();
-  if (name === "review") loadReview();
+  if (name === "internal") loadGxcTab();
   if (name === "reports") loadOwners();
   if (name === "activity") { renderActRanges(); loadActivity(); }
   if (name === "usage") loadUsage();
@@ -106,8 +102,6 @@ function load() {
       renderAutoSync(d.auto_sync);
       loadPromoted();
       loadHubSettings();
-      loadHidden();
-      contentState.loaded = false;
       showTab(tabFromHash());
       renderQueues(d);
       renderConfiguration(d.configuration);

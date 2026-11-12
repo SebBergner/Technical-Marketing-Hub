@@ -308,27 +308,6 @@ def set_auto_sync(body: AutoSyncIn, actor: str = Depends(require_perm(Perm.RUN_S
     return _auto_sync_view()
 
 
-@router.get("/content", dependencies=[VIEW_ADMIN])
-def content_summary(repo: AssetRepository = Depends(get_repo)):
-    """The content dashboard (HLR-F1), counted over what the Hub lists."""
-    from backend.services import content_dashboard
-    return content_dashboard.summary(repo)
-
-
-@router.get("/content/assets", dependencies=[VIEW_ADMIN])
-def content_assets(dim: str, value: str, repo: AssetRepository = Depends(get_repo)):
-    """The assets behind one bar of the content dashboard."""
-    from backend.services import content_dashboard
-    try:
-        return content_dashboard.assets_in(repo, dim, value)
-    except KeyError:
-        raise HTTPException(status_code=404, detail=f"no dimension {dim!r}")
-
-
-class HideIn(BaseModel):
-    asset_id: str
-
-
 class GxcIn(BaseModel):
     downloads: bool
 
@@ -464,42 +443,6 @@ def revoke_gxc_links(body: GxcRevokeIn, actor: str = Depends(require_perm(Perm.M
     grant that came through them, down the chain (gxc_shares.revoke)."""
     from backend import gxc_shares
     return gxc_shares.revoke(body.sender, body.asset_id, actor)
-
-
-@router.get("/hidden", dependencies=[VIEW_ADMIN])
-def list_hidden(repo: AssetRepository = Depends(get_repo)):
-    try:
-        return repo.hidden()
-    except NotImplementedError:
-        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
-
-
-@router.post("/hidden", dependencies=[VIEW_ADMIN])
-def hide_demo(body: HideIn, repo: AssetRepository = Depends(get_repo),
-              actor: str = Depends(require_perm(Perm.MAINTAIN))):
-    """Hide a demo from the Hub -- every list, search and page -- without
-    touching SharePoint or Consensus. Manage content access, on the Admin
-    page's Content access tab (Liwei, 2026-10-14; Manage the Home page until
-    then, and never the curator key alone)."""
-    try:
-        items = repo.hide(body.asset_id, actor)
-    except KeyError:
-        raise HTTPException(status_code=422, detail=f"no listed demo with id {body.asset_id!r}")
-    except NotImplementedError:
-        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
-    log.info("demo hidden from the Hub by %s: %s", actor, body.asset_id)
-    return items
-
-
-@router.delete("/hidden/{asset_id}", dependencies=[VIEW_ADMIN])
-def unhide_demo(asset_id: str, repo: AssetRepository = Depends(get_repo),
-                actor: str = Depends(require_perm(Perm.MAINTAIN))):
-    try:
-        items = repo.unhide(asset_id)
-    except NotImplementedError:
-        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
-    log.info("demo unhidden by %s: %s", actor, asset_id)
-    return items
 
 
 class HubSettingsIn(BaseModel):
@@ -914,7 +857,8 @@ REVIEW_EXPIRING_DAYS = 30
 _USE_EVENTS = ("view", "preview", "download")
 
 
-@router.get("/content-review", dependencies=[VIEW_ADMIN])
+# Served on Content health since 2026-11-11 (routers/content_health.py);
+# Hub -> Content to review reads its rules.
 def content_review(min_age_days: int = Query(REVIEW_MIN_AGE_DAYS, ge=0),
                    idle_days: int = Query(REVIEW_IDLE_DAYS, ge=1),
                    repo: AssetRepository = Depends(get_repo)):
@@ -1002,55 +946,6 @@ def content_review(min_age_days: int = Query(REVIEW_MIN_AGE_DAYS, ge=0),
 
 
 # ──────────────────────────────────────────────────────── content access
-@router.get("/content-access", dependencies=[VIEW_ADMIN])
-def get_content_access(repo: AssetRepository = Depends(get_repo)):
-    """Every Internal demo and why (2026-10-07). Changes go through
-    PUT /api/assets/{id}/access, which the detail page uses too."""
-    try:
-        return repo.content_access()
-    except NotImplementedError:
-        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
-
-
-@router.get("/access-requests", dependencies=[VIEW_ADMIN])
-def get_access_requests(status: str | None = None, limit: int = Query(100, ge=1, le=500),
-                        repo: AssetRepository = Depends(get_repo)):
-    """Requests to make demos Internal or Open (2026-10-15), newest first;
-    `status=pending` for the ones waiting."""
-    from backend.services import access_requests
-    return access_requests.listing(repo, status=status, limit=limit)
-
-
-class DecisionIn(BaseModel):
-    approve: bool
-    note: str | None = None
-
-
-@router.post("/access-requests/{request_id}/decision", dependencies=[VIEW_ADMIN])
-def decide_access_request(request_id: str, body: DecisionIn, request: Request,
-                          repo: AssetRepository = Depends(get_repo),
-                          actor: str = Depends(require_perm(Perm.MAINTAIN))):
-    """Approve -- which applies the change -- or reject, with a note."""
-    from backend.services import access_requests
-    try:
-        decided = access_requests.decide(repo, request_id, body.approve, actor, body.note)
-    except LookupError:
-        raise HTTPException(status_code=404, detail="no such request")
-    except access_requests.RequestError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    # The Admin log names the demo, not the request's id.
-    request.state.hub_target = decided["asset_id"]
-    if body.approve:
-        who = decided["requested_by"].split(":", 1)[-1]
-        try:
-            repo.set_access(decided["asset_id"], decided["level"], actor,
-                            f"Requested by {who}: {decided['reason']}")
-        except KeyError:
-            raise HTTPException(status_code=404, detail="the demo is no longer listed")
-    log.info("access request %s %s by %s", request_id, decided["status"], actor)
-    return decided
-
-
 # ────────────────────────────────────────────────────────── users & groups
 MANAGE_USERS = require_perm(Perm.MANAGE_USERS)
 

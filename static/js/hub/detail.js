@@ -1939,7 +1939,7 @@ function accessRow(asset, may, view) {
           placeholder: yes ? "Note (optional)" : "Why not? (optional, the requester sees it)",
           confirm: yes ? "Approve and apply" : "Reject",
           submit: function (note) {
-            return send("POST", "/api/admin/access-requests/" + encodeURIComponent(pending.id)
+            return send("POST", "/api/content-health/access-requests/" + encodeURIComponent(pending.id)
                         + "/decision", { approve: yes, note: note || null })
               .then(function () {
                 if (yes) {

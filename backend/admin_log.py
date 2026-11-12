@@ -59,6 +59,10 @@ ACTIONS: dict[tuple[str, str], str] = {
     ("POST", "/api/assets/{asset_id}/access-requests/{request_id}/withdraw"):
         "Withdrew an access request",
     ("POST", "/api/admin/access-requests/{request_id}/decision"): "Decided an access request",
+    ("POST", "/api/content-health/hidden"): "Hid a demo",
+    ("DELETE", "/api/content-health/hidden/{asset_id}"): "Unhid a demo",
+    ("POST", "/api/content-health/access-requests/{request_id}/decision"):
+        "Decided an access request",
     ("GET", "/api/admin/admin-log.csv"): "Exported the Admin log",
     ("POST", "/api/uploads"): "Started an upload",
     ("POST", "/api/uploads/{upload_id}/files/{index}/session"): "Opened a file upload",
@@ -93,6 +97,7 @@ ACTIONS: dict[tuple[str, str], str] = {
 #: Reads worth a line: about one person, not about the catalogue.
 _LOGGED_READS = {route for (method, route) in ACTIONS if method == "GET"}
 WATCHED = re.compile(r"^/api/(admin|graph|consensus/(sync|oauth)|curation/proposals|migration)/"
+                     r"|^/api/content-health/(hidden|access-requests)(/|$)"
                      r"|^/api/assets/[^/]+/(access|still-current|archive"
                      r"|metadata|preview-video|thumbnail)$"
                      r"|^/api/assets/[^/]+/(related|not-related)/[^/]+$"
@@ -105,7 +110,8 @@ WATCHED = re.compile(r"^/api/(admin|graph|consensus/(sync|oauth)|curation/propos
 #: chain is untouched. First match wins.
 CATEGORIES: list[tuple[str, re.Pattern]] = [
     ("Content access", re.compile(r"^/api/assets/[^/]+/(access|access-requests)"
-                                  r"|^/api/admin/(hidden|access-requests|gxc)")),
+                                  r"|^/api/admin/(hidden|access-requests|gxc)"
+                                  r"|^/api/content-health/(hidden|access-requests)")),
     ("Content review", re.compile(r"^/api/assets/[^/]+/(still-current|archive)$")),
     ("Uploads", re.compile(r"^/api/uploads(/|$)")),
     ("Users & groups", re.compile(r"^/api/admin/(access|api-tokens|consensus-licenses)(/|$)")),

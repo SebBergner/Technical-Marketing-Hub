@@ -126,6 +126,13 @@ class SyncResult:
     #: rather than renamed, since `sync_report.py` already keys on it.
     skipped_no_demo_type: int = 0
     orphan_files: int = 0
+    #: For Content health (2026-11-11): the folders the Hub skips, with how
+    #: many files each holds, and the files loose at the library's root --
+    #: the names behind skipped_no_demo_type and the root files, which the
+    #: sync otherwise only counted. Folders named "_..." (_Archive) are the
+    #: library's own and not listed.
+    skipped_folders: list[dict] = field(default_factory=list)
+    loose_files: list[dict] = field(default_factory=list)
     delta_token: str | None = None
     full_resync: bool = False
     #: True when delta reported nothing changed, so the run did no work. Without
@@ -318,6 +325,12 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
             )
         else:
             result.skipped_no_demo_type += 1
+            if not name.startswith("_"):
+                result.skipped_folders.append({
+                    "name": name, "web_url": item.get("webUrl"), "files": 0,
+                    "created_at": item.get("createdDateTime"),
+                    "modified_at": item.get("lastModifiedDateTime"),
+                    "content_type": m.clean_text(_field(fields, "content_type"))})
             continue
 
         if item.get("hub_archived"):
@@ -325,16 +338,23 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
         assets[name] = asset
 
     # Pass 2 — every file belongs to its first path segment.
+    skipped = {f["name"]: f for f in result.skipped_folders}
     for item in items:
         if "file" not in item or item.get("deleted"):
             continue
         relative = _relative_path(item)
         if not relative:
-            continue                      # a loose file at the drive root
+            # A loose file at the drive root: in no demo, so never in the Hub.
+            result.loose_files.append({"name": item.get("name"), "web_url": item.get("webUrl"),
+                                       "size": item.get("size"),
+                                       "modified_at": item.get("lastModifiedDateTime")})
+            continue
         folder, _, subfolder = relative.partition("/")
         owner = assets.get(folder)
         if owner is None:
             result.orphan_files += 1      # under a folder with no Demo Type
+            if folder in skipped:
+                skipped[folder]["files"] += 1
             continue
         filename = m.clean_text(item.get("name")) or ""
         owner["resources"].append(m.build_resource(filename, subfolder, item))
@@ -435,6 +455,10 @@ def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
     result.full_resync = full
 
     repo.replace_source_rows(assets, source_system=SOURCE_SYSTEM)
+    if keep := getattr(repo, "set_sync_field", None):
+        keep(SOURCE_SYSTEM, "health", {"read_at": read_at,
+                                       "skipped_folders": result.skipped_folders,
+                                       "loose_files": result.loose_files})
     result.retired_seed = _retire_seed(repo)
     if stamp := getattr(repo, "record_sync", None):
         stamp(SOURCE_SYSTEM)

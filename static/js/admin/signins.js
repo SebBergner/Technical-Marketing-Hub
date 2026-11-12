@@ -6,6 +6,7 @@
 
 import { $, actorWord, el, gxcMark, row, session, tile, when } from "./util.js";
 import { groupNames, ug } from "./users.js";
+import { adminLogTable } from "./logtable.js";
 
 /* ── Sign-ins (backend/activity.py, 2026-10-07) ───────────────────────
  * Who is active now, who signed in over a period, and the log itself.
@@ -129,49 +130,6 @@ function loadAdminLog() {
   return fetch("/api/admin/admin-log?" + qs)
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (d) { if (d) renderAdminLog(d); });
-}
-
-function detailWord(d) {
-  var parts = [];
-  var add = function (obj) {
-    Object.keys(obj || {}).forEach(function (k) {
-      var v = obj[k];
-      parts.push(k + ": " + (typeof v === "object" ? JSON.stringify(v) : v));
-    });
-  };
-  add(d && d.query);
-  add(d && d.body);
-  if (d && d.body_bytes) parts.push("upload, " + d.body_bytes + " bytes");
-  return parts.join(" · ");
-}
-
-function adminLogTable(items, withArea) {
-  var t = el("table");
-  var hr = t.createTHead().insertRow();
-  var heads = ["When", "Who"].concat(withArea ? ["Area"] : [])
-    .concat(["What", "Demo / group", "Details", "Result"]);
-  heads.forEach(function (h) { hr.appendChild(el("th", null, h)); });
-  var tb = t.createTBody();
-  items.forEach(function (e) {
-    var tr = tb.insertRow();
-    var w = tr.insertCell();
-    w.className = "num faint";
-    w.textContent = new Date(e.at).toLocaleString();
-    tr.insertCell().textContent = actorWord(e.actor);
-    if (withArea) tr.insertCell().textContent = e.category || "—";
-    tr.insertCell().textContent = e.action;
-    tr.insertCell().textContent = e.target || "—";
-    var det = tr.insertCell();
-    det.className = "al-detail";
-    det.textContent = detailWord(e.detail) || "—";
-    det.title = det.textContent;
-    var res = tr.insertCell();
-    var ok = e.status >= 200 && e.status < 400;
-    res.textContent = ok ? "Done" : (e.status === 401 || e.status === 403
-      ? "Refused (" + e.status + ")" : "Failed (" + e.status + ")");
-    if (!ok) res.className = "al-refused";
-  });
-  return t;
 }
 
 function renderAdminLog(d) {
@@ -623,5 +581,5 @@ $("actPeopleSearch").addEventListener("input", function (e) {
 });
 
 export {
-  act, adminLogTable, al, loadActivity, renderActRanges
+  act, al, loadActivity, renderActRanges
 };

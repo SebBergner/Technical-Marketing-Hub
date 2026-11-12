@@ -105,7 +105,7 @@ def test_only_manage_content_access_may_change_it(client):
         "asset_id": "bobcat", "internal": True, "internal_source": "hub"}
     assert put(ADMIN, "secret").status_code == 422
     assert put(ADMIN, asset="nope").status_code == 404
-    assert client.get("/api/admin/content-access",
+    assert client.get("/api/content-health/access",
                       headers=easyauth_headers(ADMIN)).status_code == 200
-    assert client.get("/api/admin/content-access",
+    assert client.get("/api/content-health/access",
                       headers=easyauth_headers(STAFF)).status_code == 403

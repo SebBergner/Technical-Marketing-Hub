@@ -154,7 +154,7 @@ def test_archiving_needs_maintain_content_and_moves_the_folder(client):
     assert client.drive.parent["kit"] == "_arch"
     shown = client.get("/api/assets/kit", headers=TEAM_USER).json()
     assert shown["archived"] and shown["sharepoint_archived"]
-    listed = client.get("/api/admin/content-review", headers=TEAM_USER).json()["archived"]
+    listed = client.get("/api/content-health/review", headers=TEAM_USER).json()["archived"]
     assert listed[0]["where"] == "sharepoint" and listed[0]["in_sharepoint"] is True
     assert client.put(url, json={"archived": False}, headers=TEAM_USER).status_code == 200
     assert client.drive.parent["kit"] == "root"
@@ -163,7 +163,7 @@ def test_archiving_needs_maintain_content_and_moves_the_folder(client):
 def test_a_consensus_demo_is_archived_in_the_hub_only(client):
     r = client.put("/api/assets/tour/archive", json={"archived": True}, headers=TEAM_USER)
     assert r.status_code == 200 and client.drive.moves == []
-    listed = client.get("/api/admin/content-review", headers=TEAM_USER).json()["archived"]
+    listed = client.get("/api/content-health/review", headers=TEAM_USER).json()["archived"]
     assert listed[0]["where"] == "hub"
 
 
@@ -179,14 +179,14 @@ def test_a_demo_no_longer_sold_is_listed_for_admin_and_archived_like_any_other(c
     """Hidden everywhere in the Hub, but its folder is still in the library:
     Content review lists it, and Archive moves it into _Archive."""
     assert client.get("/api/assets/old", headers=TEAM_USER).status_code == 404
-    review = client.get("/api/admin/content-review", headers=TEAM_USER).json()
+    review = client.get("/api/content-health/review", headers=TEAM_USER).json()
     assert [d["asset_id"] for d in review["divested"]] == ["old"]
     assert review["divested"][0]["web_url"] == "https://sp/old"
     r = client.put("/api/assets/old/archive", json={"archived": True, "reason": "OA"},
                    headers=TEAM_USER)
     assert r.status_code == 200, r.text
     assert client.drive.parent["kit"] == "_arch"
-    review = client.get("/api/admin/content-review", headers=TEAM_USER).json()
+    review = client.get("/api/content-health/review", headers=TEAM_USER).json()
     assert review["divested"] == []
     listed = review["archived"][0]
     assert listed["asset_id"] == "old" and listed["divested"] and listed["where"] == "sharepoint"
@@ -196,7 +196,7 @@ def test_a_demo_no_longer_sold_is_listed_for_admin_and_archived_like_any_other(c
     r = client.put("/api/assets/old/archive", json={"archived": False}, headers=TEAM_USER)
     assert r.status_code == 200, r.text
     assert client.drive.parent["kit"] == "root"
-    assert [d["asset_id"] for d in client.get("/api/admin/content-review",
+    assert [d["asset_id"] for d in client.get("/api/content-health/review",
                                               headers=TEAM_USER).json()["divested"]] == ["old"]
 
 

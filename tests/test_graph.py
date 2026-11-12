@@ -367,6 +367,19 @@ def test_files_under_a_folder_with_no_demo_type_are_orphans():
     assert result.resources == 0
 
 
+def test_the_sync_names_what_the_hub_skips_for_content_health():
+    """Content health (2026-11-11) lists the skipped folders and loose root
+    files by name; _Archive is the library's own and not listed."""
+    items = [folder("Real Asset"), folder("No Type Here", demo_type=None),
+             folder("_Archive", demo_type=None),
+             file_item("stray.mp4", "/No Type Here"), file_item("two.mp4", "/No Type Here"),
+             file_item("Aircraft bulkhead.rar", "")]
+    _, result = build_assets(items)
+    assert [(f["name"], f["files"]) for f in result.skipped_folders] == [("No Type Here", 2)]
+    assert result.skipped_folders[0]["web_url"].endswith("/No Type Here")
+    assert [f["name"] for f in result.loose_files] == ["Aircraft bulkhead.rar"]
+
+
 def test_cad_model_folders_become_cad_model_assets():
     """A folder with no Demo Type but ContentType 'CAD Model' is a standalone
     CAD dataset, not a demo -- measured 2026-09-09, 280 of them in the real

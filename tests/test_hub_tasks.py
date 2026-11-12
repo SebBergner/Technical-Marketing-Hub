@@ -79,7 +79,7 @@ def test_an_upload_left_waiting_closes_its_row_when_published(upload_client, sp,
     assert row["Title"] == "Review: Creo Sheetmetal Kit"
     assert (row["TaskType"], row["TaskStatus"]) == ("Upload review", "Open")
     assert row["RequestedBy"] == "maker@ptc.com" and row["HubId"] == f"upload:{record['id']}"
-    assert row["HubLink"] == "https://dev-tmh.ptcxc.com/admin#review"
+    assert row["HubLink"] == "https://dev-tmh.ptcxc.com/content-health#review"
     assert "DecidedBy" not in row, "nothing empty is written to a new row"
     upload_client.post(f"/api/uploads/{record['id']}/publish", json={}, headers=BOSS)
     [row] = _rows(sp_list)
@@ -94,7 +94,7 @@ def test_an_access_request_is_a_row_closed_by_the_decision(access_client, sp_lis
     assert row["Title"] == "Make Internal: Bobcat" and row["TaskType"] == "Access request"
     assert row["HubLink"] == "https://dev-tmh.ptcxc.com/#/asset/bobcat"
     assert row["Details"] == "Customer data in the recording"
-    access_client.post(f"/api/admin/access-requests/{pending['id']}/decision",
+    access_client.post(f"/api/content-health/access-requests/{pending['id']}/decision",
                        json={"approve": False, "note": "Not customer data"}, headers=BOSS)
     [row] = _rows(sp_list)
     assert (row["TaskStatus"], row["DecidedBy"]) == ("Rejected", "boss@ptc.com")

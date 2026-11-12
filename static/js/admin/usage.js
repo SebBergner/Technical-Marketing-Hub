@@ -451,28 +451,14 @@ function renderSearches(u) {
   var s2 = $("usageSearches");
   s2.innerHTML = "";
   s2.appendChild(el("h2", null, "Searches"));
-  var zero = u.searches.zero_result || [];
-  if (zero.length) {
-    var lead = el("p", "muted",
-      "Searched for, and found nothing — the most direct evidence there "
-      + "is of what the catalogue is missing.");
-    lead.style.cssText = "font-size:12.5px;margin:6px 0 4px";
-    s2.appendChild(lead);
-    var zt = el("table");
-    var zh = el("tr");
-    zh.appendChild(el("th", null, "No results for"));
-    zh.appendChild(el("th", "r", "Times"));
-    zt.appendChild(el("thead")).appendChild(zh);
-    var zb = el("tbody");
-    zero.slice(0, 8).forEach(function (r) {
-      var tr = el("tr");
-      tr.appendChild(el("td", null, r.q));
-      tr.appendChild(el("td", "r num", r.zero_results));
-      zb.appendChild(tr);
-    });
-    zt.appendChild(zb);
-    s2.appendChild(zt);
-  }
+  // Searches that found nothing are on Content health -> Searches (2026-11-11).
+  var moved = el("p", "muted");
+  moved.style.cssText = "font-size:12.5px;margin:6px 0 4px";
+  moved.appendChild(document.createTextNode("Searches that found little or nothing: "));
+  var link = el("a", null, "Content health → Searches");
+  link.href = "/content-health#searches";
+  moved.appendChild(link);
+  s2.appendChild(moved);
   if ((u.searches.top || []).length) {
     var lead2 = el("p", "muted", "Most searched");
     lead2.style.cssText = "font-size:12.5px;margin:14px 0 4px";

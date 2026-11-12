@@ -77,7 +77,7 @@ def test_archiving_needs_maintain_content_and_restores(client):
 
 # ─────────────────────────────────────────────────────── review lists
 def test_the_review_lists_dust_idle_and_expiring(client):
-    review = client.get("/api/admin/content-review", headers=BOSS).json()
+    review = client.get("/api/content-health/review", headers=BOSS).json()
     assert [r["asset_id"] for r in review["dust"]] == ["dusty"]
     assert [r["asset_id"] for r in review["idle"]] == ["idle"], \
         "over a year old and not used; 'used' was opened last week; 'fresh' is too new"
@@ -86,12 +86,12 @@ def test_the_review_lists_dust_idle_and_expiring(client):
 
 def test_still_current_takes_a_demo_off_the_lists_and_shows_when_it_runs_out(client):
     client.put("/api/assets/dusty/still-current", json={"still_current": True}, headers=BOSS)
-    review = client.get("/api/admin/content-review", headers=BOSS).json()
+    review = client.get("/api/content-health/review", headers=BOSS).json()
     assert review["dust"] == [] and review["expiring"] == [], "a year away"
 
 
 def test_usage_and_people_are_counted_for_the_reviewer(client):
-    review = client.get("/api/admin/content-review?min_age_days=0&idle_days=5",
+    review = client.get("/api/content-health/review?min_age_days=0&idle_days=5",
                         headers=BOSS).json()
     used = next(r for r in review["idle"] if r["asset_id"] == "used")
     assert (used["views_12m"], used["downloads_12m"], used["people_12m"]) == (1, 1, 2)
@@ -100,7 +100,7 @@ def test_usage_and_people_are_counted_for_the_reviewer(client):
 def test_archived_demos_are_listed_with_who_and_why(client):
     client.put("/api/assets/dusty/archive", json={"archived": True, "reason": "UI from 2018"},
                headers=BOSS)
-    review = client.get("/api/admin/content-review", headers=BOSS).json()
+    review = client.get("/api/content-health/review", headers=BOSS).json()
     assert review["dust"] == []
     [entry] = review["archived"]
     assert (entry["asset_id"], entry["by"], entry["reason"]) == (
@@ -114,7 +114,7 @@ def test_a_leftover_sample_file_never_counts_as_use(client, tmp_path):
     (tmp_path / "owned" / "usage_events.demo.jsonl").write_text(json.dumps(
         {"at": long_ago, "event": "view", "asset_id": "idle", "synthetic": True,
          "user": "sample.user.01@sample.invalid"}) + "\n", encoding="utf-8")
-    review = client.get("/api/admin/content-review", headers=BOSS).json()
+    review = client.get("/api/content-health/review", headers=BOSS).json()
     assert "idle" in [r["asset_id"] for r in review["idle"]]
     assert review["usage_since"] > long_ago
 

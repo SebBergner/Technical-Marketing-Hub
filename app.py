@@ -12,7 +12,8 @@ from backend.version import app_version
 from backend.db import SessionLocal, create_all
 from backend import admin_log, oidc
 from backend.routers import (
-    admin, assets, auth, consensus, curation, debug, disclaimer, graph, migration,
+    admin, assets, auth, consensus, content_health, curation, debug, disclaimer, graph,
+    migration,
     reports, requests, segments, status, support, taxonomy, uploads, vms,
 )
 
@@ -133,6 +134,7 @@ app.include_router(support.admin_router)
 app.include_router(disclaimer.router)
 app.include_router(disclaimer.welcome_router)
 app.include_router(status.router)
+app.include_router(content_health.router)
 
 # Middleware, innermost first. Starlette wraps each new one around the ones
 # already added, so the order below is the reverse of the order a request
@@ -189,6 +191,15 @@ async def admin_page():
     Served to anyone — the page itself decides what to show, and every figure
     on it comes from /api/admin/overview, which does not."""
     return FileResponse(os.path.join(BASE_DIR, "static", "admin.html"))
+
+
+@app.get("/content-health", include_in_schema=False)
+async def content_health_page():
+    """Content health (2026-11-11): the content tools, for Maintain content.
+    Served like /admin; every figure comes from /api/content-health/..., which
+    checks the permission."""
+    return FileResponse(os.path.join(BASE_DIR, "static", "content-health.html"),
+                        headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/reports", include_in_schema=False)

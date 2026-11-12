@@ -80,15 +80,15 @@ def test_the_checks(client):
 
 def test_searches_that_found_little(client):
     d = client.get("/api/content-health/searches", headers=KEEPER).json()
-    assert d["searches"] == 6
+    assert d["totals"]["recorded"] == 6 and d["totals"]["typing"] == 0
     rows = {(r["q"].lower(), r["filters"]): r for r in d["rows"]}
-    assert set(rows) == {("ignition", None), ("mbd", None),
-                         ("full kit", "Type: Virtual Machine")}, "creo found plenty"
-    assert rows[("ignition", None)]["finds_now"] == 0
-    assert rows[("full kit", "Type: Virtual Machine")]["finds_now"] == 0
-    rows = {r["q"].lower(): r for r in d["rows"] if not r["filters"]}
-    assert (rows["ignition"]["times"], rows["ignition"]["zero_results"],
-            rows["ignition"]["few_results"], rows["ignition"]["people"]) == (3, 2, 1, 1)
+    assert set(rows) == {("ignition", None), ("mbd", None), ("creo", None),
+                         ("full kit", "Type: Virtual Machine")}
+    assert (rows[("ignition", None)]["times"], rows[("ignition", None)]["no_results"],
+            rows[("ignition", None)]["few_results"], rows[("ignition", None)]["people"])         == (3, 2, 1, 1)
+    # Nothing in the catalogue is called anything like "ignition": a gap.
+    gaps = {(g["q"].lower(), g["filters"]) for g in d["gaps"]}
+    assert gaps == {("ignition", None), ("mbd", None), ("full kit", "Type: Virtual Machine")}
     assert "p@ptc.com" not in json.dumps(d)
 
 

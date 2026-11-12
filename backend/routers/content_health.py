@@ -171,50 +171,28 @@ def _finds_now(repo: AssetRepository, q: str, key: tuple) -> int | None:
 @router.get("/searches")
 def searches(since: str | None = None, until: str | None = None,
              repo: AssetRepository = Depends(get_repo)):
-    """What people searched for and found nothing or almost nothing, in a
-    window -- the most direct evidence of what the catalogue is missing.
-
-    One row per words and filters together (Liwei, 2026-11-12): "Bobcat"
-    finds 11 demos, but nothing under the Virtual Machine type, and that is a
-    different question. Words are grouped ignoring case and spacing; how many
-    people asked, never who. Searches recorded before 2026-11-12 do not say
-    which filters were on, so they read as plain ones, and every row also
-    says what it finds today (`finds_now`): the page sets aside the rows
-    that find plenty now -- a filter was on then, or content came since.
-    """
+    """Content health -> Searches (2026-11-12): what people search for,
+    what they do not find, and what is rising, in a window and against the
+    window before it -- worked out by services/search_insights.py, which
+    says how. Counts of people, never who."""
+    from datetime import datetime, timezone
+    from backend.services import search_insights as si
     from backend.services.usage import events as _events
-    tally: dict[tuple, dict] = {}
-    total = 0
-    for e in _events(repo, since, until):
-        if e.get("event") != "search":
-            continue
-        q = " ".join(str(e.get("q") or "").split())
-        if not q:
-            continue
-        total += 1
-        key = _filters_key(e.get("filters"))
-        row = tally.setdefault((q.lower(), key), {"q": q, "key": key, "times": 0, "zero": 0,
-                                                   "few": 0, "people": set(), "last_at": ""})
-        row["times"] += 1
-        n = e.get("results") or 0
-        if n == 0:
-            row["zero"] += 1
-        elif n <= FEW_RESULTS:
-            row["few"] += 1
-        if e.get("user"):
-            row["people"].add(e["user"])
-        row["last_at"] = max(row["last_at"], e.get("at") or "")
-    rows = []
-    for row in tally.values():
-        if row["zero"] + row["few"] == 0:
-            continue
-        rows.append({"q": row["q"], "filters": _filters_words(row["key"]),
-                     "times": row["times"], "zero_results": row["zero"],
-                     "few_results": row["few"], "finds_now": _finds_now(repo, row["q"], row["key"]),
-                     "people": len(row["people"]), "last_at": row["last_at"][:10] or None})
-    rows.sort(key=lambda r: (-r["zero_results"], -r["few_results"], -r["people"],
-                             r["q"].lower(), r["filters"] or ""))
-    return {"searches": total, "few_results_max": FEW_RESULTS, "rows": rows}
+
+    def when(value: str | None):
+        if not value:
+            return None
+        try:
+            d = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status_code=422, detail=f"not a date: {value!r}")
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+    end = when(until) or datetime.now(timezone.utc)
+    records = repo.listed_records().values() if hasattr(repo, "listed_records") else []
+    return si.insights(_events(repo), when(since), end,
+                       finds_now=lambda q, key: _finds_now(repo, q, key),
+                       vocab=si.vocabulary(records), filters_words=_filters_words)
 
 
 # ─────────────────────────────────────────────────────── content review

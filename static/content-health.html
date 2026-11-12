@@ -22,6 +22,31 @@
   .hc-fix { margin: 0 0 10px; font-size: 12.5px; }
   .hc-bar { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin: -6px 0 14px; }
   .hc-bar label { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; }
+  .sr-card .sr-why, .sr-trendbox .sr-why { font-size: 12.5px; margin: 2px 0 8px; }
+  .sr-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; vertical-align: 1px; }
+  .sr-dot--red { background: #e34948; } .sr-dot--amber { background: #eda100; } .sr-dot--gray { background: #9a988f; }
+  .sr-list { list-style: none; margin: 0; padding: 0; }
+  .sr-list li { padding: 7px 0; border-top: 1px solid var(--border); }
+  .sr-list li:first-child { border-top: 0; }
+  .sr-q { font-size: 13.5px; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+  .sr-meta { font-size: 12px; color: var(--faint, #888); margin-top: 2px; }
+  .sr-act { margin-left: 10px; font-size: 12px; }
+  .sr-filter { font-size: 11px; }
+  .sr-empty, .sr-more { font-size: 12.5px; margin-top: 4px; }
+  .sr-top td { vertical-align: middle; }
+  .sr-barcell { min-width: 140px; width: 30%; }
+  .sr-bar { display: inline-block; height: 8px; border-radius: 4px; background: #2a78d6; vertical-align: middle; max-width: calc(100% - 28px); }
+  .sr-barn { font-size: 12px; margin-left: 6px; }
+  .sr-zero { color: #c0392b; }
+  .sr-trend { font-size: 11.5px; padding: 1px 7px; border-radius: 99px; background: var(--surface-2, #f1efe8); white-space: nowrap; }
+  .sr-trend--up { color: #27500a; background: #eaf3de; } .sr-trend--down { color: #791f1f; background: #fcebeb; }
+  .sr-trend--new { color: #0c447c; background: #e6f1fb; }
+  .sr-trends { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .sr-trendbox h3 { margin: 0; font-size: 14px; }
+  .sr-alldetails > summary { cursor: pointer; list-style: none; }
+  .sr-alldetails > summary::-webkit-details-marker { display: none; }
+  .sr-alldetails > summary h2::before { content: "▸ "; } .sr-alldetails[open] > summary h2::before { content: "▾ "; }
+  .sr-chart { height: 170px; }
 </style>
 </head>
 <body>
@@ -133,17 +158,39 @@
     </section>
   </div>
 
-  <!-- Searches that found little or nothing (Admin -> Hub usage until 2026-11-11). -->
+  <!-- Search insights (2026-11-12): figures, over time, what needs doing,
+       most searched, trending, every search. services/search_insights.py. -->
   <div id="tabSearches" role="tabpanel" hidden>
     <section>
       <div class="hc-bar">
-        <p class="muted" style="margin:0;flex:1 1 320px">What people looked for and did not find,
-          in their own words: the most direct evidence of what the catalogue is missing.</p>
-        <label title="Words recorded as finding little, but which find more than 2 demos today with no filter on: content added since, or a filter was on before 2026-11-12."><input type="checkbox" id="srHideFound" checked> Set aside words that find plenty today</label>
+        <p class="muted" style="margin:0;flex:1 1 320px">What people look for, what they do not
+          find, and what is rising, compared with the period before. Counts of people, never who.</p>
         <div class="ranges" id="srRanges"></div>
       </div>
       <p class="faint" id="srIntro" style="margin:0 0 14px;font-size:12.5px"></p>
-      <div class="card" id="srBody"></div>
+      <div class="tiles" id="srTiles"></div>
+      <div class="card" style="margin-top:12px"><div id="srChart"></div></div>
+    </section>
+    <section>
+      <div class="section-head"><h2>What needs doing</h2></div>
+      <div class="grid grid--2" id="srProblems"></div>
+    </section>
+    <section>
+      <div class="section-head"><h2>Most searched</h2></div>
+      <p class="muted" style="margin:-6px 0 10px;font-size:13px">By the number of people, so one
+        person searching ten times does not lead. Opened: how often a search led to opening a
+        demo within ten minutes.</p>
+      <div class="card" id="srTop"></div>
+    </section>
+    <section>
+      <div class="section-head"><h2>Trending</h2></div>
+      <div class="card"><div class="sr-trends" id="srTrending"></div></div>
+    </section>
+    <section>
+      <details class="card sr-alldetails">
+        <summary class="card-head"><h2>All searches</h2><span class="faint" id="srAllCount"></span></summary>
+        <div id="srAll" style="margin-top:8px"></div>
+      </details>
     </section>
   </div>
   </main>

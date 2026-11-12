@@ -94,3 +94,54 @@ def test_a_request_still_waiting_for_sharepoint_shows_too(client, monkeypatch):
     mine = client.get("/api/me/requests", headers=ANN).json()
     assert mine["readable"] is False
     assert [i["status"] for i in mine["items"]] == ["Not sent yet"]
+
+
+# ─────────────────────────────────────────────── playlists (phase 2)
+def make(client, who, name="Customer pitch", items=()):
+    r = client.post("/api/me/playlists", headers=who, json={"name": name, "items": list(items)})
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+def test_a_playlist_is_its_owners_to_change(client):
+    pid = make(client, ANN, items=["d0", "d1"])
+    assert client.put(f"/api/me/playlists/{pid}/items/d2", headers=ANN).json()["items"] == \
+        ["d0", "d1", "d2"]
+    r = client.patch(f"/api/me/playlists/{pid}", headers=ANN,
+                     json={"name": "  Renamed  ", "items": ["d2", "d0", "d1"]})
+    assert (r.json()["name"], r.json()["items"]) == ("Renamed", ["d2", "d0", "d1"])
+    assert client.delete(f"/api/me/playlists/{pid}/items/d0", headers=ANN).json()["items"] == \
+        ["d2", "d1"]
+    for call in (lambda: client.put(f"/api/me/playlists/{pid}/items/d0", headers=BOB),
+                 lambda: client.patch(f"/api/me/playlists/{pid}", headers=BOB, json={"name": "x"}),
+                 lambda: client.delete(f"/api/me/playlists/{pid}", headers=BOB)):
+        assert call().status_code == 403
+    assert [p["name"] for p in client.get("/api/me/playlists", headers=ANN).json()["items"]] == \
+        ["Renamed"]
+    assert client.get("/api/me/playlists", headers=BOB).json()["items"] == []
+    assert client.delete(f"/api/me/playlists/{pid}", headers=ANN).status_code == 204
+    assert client.get(f"/api/me/playlists/{pid}", headers=ANN).status_code == 404
+
+
+def test_a_shared_link_shows_what_the_reader_may_open_and_copies_only_that(client):
+    pid = make(client, ANN, items=["d0", "d3", "d1"])        # d3 archived: nobody sees it
+    page = client.get(f"/api/me/playlists/{pid}", headers=BOB).json()
+    assert ([a["id"] for a in page["items"]], page["unavailable"], page["mine"]) == \
+        (["d0", "d1"], 1, False)
+    copy = client.post(f"/api/me/playlists/{pid}/copy", headers=BOB).json()
+    assert (copy["name"], copy["items"]) == ("Customer pitch", ["d0", "d1"])
+    assert client.get(f"/api/me/playlists/{copy['id']}", headers=BOB).json()["mine"] is True
+
+
+def test_names_are_required_and_bounded(client):
+    assert client.post("/api/me/playlists", headers=ANN, json={"name": "   "}).status_code == 422
+    pid = make(client, ANN, name="x" * 150)
+    assert len(client.get(f"/api/me/playlists/{pid}", headers=ANN).json()["name"]) == 80
+    assert client.get("/api/me/playlists/../../etc", headers=ANN).status_code == 404
+
+
+def test_a_playlist_file_holds_no_address_or_object_id(client, tmp_path):
+    """The sign-in here gives the address as the name: it is not kept."""
+    make(client, ANN)
+    text = next((tmp_path / "owned" / "playlists").iterdir()).read_text(encoding="utf-8")
+    assert "ann@ptc.com" not in text and "oid-ann" not in text

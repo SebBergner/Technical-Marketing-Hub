@@ -3,8 +3,8 @@
  * One page, top to bottom, as a library page in a media app is: what you
  * viewed lately and what you starred, as cards; then what you asked for --
  * New Asset Inquiries with the status the team gives them, your feedback --
- * and, for people who create demos, what you created. Playlists come next
- * (phase 2), between Favorites and the lists.
+ * and, for people who create demos, what you created. Playlists
+ * (playlists.js, phase 2) sit between Favorites and the lists.
  *
  * Everything is the signed-in person's own (GET /api/me...). My feedback
  * and My demos are drawn by report.js and upload.js, which own them.
@@ -16,6 +16,7 @@ import { hubPermissions } from "./permissions.js";
 import { renderMyFeedback } from "./report.js";
 import { renderMyDemos } from "./upload.js";
 import { closeAdvancedSearch } from "./search.js";
+import { renderMyPlaylists } from "./playlists.js";
 
 function el(tag, cls, text) {
   var n = document.createElement(tag);
@@ -65,6 +66,7 @@ function buildPage() {
   var host = page.querySelector(".hub-me");
   host.appendChild(section("meRecent", "Recently viewed"));
   host.appendChild(section("meFavorites", "Favorites", "Star a demo on its card or page"));
+  host.appendChild(section("mePlaylists", "My playlists", "Save on a demo's page adds to one"));
   host.appendChild(section("meRequests", "My requests", "New Asset Inquiries"));
   host.appendChild(section("meFeedback", "My feedback"));
   host.appendChild(section("meDemos", "My demos", "Demos you created in the Hub"));
@@ -225,6 +227,7 @@ function openMyHub() {
     }
   });
   renderMyFeedback(document.querySelector("#meFeedback .hub-me__body"));
+  renderMyPlaylists(document.querySelector("#mePlaylists .hub-me__body"));
 }
 
 function closeMyHub() {

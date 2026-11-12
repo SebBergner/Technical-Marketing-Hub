@@ -34,7 +34,11 @@ SharePoint 里的数据清理（kit 日期、Demo Type、标错的 LDK/VDK、旧
   - My requests：从 Demo Requests 列表按 Requester 读回状态，6 个状态依次是 New、Triaged、Scoped、In production、Delivered、Declined；交付后显示 DeliveredAsset；
   - My feedback：从 Get help 搬过来；
   - My demos：Create New Demo 页面只保留"等你处理"的条目。
-- **第 2 期**：播放列表。demo 页加 Save 菜单（收藏或加入播放列表），可以新建、改名、排序、删除，Copy link 分享，对方可以 Save a copy。
+- **第 2 期（11/12 已做，只上 staging，不 swap）**：播放列表。
+  - demo 页的 Save 菜单：可以选 Favorites 和自己的播放列表，也能直接新建；
+  - My Hub 里的 My playlists，带封面；
+  - 播放列表页 #/playlist/…：自己的列表可以改名、排序、移除、删除；Copy link 分享；别人的列表可以 Save a copy；看不到的 demo 只显示数量；
+  - partner 和地址不会作为创建者名字显示。
 - **第 3 期**：设置区，包括 S1 新内容邮件订阅等。
 
 ### 要先和 IT 沟通

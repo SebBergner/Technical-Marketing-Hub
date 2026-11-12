@@ -16,6 +16,7 @@ import threading
 import time
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from backend.access import Perm
 from backend.auth import CurrentUser, require_authenticated
@@ -23,6 +24,7 @@ from backend.config import settings
 from backend.deps import get_repo
 from backend.repositories.base import AssetRepository
 from backend.services import my_hub
+from backend.services import playlists as pl
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/me", tags=["me"])
@@ -124,3 +126,135 @@ def my_requests(user: CurrentUser = Depends(require_authenticated),
         r.pop("requester", None)
     items.sort(key=lambda r: r.get("created_at") or "", reverse=True)
     return {"items": items, "readable": rows is not None}
+
+
+# ───────────────────────────────────────────────────── playlists (phase 2)
+
+class PlaylistIn(BaseModel):
+    name: str | None = Field(default=None, max_length=200)
+    #: Create: the demos to start with. Update: the same demos, reordered.
+    items: list[str] | None = Field(default=None, max_length=pl.MAX_ITEMS)
+
+
+def _owner_name(user: CurrentUser) -> str | None:
+    """Shown on a shared playlist: a PTC person's display name; a partner's
+    never, and never an address (some sign-ins give the address as the name)."""
+    name = (user.name or "").strip()
+    return None if user.is_partner or not name or "@" in name else name
+
+
+def _brief(record: dict, repo: AssetRepository) -> dict:
+    """A playlist on My Hub and in the Save menu: its name, how many demos,
+    and the first few to draw its cover."""
+    summaries = getattr(repo, "summaries", None)
+    visible = summaries(record["items"]) if summaries else []
+    return {"id": record["id"], "name": record["name"], "count": len(visible),
+            "items": record["items"], "updated_at": record.get("updated_at"),
+            # Enough of each demo for its card's cover, picture or product mark.
+            "covers": [{"id": a.id, "thumbnail_url": a.thumbnail_url, "type": a.type,
+                        "title": a.title, "products": a.products,
+                        "product_families": a.product_families}
+                       for a in visible[:4]]}
+
+
+def _refuse(exc: Exception):
+    if isinstance(exc, KeyError):
+        raise HTTPException(status_code=404, detail="No such playlist.")
+    if isinstance(exc, PermissionError):
+        raise HTTPException(status_code=403, detail=str(exc))
+    raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/playlists")
+def my_playlists(user: CurrentUser = Depends(require_authenticated),
+                 repo: AssetRepository = Depends(get_repo)):
+    return {"items": [_brief(r, repo) for r in pl.mine(_key(user))]}
+
+
+@router.post("/playlists", status_code=201)
+def create_playlist(body: PlaylistIn, user: CurrentUser = Depends(require_authenticated),
+                    repo: AssetRepository = Depends(get_repo)):
+    items = [i for i in (body.items or []) if repo.get(i) is not None]
+    try:
+        record = pl.create(_key(user), body.name or "", _owner_name(user), items)
+    except pl.PlaylistError as exc:
+        _refuse(exc)
+    return _brief(record, repo)
+
+
+@router.get("/playlists/{playlist_id}")
+def open_playlist(playlist_id: str, user: CurrentUser = Depends(require_authenticated),
+                  repo: AssetRepository = Depends(get_repo)):
+    """Anyone signed in, by its link: the demos this person may open, in
+    order, and how many others it holds."""
+    record = pl.get(playlist_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="No such playlist.")
+    summaries = getattr(repo, "summaries", None)
+    visible = summaries(record["items"]) if summaries else []
+    is_mine = record["owner"] == pl.owner_digest(_key(user))
+    return {"id": record["id"], "name": record["name"], "mine": is_mine,
+            "owner_name": None if is_mine else record.get("owner_name"),
+            "updated_at": record.get("updated_at"),
+            "items": [a.model_dump(mode="json") for a in visible],
+            "unavailable": len(record["items"]) - len(visible)}
+
+
+@router.patch("/playlists/{playlist_id}")
+def change_playlist(playlist_id: str, body: PlaylistIn,
+                    user: CurrentUser = Depends(require_authenticated),
+                    repo: AssetRepository = Depends(get_repo)):
+    try:
+        record = pl.update(_key(user), playlist_id, name=body.name, items=body.items)
+    except (KeyError, PermissionError, pl.PlaylistError) as exc:
+        _refuse(exc)
+    return _brief(record, repo)
+
+
+@router.put("/playlists/{playlist_id}/items/{asset_id}")
+def add_to_playlist(playlist_id: str, asset_id: str,
+                    user: CurrentUser = Depends(require_authenticated),
+                    repo: AssetRepository = Depends(get_repo)):
+    if repo.get(asset_id) is None:
+        raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
+    try:
+        record = pl.set_item(_key(user), playlist_id, asset_id, True)
+    except (KeyError, PermissionError, pl.PlaylistError) as exc:
+        _refuse(exc)
+    return _brief(record, repo)
+
+
+@router.delete("/playlists/{playlist_id}/items/{asset_id}")
+def remove_from_playlist(playlist_id: str, asset_id: str,
+                         user: CurrentUser = Depends(require_authenticated),
+                         repo: AssetRepository = Depends(get_repo)):
+    try:
+        record = pl.set_item(_key(user), playlist_id, asset_id, False)
+    except (KeyError, PermissionError, pl.PlaylistError) as exc:
+        _refuse(exc)
+    return _brief(record, repo)
+
+
+@router.delete("/playlists/{playlist_id}", status_code=204)
+def delete_playlist(playlist_id: str, user: CurrentUser = Depends(require_authenticated)):
+    try:
+        pl.delete(_key(user), playlist_id)
+    except (KeyError, PermissionError) as exc:
+        _refuse(exc)
+
+
+@router.post("/playlists/{playlist_id}/copy", status_code=201)
+def copy_playlist(playlist_id: str, user: CurrentUser = Depends(require_authenticated),
+                  repo: AssetRepository = Depends(get_repo)):
+    """Save a copy of a shared playlist as one's own: only the demos this
+    person can open, under the same name."""
+    record = pl.get(playlist_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="No such playlist.")
+    summaries = getattr(repo, "summaries", None)
+    visible = [a.id for a in summaries(record["items"])] if summaries else []
+    try:
+        copy = pl.create(_key(user), record["name"], _owner_name(user), visible)
+    except pl.PlaylistError as exc:
+        _refuse(exc)
+    return _brief(copy, repo)

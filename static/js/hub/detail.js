@@ -26,6 +26,7 @@ import { closeReview, openReview } from "./review.js";
 import { closeHelp, openHelp, openReportModal } from "./report.js";
 import { closeGuide, openGuide } from "./guide.js";
 import { closeMyHub, openMyHub } from "./me.js";
+import { closePlaylist, closeSaveMenu, openPlaylist, saveButton } from "./playlists.js";
 import {
   advancedHash, advState, closeAdvancedSearch, fileTotalsText,
   openAdvancedSearch
@@ -393,6 +394,14 @@ async function openAssetDetail(id, fileItemId, linkToken) {
       setTimeout(drawCopy, 1500);
     });
     actions.appendChild(copy);
+  }
+  // Save to Favorites or a playlist (My Hub phase 2, 2026-11-12), after
+  // Share Internally.
+  closeSaveMenu();
+  if (actions && !document.getElementById("vpSave")) {
+    var save = saveButton(function () { return detailAsset; });
+    var after = document.getElementById("vpCopyLink");
+    actions.insertBefore(save, after ? after.nextSibling : null);
   }
   // GXC group only (B10): no link to pass on, so no Share Internally.
   var copyBtn = document.getElementById("vpCopyLink");
@@ -1642,6 +1651,20 @@ function routeFromHash() {
     return;
   }
   closeMyHub();
+  // A playlist's page (My Hub phase 2), by its link.
+  var playlist = /^#\/playlist\/([^/]+)$/.exec(hash);
+  if (playlist) {
+    closeFilePreview(false);
+    closeAssetDetail();
+    closeUpload();
+    closeActivity();
+    closeReview();
+    closeHelp();
+    closeGuide();
+    openPlaylist(decodeURIComponent(playlist[1]));
+    return;
+  }
+  closePlaylist();
   if (hash === "#/guide") {
     closeFilePreview(false);
     closeAssetDetail();

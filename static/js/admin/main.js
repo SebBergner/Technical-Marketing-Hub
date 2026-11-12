@@ -152,6 +152,10 @@ $("logoutBtn").addEventListener("click", function () {
 });
 
 $("refreshBtn").addEventListener("click", load);
+// overview.js asks for this after a sync; a tab's address changing (the
+// Admin log link on a tab's Recent changes) opens that tab.
+document.addEventListener("admin:reload", load);
+window.addEventListener("hashchange", function () { showTab(tabFromHash()); });
 
 $("sheetClose").addEventListener("click", function () {
   $("overlay").hidden = true;
@@ -167,6 +171,4 @@ document.addEventListener("keydown", function (e) {
 
 boot();
 
-export {
-  load, showTab
-};
+

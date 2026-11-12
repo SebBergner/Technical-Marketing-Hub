@@ -366,7 +366,7 @@ class NoteIn(BaseModel):
 
 
 # Left from before review was removed (2026-10-28): uploads still waiting
-# are published, or cancelled, by hand from Admin -> Content review.
+# are published, or cancelled, by hand from Content health -> Content review.
 @router.post("/{upload_id}/publish")
 def publish(upload_id: str, body: NoteIn, repo: AssetRepository = Depends(get_repo),
             actor: str = Depends(REVIEW), user: CurrentUser = Depends(get_current_user)):
@@ -410,7 +410,7 @@ def indexing(user: CurrentUser = Depends(get_current_user),
 def cancel(upload_id: str, request: Request, repo: AssetRepository = Depends(get_repo),
            user: CurrentUser = Depends(get_current_user)):
     """Its uploader stops it; someone with Review content may cancel any one
-    left from before review was removed (Admin -> Content review). The
+    left from before review was removed (Content health -> Content review). The
     folder stays in SharePoint, for a person to delete there."""
     from backend.admin_auth import _actor
     _get(repo, upload_id)

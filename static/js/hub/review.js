@@ -3,9 +3,9 @@
  * team to judge and to archive, or confirm Still current, several at a
  * time. Each step can be undone and is in the Admin log. Archived (Liwei
  * 2026-10-30) lists what is archived, to restore several at a time: the
- * team archives here and may not open Admin -> Content review.
+ * team archives here and may not open Admin; Content health -> Content review has the same lists.
  *
- * Why (2026-10-28), worked out by the server: Admin -> Content review's own
+ * Why (2026-10-28), worked out by the server: Content health -> Content review's
  * rules (collecting dust, little used, Still current running out), and the
  * columns the Data Clean list counts as empty (Demo owner, Publish date...).
  * Every demo is listed; those with the most reasons come first.

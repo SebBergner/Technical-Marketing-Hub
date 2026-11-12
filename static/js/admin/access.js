@@ -7,9 +7,8 @@
  * 2026-10-15; static/js/admin/main.js loads it. */
 
 import { $, actorWord, el, gxcMark, row, session, TYPE_WORD, when } from "./util.js";
-import { al } from "./signins.js";
+import { openAdminLogAt } from "./signins.js";
 import { adminLogTable } from "./logtable.js";
-import { showTab } from "./main.js";
 
 /* GXC downloads are an access decision for administrators (2026-10-30). */
 function canSwitchGxc() {
@@ -45,12 +44,7 @@ function loadChanges(hostId, category) {
       more.addEventListener("click", function (e) {
         e.preventDefault();
         // A tab may show two areas; the filter takes the first, the log shows it.
-        al.category = category.split(",")[0];
-        $("alCategory").value = al.category;
-        al.offset = 0;
-        history.replaceState(null, "", "#activity");
-        showTab("activity");
-        setTimeout(function () { $("alTitle").scrollIntoView({ block: "start" }); }, 600);
+        openAdminLogAt(category.split(",")[0]);
       });
       host.appendChild(more);
     });

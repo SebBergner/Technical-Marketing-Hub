@@ -1786,7 +1786,7 @@ function renderAccessMark(meta, asset) {
  * Access goes through requests for most people (services/access_requests.py,
  * Elio 2026-10-07: a controlled, tracked process): "Request Internal" with a
  * reason; someone with Manage content access approves or rejects it, here or
- * on Admin -> Content access. They may also change it directly, with a reason.
+ * on Content health -> Content access. They may also change it directly, with a reason.
  * Changing access and archiving ask for confirmation; everything is in the
  * Admin log. The tab last chosen is kept from demo to demo, so a reviewer
  * working through a list stays on Manage; a waiting request puts a dot on it

@@ -116,7 +116,7 @@ def searches(since: str | None = None, until: str | None = None,
     window -- the most direct evidence of what the catalogue is missing.
     Grouped by the words as typed, ignoring case and spacing; how many
     people searched for each, never who."""
-    from backend.routers.admin import _events
+    from backend.services.usage import events as _events
     tally: dict[str, dict] = {}
     total = 0
     for e in _events(repo, since, until):
@@ -153,10 +153,10 @@ def searches(since: str | None = None, until: str | None = None,
 @router.get("/review")
 def review(min_age_days: int | None = Query(None, ge=0), idle_days: int | None = Query(None, ge=1),
            repo: AssetRepository = Depends(get_repo)):
-    from backend.routers import admin
-    return admin.content_review(
-        min_age_days=admin.REVIEW_MIN_AGE_DAYS if min_age_days is None else min_age_days,
-        idle_days=admin.REVIEW_IDLE_DAYS if idle_days is None else idle_days, repo=repo)
+    from backend.services import content_review as cr
+    return cr.content_review(
+        repo, min_age_days=cr.REVIEW_MIN_AGE_DAYS if min_age_days is None else min_age_days,
+        idle_days=cr.REVIEW_IDLE_DAYS if idle_days is None else idle_days)
 
 
 # ─────────────────────────────────────────────────────── content access

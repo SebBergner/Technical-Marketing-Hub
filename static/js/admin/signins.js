@@ -123,6 +123,16 @@ function alQuery(paged) {
   }).join("&");
 }
 
+/* Show the Admin log filtered to one area (a tab's "Open in the Admin
+ * log"): the filter is set here, the tab is opened by its address. */
+function openAdminLogAt(category) {
+  al.category = category;
+  if ($("alCategory")) $("alCategory").value = category;
+  al.offset = 0;
+  location.hash = "#activity";
+  setTimeout(function () { $("alTitle").scrollIntoView({ block: "start" }); }, 600);
+}
+
 function loadAdminLog() {
   var qs = alQuery(true);
   // The export carries the same filters, so what downloads is what is shown.
@@ -581,5 +591,5 @@ $("actPeopleSearch").addEventListener("input", function (e) {
 });
 
 export {
-  act, al, loadActivity, renderActRanges
+  act, al, loadActivity, openAdminLogAt, renderActRanges
 };

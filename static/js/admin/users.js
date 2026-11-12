@@ -5,7 +5,6 @@
  * 2026-10-15; static/js/admin/main.js loads it. */
 
 import { $, actorWord, el, row, session, when } from "./util.js";
-import { act } from "./signins.js";
 
 /* ── Users & groups (backend/access.py, 2026-10-06) ───────────────────
  * Groups on the left, the chosen one on the right. Built-in groups keep

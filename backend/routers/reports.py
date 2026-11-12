@@ -170,7 +170,7 @@ def content_to_review(user: CurrentUser = Depends(_reviewer),
     anyone last opened, previewed or downloaded it -- no figures about who --
     and why it may need a look (2026-10-28):
 
-    * `reasons`: Admin -> Content review's own rules -- collecting dust,
+    * `reasons`: Content health -> Content review's rules (services/content_review.py) -- collecting dust,
       little used, Still current running out -- so the two pages agree;
     * `missing`: the columns the Data Clean list counts as empty.
 
@@ -180,8 +180,8 @@ def content_to_review(user: CurrentUser = Depends(_reviewer),
     open Admin)."""
     from datetime import date as _date, timedelta as _td
     from backend.repositories.base import AssetQuery as _Q
-    from backend.routers.admin import (REVIEW_EXPIRING_DAYS, REVIEW_IDLE_DAYS,
-                                       REVIEW_MIN_AGE_DAYS)
+    from backend.services.content_review import (REVIEW_EXPIRING_DAYS, REVIEW_IDLE_DAYS,
+                                                 REVIEW_MIN_AGE_DAYS)
     from backend.services import content_age
     from backend.services.metadata_edit import NotEditable, target_key
 

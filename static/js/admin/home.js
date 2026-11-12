@@ -4,7 +4,6 @@
  * 2026-10-15; static/js/admin/main.js loads it. */
 
 import { $, el, gxcMark, row, TYPE_WORD } from "./util.js";
-import { act } from "./signins.js";
 
 /* ── Promoted on Home ───────────────────────────────────────────────
  *

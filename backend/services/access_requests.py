@@ -6,7 +6,7 @@ controlled, tracked process, not only a switch. So:
 * anyone with "Request content access change" (PTC employees by default,
   never partners) asks, with a reason, from the demo's page;
 * someone with "Manage content access" approves or rejects it -- on the
-  demo's page or on Admin -> Content access -- with an optional note, and an
+  demo's page or on Content health -> Content access -- with an optional note, and an
   approval applies the change;
 * the requester may withdraw it while it is pending;
 * every step is kept here, and also lands in the Admin log.

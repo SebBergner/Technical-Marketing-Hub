@@ -5,7 +5,10 @@
  * 2026-10-15; static/js/admin/main.js loads it. */
 
 import { $, card, el, localHour, openSheet, row, session, two, when } from "./util.js";
-import { load } from "./main.js";
+
+/* Reload the whole page's figures after a sync: main.js listens, so this
+ * file need not import main.js, which imports it (2026-11-11). */
+function load() { document.dispatchEvent(new Event("admin:reload")); }
 
 /* Freshness is the one number on this page that rots by itself, so it is
  * the one with a threshold. Two days is a working tolerance for a manual

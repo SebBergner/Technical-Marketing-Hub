@@ -96,7 +96,7 @@ CATALOGUE: list[tuple[str, list[tuple[Perm, str, str]]]] = [
          "partners in SharePoint. Never given to partner (guest) accounts."),
         (Perm.VIEW_GXC, "Access GXC videos",
          "Find, open and preview the videos in the GXC Video library, and download them "
-         "when Admin -> Content access switches that on. Without it they are never listed "
+         "when Admin -> GXC videos switches that on. Without it they are never listed "
          "or found; a PTC person opens one only through a personal link somebody shared, "
          "and the Hub records who passed it on. Never given to partner (guest) accounts."),
         (Perm.VIEW_REPORTS, "View Hub activity",

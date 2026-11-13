@@ -1,4 +1,5 @@
-"""The welcome pop-up: once per person, again after a big update (Liwei, 2026-11-08)."""
+"""The welcome pop-up: until "Don't show again", and again after a big update
+(Liwei, 2026-11-08, 2026-11-13)."""
 from __future__ import annotations
 
 import pytest
@@ -24,21 +25,25 @@ def status(client, who):
     return client.get("/api/welcome", headers=easyauth_headers(who)).json()
 
 
-def test_shown_once_per_person(client):
-    assert status(client, "ann@ptc.com") == {"required": True, "version": welcome.VERSION,
-                                             "kind": "welcome", "whats_new": []}
+def test_shown_until_seen_per_person(client):
+    first = status(client, "ann@ptc.com")
+    assert first["required"] and first["version"] == welcome.VERSION
+    assert status(client, "ann@ptc.com")["required"], "until Don't show again records it"
     assert client.post("/api/welcome/seen", headers=easyauth_headers("ann@ptc.com")).status_code == 200
     assert not status(client, "ann@ptc.com")["required"], "not again, in any browser"
     assert status(client, "bob@ptc.com")["required"], "per person"
 
 
-def test_a_big_update_shows_what_is_new_to_those_who_saw_the_welcome(client, monkeypatch):
+def test_a_big_update_shows_what_is_new_to_everyone(client, monkeypatch):
     client.post("/api/welcome/seen", headers=easyauth_headers("ann@ptc.com"))
+    new = ({"icon": "i-star", "title": "Playlists", "text": "Save demos."},)
     monkeypatch.setattr(welcome, "VERSION", "2027-01-15")
-    monkeypatch.setattr(welcome, "WHATS_NEW", ("Playlists",))
+    monkeypatch.setattr(welcome, "WHATS_NEW", new)
     again = status(client, "ann@ptc.com")
-    assert again["required"] and again["kind"] == "whats_new" and again["whats_new"] == ["Playlists"]
-    assert status(client, "new@ptc.com")["kind"] == "welcome", "someone new is welcomed"
+    assert again["required"] and again["kind"] == "whats_new" and again["whats_new"] == list(new)
+    assert status(client, "new@ptc.com")["kind"] == "whats_new", "someone new is told too"
+    monkeypatch.setattr(welcome, "WHATS_NEW", ())
+    assert status(client, "new@ptc.com")["kind"] == "welcome", "nothing new: the welcome"
     client.post("/api/welcome/seen", headers=easyauth_headers("ann@ptc.com"))
     assert not status(client, "ann@ptc.com")["required"]
 

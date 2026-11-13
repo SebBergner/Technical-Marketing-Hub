@@ -1,10 +1,11 @@
 /* The welcome pop-up (Liwei, 2026-11-08; backend/welcome.py).
  *
- * Once per person, after the Customer Data Disclaimer: a short welcome and
- * where the user guide is ("User guide", top right corner, #/guide). Shown
- * again only after a big update, then as "What's new". Unlike the
- * disclaimer it can be closed any way at all -- X, Escape, a click outside
- * -- and closing it is what counts as seen. As it closes, "User guide" pulses
+ * After the Customer Data Disclaimer: what is new in the Hub (or, with
+ * nothing new, a short welcome) and where the user guide is ("User guide",
+ * top right corner, #/guide). Unlike the disclaimer it can be closed any
+ * way at all -- X, Escape, a click outside. It comes back at each visit
+ * until "Don't show again" is ticked (Liwei, 2026-11-13), and again after
+ * the next big update. As it closes, "User guide" pulses
  * and says what it is, so the way back is found by looking, not reading. */
 
 import { escapeHtml } from "./util.js";
@@ -37,9 +38,15 @@ function body(d) {
   if (d.kind === "whats_new") {
     return '<div class="hub-welcome__eyebrow">Hub update</div>'
       + '<h2 class="hub-welcome__title" id="hubWelcomeTitle">What\'s new in the Hub</h2>'
-      + '<ul class="hub-welcome__new">'
-      + d.whats_new.map(function (t) { return "<li>" + escapeHtml(t) + "</li>"; }).join("")
-      + "</ul>";
+      + '<div class="hub-welcome__points">'
+      + d.whats_new.map(function (p) {
+          if (typeof p === "string") p = { icon: "i-check", title: "", text: p };
+          var id = /^i-[a-z-]+$/.test(p.icon || "") ? p.icon : "i-check";
+          return '<div class="hub-welcome__point"><span class="hub-welcome__ico">' + icon(id)
+            + "</span><span>" + (p.title ? "<b>" + escapeHtml(p.title) + "</b>" : "")
+            + escapeHtml(p.text || "") + "</span></div>";
+        }).join("")
+      + "</div>";
   }
   return '<div class="hub-welcome__eyebrow">Welcome</div>'
     + '<h2 class="hub-welcome__title" id="hubWelcomeTitle">Welcome to the Technical Marketing Hub</h2>'
@@ -71,8 +78,11 @@ function show(d) {
     +       "To report a problem, use <b>Get help</b> at the bottom of the menu.</span></div>"
     +     '<div class="hub-welcome__foot">'
     +       '<a class="btn-ghost hub-welcome__open" href="#/guide">Open the user guide</a>'
-    +       '<button type="button" class="btn-primary-sm hub-welcome__go">Get started</button>'
+    +       '<button type="button" class="btn-primary-sm hub-welcome__go">'
+    +         (d.kind === "whats_new" ? "Got it" : "Get started") + "</button>"
     +     "</div>"
+    +     '<label class="hub-welcome__never"><input type="checkbox" class="hub-welcome__nevercb">'
+    +       "Don't show again</label>"
     +   "</div>"
     + "</div>";
   document.body.appendChild(overlay);
@@ -84,8 +94,11 @@ function show(d) {
     overlay.classList.add("is-leaving");
     setTimeout(function () { overlay.remove(); }, 160);
     document.removeEventListener("keydown", onKey, true);
-    // Seen however it was closed; a failure only means it shows next time.
-    fetch("/api/welcome/seen", { method: "POST", credentials: "same-origin" }).catch(function () {});
+    // Recorded only with "Don't show again" ticked (Liwei, 2026-11-13);
+    // otherwise it comes back at the next visit. A failure only means the same.
+    if (overlay.querySelector(".hub-welcome__nevercb").checked) {
+      fetch("/api/welcome/seen", { method: "POST", credentials: "same-origin" }).catch(function () {});
+    }
     pointAtGuide();
   }
   function onKey(e) { if (e.key === "Escape") close(); }

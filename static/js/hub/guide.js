@@ -46,15 +46,22 @@ var STEPS = [
     "In the table, click a column to sort; point at a picture to see it larger.",
     "<b>Export CSV</b> saves everything the filters match."
   ]],
+  ["i-star", "My Hub", [
+    "<b>My Hub</b>, first in the menu, is your own page; only you see it.",
+    "<b>Recently viewed</b> keeps the last 20 demos you opened.",
+    "Star a demo on its card or page to keep it in <b>Favorites</b>.",
+    "<b>Save</b> on a demo's page adds it to a <b>playlist</b>; <b>Copy link</b> shares one.",
+    "Follow your <b>requests</b> and <b>feedback</b>, and the <b>demos</b> you created."
+  ]],
   ["i-plus", "Ask for something new", [
     "Missing a video, VDK, LDK or something else? Open <b>New Asset Inquiry</b> in the menu.",
     "Say which products, what it should show, and by when.",
-    "It goes into the team's queue."
+    "It goes into the team's queue; follow its status on <b>My Hub</b>."
   ]],
   ["i-flag", "Tell us what is wrong", [
     "On a demo's page, <b>Share feedback</b> reaches the people who look after it.",
     "For the Hub itself, use <b>Get help</b> at the bottom of the menu.",
-    "Your reports are listed there; withdraw one that is still open."
+    "<b>My Hub</b> lists what you sent; edit or withdraw one that is still open."
   ]],
   ["i-lock", "Customer data", [
     "Some demos use customer datasets.",

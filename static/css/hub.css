@@ -1910,6 +1910,8 @@ button.hub-guide__video--tour:hover .hub-guide__play { transform: scale(1.08); }
 .hub-guide__action:hover .hub-guide__action-go { color: var(--orion-indigo); }
 
 .hub-guide__steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+/* A last card alone on its row takes the whole row (7 steps since My Hub, 2026-11-13). */
+.hub-guide__step:last-child:nth-child(3n+1) { grid-column: 1 / -1; }
 .hub-guide__step { padding: 18px 20px 16px; border-radius: 12px; background: var(--orion-surface); border: 1px solid var(--orion-border); }
 .hub-guide__step-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .hub-guide__step-ico { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
@@ -1927,6 +1929,8 @@ button.hub-guide__video--tour:hover .hub-guide__play { transform: scale(1.08); }
 
 @media (max-width: 1000px) {
   .hub-guide__steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hub-guide__step:last-child:nth-child(3n+1) { grid-column: auto; }
+  .hub-guide__step:last-child:nth-child(2n+1) { grid-column: 1 / -1; }
 }
 @media (max-width: 760px) {
   .hub-guide__hero { grid-template-columns: 1fr; padding: 22px 18px; }

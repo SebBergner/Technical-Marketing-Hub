@@ -3,8 +3,8 @@
  * After the Customer Data Disclaimer: what is new in the Hub (or, with
  * nothing new, a short welcome) and where the user guide is ("User guide",
  * top right corner, #/guide). Unlike the disclaimer it can be closed any
- * way at all -- X, Escape, a click outside. It comes back at each visit
- * until "Don't show again" is ticked (Liwei, 2026-11-13), and again after
+ * way at all -- X, Escape, a click outside. It comes back, at most once a
+ * day, until "Don't show again" is ticked (Liwei, 2026-11-13), and again after
  * the next big update. As it closes, "User guide" pulses
  * and says what it is, so the way back is found by looking, not reading. */
 
@@ -94,11 +94,12 @@ function show(d) {
     overlay.classList.add("is-leaving");
     setTimeout(function () { overlay.remove(); }, 160);
     document.removeEventListener("keydown", onKey, true);
-    // Recorded only with "Don't show again" ticked (Liwei, 2026-11-13);
-    // otherwise it comes back at the next visit. A failure only means the same.
-    if (overlay.querySelector(".hub-welcome__nevercb").checked) {
-      fetch("/api/welcome/seen", { method: "POST", credentials: "same-origin" }).catch(function () {});
-    }
+    // "Don't show again" ticked: seen for good (Liwei, 2026-11-13). Not
+    // ticked: back the next day, at most once a day. A failure only means
+    // it shows at the next visit.
+    var never = overlay.querySelector(".hub-welcome__nevercb").checked;
+    fetch("/api/welcome/" + (never ? "seen" : "shown"),
+          { method: "POST", credentials: "same-origin" }).catch(function () {});
     pointAtGuide();
   }
   function onKey(e) { if (e.key === "Escape") close(); }

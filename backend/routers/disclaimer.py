@@ -52,6 +52,16 @@ def welcome_seen(user: CurrentUser = Depends(get_current_user)):
     return row
 
 
+@welcome_router.post("/shown")
+def welcome_shown(user: CurrentUser = Depends(get_current_user)):
+    """Closed without "Don't show again": back after a while, at most once a day."""
+    try:
+        row = welcome.shown(user)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    return row
+
+
 #: How long the video's lookup and cover are reused (2026-11-11): finding the
 #: file takes four Graph calls, about 4-5 s on production, so the card's cover
 #: and length came in late on every visit. A replaced video shows within this.

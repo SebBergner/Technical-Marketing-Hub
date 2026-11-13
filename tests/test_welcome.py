@@ -34,6 +34,32 @@ def test_shown_until_seen_per_person(client):
     assert status(client, "bob@ptc.com")["required"], "per person"
 
 
+def test_closed_without_dont_show_again_it_is_back_the_next_day(tmp_path, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+    monkeypatch.setattr(welcome, "key_of", lambda user: user.email)
+    ann = SimpleNamespace(email="ann@ptc.com")
+    t0 = datetime(2026, 11, 13, 14, tzinfo=timezone.utc)
+    assert welcome.status(ann, str(tmp_path), now=t0)["required"]
+    welcome.shown(ann, str(tmp_path), now=t0)
+    assert not welcome.status(ann, str(tmp_path), now=t0 + timedelta(hours=6))["required"], \
+        "not twice in a day"
+    assert welcome.status(ann, str(tmp_path), now=t0 + timedelta(hours=20))["required"], \
+        "back the next morning"
+    welcome.seen(ann, str(tmp_path), now=t0 + timedelta(hours=20))
+    assert not welcome.status(ann, str(tmp_path), now=t0 + timedelta(days=5))["required"]
+    monkeypatch.setattr(welcome, "VERSION", "2027-01-15")
+    assert welcome.status(ann, str(tmp_path), now=t0 + timedelta(days=5))["required"], \
+        "the next big update shows again"
+
+
+def test_shown_is_recorded_for_the_signed_in_person(client):
+    h = easyauth_headers("ann@ptc.com")
+    assert client.post("/api/welcome/shown", headers=h).status_code == 200
+    assert not status(client, "ann@ptc.com")["required"]
+    assert status(client, "bob@ptc.com")["required"]
+
+
 def test_a_big_update_shows_what_is_new_to_everyone(client, monkeypatch):
     client.post("/api/welcome/seen", headers=easyauth_headers("ann@ptc.com"))
     new = ({"icon": "i-star", "title": "Playlists", "text": "Save demos."},)

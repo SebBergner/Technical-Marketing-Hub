@@ -23,12 +23,16 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from backend.config import settings
 from backend.disclaimer import key_of
 
 FILE = "welcome_seen.json"
+#: Closed without "Don't show again", it comes back at most once a day
+#: (Liwei, 2026-11-13). 20 hours, not a calendar day: the next morning it is
+#: back, and a UTC midnight in someone's afternoon does not show it twice.
+AGAIN_AFTER = timedelta(hours=20)
 #: Change it for a big update (and fill WHATS_NEW): everyone sees it again.
 VERSION = "2026-11-13"
 #: What the big update brought: a few short points, each an icon from the
@@ -59,11 +63,17 @@ def load(data_dir: str | None = None) -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def status(user, data_dir: str | None = None) -> dict:
+def status(user, data_dir: str | None = None, now: datetime | None = None) -> dict:
     """Whether to show it, and which: the first welcome or what is new."""
     key = key_of(user)
-    row = load(data_dir).get(key) if key else None
-    required = bool(key) and (row or {}).get("version") != VERSION
+    row = (load(data_dir).get(key) if key else None) or {}
+    required = bool(key) and row.get("version") != VERSION
+    if required and row.get("shown_version") == VERSION and row.get("shown_at"):
+        try:
+            last = datetime.fromisoformat(row["shown_at"])
+            required = (now or datetime.now(timezone.utc)) - last >= AGAIN_AFTER
+        except ValueError:
+            pass
     return {"required": required, "version": VERSION,
             # What is new, to everyone (2026-11-13); the plain welcome only
             # when there is nothing new to tell.
@@ -85,6 +95,25 @@ def seen(user, data_dir: str | None = None, now: datetime | None = None) -> dict
         before = data.get(key) or {}
         row = {"version": VERSION, "seen_at": at,
                "first_seen_at": before.get("first_seen_at") or at}
+        data[key] = row
+        replace_with(path, lambda fh: json.dump(data, fh, ensure_ascii=False, indent=1))
+    return row
+
+
+def shown(user, data_dir: str | None = None, now: datetime | None = None) -> dict:
+    """Record that it was closed without "Don't show again": not again for a
+    while (AGAIN_AFTER), and what was seen before is kept."""
+    from backend.file_safety import locked, replace_with
+    key = key_of(user)
+    if not key:
+        raise ValueError("Only a signed-in person sees the welcome.")
+    path = _path(data_dir)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    at = (now or datetime.now(timezone.utc)).isoformat(timespec="seconds")
+    with locked(path):
+        data = load(data_dir)
+        row = dict(data.get(key) or {})
+        row.update({"shown_version": VERSION, "shown_at": at})
         data[key] = row
         replace_with(path, lambda fh: json.dump(data, fh, ensure_ascii=False, indent=1))
     return row

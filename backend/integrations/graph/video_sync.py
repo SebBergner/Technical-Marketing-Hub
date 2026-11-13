@@ -353,9 +353,11 @@ def sync_videos(client: GraphClient, repo, site: SiteRef | None = None,
     previous = counter(which.source) if counter else 0
     repo.replace_source_rows(assets, source_system=which.source,
                              allow_shrink=previous < SHRINK_GUARD_FROM)
-    # Once the mirror holds them: GXC ids made from titles before B10 move to
-    # the folder-made ones, with the Hub's own data (json_repo.adopt_new_ids).
-    if which.gxc and (adopt := getattr(repo, "adopt_new_ids", None)):
+    # Once the mirror holds them: an id that changed for the same folder takes
+    # the Hub's own data with it (json_repo.adopt_new_ids). GXC: the ids made
+    # from titles before B10. Demo Video: a folder renamed, by a migration
+    # sheet's new title or by hand, has a new id (2026-11-12).
+    if adopt := getattr(repo, "adopt_new_ids", None):
         adopt(assets, which.source)
     if stamp := getattr(repo, "record_sync", None):
         stamp(which.source)

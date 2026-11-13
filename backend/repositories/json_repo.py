@@ -1575,10 +1575,9 @@ class JsonAssetRepository(AssetRepository):
             word = re.compile(r"(?<![a-z0-9-])(" + "|".join(
                 re.escape(k) for k in sorted(renames, key=len, reverse=True))
                 + r")(?![a-z0-9-])")
-            for name in sorted(os.listdir(self.owned_dir)):
-                path = os.path.join(self.owned_dir, name)
-                if (name in self._RENAME_SKIPS or not os.path.isfile(path)
-                        or not name.endswith((".json", ".jsonl"))):
+            for path in self._owned_files():
+                name = os.path.basename(path)
+                if name in self._RENAME_SKIPS or not name.endswith((".json", ".jsonl")):
                     continue
                 with open(path, encoding="utf-8") as fh:
                     text = fh.read()
@@ -1594,6 +1593,9 @@ class JsonAssetRepository(AssetRepository):
                     "first_seen_at": row.get("first_seen_at") or now,
                     "source_system": source_system,
                     "source_item_id": row["source_item_id"], "retired_at": None})
+                # A folder renamed back to a name it had: that id is current again.
+                identity[new].pop("renamed_to", None)
+                identity[new]["retired_at"] = None
                 row["renamed_to"] = new
                 row["retired_at"] = row.get("retired_at") or now
             self._save("identity", identity)
@@ -1601,9 +1603,29 @@ class JsonAssetRepository(AssetRepository):
             log.info("%s: %d id(s) renamed in the Hub's own data", source_system, len(renames))
             return renames
 
+    #: Owned folders a rename leaves alone: the migration's batch logs and
+    #: sheets are records of what happened.
+    _RENAME_SKIP_DIRS = frozenset({"migration"})
+
+    def _owned_files(self) -> list[str]:
+        """Every file in owned/, and in its folders: My Hub keeps one file
+        per person (me/) and per playlist (playlists/), and those name ids too."""
+        out = []
+        for root, dirs, files in os.walk(self.owned_dir):
+            dirs[:] = sorted(d for d in dirs
+                             if not (root == self.owned_dir and d in self._RENAME_SKIP_DIRS))
+            out.extend(os.path.join(root, f) for f in sorted(files))
+        return out
+
     def renamed_to(self, asset_id: str) -> str | None:
-        """The id an old one became (adopt_new_ids), for its old links."""
-        return ((self._load("identity").get(asset_id) or {}).get("renamed_to")) or None
+        """The id an old one became (adopt_new_ids), for its old links. A
+        folder renamed twice is followed to its newest id."""
+        identity = self._load("identity")
+        seen, current = set(), asset_id
+        while (nxt := (identity.get(current) or {}).get("renamed_to")) and nxt not in seen:
+            seen.add(current)
+            current = nxt
+        return current if current != asset_id else None
 
     # ------------------------------------------------- owned-data write paths
     def set_curation(self, asset_id: str, **fields: Any) -> None:

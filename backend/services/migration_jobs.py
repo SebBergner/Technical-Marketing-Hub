@@ -109,9 +109,13 @@ class Targets:
     def for_record(self, r):
         return self.gxc if r.is_gxc else self.main
 
+    def by_name(self, name: str):
+        return next(t for t in (self.main, self.gxc) if t is not None and t.name == name)
+
 
 def _prepare(manifest: str, *, progress=None):
-    """Targets, terms, Brightcove client and validated records. Read-only."""
+    """Targets, terms, Brightcove client, validated records, their status and
+    the titles to update. Read-only."""
     from backend.integrations.graph import migration_writer as w
     graph, bc = clients()
     if graph is None:
@@ -122,9 +126,17 @@ def _prepare(manifest: str, *, progress=None):
     records = run.load_manifest(manifest)
     gxc = [r for r in records if r.is_gxc]
     targets = Targets(target)
-    if gxc and settings.migration_gxc_library:
-        targets.gxc = w.LibraryTarget.resolve(graph, settings.migration_gxc_library,
-                                              allow_production=True)
+    # Resolved whenever configured, GXC rows or not: a Brightcove ID already
+    # in the other library is not uploaded twice (Lamborghini, 2026-11-12).
+    if settings.migration_gxc_library:
+        try:
+            targets.gxc = w.LibraryTarget.resolve(graph, settings.migration_gxc_library,
+                                                  allow_production=True)
+        except w.MigrationTargetError:
+            if gxc:                    # needed for these rows: say so, as before
+                raise
+            log.warning("migration: %r not found; Brightcove IDs checked in %s only",
+                        settings.migration_gxc_library, target.name)
     elif gxc:
         for r in gxc:
             r.problems.append("GXC Gallery videos go to the GXC library, and none is "
@@ -138,19 +150,26 @@ def _prepare(manifest: str, *, progress=None):
             run.enrich(todo[i:i + 20], bc)
             if progress:
                 progress(min(i + 20, len(todo)), len(todo))
-    # Each library checks its own rows: its options, and what it already holds.
+    # Each library checks its rows against its own options and folder names;
+    # whether a video already exists is asked of both libraries.
+    held = [(lib.name, w.existing_with_archive(graph, lib), w.folder_names(graph, lib))
+            for lib in (targets.main, targets.gxc) if lib is not None]
+    everywhere: dict[str, dict] = {}
+    for _, existing, _ in held:
+        everywhere.update({k: v for k, v in existing.items() if k not in everywhere})
     status: dict[str, str] = {}
     for lib, rows in ((targets.main, [r for r in records if not r.is_gxc]),
                       (targets.gxc, gxc)):
         if not rows:
             continue
         if lib is None:
-            status.update(run.plan(rows, {}, set()))
+            status.update(run.plan(rows, everywhere, set()))
             continue
         run.validate(rows, lib.choices, terms)
-        status.update(run.plan(rows, w.existing_by_brightcove_id(graph, lib),
-                               w.folder_names(graph, lib)))
-    return graph, bc, targets, terms, records, status
+        names = next(n for name, _, n in held if name == lib.name)
+        status.update(run.plan(rows, everywhere, names))
+    renames = run.plan_renames(records, held)
+    return graph, bc, targets, terms, records, status, renames
 
 
 # ─────────────────────────────────────────────────────────────── sheets
@@ -197,8 +216,8 @@ def compute_preview(sheet_id: str) -> dict:
         _write_json(path, preview)
 
     try:
-        _, _, targets, _, records, status = _prepare(os.path.join(folder, "manifest.csv"),
-                                                    progress=progress)
+        _, _, targets, _, records, status, renames = _prepare(
+            os.path.join(folder, "manifest.csv"), progress=progress)
     except Exception as exc:                                   # noqa: BLE001
         log.exception("migration preview %s failed", sheet_id)
         preview.update(status="error", error=str(exc)[:500], computed_at=_now())
@@ -232,7 +251,10 @@ def compute_preview(sheet_id: str) -> dict:
         gxc_rows=sum(1 for r in records if r.is_gxc),
         counts={"rows": len(records), "new": counts.get("new", 0),
                 "existing": counts.get("existing", 0), "conflict": counts.get("conflict", 0),
-                "invalid": counts.get("invalid", 0), "scope": len(scope)},
+                "invalid": counts.get("invalid", 0), "scope": len(scope),
+                "rename": sum(1 for x in renames if x["status"] == "rename")},
+        # Titles that follow this sheet (Liwei, 2026-11-12): shown before a run.
+        renames=renames,
         volume_bytes=volume,
         volume_ready_bytes=sum(r.size_bytes or 0 for r in new),
         runtime_seconds=round(sum(r.duration_s or 0 for r in scope)),
@@ -406,8 +428,10 @@ def start_run(sheet_id: str, *, limit: int | None, operator: str, via: str,
     # live. The run itself re-checks everything live before each video.
     manifest = os.path.join(_sheets_dir(), sheet_id, "manifest.csv")
     todo = [r for r in preview.get("rows") or [] if r.get("status") == "new"][: limit or None]
-    if not todo:
-        raise RunRefused("Nothing new to migrate in that sheet.")
+    # Every rename goes, pilot or not: a rename is quick and changes no file's content.
+    renames = [x for x in preview.get("renames") or [] if x.get("status") == "rename"]
+    if not todo and not renames:
+        raise RunRefused("Nothing new to migrate and no title to update in that sheet.")
     blog = run.BatchLog.new("upload", preview.get("library") or settings.migration_brightcove_library,
                             manifest, planned=(preview.get("counts") or {}).get("rows"))
     blog.data.update(sheet_id=sheet_id, operator=operator.strip(), via=via, limit=limit,
@@ -417,6 +441,11 @@ def start_run(sheet_id: str, *, limit: int | None, operator: str, via: str,
         blog.data["items"].append({"brightcove_id": r["brightcove_id"], "row": r["row"],
                                    "title": r["title"], "status": "pending",
                                    "size": r.get("size_bytes"), "problems": []})
+    for x in renames:
+        blog.data["items"].append({"brightcove_id": x["brightcove_id"], "row": x["row"],
+                                   "title": x["to"], "status": "rename_pending", "kind": "rename",
+                                   "from": x["from"], "to": x["to"], "library": x["library"],
+                                   "folder_id": x["folder_id"]})
     blog.save()
     batch_id = blog.data["batch_id"]
     _spawn(batch_id)
@@ -440,10 +469,11 @@ def execute(batch_id: str) -> None:
         return
     try:
         blog = run.BatchLog.load(batch_id)
-        graph, bc, targets, terms, records, status = _prepare(blog.data["manifest"])
+        graph, bc, targets, terms, records, status, _ = _prepare(blog.data["manifest"])
         by_id = {r.brightcove_id: r for r in records}
         queue = [i["brightcove_id"] for i in blog.data["items"]
-                 if i.get("status") in ("pending", "folder_created", "uploading", "uploaded")]
+                 if i.get("status") in ("pending", "folder_created", "uploading", "uploaded",
+                                        "rename_pending")]
         parallel = max(1, min(MAX_PARALLEL, int(blog.data.get("parallel") or 1)))
         blog.data.pop("paused_at", None)
         blog.data["finished_at"] = None
@@ -459,6 +489,14 @@ def execute(batch_id: str) -> None:
                 return queue.pop(0) if queue else None
 
         def one(bcid: str) -> None:
+            item = blog.item(bcid)
+            if item.get("kind") == "rename":
+                try:
+                    run.rename_one(graph, targets.by_name(item["library"]), item, blog)
+                except Exception as exc:                   # noqa: BLE001
+                    log.exception("migration %s: renaming %s failed", batch_id, bcid)
+                    blog.set_item(bcid, status="failed", error=str(exc)[:500])
+                return
             record = by_id.get(bcid)
             if blog.item(bcid).get("status") == "pending" and status.get(bcid) == "existing":
                 # Arrived in the library since the preview (another run, or
@@ -493,7 +531,8 @@ def execute(batch_id: str) -> None:
         for t in workers:
             t.join()
         if paused.is_set() and any(i.get("status") in ("pending", "folder_created", "uploading",
-                                                       "uploaded") for i in blog.data["items"]):
+                                                       "uploaded", "rename_pending")
+                                   for i in blog.data["items"]):
             blog.data["paused_at"] = _now()
             blog.save()
             log.info("migration %s paused", batch_id)
@@ -557,7 +596,8 @@ def run_status(batch_id: str) -> dict | None:
         "current": [{k: c.get(k) for k in ("brightcove_id", "title", "status", "size",
                                            "uploaded_bytes")} for c in current],
         "items": [{k: i.get(k) for k in ("brightcove_id", "title", "status", "size",
-                                         "uploaded_bytes", "error", "web_url")} for i in items],
+                                         "uploaded_bytes", "error", "web_url", "kind", "from",
+                                         "library")} for i in items],
     }
 
 

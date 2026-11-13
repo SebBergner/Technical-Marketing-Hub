@@ -33,9 +33,11 @@ wins over Brightcove's.
 Rules this module keeps, each for a reason written in the plan:
 
 * Unknown values are reported, never forced to a near match (HLR-A7).
-* An existing video (same Brightcove ID) is SKIPPED, never updated, so no
-  value a person corrected can be overwritten (HLR-A6). Updating in place
-  comes later, with the last-written values kept to compare against.
+* An existing video (same Brightcove ID, in either library, archived or
+  not) is never uploaded again. Its metadata is never updated (HLR-A6), but
+  its TITLE follows the newest sheet (Liwei, 2026-11-12): the folder, and
+  the video file named after it, are renamed when the sheet's title differs
+  (`plan_renames`, `rename_one`). Archived videos are left as they are.
 * Per video: create the folder, upload the file, and write the metadata
   LAST. The Brightcove ID is therefore only on complete folders; a folder
   left half-done by a failure has none, shows up as a conflict on the next
@@ -380,15 +382,99 @@ def plan(records: list[VideoRecord], existing: dict[str, dict],
     """
     status = {}
     for r in records:
-        if r.problems:
-            status[r.brightcove_id or f"row {r.row}"] = "invalid"
-        elif r.brightcove_id in existing:
+        # Existing first: a video already in a library is not uploaded, so
+        # what would stop an upload (no Customer Facing...) does not apply.
+        if r.brightcove_id and r.brightcove_id in existing:
             status[r.brightcove_id] = "existing"
+        elif r.problems:
+            status[r.brightcove_id or f"row {r.row}"] = "invalid"
         elif r.folder_name.lower() in names_in_use:
             status[r.brightcove_id] = "conflict"
         else:
             status[r.brightcove_id] = "new"
     return status
+
+
+def _title_problem(r: VideoRecord) -> str | None:
+    return next((p for p in r.problems if p.startswith("title")), None)
+
+
+def plan_renames(records: list[VideoRecord],
+                 libraries: list[tuple[str, dict[str, dict], set[str]]]) -> list[dict]:
+    """The sheet's title against each existing video's folder name. Writes nothing.
+
+    `libraries`: (library name, existing_with_archive, folder_names) per
+    library. One dict per video whose name differs, with `status`:
+    `rename`; `blocked` (another folder has that name, or the sheet's title
+    has a problem), with a `reason`; or `archived` (left as it is).
+    """
+    out = []
+    for r in records:
+        found = next(((name, existing[r.brightcove_id], names)
+                      for name, existing, names in libraries
+                      if r.brightcove_id and r.brightcove_id in existing), None)
+        if not found or not r.title:
+            continue
+        library, item, names = found
+        old, new = item.get("name") or "", r.folder_name
+        if old == new:
+            continue
+        entry = {"brightcove_id": r.brightcove_id, "row": r.row, "library": library,
+                 "folder_id": item.get("id"), "from": old, "to": new, "status": "rename"}
+        if item.get("_archived"):
+            entry["status"] = "archived"
+        elif problem := _title_problem(r):
+            entry.update(status="blocked", reason=problem)
+        elif new.lower() != old.lower() and new.lower() in names:
+            entry.update(status="blocked",
+                         reason=f"{library} already has another folder named {new!r}")
+        out.append(entry)
+    return out
+
+
+def renamed_file(name: str, old: str, new: str) -> str | None:
+    """A file the migration named after the old title ("<old>_<type>.mp4" or
+    "<old>.mp4"), under the new one; None for any other file."""
+    for sep in ("_", "."):
+        if name.startswith(old + sep):
+            return new + name[len(old):]
+    return None
+
+
+def rename_one(client: GraphClient, target: w.LibraryTarget, entry: dict,
+               log: BatchLog) -> None:
+    """Rename one video's folder, then its files named after the old title.
+
+    Read again first: the folder must still carry this Brightcove ID. A name
+    already changed by hand is still renamed: the newest sheet wins."""
+    bcid = entry["brightcove_id"]
+    item = w.get_item(client, target, entry["folder_id"])
+    fields = ((item.get("listItem") or {}).get("fields") or {})
+    if m.clean_text(fields.get("BrightcoveID")) != bcid:
+        raise GraphError("the folder no longer carries this Brightcove ID")
+    old = item.get("name") or entry["from"]
+    if old != entry["to"]:
+        try:
+            w.rename_item(client, target, entry["folder_id"], entry["to"])
+        except GraphError as exc:
+            if "409" in str(exc) or "nameAlreadyExists" in str(exc):
+                raise GraphError(f"{target.name} already has a folder named {entry['to']!r}")
+            raise
+    files, notes = [], []
+    for child in client.list_children(target.drive_id, entry["folder_id"], expand_fields=False):
+        if "folder" in child:
+            continue
+        name = child.get("name") or ""
+        new = renamed_file(name, old, entry["to"]) or renamed_file(name, entry["from"], entry["to"])
+        if not new or new == name:
+            continue
+        try:
+            w.rename_item(client, target, child["id"], new)
+            files.append(new)
+        except GraphError as exc:
+            notes.append(f"file {name!r} kept its name: {str(exc)[:120]}")
+    log.set_item(bcid, status="renamed", renamed_files=files,
+                 error="; ".join(notes) or None)
 
 
 def fields_for(r: VideoRecord, optional: dict | None = None) -> dict:

@@ -440,7 +440,8 @@
     tile(t, fmtInt(c.scope), "2 · This migration", "videos from " + fmtInt(c.rows) + " kept rows");
     tile(t, fmtInt(c.new), "Ready to go now", "valid and not yet in the library");
     tile(t, fmtInt((c.invalid || 0) + (c.conflict || 0)), "Need fixing first", "see Problems below");
-    tile(t, fmtInt(c.existing), "Already in the library", "skipped, never overwritten");
+    tile(t, fmtInt(c.existing), "Already in a library", "not uploaded again; metadata kept");
+    tile(t, fmtInt(c.rename), "Titles to update", "renamed to this sheet's title");
     tile(t, fmtInt((p.sheet || {}).left_out), "Left out", "ticked Delete? / Archive?");
     tile(t, fmtSize(p.volume_bytes), "To upload", fmtRuntime(p.runtime_seconds) + " of video · " +
          fmtSize(p.volume_ready_bytes) + " ready now");
@@ -459,6 +460,7 @@
         "customer facing, with Segment, Video Type and products left empty, to fill in " +
         "afterwards with Maintain content."));
     }
+    renderRenames(p.renames || []);
     renderShare($("pvSegments"), "Segment", p.segments || [],
       "Of every video in this migration, including those that need fixing. A video can have several segments.");
     renderShare($("pvProducts"), "Hub Products", p.hub_products || [],
@@ -506,6 +508,44 @@
     pc.appendChild(a);
   }
 
+  /* Titles follow the newest sheet (Liwei, 2026-11-12): a video already in
+   * Demo Video or GXC Video whose folder name differs from this sheet's title
+   * is renamed by the run, folder and video file. Listed here before a run. */
+  var RENAME_STATE = { rename: ["Will be renamed", "pill--warn"],
+                       blocked: ["Not renamed", "pill--bad"],
+                       archived: ["Archived, left as is", "pill--off"] };
+
+  function renderRenames(list) {
+    var c = $("pvRenames");
+    c.innerHTML = "";
+    c.hidden = !list.length;
+    if (!list.length) return;
+    var go = list.filter(function (x) { return x.status === "rename"; }).length;
+    cardHead(c, "Titles to update", fmtInt(go) + " of " + fmtInt(list.length),
+             go ? "pill--warn" : "pill--off");
+    c.appendChild(box("warnbox", "These videos are already in the Hub under another title. " +
+      "Starting the run renames each one to this sheet's title: its folder, and the video file " +
+      "named after the old title. Demo Video links, favorites and playlists follow the new name " +
+      "at the next sync. Nothing else about the video changes."));
+    var d = el("details");
+    d.open = list.length <= 20;
+    d.appendChild(el("summary", null, "Every title that differs (" + fmtInt(list.length) + ")"));
+    d.appendChild(table(["Row", "Library", "Now", "Becomes", ""], list.map(function (x) {
+      var tr = el("tr");
+      tr.appendChild(el("td", "num", x.row));
+      tr.appendChild(el("td", null, x.library));
+      tr.appendChild(el("td", null, x.from));
+      tr.appendChild(el("td", null, x.to));
+      var st = RENAME_STATE[x.status] || [x.status, "pill--off"];
+      var td = el("td");
+      td.appendChild(el("span", "pill " + st[1], st[0]));
+      if (x.reason) td.appendChild(el("div", "faint", x.reason));
+      tr.appendChild(td);
+      return tr;
+    })));
+    c.appendChild(d);
+  }
+
   function renderStart(p) {
     var c = $("bcStart");
     c.hidden = false;
@@ -521,7 +561,11 @@
       c.appendChild(box("warnbox", "A run is in progress. Wait for it, or pause it below."));
       return;
     }
-    if (!n) { c.appendChild(el("p", "empty", "Nothing new to migrate in this workbook.")); return; }
+    var renames = (p.counts || {}).rename || 0;
+    if (!n && !renames) {
+      c.appendChild(el("p", "empty", "Nothing new to migrate and no title to update in this workbook."));
+      return;
+    }
     var form = el("div", "form");
     var choice = el("div", "choice");
     function radio(value, text, checked) {
@@ -531,9 +575,17 @@
       choice.appendChild(l);
       return i;
     }
-    var pilot = radio("pilot", "Pilot: the first " + Math.min(10, n) + " (review them in SharePoint first)", n > 10);
-    radio("all", "All " + fmtInt(n) + " videos", n <= 10);
-    form.appendChild(choice);
+    var pilot = { checked: false };
+    if (n) {
+      pilot = radio("pilot", "Pilot: the first " + Math.min(10, n) + " (review them in SharePoint first)", n > 10);
+      radio("all", "All " + fmtInt(n) + " videos", n <= 10);
+      form.appendChild(choice);
+    }
+    if (renames) {
+      form.appendChild(box("warnbox", "This run also renames " + fmtInt(renames) +
+        (renames === 1 ? " video" : " videos") + " already in the Hub to this sheet's title " +
+        "(see Titles to update above), whichever option you choose."));
+    }
 
     // The library is fixed (Liwei, 2026-09-29): shown, not asked for.
     form.appendChild(el("p", "empty", "Target library: " + LIB + " — the only library this page writes to."));
@@ -560,7 +612,7 @@
     } else if (ACTOR) {
       form.appendChild(el("p", "empty", "The run is recorded as " + ACTOR.name + "."));
     }
-    var go = el("button", "btn-primary", "Start migration");
+    var go = el("button", "btn-primary", n ? "Start migration" : "Update titles");
     go.disabled = true;
     function check() {
       go.disabled = !!(operator && operator.value.trim().length < 2);
@@ -593,7 +645,8 @@
                     finished: ["Finished", "pill--ok"], stopped: ["Stopped", "pill--bad"] };
   var ITEM_STATE = { pending: "Waiting", folder_created: "Starting", uploading: "Uploading",
                      uploaded: "Writing metadata", done: "Done", failed: "Failed",
-                     existing: "Already there" };
+                     existing: "Already there", rename_pending: "Rename waiting",
+                     renamed: "Renamed" };
 
   function trackRun(id) {
     runId = id;
@@ -628,7 +681,7 @@
       (s.finished_at ? " · finished " + fmtStamp(s.finished_at) : "")));
     if (s.stopped_error) c.appendChild(box("badbox", "The run stopped: " + s.stopped_error));
 
-    var done = (s.counts || {}).done || 0;
+    var done = ((s.counts || {}).done || 0) + ((s.counts || {}).renamed || 0);
     var pct = s.bytes_total ? Math.min(100, Math.round(s.bytes_done * 100 / s.bytes_total)) : 0;
     var meter = el("div", "meter");
     var fill = el("span");
@@ -706,9 +759,11 @@
       } else {
         td.textContent = i.title;
       }
+      if (i.kind === "rename") td.appendChild(el("div", "faint", "was: " + i.from + " · " + i.library));
       tr.appendChild(td);
-      var cls = i.status === "done" ? "pill--ok" : i.status === "failed" ? "pill--bad"
-              : i.status === "pending" || i.status === "existing" ? "pill--off" : "pill--warn";
+      var cls = i.status === "done" || i.status === "renamed" ? "pill--ok" : i.status === "failed" ? "pill--bad"
+              : i.status === "pending" || i.status === "existing" || i.status === "rename_pending"
+                ? "pill--off" : "pill--warn";
       var sc = el("td");
       sc.appendChild(el("span", "pill " + cls, ITEM_STATE[i.status] || i.status));
       tr.appendChild(sc);

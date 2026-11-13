@@ -162,6 +162,41 @@ def existing_by_brightcove_id(client: GraphClient, target: LibraryTarget) -> dic
     return found
 
 
+#: The archive folder in each library (services/archive.py). Its folders are
+#: still the library's videos: a Brightcove ID found there is not uploaded
+#: again.
+ARCHIVE_FOLDER = "_Archive"
+
+
+def existing_with_archive(client: GraphClient, target: LibraryTarget) -> dict[str, dict]:
+    """existing_by_brightcove_id, plus the folders in _Archive, each marked
+    `_archived`. Without these a sheet run again would upload an archived
+    video a second time (2026-11-12)."""
+    found = existing_by_brightcove_id(client, target)
+    archive = next((i for i in client.list_children(target.drive_id, "root", expand_fields=False)
+                    if "folder" in i and (i.get("name") or "") == ARCHIVE_FOLDER), None)
+    if archive:
+        for item in client.list_children(target.drive_id, archive["id"]):
+            fields = ((item.get("listItem") or {}).get("fields") or {})
+            bcid = m.clean_text(fields.get("BrightcoveID"))
+            if "folder" in item and bcid and bcid not in found:
+                found[bcid] = dict(item, _archived=True)
+    return found
+
+
+def rename_item(client: GraphClient, target: LibraryTarget, item_id: str, name: str) -> dict:
+    """Rename a folder or file in place. `fail` on a name already taken: the
+    caller reports it, it never renames around it."""
+    item = client._request("PATCH", f"/drives/{target.drive_id}/items/{item_id}",
+                           json={"name": name, "@microsoft.graph.conflictBehavior": "fail"})
+    return item or {}
+
+
+def get_item(client: GraphClient, target: LibraryTarget, item_id: str) -> dict:
+    return client._request("GET", f"/drives/{target.drive_id}/items/{item_id}",
+                           params={"$expand": "listItem($expand=fields)"}) or {}
+
+
 def folder_names(client: GraphClient, target: LibraryTarget) -> set[str]:
     return {(i.get("name") or "").lower()
             for i in client.list_children(target.drive_id, "root", expand_fields=False)}

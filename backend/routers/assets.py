@@ -245,9 +245,10 @@ def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo),
                                     description="a personal GXC link's token (B10)")):
     repo = _through_link(asset_id, s, repo, user)
     asset = repo.get(asset_id)
-    if asset is None and getattr(repo, "gxc", False) and asset_id.startswith("gxc-"):
-        # A GXC link from before B10 (2026-11-03), whose id spelled the title:
-        # the video under its new id, for whoever may see GXC. The page puts
+    if asset is None and (getattr(repo, "gxc", False) or not asset_id.startswith("gxc-")):
+        # A link from before its id changed: a GXC link from before B10
+        # (2026-11-03), whose id spelled the title, for whoever may see GXC;
+        # a Demo Video renamed since (2026-11-12), for anyone. The page puts
         # the new id in the address bar. Anyone else: the 404 below.
         renamed = getattr(repo, "renamed_to", None)
         if new_id := (renamed(asset_id) if renamed else None):

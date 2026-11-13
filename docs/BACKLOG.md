@@ -44,7 +44,8 @@ SharePoint 里的数据清理（kit 日期、Demo Type、标错的 LDK/VDK、旧
   - My feedback 在状态还是 Open 时可以 Edit，Hub Tasks 那一行会注明 "Edited by its sender"；
   - My requests 不能修改（团队可能已经在做），但可以 "Add a note"：写进 Demo Requests 的 Notes 列，带日期和署名，追加在原有内容后面；Delivered 或 Declined 之后不能再加（Liwei 定）；
   - My demos 不变，在 demo 页用 metadata edit。
-- **第 3 期**：设置区，包括 S1 新内容邮件订阅等。
+- **第 3 期**：设置区，包括 S1 新内容邮件订阅等。**11/13 Liwei 定：先不做，等 Seb 的意见**（频率、订阅名单存哪里、partner 能否订阅、发信账号，见 S1）。设置区目前只有 S1 这一项，所以第 3 期整体押后。
+- **My Hub 收尾（11/13）**：第 1、2 期和 11/12 补充都已在 staging（v2026.3.207）。剩下：Liwei 在 staging 测试（分享播放列表、feedback Edit、request Add a note），之后决定 swap；swap 后删掉测试数据。
 
 ### 要先和 IT 沟通
 - **AI 补全 metadata 和搜索**：上传时根据标题、描述和视频转录，建议 Product、Segment、Video Type 和关键词；按视频内容搜索。要先确认公司的 AI 使用政策和数据流向（Azure OpenAI / Copilot）。
@@ -248,6 +249,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   4. partner 能否订阅：邮件里只能列他们有权限看的内容；建议第一期只开放给 PTC 员工。
 - **工作量**：Hub 侧 1–1.5 天；Power Automate 流程约半天（你来配置）。
 - **10/26 备注**：押后处理，还需要讨论（Liwei）。
+- **11/13 备注**：仍然押后，需要 Seb 的意见（Liwei）。
 
 ### S2. 公开 Dashboard（已定：使用 + 内容统计，对 PTC 员工公开）
 - **结论**：Hub activity 只是使用数据；Serge 要的 Dashboard 还要有内容统计：内容有多全、各类型数量、
@@ -828,6 +830,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - [ ] Funnel stage 只有 325 / 1,621 个填了，Post-Sale 一个都没有。
 - [ ] 标题像文件名：Honda3Wheeler_EDU、Honda3Wheeler_COMM、CFD and AMX_Heat Exchanger Dataset、Technical Illustrations_Dataset。
 - [ ] Lamborghini - Intelligent Product Lifecycle（VDK）：Demo owner 要改成真正的负责人（Liwei 只是代为上传）。
+- [ ] **Hub Tasks #28：Jetstream 素材不在 PTC Jetstream 页面**（11/13 查）。原因是产品没填 Jetstream。Demo Video 的 "PTC Jetstream Product Overview" 已改（HubProducts = PTC Jetstream，11/13 写入并读回确认）。还剩 4 个 Demo Catalog 素材要 **Liwei 在 SharePoint 手动改 Product**：Windchill Jetstream Change（保留 Windchill PDMLink，加 Jetstream）、PTC Jetstream VDK、PTC Jetstream LDK、PTC Jetstream Overview（都加 Jetstream）。Hub 的应用读不到术语库，站点上也没有素材用过 Jetstream 术语，所以拿不到术语 ID，程序写不了。如果 Product 里选不到 Jetstream：请术语集管理员加，或在 Hub 加规则（标题含 "Jetstream" 的 Demo Catalog 素材归到 Jetstream）。改完等下次同步，再把 #28 标成 Done。
 
 ---
 

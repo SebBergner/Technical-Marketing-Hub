@@ -2103,3 +2103,9 @@ button.hub-guide__video--tour:hover .hub-guide__play { transform: scale(1.08); }
 
 /* #19: the card picture is clickable (play preview, or open details). */
 .asset-card__thumb--link { cursor: pointer; }
+/* My Hub: find in favorites, and lists that open with "Show all" (2026-11-13). */
+.hub-me--off{display:none!important}
+.hub-me__find{margin-left:auto;width:220px;max-width:100%;font:inherit;font-size:13px;padding:5px 9px;border:1px solid var(--orion-border-md);border-radius:6px;background:var(--orion-surface);color:var(--orion-text)}
+.hub-me__more{display:block;margin:10px auto 0;padding:5px 14px;font:inherit;font-size:13px;font-weight:600;color:var(--orion-indigo);background:transparent;border:1px solid var(--orion-border-md);border-radius:999px;cursor:pointer}
+.hub-me__more:hover{background:#eef0fb}
+@media (max-width:768px){.hub-me__find{margin-left:0;width:100%}}

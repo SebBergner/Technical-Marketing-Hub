@@ -73,6 +73,13 @@ function buildPage() {
   var anchor = document.getElementById("videoPreviewPage");
   if (anchor) anchor.parentNode.insertBefore(page, anchor);
   else document.body.appendChild(page);
+  shortList("meRequests", ".hub-me__req");
+  shortList("meFeedback", "tbody > tr");
+  shortList("meDemos", ".hub-up__mine");
+  // A demo opened from My demos comes back here, as one from My feedback does.
+  page.querySelector("#meDemos").addEventListener("click", function (e) {
+    if (e.target.closest('a[href^="#/asset/"]')) window.hubDetailReturn = "#/me";
+  }, true);
   page.querySelector(".vp-back").addEventListener("click", function () {
     history.pushState(null, "", location.pathname + location.search);
     closeMyHub();
@@ -93,10 +100,93 @@ function cardRow(host, items, empty) {
   var row = el("div", "asset-row hub-me__row");
   items.forEach(function (a) {
     var card = buildCard(a);
+    card.dataset.find = [a.title, a.type].filter(Boolean).join(" ").toLowerCase();
     card.addEventListener("click", function () { window.hubDetailReturn = "#/me"; }, true);
     row.appendChild(card);
   });
   host.appendChild(row);
+}
+
+/* Favorites can hold hundreds, in one row (Liwei, 2026-11-13): past
+ * FIND_FROM a box beside the heading narrows the row by title. Recently
+ * viewed keeps 20, newest first, and needs none. */
+var FIND_FROM = 9;
+
+function favoritesFinder(count) {
+  var head = document.querySelector("#meFavorites .hub-me__head");
+  var box = document.getElementById("meFavFind");
+  if (count < FIND_FROM) {
+    if (box) { box.value = ""; box.hidden = true; }
+    return;
+  }
+  if (!box) {
+    box = el("input", "hub-me__find");
+    box.id = "meFavFind";
+    box.type = "search";
+    box.placeholder = "Find in favorites";
+    box.setAttribute("aria-label", "Find in favorites");
+    box.addEventListener("input", filterFavorites);
+    head.appendChild(box);
+  }
+  box.hidden = false;
+  filterFavorites();
+}
+
+function filterFavorites() {
+  var box = document.getElementById("meFavFind");
+  var body = document.querySelector("#meFavorites .hub-me__body");
+  var words = (box && !box.hidden ? box.value : "").toLowerCase().split(/\s+/).filter(Boolean);
+  var shown = 0;
+  body.querySelectorAll(".hub-me__row > .asset-card").forEach(function (card) {
+    var hit = words.every(function (w) { return (card.dataset.find || "").indexOf(w) >= 0; });
+    card.classList.toggle("hub-me--off", !hit);
+    if (hit) shown++;
+  });
+  var none = body.querySelector(".hub-me__nofind");
+  if (!shown && words.length) {
+    if (!none) body.appendChild(el("div", "hub-me__empty hub-me__nofind", "No favorite matches that."));
+  } else if (none) {
+    none.remove();
+  }
+}
+
+/* Lists stop at SHORT_LIST (Liwei, 2026-11-13): My requests, My feedback
+ * and My demos show their newest few and a "Show all" that opens the rest,
+ * rather than a box that scrolls inside the page. report.js and upload.js
+ * draw two of them, so the rows are found once drawn, and found again
+ * after each redraw (a note added, feedback edited); an opened list stays
+ * open. */
+var SHORT_LIST = 5;
+
+function shortList(sectionId, rowSelector) {
+  var body = document.querySelector("#" + sectionId + " .hub-me__body");
+  if (!body || body.dataset.short) return;
+  body.dataset.short = "1";
+  var open = false;
+  var watch = new MutationObserver(apply);
+  function apply() {
+    watch.disconnect();
+    var old = body.querySelector(".hub-me__more");
+    if (old) old.remove();
+    var rows = body.querySelectorAll(rowSelector);
+    rows.forEach(function (r, i) { r.classList.toggle("hub-me--off", !open && i >= SHORT_LIST); });
+    if (rows.length > SHORT_LIST) {
+      var more = el("button", "hub-me__more",
+        open ? "Show fewer" : "Show all (" + rows.length + ")");
+      more.type = "button";
+      more.addEventListener("click", function () {
+        open = !open;
+        apply();
+        if (!open) body.closest(".hub-me__section").scrollIntoView({ block: "nearest" });
+      });
+      var holder = rows[0].parentNode;
+      if (holder.tagName === "TBODY") holder = holder.closest(".hub-table-wrap") || holder.parentNode;
+      if (holder === body) body.appendChild(more);
+      else holder.after(more);
+    }
+    watch.observe(body, { childList: true, subtree: true });
+  }
+  apply();
 }
 
 function loadCards() {
@@ -108,6 +198,7 @@ function loadCards() {
       "Nothing yet: the demos you open will be listed here, newest first.");
     cardRow(document.querySelector("#meFavorites .hub-me__body"), d.favorites,
       "No favorites yet. Star a demo on its card or its page to keep it here.");
+    favoritesFinder(d.favorites.length);
     document.getElementById("meRequests").hidden = !d.sections.requests;
     document.getElementById("meDemos").hidden = !d.sections.demos;
     return d;

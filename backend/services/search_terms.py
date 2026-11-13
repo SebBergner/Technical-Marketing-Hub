@@ -43,6 +43,7 @@ DEFAULTS: list[tuple[list[str], str]] = [
     (["IPL", "Intelligent Product Lifecycle"], "Hub Tasks #29; 25 demos spell it out"),
     (["EHT", "E&HT", "Electronics & High Tech"], "Hub Tasks #29: both spellings are used"),
     (["PLE", "Product Line Engineering"], "Hub Tasks #15"),
+    (["IPE", "Industrial Product Engineering"], "Hub Tasks #17; spelled out by Liwei 2026-11-13"),
     # Spelled out in the catalogue's own titles and descriptions.
     (["CWC", "Connected Work Cell"], "Catalogue"),
     (["DPM", "Digital Performance Management"], "Catalogue"),

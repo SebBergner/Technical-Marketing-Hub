@@ -62,6 +62,7 @@
     <symbol id="a-chart" viewBox="0 0 16 16"><path d="M2.5 13.5h11M4.5 11V7.5M8 11V4M11.5 11V8.5"/></symbol>
     <symbol id="a-review" viewBox="0 0 16 16"><rect x="3" y="2.5" width="10" height="11.5" rx="1.2"/><path d="M5.6 8.4l1.6 1.6 3.2-3.2"/></symbol>
     <symbol id="a-flag" viewBox="0 0 16 16"><path d="M3.5 14V2.5M3.5 3h8l-1.6 3 1.6 3h-8"/></symbol>
+    <symbol id="a-terms" viewBox="0 0 16 16"><circle cx="6.5" cy="6.5" r="4"/><path d="M9.5 9.5L14 14M4.8 6.5h3.4"/></symbol>
     <symbol id="a-lock" viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></symbol>
     <symbol id="a-usage" viewBox="0 0 16 16"><path d="M1.5 8.5h3l2-5 3 9 2-4h3"/></symbol>
     <symbol id="a-users" viewBox="0 0 16 16"><circle cx="6" cy="5.5" r="2.3"/><path d="M1.8 13.5c.4-2.4 2.1-3.8 4.2-3.8s3.8 1.4 4.2 3.8M10.6 3.4a2.2 2.2 0 0 1 0 4.2M12.2 9.9c1.1.5 1.8 1.7 2 3.6"/></symbol>
@@ -86,6 +87,7 @@
       <button type="button" class="tab" role="tab" data-tab="home" aria-selected="false"><svg class="ico"><use href="#a-home"/></svg><span>Home page</span></button>
       <button type="button" class="tab" role="tab" data-tab="internal" aria-selected="false"><svg class="ico"><use href="#a-lock"/></svg><span>GXC videos</span></button>
       <button type="button" class="tab" role="tab" data-tab="reports" aria-selected="false"><svg class="ico"><use href="#a-flag"/></svg><span>Report owners</span></button>
+      <button type="button" class="tab" role="tab" data-tab="terms" aria-selected="false"><svg class="ico"><use href="#a-terms"/></svg><span>Search terms</span></button>
       <div class="side__group">People &amp; usage</div>
       <button type="button" class="tab" role="tab" data-tab="usage" aria-selected="false"><svg class="ico"><use href="#a-usage"/></svg><span>Hub usage</span></button>
       <button type="button" class="tab" role="tab" data-tab="access" aria-selected="false"><svg class="ico"><use href="#a-users"/></svg><span>Users &amp; groups</span></button>
@@ -142,6 +144,38 @@
       <div class="section-head"><h2>Home page</h2></div>
       <div class="card" id="promoted" style="margin-bottom:12px"></div>
       <div class="card" id="hubDisplay"></div>
+    </section>
+  </div>
+
+  <!-- Abbreviations and the words they stand for, for the search (2026-11-13). -->
+  <div id="tabTerms" role="tabpanel" hidden>
+    <section>
+      <div class="section-head"><h2>Search terms</h2></div>
+      <p class="muted" style="margin:-6px 0 6px">Terms in one group mean the same. A search that names
+        one also looks for the others, so <b>MBSE</b> and <b>Model-Based Systems Engineering</b> find
+        the same demos. Case, "&amp;" and "and" do not matter; a plural in the search still counts.</p>
+      <p class="faint" id="stIntro" style="margin:0 0 14px;font-size:12.5px"></p>
+      <div class="card st-try">
+        <label for="stTry"><b>Try a search</b></label>
+        <input id="stTry" type="search" placeholder="e.g. mbse demo" autocomplete="off">
+        <div class="faint" id="stTryOut">Type a search to see what else it looks for.</div>
+      </div>
+      <div class="card st-add" id="stAdd" hidden>
+        <b>Add a group</b>
+        <input id="stAddTerms" placeholder="Terms that mean the same, separated by commas: PLE, Product Line Engineering" autocomplete="off">
+        <input id="stAddNote" placeholder="Note (optional): where it comes from" autocomplete="off">
+        <div class="st-addacts"><button type="button" class="btn-primary" id="stAddBtn">Add</button>
+          <span class="st-msg" id="stAddMsg"></span></div>
+      </div>
+      <div class="card">
+        <div class="st-tools"><input id="stFilter" type="search" placeholder="Filter the list" autocomplete="off">
+          <span class="faint" id="stCount"></span></div>
+        <div class="tablewrap" id="stBody">Loading…</div>
+      </div>
+    </section>
+    <section>
+      <div class="section-head"><h2>Recent changes</h2></div>
+      <div class="card tablewrap" id="stChanges"></div>
     </section>
   </div>
 

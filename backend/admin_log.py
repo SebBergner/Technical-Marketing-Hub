@@ -124,6 +124,7 @@ CATEGORIES: list[tuple[str, re.Pattern]] = [
                             r"|^/api/assets/[^/]+/(related|not-related)/[^/]+$")),
     ("Migration", re.compile(r"^/api/migration/")),
     ("Reports", re.compile(r"^/api/admin/report-owners")),
+    ("Search terms", re.compile(r"^/api/admin/search-terms")),
     ("Usage data", re.compile(r"^/api/admin/(activity/person|admin-log)")),
 ]
 

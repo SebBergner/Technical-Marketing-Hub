@@ -15,6 +15,7 @@ import {
 import { loadUsage, renderDims, renderRanges } from "./usage.js";
 import { loadHubSettings, loadPromoted } from "./home.js";
 import { loadOwners } from "./owners.js";
+import { loadTerms } from "./terms.js";
 import { loadGxcTab } from "./access.js";
 import { loadAccess, loadDisclaimer, loadLicences, loadTokens } from "./users.js";
 import { loadActivity, renderActRanges } from "./signins.js";
@@ -51,7 +52,7 @@ import { loadActivity, renderActRanges } from "./signins.js";
  * address (#usage, #access), so a refresh or a shared link opens the
  * same one. */
 var PANELS = { overview: "tabOverview", home: "tabHome",
-               reports: "tabReports", internal: "tabInternal", usage: "tabUsage",
+               reports: "tabReports", terms: "tabTerms", internal: "tabInternal", usage: "tabUsage",
                access: "tabAccess", activity: "tabActivity" };
 
 function tabFromHash() {
@@ -77,6 +78,7 @@ function showTab(name) {
   if (name === "access") { loadAccess(); loadLicences(); loadDisclaimer(); loadTokens(); }
   if (name === "internal") loadGxcTab();
   if (name === "reports") loadOwners();
+  if (name === "terms") loadTerms();
   if (name === "activity") { renderActRanges(); loadActivity(); }
   if (name === "usage") loadUsage();
 }

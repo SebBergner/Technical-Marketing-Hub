@@ -401,3 +401,22 @@
     width:min(820px,100%);padding:20px 22px 26px}
   .sheet__head{display:flex;justify-content:space-between;align-items:flex-start;
     gap:16px;margin-bottom:16px}
+  /* Admin -> Search terms (2026-11-13). */
+  .st-try,.st-add{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+  .st-try input,.st-add input,.st-tools input,.st-edit input{font:inherit;font-size:13px;padding:6px 10px;
+    border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);min-width:0}
+  .st-try>div{font-size:13px}
+  .st-addacts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .st-msg{font-size:12.5px;color:var(--red)}
+  .st-msg--ok{color:var(--green);font-weight:600}
+  .st-tools{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+  .st-tools input{flex:0 1 260px}
+  .st-table td{vertical-align:top}
+  .st-terms{line-height:2}
+  .st-term{display:inline-block;padding:1px 9px;border-radius:999px;background:var(--surface-2);
+    border:1px solid var(--border);font-size:13px;font-weight:600;white-space:nowrap}
+  .st-eq{margin:0 6px;color:var(--faint)}
+  .st-note{font-size:12.5px;max-width:280px}
+  .st-acts{white-space:nowrap;text-align:right}
+  .st-acts button{margin-left:4px;padding:4px 10px;font-size:12px}
+  .st-edit{display:flex;flex-direction:column;gap:6px}

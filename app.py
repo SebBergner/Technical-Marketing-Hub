@@ -14,7 +14,7 @@ from backend import admin_log, oidc
 from backend.routers import (
     admin, assets, auth, consensus, content_health, curation, debug, disclaimer, graph, me,
     migration,
-    reports, requests, segments, status, support, taxonomy, uploads, vms,
+    reports, requests, search_terms, segments, status, support, taxonomy, uploads, vms,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -136,6 +136,7 @@ app.include_router(oidc.router)
 app.include_router(vms.router)
 app.include_router(support.router)
 app.include_router(support.admin_router)
+app.include_router(search_terms.router)
 app.include_router(disclaimer.router)
 app.include_router(disclaimer.welcome_router)
 app.include_router(status.router)

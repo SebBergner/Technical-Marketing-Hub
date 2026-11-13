@@ -45,7 +45,7 @@ SharePoint 里的数据清理（kit 日期、Demo Type、标错的 LDK/VDK、旧
   - My requests 不能修改（团队可能已经在做），但可以 "Add a note"：写进 Demo Requests 的 Notes 列，带日期和署名，追加在原有内容后面；Delivered 或 Declined 之后不能再加（Liwei 定）；
   - My demos 不变，在 demo 页用 metadata edit。
 - **第 3 期**：设置区，包括 S1 新内容邮件订阅等。**11/13 Liwei 定：先不做，等 Seb 的意见**（频率、订阅名单存哪里、partner 能否订阅、发信账号，见 S1）。设置区目前只有 S1 这一项，所以第 3 期整体押后。
-- **My Hub 收尾（11/13）**：第 1、2 期和 11/12 补充都已在 staging（v2026.3.207）。剩下：Liwei 在 staging 测试（分享播放列表、feedback Edit、request Add a note），之后决定 swap；swap 后删掉测试数据。
+- **My Hub 收尾（11/13）**：第 1、2 期和 11/12 补充，加上 Favorites 搜索、列表 Show all、User Guide 的 My Hub 一步、What's new 弹窗（每天最多一次，Don't show again），**11/13 已 swap 到 production（v2026.3.211）**；staging 已重新部署同一版本。swap 后检查：两边匿名都跳登录，冒烟 0 失败，使用量和 swap 前一致（views 1339、downloads 634）。剩下：在 production 编辑一条自己的 Open 反馈，确认 Hub Tasks 那一行写了 "Edited by its sender"（staging 没接 Hub Tasks，没测过）；如果在 staging 给真实请求加过测试备注，到 Demo Requests 删掉。Demo Video 改名迁移现在可以做了（等 Christine 的表）。
 
 ### 要先和 IT 沟通
 - **AI 补全 metadata 和搜索**：上传时根据标题、描述和视频转录，建议 Product、Segment、Video Type 和关键词；按视频内容搜索。要先确认公司的 AI 使用政策和数据流向（Azure OpenAI / Copilot）。
@@ -90,7 +90,7 @@ Serge 11/11（周三）会向 CK 和各部门负责人介绍 Hub：既是找现�
 | 2 | 资产类型修改 | **已做**：Edit 表单最上面加了 "Demo type"，只对 Demo Catalog 的 kit 显示，只能在 Live Demo Kit 和 Virtual Demo Kit 之间改（kit 只在 Demo Catalog；视频分在几个库里，不能改）。库里还有一个 "AR Experience" 选项，不提供。写回 Demo_x0020_Type，Hub 上立即显示，权限和 Edit 相同。**PM 忘了填 Demo Type 的文件夹不会出现在 Hub**，所以这个功能救不了它们：11/08 只读查了，Demo Catalog 顶层 753 个文件夹里 297 个没有 Demo Type，名字里带 VDK/LDK 的有 9 个，由 Liwei 或 PM 在 SharePoint 补：DEX VDK v.2、Onshape Vision - VDK、Creo Advanced Assembly Extension - VDK、Creo Advanced Assembly Extension - LDK、What's New in Mathcad Prime 11.0 - LDK v.1、What's New in Mathcad Prime 11.0 - VDK v.1、Creo Mechanism MDX and MDO Overview VDK v.1、EZ Tolerance Analysis VDK v.1、Creo Mold Analysis Overview VDK v.1 |
 | 3 | 欢迎视频和帮助按钮 | **已做帮助部分**：右上角常驻 "?" 按钮，打开单独的使用说明页（#/guide），有 6 段：找内容、打开 demo、列表和表格、申请新内容、反馈问题、客户数据。和 Get help（#/help，报告问题）分开。11/10 已加上培训视频：放在 SharePoint Demo Video 库的 "TMH Training Video" 文件夹（没有 Demo Type，所以不会被同步成 demo），这一页最上面点播放才加载，播放文件夹里最新的视频；换视频只要在 SharePoint 里替换文件，不用部署。不计入 usage |
 | 4 | 申请提交后的提醒 | **Liwei 以后做**（Power Automate 或 Seb 的邮箱） |
-| 5 | 缩写搜索（#15 PLE、#17 IPE，Neal） | **先不做**：开会确认缩写清单 |
+| 5 | 缩写搜索（#15 PLE、#17 IPE，Neal；#29 MBSE、IPL、EHT/E&HT） | **11/13 已做第一版，未推送**：Admin → Search terms，33 组，搜一个就同时搜同组其它词；Maintain content 可以增改删，改动进 Admin log。第一版来自目录里 "全称 (缩写)" 的写法和反馈；IPE 目录里没有出现，没有收。请 Liwei、Elio 看一遍清单 |
 | 6 | 导航加产品 logo（#26、#16，C10） | **先不做**：还没拿到 logo |
 | 7 | 旧的 ThingWorx 视频（#20 Enrique） | **保留** |
 | 8 | 撤回反馈（#24 Serge） | **已做**：Get help → My feedback 里，自己的、状态还是 Open 的反馈有 Withdraw 按钮（会先确认）。Hub Tasks 里那一行改成 Withdrawn，Hub 立即显示为 Withdrawn。团队已经处理过（不是 Open）的不能撤回 |

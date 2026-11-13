@@ -227,9 +227,23 @@ def _close_hit(haystack: str, term: str, tolerance: "Tolerance") -> bool:
     return bool(close) and not close.isdisjoint(_words_of(haystack))
 
 
+def _variants(text: str | None) -> tuple:
+    """The query, and the same query in the words of Admin -> Search terms
+    (services/search_terms: "MBSE" is "Model-Based Systems Engineering")."""
+    from backend.services import search_terms
+    return search_terms.variants(text) or (text,)
+
+
 def score(text: str | None, title: str | None, description: str | None = None,
           partial: bool = False, tolerance: "Tolerance | None" = None) -> int:
-    """How well one record answers a query. 0 means it does not.
+    """How well one record answers a query, or any of its Search terms
+    variants (Liwei, 2026-11-13): the best of them. 0 means it does not."""
+    return max(_score(v, title, description, partial, tolerance) for v in _variants(text))
+
+
+def _score(text: str | None, title: str | None, description: str | None = None,
+           partial: bool = False, tolerance: "Tolerance | None" = None) -> int:
+    """How well one record answers one query. 0 means it does not.
 
     A contiguous phrase match always outranks the same words scattered, so
     "Creo Overview" beats "Creo Parametric Overview" for the query
@@ -284,6 +298,11 @@ _NO_SPAN = 10_000
 
 
 def span(text: str | None, title: str | None, partial: bool = False) -> int:
+    """The shortest _span of the query and its Search terms variants."""
+    return min(_span(v, title, partial) for v in _variants(text))
+
+
+def _span(text: str | None, title: str | None, partial: bool = False) -> int:
     """How far into the title you must read before every term has appeared.
 
     The tiers alone barely discriminate on multi-word queries: "Creo overview"
@@ -353,6 +372,11 @@ def matches(text: str | None, title: str | None,
 
 
 def names(text: str | None, name: str | None, partial: bool = False) -> bool:
+    """Whether the query, or one of its Search terms variants, is in a file name."""
+    return any(_names(v, name, partial) for v in _variants(text))
+
+
+def _names(text: str | None, name: str | None, partial: bool = False) -> bool:
     """Whether every term of the query is in a file name.
 
     File names are written for machines -- "Bobcat_03_Engineering.mp4" --

@@ -205,6 +205,19 @@ function cardShell(a) {
     thumb.appendChild(play);
   }
 
+  /* The picture itself answers a click too (#19, Enrique, 2026-11-06): a
+   * video plays its preview, as the play button does; anything else opens
+   * its details page, as the title does. Its own buttons (play, star) and a
+   * player inside it keep their clicks. */
+  thumb.classList.add("asset-card__thumb--link");
+  thumb.title = previewUrl(a) ? "Play preview" : "Open details";
+  thumb.addEventListener("click", function (e) {
+    if (e.target.closest("button, a, video, iframe, .hub-inline-player")) return;
+    e.preventDefault();
+    if (previewUrl(a)) openPreview(a);
+    else openAssetDetail(a.id);
+  });
+
   // Not for an LDK. Seb, in review: he'd assume a 13:15 badge means the
   // demo takes 13:15, but that number is the recording's own length --
   // a live demo can run well past it. Elio: hide it; time only matters

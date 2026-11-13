@@ -908,7 +908,19 @@ async function applyFilters() {
   fillSidebarCounts(facets);
 
   var none = document.querySelector(".hub-noresults");
-  if (none) none.classList.toggle("show", page.total === 0);
+  if (none) {
+    none.classList.toggle("show", page.total === 0);
+    // A product with nothing in the Hub yet, chosen on its own (#26, Serge's
+    // words): say so, rather than suggest clearing a filter -- PTC Ignition
+    // was a blank page.
+    var narrowing = [];
+    params.forEach(function (v, k) { if (k !== "include_older_vms") narrowing.push(k); });
+    var productOnly = narrowing.length === 1 &&
+      (narrowing[0] === "umbrella" || narrowing[0] === "family");
+    none.textContent = productOnly
+      ? "Technical Marketing content related to this product does not yet exist in TMH."
+      : "No assets match these filters. Try clearing one.";
+  }
 
   // What else narrowed it, with the words (Liwei, 2026-11-12: "Bobcat" read
   // as finding almost nothing because a filter was on; which filter is part

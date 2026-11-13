@@ -2100,3 +2100,6 @@ button.hub-guide__video--tour:hover .hub-guide__play { transform: scale(1.08); }
 .hub-me__addnote:hover{text-decoration:underline}
 .hub-me__noteform{margin-top:6px;max-width:560px}
 .hub-me__noteerr{font-size:12px;color:#b42318;margin-top:4px}
+
+/* #19: the card picture is clickable (play preview, or open details). */
+.asset-card__thumb--link { cursor: pointer; }

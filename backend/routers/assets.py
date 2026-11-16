@@ -323,7 +323,7 @@ def _record(repo: AssetRepository, event: str, asset_id: str | None = None,
     disk hiccup must never turn a working page or download into a 500 — the
     counter exists to inform, not to gate."""
     recorder = getattr(repo, "record_usage_event", None)
-    if recorder is None:
+    if recorder is None or getattr(user, "view_as", None):     # a preview is no one's use (A9)
         return
     try:
         recorder(event, asset_id=asset_id, **fields, **_who(user))

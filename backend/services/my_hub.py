@@ -36,6 +36,9 @@ def user_key(user) -> str | None:
     (anonymous)."""
     if user is None or not (user.is_authenticated or user.is_dev_principal):
         return None
+    if getattr(user, "view_as", None):
+        # A preview (A9) has no person behind it: an empty My Hub, never written.
+        return f"preview:{user.view_as['group_id']}"
     if getattr(user, "object_id", None):
         return f"oid:{user.object_id}"
     who = (user.email or user.username or "").strip().lower()

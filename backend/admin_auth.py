@@ -123,6 +123,11 @@ def verify_password(username: str, password: str) -> bool:
 
 
 def has_admin_session(request: Request) -> bool:
+    # The shared password would lift a preview's permissions (A9).
+    state = request.scope.get("state") or {}
+    principal = state.get("hub_principal")
+    if principal is not None and principal.view_as:
+        return False
     raw = request.cookies.get(COOKIE_NAME)
     if not raw or not settings.admin_configured:
         return False
@@ -164,7 +169,7 @@ def require_perm(perm):
         # attempts included.
         request.state.hub_actor = actor or (
             f"token:{user.token_name}" if user.token_name
-            else f"user:{user.email}" if user.is_authenticated else None)
+            else _person(request, user) if user.is_authenticated else None)
         if actor:
             return actor
         if user.is_authenticated:
@@ -178,13 +183,22 @@ def require_perm(perm):
     return dependency
 
 
+def _person(request: Request, user) -> str:
+    """`user:<address>`; during a preview (A9) the real person, and as whom."""
+    if getattr(user, "view_as", None):
+        from backend.auth import real_principal
+        real = real_principal(request)
+        return f"user:{real.email or 'dev'} as {user.view_as['label']}"
+    return f"user:{user.email}"
+
+
 def _actor(request: Request, user, value: str) -> str | None:
     from backend.access import ADMIN_SESSION_PERMS
 
     if user.token_name:
         return f"token:{user.token_name}" if user.can(value) else None
     if user.is_authenticated and user.can(value):
-        return f"user:{user.email}"
+        return _person(request, user)
     if value in ADMIN_SESSION_PERMS and has_admin_session(request):
         return "admin-session"
     if user.is_dev_principal and user.can(value):

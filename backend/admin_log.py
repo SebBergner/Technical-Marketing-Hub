@@ -50,6 +50,8 @@ ACTIONS: dict[tuple[str, str], str] = {
     ("POST", "/api/admin/access/groups"): "Created a group",
     ("PUT", "/api/admin/access/groups/{group_id}"): "Changed a group",
     ("DELETE", "/api/admin/access/groups/{group_id}"): "Deleted a group",
+    ("POST", "/api/admin/view-as"): "Started viewing the Hub as a group",
+    ("POST", "/api/admin/view-as/exit"): "Stopped viewing the Hub as a group",
     ("POST", "/api/admin/api-tokens"): "Created an API token",
     ("POST", "/api/admin/api-tokens/{token_id}/revoke"): "Revoked an API token",
     ("POST", "/api/admin/consensus-licenses"): "Uploaded the Consensus licence list",
@@ -115,7 +117,7 @@ CATEGORIES: list[tuple[str, re.Pattern]] = [
                                   r"|^/api/content-health/(hidden|access-requests)")),
     ("Content review", re.compile(r"^/api/assets/[^/]+/(still-current|archive)$")),
     ("Uploads", re.compile(r"^/api/uploads(/|$)")),
-    ("Users & groups", re.compile(r"^/api/admin/(access|api-tokens|consensus-licenses)(/|$)")),
+    ("Users & groups", re.compile(r"^/api/admin/(access|api-tokens|consensus-licenses|view-as)(/|$)")),
     ("Sign-in", re.compile(r"^/api/admin/(login|logout)$")),
     ("Home page", re.compile(r"^/api/admin/(promoted|hub-settings)$")),
     ("Sync", re.compile(r"^/api/(graph/sync|consensus/(sync|oauth)|admin/auto-sync)")),
@@ -316,6 +318,9 @@ def _who(scope) -> str:
     user = principal_from_request(request)
     if user.is_dev_principal:
         return f"dev:{user.email}"
+    if user.view_as:
+        from backend.auth import real_principal
+        return f"user:{real_principal(request).email or 'dev'} as {user.view_as['label']}"
     if user.is_authenticated:
         return f"user:{user.email}"
     return "admin-session" if has_admin_session(request) else "anonymous"

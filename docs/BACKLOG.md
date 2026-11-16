@@ -487,6 +487,15 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - **工作量**：约 1.5–2 天。
 - **10/26 备注**：不向 IT 申请测试账号。
 - **已定**（Liwei 10/28）：所有组都可以预览（Users & groups 里每个组都有这个按钮，以后新建的组也有）。
+- **11/16 已做，本地完成，未提交、未上 staging**（计划见 `docs/A9-view-as-plan.md`）：
+  - 预览状态放在已签名的 session cookie 里（`backend/view_as.py`）；`auth.principal_from_request` 在这一处把真实用户换成"有效用户"（没有邮箱、姓名、对象 ID；权限 = 该组与自己的交集；partner 标记按组），每个请求只算一次。
+  - 只读：`view_as.ReadOnly` 中间件，预览中所有写操作 403（带 `X-Hub-View-As: read-only` 和统一的提示），统计请求（搜索、功能使用、查看、Consensus 预览、欢迎弹窗）静默返回 204；Consensus 的 OAuth 两个 GET 也拒绝。不计入使用、不写 My Hub、不写 Activity。
+  - 入口：Admin → Users & groups，每个组的 "View the Hub as this group"（Manage users & groups；本地开发账号也可以）；顶部横幅 "Viewing the Hub as <组> · Exit"（`static/js/view-as.js`，Hub、Admin、Content health、Migration 四页都加载）；被拒的操作显示一条提示。
+  - Admin log 记开始和结束（操作人是你本人，目标是组名）；组被删、不是原来的人时预览自动结束并记一条。共用 Admin 密码在预览中不会抬高权限；API token 不会被预览。
+  - 手工建的组（Team Member 等）连同 PTC employees 一起预览，横幅写 "(with PTC employees)"。
+  - 测试：`tests/test_view_as.py` 23 项，含逐个枚举所有写路由、所有 GET 路由对比"真实 partner / 真实员工"与"预览同一组"的状态码、预览期间数据目录文件不变；全部 1123 通过。
+  - 本地用假管理员（`admin-test`）在浏览器里走过：开始、横幅、被拒写入的提示、Exit、Admin log 两条。
+  - **还没做**：你的手工检查清单（见计划第 9 节），尤其是 PTC employees 预览下没有 GXC、Team Member 预览下点保存的提示、预览中的 Admin 页，要在 staging 上用真实账号看。
 
 ### A10. Create New Demo 模板（Summit，Liwei）
 - **来源**：Summit：创建 demo 时可以选模板，文件按 Scripts、Presentation deck、Videos、Documents、

@@ -378,12 +378,19 @@ async def require_sign_in(request: Request, call_next):
     if session_user(request) is not None:
         from backend import activity
         from backend.auth import principal_from_request
-        activity.note_request(principal_from_request(request))
+        me = principal_from_request(request)
+        if not me.view_as:                  # a preview (A9) is nobody's activity
+            activity.note_request(me)
         if _may_view_hub(request):
             return await call_next(request)
         if request.url.path.startswith("/api/"):
             return JSONResponse({"detail": "Your account does not have access to the Hub."},
                                 status_code=403)
+        if me.view_as:
+            return _page("No access to the Hub",
+                         f"Viewing as {me.view_as['label']}: that group may not view the "
+                         "Hub, so this is what its members see. Open Admin to exit the preview.",
+                         403, action=("/admin", "Open Admin"))
         return _page("No access to the Hub",
                      "You're signed in, but your account isn't in a group that may "
                      "view the Hub. Ask a Hub administrator for access.", 403,

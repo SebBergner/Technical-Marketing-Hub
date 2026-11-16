@@ -854,6 +854,50 @@ def usage_untouched(since: str | None = None, until: str | None = None,
 MANAGE_USERS = require_perm(Perm.MANAGE_USERS)
 
 
+# ───────────────────────────────────────── view the Hub as a group (A9)
+class ViewAsIn(BaseModel):
+    group_id: str = Field(max_length=80)
+
+
+@router.post("/view-as")
+def start_view_as(body: ViewAsIn, request: Request):
+    """Begin a read-only preview of the Hub as one group sees it
+    (backend/view_as.py). Manage users & groups, as every group change; the
+    local development principal may too. The real person is the actor."""
+    from backend import view_as
+    from backend.auth import principal_from_request, real_principal
+    real = real_principal(request)
+    if not (real.is_authenticated or real.is_dev_principal):
+        raise HTTPException(status_code=401, detail="Sign-in required.")
+    request.state.hub_actor = f"user:{real.email or 'dev'}"
+    if not view_as.may_start(real):
+        raise HTTPException(status_code=403, detail="Viewing as a group needs the "
+                            "Manage users & groups permission.")
+    if principal_from_request(request).view_as:
+        raise HTTPException(status_code=409, detail="A preview is already on. Exit it first.")
+    profile = view_as.start(request, real, body.group_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="No such group.")
+    request.state.hub_target = profile["label"]
+    return {"ok": True, "group_id": profile["group_id"], "label": profile["label"]}
+
+
+@router.post("/view-as/exit")
+def stop_view_as(request: Request):
+    """End the preview. Needs no permission: whoever is in one must be able
+    to leave it, whatever the group they are looking as may do."""
+    from backend import view_as
+    from backend.auth import principal_from_request, real_principal
+    user = principal_from_request(request)
+    real = real_principal(request)
+    request.state.hub_actor = f"user:{real.email or 'dev'}"
+    if not user.view_as:
+        return {"ok": True, "was_on": False}
+    request.state.hub_target = user.view_as["label"]
+    view_as.stop(request)
+    return {"ok": True, "was_on": True}
+
+
 class GroupIn(BaseModel):
     name: str | None = Field(default=None, max_length=80)
     description: str | None = Field(default=None, max_length=300)

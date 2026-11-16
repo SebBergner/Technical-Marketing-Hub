@@ -10,7 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from backend.config import settings
 from backend.version import app_version
 from backend.db import SessionLocal, create_all
-from backend import admin_log, oidc
+from backend import admin_log, oidc, view_as
 from backend.routers import (
     admin, assets, auth, consensus, content_health, curation, debug, disclaimer, graph, me,
     migration,
@@ -156,6 +156,9 @@ app.include_router(me.router)
 # The Admin log is innermost: by the time an answer passes it, the route is
 # known and require_perm() has said who acted (backend/admin_log.py).
 app.add_middleware(admin_log.middleware)
+# A preview ("View the Hub as a group", A9) is read-only: inside the session,
+# outside the Admin log, so a refused attempt is neither run nor logged.
+app.add_middleware(view_as.ReadOnly)
 app.middleware("http")(oidc.require_sign_in)
 app.add_middleware(
     SessionMiddleware,

@@ -121,6 +121,14 @@ class CurrentUser:
     #: `preferred_username` (the UPN) in oidc mode; matched alongside `email`
     #: when deciding group membership (backend/access.py).
     username: str | None = None
+    #: "View the Hub as this group" (A9, backend/view_as.py): set only on the
+    #: effective user a preview builds -- who has no email, name or object id,
+    #: so nothing personal is found or written for them -- with the group's
+    #: permissions (already cut to the real person's) and whether it is a
+    #: partner's view. `view_as` is {"group_id", "label", "by"} for the banner.
+    view_as: dict | None = None
+    preview_permissions: frozenset | None = None
+    partner_as: bool | None = None
 
     @property
     def is_partner(self) -> bool:
@@ -130,6 +138,8 @@ class CurrentUser:
         partner's guest account signs in with their own address
         (someone@parametricdesign.it). The local development principal is
         never one."""
+        if self.partner_as is not None:
+            return self.partner_as
         if self.is_dev_principal or self.token_name:
             return False
         if self.external:
@@ -146,6 +156,8 @@ class CurrentUser:
     def permissions(self) -> frozenset[str]:
         """What this person may do -- the union of their groups (backend/access.py).
         A program with an API token: what its token carries, nothing more."""
+        if self.preview_permissions is not None:
+            return self.preview_permissions
         if self.token_permissions is not None:
             return self.token_permissions
         from backend.access import permissions_of
@@ -163,6 +175,7 @@ class CurrentUser:
             "can_curate": self.can_curate,
             "is_partner": self.is_partner,
             "permissions": sorted(self.permissions),
+            "view_as": self.view_as,
         }
 
 
@@ -322,6 +335,30 @@ def _principal_from_token(request: Request) -> CurrentUser | None:
 
 
 def principal_from_request(request: Request) -> CurrentUser:
+    """Build the current user, or -- while a "View the Hub as this group"
+    preview is on (A9, backend/view_as.py) -- the effective user it makes.
+
+    Every identity check goes through here (the dependencies, require_perm,
+    the sign-in gate, the Admin log), so swapping at this one place covers
+    them all. Built once per request. An API token is never previewed."""
+    state = request.scope.setdefault("state", {})
+    if "hub_principal" in state:
+        return state["hub_principal"]
+    real = _real_principal(request)
+    from backend import view_as
+    user = view_as.effective(request, real)
+    state["hub_principal"] = user
+    state["hub_real_principal"] = real
+    return user
+
+
+def real_principal(request: Request) -> CurrentUser:
+    """The person themselves, whatever preview is on."""
+    principal_from_request(request)
+    return request.scope["state"]["hub_real_principal"]
+
+
+def _real_principal(request: Request) -> CurrentUser:
     """Build the current user. Headers are honoured only in easyauth mode;
     an API token (Authorization: Bearer) in every mode, on /api/ only."""
     if request.url.path.startswith("/api/"):

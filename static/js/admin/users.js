@@ -425,12 +425,38 @@ function renderEditor() {
         renderGroups();
       });
       tools.appendChild(edit);
+      // A9: see the Hub as this group sees it, read-only.
+      var preview = el("button", "btn-small", "View the Hub as this group");
+      preview.type = "button";
+      preview.addEventListener("click", function () {
+        preview.disabled = true;
+        fetch("/api/admin/view-as", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ group_id: g.id })
+        }).then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (d) {
+            if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
+            location.href = "/";
+          });
+        }).catch(function (err) {
+          preview.disabled = false;
+          ug.flash = err.message;
+          renderGroups();
+        });
+      });
+      tools.appendChild(preview);
       head.appendChild(tools);
     } else if (editable) {
       head.appendChild(el("span", "pill pill--warn", "editing"));
     }
     c.appendChild(head);
     if (g.description) c.appendChild(el("p", "muted", g.description));
+    if (canManage && !editable) {
+      c.appendChild(el("p", "faint", "“View the Hub as this group” is read-only and shows what "
+        + "this group's permissions allow, with none of your own favourites, playlists or GXC "
+        + "links. It cannot test GXC personal links, SharePoint's own permissions or a real "
+        + "partner sign-in. It is not counted as anyone's use."));
+    }
   } else {
     var editHead = el("div", "card-head");
     editHead.appendChild(el("h2", null, creating ? "New group" : "Edit group"));

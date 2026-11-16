@@ -482,6 +482,37 @@ def permissions_of(user) -> frozenset[str]:
     return frozenset(perms)
 
 
+def preview_profile(group_id: str, real_permissions) -> dict | None:
+    """What "View the Hub as this group" shows (A9, Liwei 2026-11-16): the
+    group's permissions together with the real person's own -- a preview can
+    lower what they may do, never raise it. None when the group is gone.
+
+    * Partners: the white-list a real partner is held to, and treated as a
+      partner (the real person's PTC address would say otherwise).
+    * PTC employees: as themselves, not partners.
+    * Administrators: only the overlap with the real person.
+    * A hand-made group (Team Member...): together with PTC employees, as a
+      real member is always also one (Liwei 2026-11-16).
+    """
+    try:
+        group = _group(load_state(), group_id)
+    except KeyError:
+        return None
+    perms = set(group["permissions"])
+    partner = group.get("auto") == "guests"
+    label = group["name"]
+    if partner:
+        perms -= PARTNER_NEVER
+    elif not group.get("builtin"):
+        try:
+            perms |= set(_group(load_state(), EMPLOYEES)["permissions"])
+            label = f"{group['name']} (with PTC employees)"
+        except KeyError:
+            pass
+    return {"group_id": group["id"], "name": group["name"], "label": label,
+            "partner": partner, "permissions": frozenset(perms & set(real_permissions))}
+
+
 #: The shared Admin sign-in: everything but writing SharePoint columns, and
 #: no GXC (B10, 2026-11-02: a shared password names nobody; D2 removes it).
 ADMIN_SESSION_PERMS = ALL - {Perm.MAINTAIN.value, Perm.VIEW_GXC.value}

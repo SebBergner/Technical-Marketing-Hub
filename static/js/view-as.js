@@ -29,10 +29,16 @@
   function exitPreview() {
     fetch("/api/admin/view-as/exit", { method: "POST" })
       .catch(function () {})
-      .then(function () { location.href = "/admin#access"; });
+      .then(function () {
+        // Reload as well: from the Admin page the address does not change.
+        var onAdmin = location.pathname === "/admin";
+        location.href = "/admin#access";
+        if (onAdmin) location.reload();
+      });
   }
 
   function drawBar(view) {
+    if (document.getElementById("hubViewAsBar")) return;
     var bar = document.createElement("div");
     bar.id = "hubViewAsBar";
     bar.setAttribute("role", "status");
@@ -52,16 +58,25 @@
   }
 
   var toastTimer = null;
+  var checkAgain = function () {};
   function toast(message) {
     var old = document.getElementById("hubViewAsToast");
     if (old) old.remove();
     var t = document.createElement("div");
     t.id = "hubViewAsToast";
     t.setAttribute("role", "alert");
-    t.textContent = message;
+    t.textContent = message + " ";
+    // The way out, right where the refusal is read.
+    var leave = document.createElement("button");
+    leave.type = "button";
+    leave.textContent = "Exit preview";
+    leave.style.cssText = "margin-left:8px;padding:3px 10px;border:0;border-radius:4px;" +
+      "background:#fff;color:#222;font:600 12px system-ui,sans-serif;cursor:pointer";
+    leave.addEventListener("click", exitPreview);
+    t.appendChild(leave);
     document.body.appendChild(t);
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.remove(); }, 5000);
+    toastTimer = setTimeout(function () { t.remove(); }, 12000);
   }
 
   // A refused write says why, once, wherever it came from.
@@ -71,18 +86,32 @@
       return original.apply(this, arguments).then(function (response) {
         if (response.status === 403 && response.headers.get("X-Hub-View-As") === "read-only") {
           response.clone().json().then(function (d) { toast(d.detail); }).catch(function () {});
+          checkAgain();       // a refusal means a preview is on: make sure its bar shows
         }
         return response;
       });
     };
   }
 
+  /* Whether a preview is on, asked again whenever it could have changed: a
+   * preview started in another tab, or ended there, while this one sat open
+   * (the session is shared by every tab). */
   function start() {
     original("/api/auth/me", { credentials: "same-origin" })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { if (d && d.user && d.user.view_as) drawBar(d.user.view_as); })
+      .then(function (d) {
+        if (!d || !d.user) return;
+        var bar = document.getElementById("hubViewAsBar");
+        if (d.user.view_as) drawBar(d.user.view_as);
+        else if (bar) { bar.remove(); document.body.classList.remove("hub-view-as"); }
+      })
       .catch(function () {});
   }
+  checkAgain = start;
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) start();
+  });
+  window.addEventListener("focus", start);
   if (document.body) start();
   else document.addEventListener("DOMContentLoaded", start);
 })();

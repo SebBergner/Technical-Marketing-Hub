@@ -377,6 +377,31 @@ def record_search(body: SearchEventIn, repo: AssetRepository = Depends(get_repo)
             filters=_search_filters(body.filters))
 
 
+class FeatureEventIn(BaseModel):
+    feature: str
+
+
+@router.post("/feature-event", status_code=204)
+def record_feature(body: FeatureEventIn, repo: AssetRepository = Depends(get_repo),
+                   user: CurrentUser = Depends(get_current_user)):
+    """The page opened a Hub feature (A16, Liwei 2026-11-16): My Hub, the User
+    guide... Only the names in backend/services/feature_usage.FEATURES are
+    recorded; anything else is dropped without an error. Once per person per
+    feature per day. Under /search-event's rules: nobody anonymous, a partner
+    only as "external"."""
+    from backend.services import feature_usage
+    if body.feature not in feature_usage.FEATURE_IDS:
+        return
+    who = _who(user)
+    if not who:
+        return
+    from datetime import datetime, timezone
+    day = datetime.now(timezone.utc).date().isoformat()
+    if not feature_usage.first_today(body.feature, who, day):
+        return
+    _record(repo, "feature", None, user, feature=body.feature)
+
+
 @router.post("/{asset_id}/consensus-preview", status_code=204)
 def record_consensus_preview(asset_id: str, repo: AssetRepository = Depends(get_repo),
                              user: CurrentUser = Depends(get_current_user)):

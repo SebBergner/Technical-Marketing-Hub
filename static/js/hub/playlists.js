@@ -14,6 +14,7 @@ import { buildCard, cardImage, paintCoverInto } from "./cards.js";
 import { isFavorite, setFavorite } from "./favorites.js";
 import { closeAdvancedSearch } from "./search.js";
 import { report } from "./util.js";
+import { noteFeature } from "./features.js";
 
 function el(tag, cls, text) {
   var n = document.createElement(tag);
@@ -23,6 +24,8 @@ function el(tag, cls, text) {
 }
 
 function api(method, url, body) {
+  // Making or filling a playlist is using playlists (A16); reading is not.
+  if (method !== "GET" && url.indexOf("/api/me/playlists") === 0) noteFeature("playlists");
   return fetch(url, {
     method: method,
     headers: body ? { "Content-Type": "application/json" } : {},

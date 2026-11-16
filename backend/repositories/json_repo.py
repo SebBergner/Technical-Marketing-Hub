@@ -1679,7 +1679,9 @@ class JsonAssetRepository(AssetRepository):
     #: "visits"; the gain is that this file is not personal data and needs no
     #: privacy review to exist. If SSO ever makes attribution possible, that is
     #: a decision to take deliberately, not to inherit by accident.
-    USAGE_EVENTS = ("view", "preview", "download", "search")
+    #: "feature" (A16, 2026-11-16): somebody opened a Hub feature (My Hub, the
+    #: User guide...), named in `feature`; backend/services/feature_usage.py.
+    USAGE_EVENTS = ("view", "preview", "download", "search", "feature")
 
     def record_usage_event(self, event: str, asset_id: str | None = None,
                            **fields) -> None:

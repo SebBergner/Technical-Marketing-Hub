@@ -571,6 +571,37 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
   Experience Asset 的子类型）；子类型加 Product、Social、Attract Loop、Presenter Support、XDP Clip。Release 保留给那 3 个视频，
   新建时不再提供。缺客户名的 6 个视频保持原样，下次编辑时要求补填。SharePoint 还没有的子类型，表单会注明缺哪些。
 
+### A16. 功能使用统计：多少人用了哪些功能（Liwei 11/16）
+- **来源**：Liwei 想知道 My Hub（11/13 上线）有多少人真的在用；以后别的功能也要能这样看。
+- **现状（11/16 核对代码）**：
+  - 使用记录只有 4 种事件：view、preview、download、search（`json_repo.USAGE_EVENTS`，存在 `owned/usage_events.jsonl`），
+    都是关于 demo 的。Hub 是单页应用，打开 My Hub、User guide、Get help 等只改地址栏的 `#`，服务器不知道，也就没有记录。
+  - 能间接看到一部分：每人的收藏存在 `owned/me/<摘要>.json`（带收藏时间），播放列表存在 `owned/playlists/`，所以能数出
+    "多少人收藏过 / 建过播放列表"，11/13 以来的都在。但只打开 My Hub 看、不点收藏的人没有记录；recently viewed
+    对每个看过 demo 的人都会写，不能算用过 My Hub。
+  - 所以，11/13 到这一项做好之前"打开过 My Hub 的人数"补不回来，收藏和播放列表的人数能补。
+- **建议做法**：
+  1. 新事件 "feature"，只接受一份固定的功能名单（名单写在代码里，网页发来名单外的名字就丢掉）。网页在打开某个功能时发一次；
+     同一人、同一功能、同一天只记一次。
+  2. 记人的规则和现在一样：PTC 员工记邮箱，partner 只记 "external"。
+  3. Admin → Hub usage 加一张"功能使用"表：所选时间段内每个功能的使用人数（PTC 和 partner 分开）和天数，可以按周看趋势。
+     My Hub 那一行另外显示"收藏过 / 建过播放列表的人数"（从现有文件数，包括 11/13 以来的）。
+  4. A9 预览中不记（加进 A9 计划里"静默丢弃"的统计请求名单）。
+- **已定（Liwei 11/16）**：
+  1. 功能名单就是这 11 个：My Hub、收藏、播放列表、高级搜索、表格视图、User guide、Get help、New Asset Inquiry、
+     Share Internally、Create DemoBoard、Report asset。以后加功能 = 名单里加一个名字。
+  2. 同一人、同一功能、同一天只记一次。
+  3. **只在 Admin → Hub usage 显示**；Hub activity 页（`#/activity`）不显示。
+  4. **先做 A16，再做 A9**（My Hub 的数据早几天开始积累）。A9 做的时候把 A16 的接口加进"静默丢弃"名单。
+- **工作量**：约 1 天。和 A9 互不依赖。
+- **11/16 已做，本地完成，未提交、未上 staging**：
+  - 后端：`backend/services/feature_usage.py`（名单、每人每天一次、汇总）；`POST /api/assets/feature-event`（名单外的名字静默丢弃；未登录不记；partner 只记 external）；`json_repo.USAGE_EVENTS` 加 "feature"；`/api/admin/usage` 多返回 `features`。
+  - 前端：`static/js/hub/features.js`（每个浏览器每天每功能只发一次）。打开 #/me、#/guide、#/help、#/request、#/search、#/playlist 时发；点 Share Internally、Create DemoBoard、表格视图时发；加星标成功、新建或改播放列表、打开 Share feedback 时发。Admin → Hub usage 底部新增 "Feature use" 表：PTC 人数、partner 访问次数（partner 匿名，不是人数）、使用天数、按周的人数趋势，另有"持有星标的人数 / 建过播放列表的人数"（从文件数，包括上线前）。
+  - 顺手修了 `usage.js` 里 `renderSearches` 末尾引用未定义的 `zero`：它会在画完搜索表后抛错，所以放在它后面的绘制不会执行。
+  - 测试：`tests/test_feature_usage.py` 8 项；全部 1100 通过。本地用假管理员（`admin-test`）看过 Admin 表，6 个功能的事件能写入并显示。
+  - **A9 要做**：把 `POST /api/assets/feature-event` 加进预览期间"静默丢弃"的名单。
+  - 注意：Favorites 只算"加星标"，不算取消；Table view 算打开过表格（包括浏览器记住了表格的人）；"Report asset" 是打开 Share feedback，不是提交。
+
 ---
 
 ## B. 要先定方向
@@ -714,7 +745,7 @@ Serge、Elio、Seb、Liwei。下周开始开发前的最后一次会议，原 TM
 - **依赖**：Jamie；团队的决定；发布之后。
 - **11/02 会议的结论**：IoT 和 AR 的视频由 Christine 给表，和 GXC 一样迁进 GXC Video，按 B10 的规则展示。Demo Catalog 里已出售产品的套件（ThingWorx 64 个等）暂时保持对所有人隐藏，以后再考虑移进 GXC 或更新（Liwei 11/02）。上面的权限层和 Admin 隐藏页先不做。法务认为这些内容可以内部使用（Liwei 11/02）。
 
-### B10. GXC 内容不公开列出，PTC 凭链接可看（11/02 会议定，Liwei 转来；未开发）
+### B10. GXC 内容不公开列出，PTC 凭链接可看（11/02 会议定，Liwei 转来；已完成，11/16 Liwei 确认；用非 GXC 账号的实测和 production 上标记 3 个 Lamborghini 仍待确认，见文末 11/04 状态）
 - **来源**：11/02 会议对 B9 的结论。新迁入的 IoT、AR 视频和原有的 113 个 GXC 视频都按这个规则。
 - **规则**：
   - **GXC 组**：只能用关键字搜索，或按年份浏览（Published 的年份）找到。不在左边导航、下拉筛选和首页，不计入任何计数；用了年份以外的筛选（Segment、Video Type 等）就不出现；没有 IoT、AR 筛选。

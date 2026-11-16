@@ -17,6 +17,7 @@
 import { fullDate, report as complain } from "./util.js";
 import { hubPermissions } from "./permissions.js";
 import { closeAdvancedSearch } from "./search.js";
+import { noteFeature } from "./features.js";
 
 var categories = null;          // {demo, demo_groups, hub}, from /api/support/options, once
 
@@ -145,6 +146,7 @@ function sentNote(answer) {
 
 /* ── Share feedback, on a demo's page ─────────────────────────────────── */
 function openReportModal(asset) {
+  noteFeature("report_asset");
   var back = document.getElementById("hubReportBackdrop");
   if (back) back.remove();
   back = el("div", "modal-backdrop open");

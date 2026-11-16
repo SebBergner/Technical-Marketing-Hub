@@ -7,6 +7,8 @@
  *
  * Part of the Hub page's script. */
 
+import { noteFeature } from "./features.js";
+
 var ids = null;                 // Set of asset ids, once read
 var loading = null;
 
@@ -49,6 +51,7 @@ function setFavorite(id, on) {
     .then(function (d) {
       ids = new Set(d.ids || []);
       paintAll(id);
+      if (on) noteFeature("favorites");
       document.dispatchEvent(new CustomEvent("hub:favorites", { detail: { id: id, on: on } }));
     })
     .catch(function () {

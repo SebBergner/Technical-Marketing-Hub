@@ -9,6 +9,7 @@ import { debounce, escapeHtml, getJSON, pill, report } from "./util.js";
 import { hubPermissions } from "./permissions.js";
 import { buildCard } from "./cards.js";
 import { exportCsv, rememberView, renderRows, tableView } from "./table.js";
+import { noteFeature } from "./features.js";
 import {
   markNavActive, NAV_TYPE, NO_COUNT_GROUPS, renderSegmentHeader,
   umbrellaDisplayName
@@ -672,6 +673,7 @@ function renderResults(grid, items, append) {
   var table = tableView();
   grid.classList.toggle("is-table", table);
   if (table) {
+    noteFeature("table_view");        // also for someone whose browser remembers the table (A16)
     renderRows(grid, items, append, {
       sort: effectiveSort() || (val("hubSearchInput").length >= 2 ? "relevance" : "recent"),
       order: navFilter.order,

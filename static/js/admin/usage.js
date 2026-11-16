@@ -187,6 +187,7 @@ function renderUsage(u) {
 
   drawChart($("usageChart"), u.daily);
   renderSearches(u);
+  renderFeatures(u);
 }
 
 /* ── the breakdown table ──────────────────
@@ -474,9 +475,72 @@ function renderSearches(u) {
     tt.appendChild(tb);
     s2.appendChild(tt);
   }
-  if (!zero.length && !(u.searches.top || []).length) {
+  // (`zero` was never defined here: this line threw after the tables were
+  // drawn, so anything drawn after renderSearches() never ran.)
+  if (!(u.searches.top || []).length) {
     s2.appendChild(el("p", "muted", "No searches recorded in this window."));
   }
+}
+
+/* ── feature usage (A16, 2026-11-16) ──────────────────────────────────
+ *
+ * How many people opened each Hub feature in the period. The page tells the
+ * server once per person per feature per day, so "days" is how many different
+ * days someone used it. A partner is anonymous, so a partner's figure is
+ * visits (one per browser per day), not people.
+ */
+var BLOCKS = "▁▂▃▄▅▆▇█";
+
+function spark(values) {
+  var max = Math.max.apply(null, values.concat([0]));
+  if (!max) return "—";
+  return values.map(function (v) {
+    return v ? BLOCKS.charAt(Math.min(BLOCKS.length - 1, Math.ceil(v / max * BLOCKS.length) - 1)) : "·";
+  }).join("");
+}
+
+function renderFeatures(u) {
+  var host = $("usageFeatures");
+  host.innerHTML = "";
+  host.appendChild(el("h2", null, "Feature use"));
+  var f = u.features;
+  if (!f) return;
+  var lead = el("p", "muted",
+    "PTC people who opened each feature in " + rangeLabel().toLowerCase()
+    + ", once per person per day. Recorded only since this table shipped; earlier opens are not known.");
+  lead.style.cssText = "font-size:12.5px;margin:6px 0 10px";
+  host.appendChild(lead);
+
+  var table = el("table");
+  var head = el("thead");
+  var hr = el("tr");
+  ["Feature", "PTC people", "Partner visits", "Days in use",
+   "People per week" + (f.weeks && f.weeks.length ? " (" + f.weeks.length + " wk)" : "")]
+    .forEach(function (t, i) { hr.appendChild(el("th", i ? "r" : null, t)); });
+  head.appendChild(hr);
+  table.appendChild(head);
+  var body = el("tbody");
+  f.rows.forEach(function (r) {
+    var tr = el("tr");
+    tr.appendChild(el("td", null, r.label));
+    tr.appendChild(el("td", "r num", r.people));
+    tr.appendChild(el("td", "r num", r.partner_visits));
+    tr.appendChild(el("td", "r num", r.days));
+    var trend = el("td", "r", spark(r.weekly));
+    trend.title = r.weekly.join(", ");
+    trend.style.cssText = "font-family:monospace;letter-spacing:1px";
+    tr.appendChild(trend);
+    body.appendChild(tr);
+  });
+  table.appendChild(body);
+  host.appendChild(table);
+
+  var extra = el("p", "muted",
+    "From what people saved, including before this table shipped: " + f.starred_people
+    + " people hold a star added in this period; " + f.playlist_people
+    + " people made a playlist in this period. These include partners, and a star that was taken off is not counted.");
+  extra.style.cssText = "font-size:12.5px;margin:10px 0 0";
+  host.appendChild(extra);
 }
 
 /* ── drill-downs ───────────────────────────────────────────────────── */

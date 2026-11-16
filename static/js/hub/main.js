@@ -37,6 +37,7 @@ import { addMyHubNav } from "./me.js";
 import { addGuideButton } from "./guide.js";
 import { askDisclaimerIfDue } from "./disclaimer.js";
 import { askWelcomeIfDue } from "./welcome.js";
+import { wireFeatureUsage } from "./features.js";
 
 /* ── when the session runs out with the page open ─────────────────────
  *
@@ -161,6 +162,7 @@ async function load() {
   wireScopeState();
   wireAdvancedSearch();
   wireDetailPage();
+  wireFeatureUsage();
   fillProductPills(facets);
   await buildFamilyNav(facets);
   wireNav(facets);

@@ -584,6 +584,10 @@ def usage(since: str | None = None, until: str | None = None,
         if not e.get("results"):
             row["zero_results"] += 1
 
+    from backend.services import feature_usage
+    features = feature_usage.summarise(events, since, until)
+    features.update(feature_usage.starred_and_listed(settings.data_dir, since, until))
+
     return {
         "window": {"since": since, "until": until},
         "totals": {
@@ -593,6 +597,7 @@ def usage(since: str | None = None, until: str | None = None,
             "searches": by_type.get("search", 0),
             "assets_touched": len(touched),
         },
+        "features": features,
         "daily": _daily(events),
         # Against the window immediately before this one, same length. A count
         # on its own says nothing about whether it is good -- "95 downloads"

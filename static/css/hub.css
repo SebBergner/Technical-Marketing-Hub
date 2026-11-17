@@ -2012,6 +2012,10 @@ button.hub-guide__video--tour:hover .hub-guide__play { transform: scale(1.08); }
 .hub-star--on svg{fill:currentColor}
 .hub-star:focus-visible{outline:2px solid var(--orion-indigo);outline-offset:2px}
 .hub-star--card{position:absolute;top:6px;right:6px;z-index:2}
+/* Add to playlist on a Favorites card, left of the star (Seb, 2026-11-17). */
+.hub-plbtn{position:absolute;top:6px;right:40px;z-index:2;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border-radius:50%;border:1px solid var(--orion-border-md);background:rgba(255,255,255,.94);color:var(--orion-text-3,#6b7280);cursor:pointer}
+.hub-plbtn:hover{color:var(--orion-indigo);background:#fff}
+.hub-plbtn:focus-visible{outline:2px solid var(--orion-indigo);outline-offset:2px}
 .hub-star--title{margin-left:10px;vertical-align:3px;width:30px;height:30px}
 
 /* My Hub (#/me; A3, 2026-11-12). */

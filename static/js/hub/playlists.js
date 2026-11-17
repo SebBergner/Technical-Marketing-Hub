@@ -60,7 +60,7 @@ function closeOnScroll(e) {
 
 function outside(e) {
   if (openMenu && !openMenu.contains(e.target)
-      && !(e.target.closest && e.target.closest("#vpSave"))) closeMenu();
+      && !(e.target.closest && e.target.closest("[data-plmenu]"))) closeMenu();
 }
 
 function option(label, checked, onChange) {
@@ -107,7 +107,7 @@ function drawMenu(menu, assetId, note) {
           .then(function () {
             say(status, on ? "✓ Added to " + p.name : "Removed from " + p.name,
                 on ? p.id : null);
-            refreshSaved(assetId);
+            refreshIfShown(assetId);
           })
           .catch(function (err) { box.checked = !on; report(err.message, true); });
       }));
@@ -130,7 +130,7 @@ function drawMenu(menu, assetId, note) {
       .then(function (p) {
         drawMenu(menu, assetId, { text: "✓ Created " + p.name + " and added this demo",
                                   playlist: p.id });
-        refreshSaved(assetId);
+        refreshIfShown(assetId);
       })
       .catch(function (err) { go.disabled = false; report(err.message, true); });
   });
@@ -153,6 +153,12 @@ function drawSaveButton(saved) {
   saveBtn.title = saved
     ? "This demo is in one of your playlists (My Hub). Click to change."
     : "Add this demo to one of your playlists (My Hub)";
+}
+
+/* A menu opened from a card (My Hub's Favorites) must not repaint the demo
+ * page's button, which may belong to another demo. */
+function refreshIfShown(assetId) {
+  if (saveBtn && saveBtn.dataset.assetId === assetId) refreshSaved(assetId);
 }
 
 function refreshSaved(assetId) {
@@ -195,12 +201,8 @@ function place(menu, button) {
 
 /* The Add to playlist button; reads the demo on show from `current()`, since the
  * demo page's actions row is reused from one demo to the next. */
-function saveButton(current) {
-  var b = el("button", "btn-ghost");
-  b.type = "button";
-  b.id = "vpSave";
-  saveBtn = b;
-  drawSaveButton(false);
+function openMenuFor(b, current) {
+  b.dataset.plmenu = "1";
   b.addEventListener("click", function (e) {
     e.stopPropagation();
     if (openMenu) { closeMenu(); return; }
@@ -221,6 +223,27 @@ function saveButton(current) {
       document.addEventListener("scroll", closeOnScroll, true);
     }, 0);
   });
+}
+
+function saveButton(current) {
+  var b = el("button", "btn-ghost");
+  b.type = "button";
+  b.id = "vpSave";
+  saveBtn = b;
+  drawSaveButton(false);
+  openMenuFor(b, current);
+  return b;
+}
+
+/* "Add to playlist" on a card, without opening the demo (Seb, 2026-11-17):
+ * the same menu as the demo page's. Used in My Hub's Favorites row. */
+function cardPlaylistButton(asset) {
+  var b = el("button", "hub-plbtn");
+  b.type = "button";
+  b.title = "Add to playlist";
+  b.setAttribute("aria-label", "Add " + (asset.title || "this demo") + " to a playlist");
+  b.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-plus"/></svg>';
+  openMenuFor(b, function () { return asset; });
   return b;
 }
 
@@ -517,5 +540,5 @@ function closePlaylist() {
 
 export {
   closeMenu as closeSaveMenu, closePlaylist, openPlaylist, refreshSaved, renderMyPlaylists,
-  saveButton
+  cardPlaylistButton, saveButton
 };

@@ -16,7 +16,7 @@ import { hubPermissions } from "./permissions.js";
 import { renderMyFeedback } from "./report.js";
 import { renderMyDemos } from "./upload.js";
 import { closeAdvancedSearch } from "./search.js";
-import { renderMyPlaylists } from "./playlists.js";
+import { cardPlaylistButton, renderMyPlaylists } from "./playlists.js";
 
 function el(tag, cls, text) {
   var n = document.createElement(tag);
@@ -91,7 +91,7 @@ function buildPage() {
   return page;
 }
 
-function cardRow(host, items, empty) {
+function cardRow(host, items, empty, withPlaylist) {
   host.innerHTML = "";
   if (!items.length) {
     host.appendChild(el("div", "hub-me__empty", empty));
@@ -100,6 +100,9 @@ function cardRow(host, items, empty) {
   var row = el("div", "asset-row hub-me__row");
   items.forEach(function (a) {
     var card = buildCard(a);
+    // Add to playlist without opening the demo (Seb, 2026-11-17).
+    var thumb = card.querySelector(".asset-card__thumb");
+    if (withPlaylist && thumb) thumb.appendChild(cardPlaylistButton(a));
     card.dataset.find = [a.title, a.type].filter(Boolean).join(" ").toLowerCase();
     card.addEventListener("click", function () { window.hubDetailReturn = "#/me"; }, true);
     row.appendChild(card);
@@ -197,7 +200,7 @@ function loadCards() {
     cardRow(document.querySelector("#meRecent .hub-me__body"), d.recent,
       "Nothing yet: the demos you open will be listed here, newest first.");
     cardRow(document.querySelector("#meFavorites .hub-me__body"), d.favorites,
-      "No favorites yet. Star a demo on its card or its page to keep it here.");
+      "No favorites yet. Star a demo on its card or its page to keep it here.", true);
     favoritesFinder(d.favorites.length);
     document.getElementById("meRequests").hidden = !d.sections.requests;
     document.getElementById("meDemos").hidden = !d.sections.demos;

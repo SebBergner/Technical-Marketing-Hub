@@ -117,6 +117,18 @@ def make(client, who, name="Customer pitch", items=()):
     return r.json()["id"]
 
 
+def test_a_partner_can_add_a_favorite_to_a_playlist(client):
+    """Seb, 2026-11-17: "Add to playlist" on a Favorites card. Partners have My
+    Hub and Favorites, so the playlist calls behind it must not need a
+    permission a partner cannot hold."""
+    partner = {**easyauth_headers("p@partner.it"), "X-MS-CLIENT-PRINCIPAL-ID": "oid-partner"}
+    assert client.put("/api/me/favorites/d1", headers=partner).status_code == 200
+    pid = make(client, partner, items=["d1"])
+    listed = client.get("/api/me/playlists", headers=partner).json()["items"]
+    assert [(p["id"], p["items"]) for p in listed] == [(pid, ["d1"])]
+    assert client.put(f"/api/me/playlists/{pid}/items/d2", headers=partner).status_code == 200
+
+
 def test_a_playlist_is_its_owners_to_change(client):
     pid = make(client, ANN, items=["d0", "d1"])
     assert client.put(f"/api/me/playlists/{pid}/items/d2", headers=ANN).json()["items"] == \

@@ -7,15 +7,9 @@
 
 import { escapeHtml } from "./util.js";
 import { applyFilters, clearAll, CONTROLS, navFilter, pushNextUrl } from "./filters.js";
-import { closeAssetDetail, closeFilePreview } from "./detail.js";
-import { addActivityNav, closeActivity } from "./activity.js";
-import { addReviewNav, closeReview } from "./review.js";
-import { closeHelp } from "./report.js";
-import { closeGuide } from "./guide.js";
-import { closeAdvancedSearch } from "./search.js";
-import { closeUpload } from "./upload.js";
-import { closeMyHub } from "./me.js";
-import { closePlaylist } from "./playlists.js";
+import { addActivityNav } from "./activity.js";
+import { addReviewNav } from "./review.js";
+import { closeOtherViews } from "./views.js";
 
 /* ---------------------------------------------------------- the left nav */
 
@@ -121,21 +115,14 @@ var HIDDEN_UMBRELLAS = ["Servigistics"];
  * Both closers run, because either view can be the one in front, and each
  * is safe to call when its own view is already shut. */
 function exitOverlays() {
+  // Called even when the form is shut: it is also what moves the sidebar
+  // highlight back to Home, whose own action was removed above.
   if (typeof window.closeRequestView === "function") {
     try { window.closeRequestView(); } catch (err) {
       console.warn("[hub-api] closeRequestView threw", err);
     }
   }
-  closeFilePreview(false);
-  closeAssetDetail();
-  closeAdvancedSearch();
-  closeActivity();
-  closeReview();
-  closeHelp();
-  closeGuide();
-  closeUpload();
-  closeMyHub();          // My Hub and a playlist (2026-11-12): Home left half of
-  closePlaylist();       // My Hub showing when these two were missing here
+  closeOtherViews();     // every page, from views.js's one list
   // The hash has to follow, or a refresh reopens the page we just left.
   if (/^#\/(asset|search|activity|review|help|guide|upload|me|playlist)/.test(location.hash || "")) {
     history.pushState(null, "", location.pathname + location.search);

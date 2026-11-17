@@ -10,12 +10,8 @@ import {
 import { cardImage, paintCoverInto, TYPE_CHIP, videoTypeOf } from "./cards.js";
 import { noteSearch, val } from "./filters.js";
 import { familyDisplayName } from "./nav.js";
-import { buildFileRow, closeFilePreview, fileHash } from "./detail.js";
-import { closeActivity } from "./activity.js";
-import { closeGuide } from "./guide.js";
-import { closeHelp } from "./report.js";
-import { closeReview } from "./review.js";
-import { closeUpload } from "./upload.js";
+import { buildFileRow, fileHash } from "./detail.js";
+import { closeOtherViews } from "./views.js";
 
 /* ---------------------------------------------------- advanced search
  *
@@ -372,16 +368,10 @@ function wireAdvancedSearch() {
   var openRequest = window.openRequestView;
   if (typeof openRequest === "function" && !openRequest.hubWrapped) {
     window.openRequestView = function () {
-      closeAdvancedSearch();
-      closeActivity();
-      closeFilePreview(false);
-      // The pages in front of the catalogue too: from the user guide's "Ask
-      // for a new asset" the form opened underneath it, half in view
-      // (Liwei, 2026-11-08).
-      closeGuide();
-      closeHelp();
-      closeReview();
-      closeUpload();
+      // Every other page, from views.js's one list: the form opened in the
+      // lower half under the user guide (Liwei, 2026-11-08), then under My
+      // Hub and a playlist, which this list here had missed (2026-11-17).
+      closeOtherViews("request");
       // Opened from a details page, Advanced Search or Hub activity, the
       // address still named that page, and a refresh went back there.
       if (location.hash !== "#/request") {

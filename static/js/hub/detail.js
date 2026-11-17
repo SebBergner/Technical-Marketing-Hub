@@ -20,19 +20,15 @@ import {
 import { familyDisplayName, openTag } from "./nav.js";
 import { followUrl } from "./filters.js";
 import { renderVmCards, TYPE_LONG } from "./vm.js";
-import { closeActivity, openActivity } from "./activity.js";
-import { closeUpload, openUpload } from "./upload.js";
-import { closeReview, openReview } from "./review.js";
-import { closeHelp, openHelp, openReportModal } from "./report.js";
-import { closeGuide, openGuide } from "./guide.js";
-import { closeMyHub, openMyHub } from "./me.js";
-import {
-  closePlaylist, closeSaveMenu, openPlaylist, refreshSaved, saveButton
-} from "./playlists.js";
-import {
-  advancedHash, advState, closeAdvancedSearch, fileTotalsText,
-  openAdvancedSearch
-} from "./search.js";
+import { openActivity } from "./activity.js";
+import { openUpload } from "./upload.js";
+import { openReview } from "./review.js";
+import { openHelp, openReportModal } from "./report.js";
+import { openGuide } from "./guide.js";
+import { openMyHub } from "./me.js";
+import { closeSaveMenu, openPlaylist, refreshSaved, saveButton } from "./playlists.js";
+import { advancedHash, advState, fileTotalsText, openAdvancedSearch } from "./search.js";
+import { closeOtherViews } from "./views.js";
 
 /* ------------------------------------------------------- the details page */
 
@@ -121,8 +117,9 @@ async function openAssetDetail(id, fileItemId, linkToken) {
   if (adv && adv.classList.contains("active")) {
     detailReturnHash = advancedHash(advState.q);
   } else if (window.hubDetailReturn) {
-    // Content to review (review.js) closes as the hash changes, so it says
-    // where it was rather than being found open.
+    // Content to review, My Hub and a playlist say where they were rather
+    // than being found open: they are closed below (or by the router, when
+    // a link changed the hash), and Back opens them again by that address.
     detailReturnHash = window.hubDetailReturn;
   } else if (!(page0 && page0.classList.contains("active"))) {
     detailReturnHash = null;
@@ -493,13 +490,16 @@ async function openAssetDetail(id, fileItemId, linkToken) {
   /* Showing the page is not enough: the catalogue has to be hidden, or the
    * details render underneath it. Elio's own openRequestView() hides both
    * the topbar and the thread, and this is the same kind of view. */
-  document.getElementById("requestViewPage").classList.remove("active");
-  if (adv) adv.classList.remove("active");
   var topbar = document.getElementById("mainTopbar");
   var thread = document.getElementById("mainThread");
   // Where the list was scrolled to, for Back (2026-11-05): the list scrolls
-  // inside #mainThread, and hiding it forgets the position.
+  // inside #mainThread, and hiding it forgets the position. Read before the
+  // other pages close, as closing them shows the list again.
   if (thread && thread.style.display !== "none") listScrollTop = thread.scrollTop;
+  // Every other page, before the catalogue hides: a card on My Hub or a
+  // playlist calls this directly, no hash change and so no router, and the
+  // demo opened in the lower half with My Hub above it (Liwei, 2026-11-17).
+  closeOtherViews("asset");
   if (topbar) topbar.style.display = "none";
   if (thread) thread.style.display = "none";
   // Not setActiveNav(null): Elio's version does getElementById(id).classList
@@ -1628,108 +1628,52 @@ function routeFromHash() {
     history.replaceState(null, "", location.pathname + location.search);
     hash = "";
   }
+  // Every page but the one named closes first (views.js), then that one
+  // opens: the list of pages is kept there, once.
   if (hash === "#/request") {
-    closeFilePreview(false);
-    closeAssetDetail();
+    closeOtherViews("request");
     if (typeof window.openRequestView === "function") window.openRequestView();
     return;
   }
-  // Any other address: the request form is not where we are (2026-10-14,
-  // so Back from it, or a link elsewhere, leaves it like any other view).
-  var requestPage = document.getElementById("requestViewPage");
-  if (requestPage && requestPage.classList.contains("active")
-      && typeof window.closeRequestView === "function") {
-    window.closeRequestView();
-  }
   // My Hub (A3, 2026-11-12).
-  if (hash === "#/me") {
-    closeFilePreview(false);
-    closeAssetDetail();
-    closeUpload();
-    closeActivity();
-    closeReview();
-    closeHelp();
-    closeGuide();
-    closePlaylist();     // a playlist's page stayed under My Hub (2026-11-12)
-    openMyHub();
-    return;
-  }
-  closeMyHub();
+  if (hash === "#/me") { closeOtherViews("me"); openMyHub(); return; }
   // A playlist's page (My Hub phase 2), by its link.
   var playlist = /^#\/playlist\/([^/]+)$/.exec(hash);
   if (playlist) {
-    closeFilePreview(false);
-    closeAssetDetail();
-    closeUpload();
-    closeActivity();
-    closeReview();
-    closeHelp();
-    closeGuide();
+    closeOtherViews("playlist");
     openPlaylist(decodeURIComponent(playlist[1]));
     return;
   }
-  closePlaylist();
-  if (hash === "#/guide") {
-    closeFilePreview(false);
-    closeAssetDetail();
-    closeUpload();
-    closeActivity();
-    closeReview();
-    closeHelp();
-    openGuide();
-    return;
-  }
-  closeGuide();
-  if (hash === "#/help") {
-    closeFilePreview(false);
-    closeAssetDetail();
-    closeUpload();
-    closeActivity();
-    closeReview();
-    openHelp();
-    return;
-  }
-  closeHelp();
-  if (hash === "#/review") {
-    closeFilePreview(false);
-    closeAssetDetail();
-    closeUpload();
-    closeActivity();
-    openReview();
-    return;
-  }
-  closeReview();
-  if (hash === "#/activity") {
-    closeFilePreview(false);
-    closeAssetDetail();
-    closeUpload();
-    openActivity();
-    return;
-  }
-  closeActivity();
-  if (hash === "#/upload") {
-    closeFilePreview(false);
-    closeAssetDetail();
-    openUpload();
-    return;
-  }
-  closeUpload();
+  if (hash === "#/guide") { closeOtherViews("guide"); openGuide(); return; }
+  if (hash === "#/help") { closeOtherViews("help"); openHelp(); return; }
+  if (hash === "#/review") { closeOtherViews("review"); openReview(); return; }
+  if (hash === "#/activity") { closeOtherViews("activity"); openActivity(); return; }
+  if (hash === "#/upload") { closeOtherViews("upload"); openUpload(); return; }
   var search = /^#\/search\/(.*)$/.exec(hash);
   if (search) {
-    closeFilePreview(false);
-    closeAssetDetail();
+    closeOtherViews("search");
     openAdvancedSearch(decodeURIComponent(search[1]));
     return;
   }
+  // A demo, or one of its files. Advanced Search and the demo page stay
+  // open for openAssetDetail() to find (Back returns to Advanced Search;
+  // a file of the demo already showing opens without a reload); it closes
+  // Advanced Search itself once the demo has loaded.
   var file = /^#\/asset\/([^/]+)\/file\/([^/]+)$/.exec(hash);
   if (file) {
+    closeOtherViews(["asset", "search", "preview"]);
     openAssetDetail(decodeURIComponent(file[1]), decodeURIComponent(file[2]), linkToken);
     return;
   }
-  closeFilePreview(false);
   var match = /^#\/asset\/(.+)$/.exec(hash);
-  if (match) { openAssetDetail(decodeURIComponent(match[1]), null, linkToken); return; }
-  closeAdvancedSearch();
+  if (match) {
+    closeOtherViews(["asset", "search"]);
+    openAssetDetail(decodeURIComponent(match[1]), null, linkToken);
+    return;
+  }
+  // The catalogue. The demo page last, and keeping the list's place, for
+  // Back to the cards it was opened from (2026-11-05).
+  closeOtherViews("asset");
   closeAssetDetail(true);
 }
 

@@ -55,6 +55,20 @@ def test_recently_viewed_newest_first_once_each_and_only_what_is_visible(client,
     assert client.get("/api/me", headers=BOB).json()["recent"] == []
 
 
+def test_recently_viewed_keeps_the_newest_ten_and_cuts_old_files_on_read(tmp_path):
+    """Seb and Elio, 2026-11-17: 10, not 20; a file stored with 20 reads as 10."""
+    key = "oid:oid-cut"
+    for i in range(13):
+        my_hub.note_view(key, f"a{i}", str(tmp_path))
+    ids = [r["id"] for r in my_hub.recent(key, str(tmp_path))]
+    assert ids == [f"a{i}" for i in range(12, 2, -1)] and len(ids) == 10
+    # A file written under the old limit of 20 (as production's may be).
+    state = my_hub.load(key, str(tmp_path))
+    state["recent"] = [{"id": f"o{i}", "at": "2026-11-01T00:00:00+00:00"} for i in range(20)]
+    my_hub._save(key, state, str(tmp_path))
+    assert len(my_hub.recent(key, str(tmp_path))) == 10
+
+
 def test_the_files_name_nobody(client, tmp_path):
     client.put("/api/me/favorites/d1", headers=ANN)
     names = [p.name for p in (tmp_path / "owned" / "me").iterdir()]

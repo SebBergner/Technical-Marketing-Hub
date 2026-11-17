@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 
 from backend.config import settings
 
-RECENT_KEEP = 20            # Liwei, 2026-10-28
+RECENT_KEEP = 10            # Liwei, 2026-10-28 (20); Seb and Elio, 2026-11-17: 10 is enough
 FAVORITES_MAX = 500
 _lock = threading.Lock()
 
@@ -97,5 +97,7 @@ def note_view(key: str, asset_id: str, data_dir: str | None = None) -> None:
 
 
 def recent(key: str, data_dir: str | None = None) -> list[dict]:
-    """[{id, at}], newest first."""
-    return list(load(key, data_dir).get("recent") or [])
+    """[{id, at}], newest first, at most RECENT_KEEP. Cut on read as well as on
+    write: a file stored when the limit was 20 shows 10 at once (Seb, Elio,
+    2026-11-17)."""
+    return list(load(key, data_dir).get("recent") or [])[:RECENT_KEEP]

@@ -109,7 +109,7 @@ function cardRow(host, items, empty) {
 
 /* Favorites can hold hundreds, in one row (Liwei, 2026-11-13): past
  * FIND_FROM a box beside the heading narrows the row by title. Recently
- * viewed keeps 20, newest first, and needs none. */
+ * viewed keeps 10, newest first, and needs none. */
 var FIND_FROM = 9;
 
 function favoritesFinder(count) {

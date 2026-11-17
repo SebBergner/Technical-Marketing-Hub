@@ -1,8 +1,9 @@
 /* Playlists (My Hub phase 2; A3, Liwei 2026-10-23 and 2026-11-12).
  *
- * The Save button on a demo's page opens a small menu: Favorites, then
- * each of your playlists, ticked if the demo is in it, then "New
- * playlist". A playlist has its own page (#/playlist/<id>): its owner
+ * The Add to playlist button on a demo's page opens a small menu: each of
+ * your playlists, ticked if the demo is in it, then "New playlist". The star
+ * is the favorite and this is the playlist, never both in one control (Seb,
+ * 2026-11-17). A playlist has its own page (#/playlist/<id>): its owner
  * renames it, reorders it, takes demos out or deletes it; anyone signed in
  * who has the link sees the demos they may open themselves and can "Save a
  * copy". Copy link gives that link. A list inside the Hub, for colleagues --
@@ -11,7 +12,6 @@
  * Part of the Hub page's script. */
 
 import { buildCard, cardImage, paintCoverInto } from "./cards.js";
-import { isFavorite, setFavorite } from "./favorites.js";
 import { closeAdvancedSearch } from "./search.js";
 import { report } from "./util.js";
 import { noteFeature } from "./features.js";
@@ -43,7 +43,7 @@ function playlistUrl(id) {
   return location.origin + location.pathname + "#/playlist/" + encodeURIComponent(id);
 }
 
-/* ── the Save menu on a demo's page ───────────────────────────────────── */
+/* ── the playlist menu on a demo's page ───────────────────────────────────── */
 var openMenu = null;
 
 function closeMenu() {
@@ -90,17 +90,11 @@ function say(status, text, playlistId) {
 
 function drawMenu(menu, assetId, note) {
   menu.innerHTML = "";
-  menu.appendChild(el("div", "hub-save__h", "Save to"));
+  menu.appendChild(el("div", "hub-save__h", "Add to playlist"));
   var status = el("div", "hub-save__status");
   status.setAttribute("role", "status");
   status.setAttribute("aria-live", "polite");
   status.hidden = true;
-  menu.appendChild(option("Favorites", isFavorite(assetId), function (on) {
-    setFavorite(assetId, on).then(function () {
-      say(status, on ? "✓ Added to Favorites" : "Removed from Favorites");
-      refreshSaved(assetId);
-    });
-  }));
   var lists = el("div", "hub-save__lists");
   lists.textContent = "Loading your playlists…";
   menu.appendChild(lists);
@@ -145,35 +139,31 @@ function drawMenu(menu, assetId, note) {
   if (note) say(status, note.text, note.playlist);
 }
 
-/* The Save button says "Saved" while the demo is in Favorites or any of
- * your playlists, so it shows at a glance, here and next time. */
+/* The button says "In a playlist" while the demo is in any of your
+ * playlists, so it shows at a glance, here and next time. Favorites are the
+ * star's business, not this button's (Seb, 2026-11-17). */
 var saveBtn = null;
 
 function drawSaveButton(saved) {
   if (!saveBtn) return;
   saveBtn.classList.toggle("hub-saved", saved);
   saveBtn.innerHTML = saved
-    ? '<svg class="orion-ico--sm orion-ico"><use href="#i-check"/></svg>Saved'
-    : '<svg class="orion-ico--sm orion-ico"><use href="#i-plus"/></svg>Save';
+    ? '<svg class="orion-ico--sm orion-ico"><use href="#i-check"/></svg>In a playlist'
+    : '<svg class="orion-ico--sm orion-ico"><use href="#i-plus"/></svg>Add to playlist';
   saveBtn.title = saved
-    ? "In your Favorites or playlists (My Hub). Click to change."
-    : "Save this demo to Favorites or one of your playlists (My Hub)";
+    ? "This demo is in one of your playlists (My Hub). Click to change."
+    : "Add this demo to one of your playlists (My Hub)";
 }
-
-// A star changed elsewhere on the page (beside the title, on a card).
-document.addEventListener("hub:favorites", function (e) {
-  if (saveBtn && e.detail && saveBtn.dataset.assetId === e.detail.id) refreshSaved(e.detail.id);
-});
 
 function refreshSaved(assetId) {
   if (!saveBtn || !assetId) return;
   saveBtn.dataset.assetId = assetId;
   api("GET", "/api/me/playlists").then(function (d) {
     if (saveBtn.dataset.assetId !== assetId) return;      // another demo by now
-    drawSaveButton(isFavorite(assetId) || d.items.some(function (p) {
+    drawSaveButton(d.items.some(function (p) {
       return p.items.indexOf(assetId) >= 0;
     }));
-  }).catch(function () { drawSaveButton(isFavorite(assetId)); });
+  }).catch(function () { drawSaveButton(false); });
 }
 
 /* Under the button, never cut off (2026-11-12): the menu hangs from the
@@ -203,7 +193,7 @@ function place(menu, button) {
   menu.style.top = Math.round(top) + "px";
 }
 
-/* The Save button; reads the demo on show from `current()`, since the
+/* The Add to playlist button; reads the demo on show from `current()`, since the
  * demo page's actions row is reused from one demo to the next. */
 function saveButton(current) {
   var b = el("button", "btn-ghost");
@@ -218,7 +208,7 @@ function saveButton(current) {
     if (!asset) return;
     var menu = el("div", "hub-save");
     menu.setAttribute("role", "dialog");
-    menu.setAttribute("aria-label", "Save to");
+    menu.setAttribute("aria-label", "Add to playlist");
     document.body.appendChild(menu);
     openMenu = menu;
     drawMenu(menu, asset.id);
@@ -277,8 +267,8 @@ function renderMyPlaylists(host) {
     grid.appendChild(add);
     host.appendChild(grid);
     if (!d.items.length) {
-      host.appendChild(el("div", "hub-me__note", "Save demos into playlists from a demo's "
-        + "page (Save), then share a playlist's link with colleagues."));
+      host.appendChild(el("div", "hub-me__note", "Add demos to playlists from a demo's "
+        + "page (Add to playlist), then share a playlist's link with colleagues."));
     }
   }).catch(function (err) { host.textContent = "Could not load your playlists: " + err.message; });
 }
@@ -367,7 +357,7 @@ function draw(d) {
   }
   if (!n) {
     body.appendChild(el("div", "hub-me__empty", d.mine
-      ? "Empty. Add demos with Save on a demo's page." : "Nothing here you can open."));
+      ? "Empty. Add demos with Add to playlist on a demo's page." : "Nothing here you can open."));
     return;
   }
   var order = d.items.map(function (a) { return a.id; });

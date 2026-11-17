@@ -66,7 +66,7 @@ function buildPage() {
   var host = page.querySelector(".hub-me");
   host.appendChild(section("meRecent", "Recently viewed"));
   host.appendChild(section("meFavorites", "Favorites", "Star a demo on its card or page"));
-  host.appendChild(section("mePlaylists", "My playlists", "Save on a demo's page adds to one"));
+  host.appendChild(section("mePlaylists", "My playlists", "Add to playlist on a demo's page adds to one"));
   host.appendChild(section("meRequests", "My requests", "New Asset Inquiries"));
   host.appendChild(section("meFeedback", "My feedback"));
   host.appendChild(section("meDemos", "My demos", "Demos you created in the Hub"));

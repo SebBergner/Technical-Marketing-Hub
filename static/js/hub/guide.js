@@ -50,7 +50,7 @@ var STEPS = [
     "<b>My Hub</b>, first in the menu, is your own page; only you see it.",
     "<b>Recently viewed</b> keeps the last 20 demos you opened.",
     "Star a demo on its card or page to keep it in <b>Favorites</b>.",
-    "<b>Save</b> on a demo's page adds it to a <b>playlist</b>; <b>Copy link</b> shares one.",
+    "<b>Add to playlist</b> on a demo's page puts it in a <b>playlist</b>; <b>Copy link</b> shares one.",
     "Follow your <b>requests</b> and <b>feedback</b>, and the <b>demos</b> you created."
   ]],
   ["i-plus", "Ask for something new", [

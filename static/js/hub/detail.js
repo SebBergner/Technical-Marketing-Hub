@@ -394,8 +394,8 @@ async function openAssetDetail(id, fileItemId, linkToken) {
     });
     actions.appendChild(copy);
   }
-  // Save to Favorites or a playlist (My Hub phase 2, 2026-11-12), after
-  // Share Internally.
+  // Add to playlist (My Hub phase 2, 2026-11-12; playlists only, the star is
+  // the favorite: Seb, 2026-11-17), after Share Internally.
   closeSaveMenu();
   if (actions && !document.getElementById("vpSave")) {
     var save = saveButton(function () { return detailAsset; });

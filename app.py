@@ -14,7 +14,7 @@ from backend import admin_log, oidc, view_as
 from backend.routers import (
     admin, assets, auth, consensus, content_health, curation, debug, disclaimer, graph, me,
     migration,
-    reports, requests, search_terms, segments, status, support, taxonomy, uploads, vms,
+    reports, requests, search_api, search_terms, segments, status, support, taxonomy, uploads, vms,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -121,6 +121,7 @@ app = FastAPI(
 
 app.include_router(auth.router)
 app.include_router(assets.router)
+app.include_router(search_api.router)
 app.include_router(taxonomy.router)
 app.include_router(reports.router)
 app.include_router(segments.router)

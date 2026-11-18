@@ -1,6 +1,6 @@
 # Technical Marketing Hub — 待办清单
 
-更新于 2026-10-30（staging v2026.3.168，production 仍是 v2026.3.123；第 1–3 周、"去掉审核"、Seb 的 8 项 High、GXC、权限合并和技术债都已上 staging，等下周切换）。来源：9/2–10/7 的会议笔记、管理层 10/02 的六项要求、
+更新于 2026-11-18（11/17 周会后的改动见 "11/17 周会之后" 一节；以下第一行是 10/30 的旧状态：staging v2026.3.168，production 仍是 v2026.3.123；第 1–3 周、"去掉审核"、Seb 的 8 项 High、GXC、权限合并和技术债都已上 staging，等下周切换）。来源：9/2–10/7 的会议笔记、管理层 10/02 的六项要求、
 Serge / Seb / Elio 的意见、2026-10-16 的全面代码扫描、FY27 Summit 的 Hub 讨论（10/20 那周）、
 Serge 10/23 的会议，以及常见内部内容门户的做法。
 
@@ -54,6 +54,34 @@ SharePoint 里的数据清理（kit 日期、Demo Type、标错的 LDK/VDK、旧
 ### 暂不做
 - 每周新内容推送：新内容还不多。
 - 内容到期提醒：暂时不需要。
+
+---
+
+## 11/17 周会之后（11/17–11/18，都已上 staging，v2026.3.218；production 仍是 v2026.3.211）
+
+来源：11/17 的 TMH 每周反馈会（Seb、Elio、Liwei）。交接文档：`docs/HANDOVER-meeting-2026-11-17-changes.md`、`docs/HANDOVER-view-overlap-bugs-2026-11-17.md`（本地，未提交）。
+
+### 已做
+| 项 | 提交 | 说明 |
+|---|---|---|
+| 最近看过只留 10 个（Seb、Elio） | `8620cfd` | 旧文件读取时就截到 10 个 |
+| 星标 = 收藏，Save 按钮只管播放列表（Seb） | `be2214f` | 按钮和提示都不再提 Favorites |
+| 收藏卡片上直接加入播放列表（Seb） | `fba010f`、`fde737e` | 每张收藏卡片有 + 按钮，打开和 demo 页同一个菜单；按钮显示该 demo 是否已在某个列表里；partner 也能用 |
+| `GET /api/v1/search`，给 Growth OS 用（Seb；Liwei 负责） | `0dc4062` | 文档 `docs/search-api.md`；用 API token 调用；按调用者的权限返回；不记入 Search insights |
+| 两个整页同时出现在屏幕上 | `bcce27b` | `static/js/hub/views.js` 把所有整页只列一处（`closeOtherViews`），路由、申请表、`exitOverlays`、`openAssetDetail` 都调它；以后加页面只改这一处；浏览器里验过 209 次切换，Back 正常 |
+| My Hub 改名 **My TMH**（会上定的名字） | `3cc44bb` | 只改界面文字；`#/me` 地址、`my_hub` 标识、文件名、CSS 类、已存数据都不变；欢迎弹窗 WHATS_NEW 的文字也改了 |
+
+### 规则（Liwei 11/18）
+- 欢迎弹窗的 `backend/welcome.VERSION` **只有 Liwei 说"这是大更新"才改**，改了会让所有人再看到一次，包括选了 "Don't show again" 的人。只改 WHATS_NEW 的文字没问题。
+
+### 还没做
+- **Elio 的 Creo 缩写表**：等他发。注意：在 Admin → Search terms 编辑过之后，保存的文件盖过 `search_terms.py` 的默认值，所以要在 Admin 页面里改，不是改代码。（会上 Seb 对 "IP" 的纠正是口误，不用改，Liwei 11/18 确认。）
+- 会上决定不做：SharePoint 清理和 Consensus 迁移容量（Liwei 的建议，要团队支持）、改用 Azure Table Storage、About Us / 缩写说明区（没有负责人）、给 Growth OS 做 MCP（等搜索 API 稳定）、更新提示的 Got it / Don't show again（已经是会上说的样子）。
+
+### 等 swap 前要看的
+- production 还没有 11/13 之后的任何更新：My TMH、A9 View as、A16 功能使用、搜索 API、播放列表改动。swap 前在 staging 上用真实账号看一遍。
+- 搜索 API 要给 Seb 一个 token（Admin → Users & groups → API tokens）。
+- A9：PTC employees 预览下没有 GXC；Partners 预览下只有查看、预览、下载；Team Member 预览下点保存会弹只读提示。
 
 ---
 

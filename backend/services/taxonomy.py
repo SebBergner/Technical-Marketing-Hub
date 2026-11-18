@@ -34,6 +34,12 @@ _FAMILY_PREFIXES = (
     # Their full names, so a variant rolls up too: "PTC Orbit AI" (Gallery
     # sheet V29 (2), 2026-09-30) would otherwise be a family of its own.
     "PTC Orbit", "PTC Jetstream",
+    # PTC Ignition is one product of the Integrated Product Engineering (IPE)
+    # portfolio, not IPE renamed (PTC Ignition 2027 launch: "the first release
+    # of a new product as part of the IPE portfolio"; Liwei, 2026-11-18). Each
+    # is its own family, so a Consensus tag of either is read as a product;
+    # FAMILY_ROLLUP puts Ignition under the IPE umbrella.
+    "PTC Ignition", "IPE",
 )
 
 #: One family per product, whichever way it is spelled. The full-name
@@ -311,6 +317,9 @@ FAMILY_ROLLUP = {
     "Mathcad": "Creo",
     "Arbortext": "Windchill",
     "PTC Modeler": "Codebeamer",
+    # A product of the IPE portfolio (2026-11-18): the demo keeps "PTC
+    # Ignition" as its product and family; only its umbrella is IPE.
+    "PTC Ignition": "IPE",
     # Not rollups -- the same product spelled two ways. Seb's list carries the
     # brand prefix and SharePoint's Product column does not, so without these
     # both families read zero while 6 assets each sit in the catalogue.

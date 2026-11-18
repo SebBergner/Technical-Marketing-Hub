@@ -617,7 +617,8 @@ var FAMILY_MARK = {
   "Codebeamer": ["logo-codebeamer-mark", "0 0 261.71 300.76"],
   "Orbit": ["logo-ptc-mark", "0 0 284.42 325.42"],
   "Jetstream": ["logo-ptc-mark", "0 0 284.42 325.42"],
-  "IPE": ["logo-ptc-mark", "0 0 284.42 325.42"]
+  "IPE": ["logo-ptc-mark", "0 0 284.42 325.42"],
+  "PTC Ignition": ["logo-ptc-mark", "0 0 284.42 325.42"]
 };
 
 /* The family comes from the API, not from matching product strings here.

@@ -155,3 +155,26 @@ def test_ptc_prefixed_products_join_the_short_family():
     assert taxonomy.family_of("PTC Orbit AI") == taxonomy.family_of("Orbit") == "Orbit"
     assert taxonomy.families_of(["PTC Orbit", "Orbit"]) == ["Orbit"]
     assert taxonomy.umbrella_of("PTC Jetstream") == "PTC Jetstream"
+
+
+def test_ptc_ignition_is_a_product_under_the_ipe_umbrella():
+    """PTC Ignition is one product of the IPE portfolio, not IPE renamed
+    (2026-11-18). A Consensus tag of either is a product; Ignition keeps its
+    own name and family and only its umbrella is IPE."""
+    from backend.services import taxonomy
+    assert classify_tag("PTC Ignition") == ("product", "PTC Ignition")
+    assert classify_tag("IPE") == ("product", "IPE")
+    assert taxonomy.family_of("PTC Ignition") == "PTC Ignition"
+    assert taxonomy.family_of("PTC Ignition 2027") == "PTC Ignition"
+    assert taxonomy.umbrella_of("PTC Ignition") == "IPE"
+    assert taxonomy.umbrella_of("IPE") == "IPE"
+    assert taxonomy.umbrellas_of(["PTC Ignition", "IPE"]) == ["IPE"]
+    assert taxonomy.classify_tags(["PTC Ignition", "PLM"])["products"] == ["PTC Ignition"]
+
+
+def test_ptc_ignition_in_the_consensus_title_convention():
+    from backend.integrations.consensus_sync import parse_internal_title
+    from backend.services import taxonomy
+    parsed = parse_internal_title("PLM | PTC Ignition | Overview | Walkthrough | 5:00")
+    assert parsed["product"] == "PTC Ignition"
+    assert taxonomy.umbrella_of(parsed["product"]) == "IPE"

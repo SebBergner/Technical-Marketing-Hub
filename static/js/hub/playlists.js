@@ -158,6 +158,7 @@ function drawSaveButton(saved) {
 /* A menu opened from a card (My Hub's Favorites) must not repaint the demo
  * page's button, which may belong to another demo. */
 function refreshIfShown(assetId) {
+  refreshCardButtons();
   if (saveBtn && saveBtn.dataset.assetId === assetId) refreshSaved(assetId);
 }
 
@@ -240,11 +241,43 @@ function saveButton(current) {
 function cardPlaylistButton(asset) {
   var b = el("button", "hub-plbtn");
   b.type = "button";
-  b.title = "Add to playlist";
-  b.setAttribute("aria-label", "Add " + (asset.title || "this demo") + " to a playlist");
-  b.innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-plus"/></svg>';
+  b.dataset.assetId = asset.id;
+  // A bold cross, grey while the demo is in no playlist and filled like the
+  // star once it is in one (Liwei, 2026-11-18).
+  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+  paintCardButton(b, false, asset);
+  cardButtons.push(b);
   openMenuFor(b, function () { return asset; });
+  refreshCardButtons();
   return b;
+}
+
+var cardButtons = [];
+var cardTimer = null;
+
+function paintCardButton(b, inList, asset) {
+  var name = (asset && asset.title) || b.dataset.title || "this demo";
+  b.dataset.title = name;
+  b.classList.toggle("hub-plbtn--in", inList);
+  b.setAttribute("aria-pressed", inList ? "true" : "false");
+  b.title = inList ? "In a playlist (My TMH). Click to change." : "Add to playlist";
+  b.setAttribute("aria-label", (inList ? "Change playlists for " : "Add ") + name
+    + (inList ? "" : " to a playlist"));
+}
+
+/* One read of your playlists paints every card button on the page: filled
+ * when its demo is in any of them. Several buttons made together share it. */
+function refreshCardButtons() {
+  clearTimeout(cardTimer);
+  cardTimer = setTimeout(function () {
+    cardButtons = cardButtons.filter(function (b) { return b.isConnected; });
+    if (!cardButtons.length) return;
+    api("GET", "/api/me/playlists").then(function (d) {
+      var held = {};
+      d.items.forEach(function (p) { p.items.forEach(function (id) { held[id] = true; }); });
+      cardButtons.forEach(function (b) { paintCardButton(b, !!held[b.dataset.assetId]); });
+    }).catch(function () { /* the buttons stay as they were */ });
+  }, 30);
 }
 
 /* ── My Hub's "My playlists" ──────────────────────────────────────────── */

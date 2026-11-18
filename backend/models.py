@@ -557,6 +557,11 @@ class Asset(AssetBase):
     #: (Liwei, 2026-10-28: not to visitors or partners); the date has
     #: date_stated for the same.
     assumed: list[str] = Field(default_factory=list)
+    #: A Consensus demo: the fields set on the Hub (services/
+    #: consensus_overrides.py, 2026-11-18), and what Consensus itself says
+    #: for each overridable field. Empty / None for every other demo.
+    hub_set: list[str] = Field(default_factory=list)
+    consensus_values: dict | None = None
     #: The demo's folder sits in its library's _Archive folder (A8, 2026-10-28).
     sharepoint_archived: bool = False
     #: A Demo Video's Video Subtype column, as written (Content to review

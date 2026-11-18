@@ -146,7 +146,7 @@ FILTER_TYPES = (
 _CATALOGUE_OWNED = (
     "identity", "hub_settings", "publish_dates", "upload_review", "uploads",
     "metadata_edits", "sync_state", "hidden", "archived", "content_review",
-    "content_access", "upload_internal",
+    "content_access", "upload_internal", "consensus_overrides",
 )
 #: data dir -> (key, rows): the catalogue every request in this worker reads.
 _catalogue_cache: dict[str, tuple[tuple, list[dict]]] = {}
@@ -599,6 +599,12 @@ class JsonAssetRepository(AssetRepository):
             from backend.services.metadata_edit import apply_edits
             rows = apply_edits(rows, edits, {
                 s: self._synced_at(s) for s in ("sharepoint", "demo_video", *GXC_SOURCES)})
+        # Set on the Hub for a Consensus demo (2026-11-18): kept for good,
+        # since no sync ever reads them back (services/consensus_overrides.py).
+        overrides = self._load("consensus_overrides")
+        if overrides:
+            from backend.services.consensus_overrides import apply as apply_overrides
+            rows = apply_overrides(rows, overrides)
         # Who it is credited to -- after the edits, or an owner just set on the
         # Details card showed the folder creator's name beside the new owner's
         # address until the next sync (Liwei, 2026-11-05).
@@ -1272,6 +1278,8 @@ class JsonAssetRepository(AssetRepository):
             long_description=record.get("long_description"),
             overview=record.get("overview"),
             assumed=record.get("assumed") or [],
+            hub_set=record.get("hub_set") or [],
+            consensus_values=record.get("consensus_values"),
             sharepoint_archived=bool(record.get("sharepoint_archived")),
             rails=own.get("rails") or [],
             is_editor_pick=bool(own.get("is_editor_pick")),

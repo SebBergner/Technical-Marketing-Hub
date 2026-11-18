@@ -49,17 +49,137 @@ function editable(asset) {
     && ["video", "ldk", "vdk"].indexOf(asset.type) >= 0;
 }
 
-/* The Edit button, shown once the person's permissions say so. */
+/* A Consensus demo: the Hub never writes to Consensus, so its values are set
+ * and kept on the Hub (2026-11-18, services/consensus_overrides.py). */
+function consensusDemo(asset) {
+  return asset.source === "consensus";
+}
+
+/* The Edit button, shown once the person's permissions say so. A Consensus
+ * demo's says "Set on the Hub". */
 function editButton(asset) {
-  var b = mk("button", "hub-edit__open", "Edit");
+  var consensus = consensusDemo(asset);
+  var b = mk("button", "hub-edit__open", consensus ? "Set on the Hub" : "Edit");
   b.type = "button";
   b.hidden = true;
-  if (!editable(asset)) return b;
+  if (!consensus && !editable(asset)) return b;
   hubPermissions.then(function (granted) {
     if (granted.indexOf("maintain_content") >= 0) b.hidden = false;
   });
-  b.addEventListener("click", function () { openEditor(asset); });
+  b.addEventListener("click", function () {
+    if (consensus) openConsensusEditor(asset);
+    else openEditor(asset);
+  });
   return b;
+}
+
+/* ---------------------------------------------- Consensus demo, on the Hub */
+
+function shown(v) {
+  if (Array.isArray(v)) return v.length ? v.join(", ") : "nothing";
+  return v || "nothing";
+}
+
+function sameValue(a, b) {
+  var empty = function (v) { return v == null || v === "" || (Array.isArray(v) && !v.length); };
+  if (empty(a) && empty(b)) return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return (a || []).slice().sort().join("\n") === (b || []).slice().sort().join("\n");
+  }
+  return a === b;
+}
+
+function openConsensusEditor(asset) {
+  var overlay = mk("div", "hub-edit__overlay");
+  var editor = mk("div", "hub-edit__dialog hub-edit");
+  editor.setAttribute("role", "dialog");
+  editor.setAttribute("aria-label", "Set on the Hub: " + asset.title);
+  editor.appendChild(mk("div", "hub-edit__loading", "Loading…"));
+  overlay.appendChild(editor);
+  document.body.appendChild(overlay);
+
+  function close() {
+    overlay.remove();
+    document.removeEventListener("keydown", onKey);
+  }
+  function onKey(e) { if (e.key === "Escape") close(); }
+  document.addEventListener("keydown", onKey);
+
+  call("GET", base(asset) + "/consensus-metadata").then(function (form) {
+    editor.innerHTML = "";
+    editor.appendChild(mk("div", "hub-edit__title", "Set on the Hub: “" + form.title + "”"));
+    editor.appendChild(mk("div", "hub-edit__note",
+      "A Consensus demo. The Hub never writes to Consensus, so these values are kept on the "
+      + "Hub and shown instead of Consensus's. A value the same as Consensus's is not kept. "
+      + "Recorded in the Admin log. Title, description and link stay Consensus's."));
+    var grid = mk("div", "hub-edit__grid");
+    form.fields.forEach(function (f) {
+      var row = mk("label", "hub-edit__row");
+      row.appendChild(mk("span", "hub-edit__label", f.label));
+      var c = control(f, form.values[f.key]);
+      row.appendChild(c);
+      var theirs = form.consensus[f.key];
+      var help = mk("span", "hub-edit__help", "Consensus: " + shown(theirs)
+        + ((form.hub_set || []).indexOf(f.key) >= 0 ? " · set on the Hub now" : ""));
+      row.appendChild(help);
+      grid.appendChild(row);
+    });
+    editor.appendChild(grid);
+
+    var bar = mk("div", "hub-edit__bar");
+    var save = mk("button", "hub-edit__save", "Save");
+    save.type = "button";
+    var reset = mk("button", "hub-edit__btn", "Use Consensus's values");
+    reset.type = "button";
+    reset.hidden = !(form.hub_set || []).length;
+    var cancel = mk("button", "hub-edit__cancel", "Cancel");
+    cancel.type = "button";
+    var msg = mk("span", "hub-edit__msg");
+    cancel.addEventListener("click", close);
+
+    function send(values) {
+      save.disabled = reset.disabled = cancel.disabled = true;
+      msg.textContent = "Saving…";
+      call("PUT", base(asset) + "/consensus-metadata", { values: values })
+        .then(function (d) {
+          close();
+          report(d.changed.length ? "Set on the Hub: " + d.changed.length
+                   + (d.changed.length === 1 ? " field." : " fields.") : "Nothing changed.");
+          openAssetDetail(asset.id);
+        })
+        .catch(function (e) {
+          save.disabled = reset.disabled = cancel.disabled = false;
+          msg.textContent = e.message;
+          msg.classList.add("is-error");
+        });
+    }
+    save.addEventListener("click", function () {
+      var values = {};
+      grid.querySelectorAll("[data-key]").forEach(function (el) {
+        values[el.dataset.key] = valueOf(el);
+      });
+      var same = Object.keys(values).every(function (k) { return sameValue(values[k], form.values[k]); });
+      if (same) { close(); report("Nothing changed."); return; }
+      send(values);
+    });
+    reset.addEventListener("click", function () {
+      var values = {};
+      form.fields.forEach(function (f) { values[f.key] = form.consensus[f.key]; });
+      send(values);
+    });
+    bar.appendChild(save);
+    bar.appendChild(reset);
+    bar.appendChild(cancel);
+    bar.appendChild(msg);
+    editor.appendChild(bar);
+  }).catch(function (e) {
+    editor.innerHTML = "";
+    editor.appendChild(mk("div", "hub-edit__msg is-error", e.message));
+    var back = mk("button", "hub-edit__cancel", "Back");
+    back.type = "button";
+    back.addEventListener("click", close);
+    editor.appendChild(back);
+  });
 }
 
 /* ------------------------------------------------------------- fields */

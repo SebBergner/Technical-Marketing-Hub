@@ -34,7 +34,18 @@ var CHECKS = [
   ["same_name_archives", "Two archives of the same name",
    "The same name as .zip and .rar (or .7z) in one folder: often one copy too many. Many CAD "
    + "datasets ship both on purpose, so check before deleting.",
-   "Keep the one people should download; delete the other in SharePoint."]
+   "Keep the one people should download; delete the other in SharePoint."],
+  // Consensus demos (2026-11-18): the Hub never writes to Consensus, so their
+  // values are set on the Hub (Set on the Hub on the demo's page).
+  ["consensus_no_product", "Consensus demos with no product",
+   "Consensus gave neither a product tag nor a product in its internal title, so the demo "
+   + "is under no product in the navigation.",
+   "Open the demo and use Set on the Hub to choose its product."],
+  ["consensus_differs", "Consensus now says otherwise",
+   "A value set on the Hub, where Consensus has since been given a different one. The Hub's "
+   + "value is shown; one of the two is likely out of date.",
+   "Open the demo and use Set on the Hub: keep the Hub's value, or choose Consensus's to "
+   + "drop the Hub's."]
 ];
 
 function mine(row) {
@@ -64,6 +75,8 @@ function table(key, rows) {
   var hr = t.createTHead().insertRow();
   var heads = key === "skipped_folders" ? ["Folder", "Files", "Created", "SharePoint"]
     : key === "loose_files" ? ["File", "Size", "Last changed", "SharePoint"]
+    : key === "consensus_no_product" ? ["Demo", "Segment", "Consensus"]
+    : key === "consensus_differs" ? ["Demo", "Differs", "Consensus"]
     : ["Demo", "Type", "Library", "Owner"].concat(key === "same_name_archives" ? ["Files"] : [])
         .concat(["SharePoint"]);
   heads.forEach(function (h) { hr.appendChild(el("th", null, h)); });
@@ -82,6 +95,13 @@ function table(key, rows) {
       s.className = "num";
       s.textContent = r.size ? (r.size / 1048576).toFixed(1) + " MB" : "—";
       tr.insertCell().textContent = (r.modified_at || "").slice(0, 10) || "—";
+    } else if (key === "consensus_no_product" || key === "consensus_differs") {
+      tr.insertCell().appendChild(demoLink(r.asset_id, r.title));
+      tr.insertCell().textContent = key === "consensus_no_product" ? (r.segment || "—")
+        : (r.differences || []).map(function (d) {
+            var show = function (v) { return Array.isArray(v) ? v.join(", ") : (v || "—"); };
+            return d.field + ": Hub " + show(d.hub) + " · Consensus " + show(d.consensus);
+          }).join("; ");
     } else {
       tr.insertCell().appendChild(demoLink(r.asset_id, r.title));
       tr.insertCell().textContent = TYPE_WORD[r.type] || r.type || "—";

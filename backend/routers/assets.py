@@ -286,6 +286,9 @@ def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo),
     # them (Edit metadata), not for visitors or partners (2026-10-28).
     if asset.assumed and not user.can(Perm.MAINTAIN):
         asset = asset.model_copy(update={"assumed": []})
+    # Likewise which of a Consensus demo's values were set on the Hub (2026-11-18).
+    if (asset.hub_set or asset.consensus_values) and not user.can(Perm.MAINTAIN):
+        asset = asset.model_copy(update={"hub_set": [], "consensus_values": None})
     return asset
 
 
@@ -963,6 +966,57 @@ def save_metadata(asset_id: str, body: MetadataIn, repo: AssetRepository = Depen
         _sync_soon(repo, actor)
         log.info("metadata of %s edited by %s: %s", asset_id, actor, sorted(changed))
     return {"changed": sorted(changed), "asset": repo.get(asset_id)}
+
+
+# ── A Consensus demo's values, set on the Hub (Liwei, 2026-11-18) ──────────
+#: The Hub never writes to Consensus, so these are kept on the Hub for good
+#: (services/consensus_overrides.py). Edit metadata, as above; every save in
+#: the Admin log.
+def _consensus_record(repo: AssetRepository, asset_id: str) -> tuple[dict, list[dict]]:
+    load = getattr(repo, "_load_mirror", None)
+    if load is None:
+        raise HTTPException(status_code=501, detail="needs the file-backed catalogue")
+    rows = load()
+    record = next((r for r in rows if r["id"] == asset_id), None)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"no asset with id '{asset_id}'")
+    if record.get("source") != "consensus" or not record.get("consensus_uuid"):
+        raise HTTPException(status_code=422, detail="Only a Consensus demo is set on the "
+                            "Hub; a SharePoint demo is edited with Edit.")
+    return record, rows
+
+
+@router.get("/{asset_id}/consensus-metadata")
+def consensus_form(asset_id: str, repo: AssetRepository = Depends(get_repo),
+                   actor: str = EDIT):
+    """The form: each field's list, what the Hub shows now, what Consensus
+    itself says, and which fields the Hub set."""
+    from backend.services import consensus_overrides as co
+    record, rows = _consensus_record(repo, asset_id)
+    return {"title": record.get("title"), "fields": co.fields(rows),
+            "values": {k: record.get(k) for k in co.FIELDS},
+            "consensus": co.consensus_values(record),
+            "hub_set": record.get("hub_set") or []}
+
+
+class ConsensusMetadataIn(BaseModel):
+    values: dict
+
+
+@router.put("/{asset_id}/consensus-metadata")
+def save_consensus_metadata(asset_id: str, body: ConsensusMetadataIn,
+                            repo: AssetRepository = Depends(get_repo), actor: str = EDIT):
+    """Keep what differs from Consensus; a value equal to Consensus's own
+    clears the override. Shown at once: nothing waits for a sync."""
+    from backend.services import consensus_overrides as co
+    record, rows = _consensus_record(repo, asset_id)
+    try:
+        changed = co.save(repo, record, body.values, actor, rows)
+    except co.OverrideInvalid as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    if changed:
+        log.info("Consensus values of %s set on the Hub by %s: %s", asset_id, actor, changed)
+    return {"changed": changed, "asset": repo.get(asset_id)}
 
 
 class PreviewIn(BaseModel):

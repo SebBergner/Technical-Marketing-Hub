@@ -95,10 +95,20 @@ def checks(repo: AssetRepository = Depends(get_repo)):
     health = (repo.sync_state("sharepoint") if hasattr(repo, "sync_state") else {}) \
         .get("health") or {}
     records = repo.listed_records() if hasattr(repo, "listed_records") else {}
+    from backend.services import consensus_overrides as co
     empty, no_product, no_segment, archives = [], [], [], []
+    consensus_no_product, consensus_differs = [], []
     for r in records.values():
+        if r.get("source") == "consensus":
+            # Set on the Hub, since the Hub never writes to Consensus
+            # (consensus_overrides.py, 2026-11-18).
+            if not r.get("products"):
+                consensus_no_product.append(_row(r, library="Consensus"))
+            if diffs := co.differences(r):
+                consensus_differs.append(_row(r, library="Consensus", differences=diffs))
+            continue
         if r.get("source") != "sharepoint":
-            continue            # Consensus and the page sources are edited where they live
+            continue            # the page sources are edited where they live
         # A VM is a machine to book, and a demo known only from its SharePoint
         # page has no folder (demo_pages.py): neither is ever "empty".
         library = _library(r.get("id") or "")
@@ -111,14 +121,17 @@ def checks(repo: AssetRepository = Depends(get_repo)):
             no_segment.append(_row(r))
         if dupes := _same_name_archives(r):
             archives.append(_row(r, files=dupes))
-    for rows in (empty, no_product, no_segment, archives):
+    for rows in (empty, no_product, no_segment, archives,
+                 consensus_no_product, consensus_differs):
         rows.sort(key=lambda x: (x["title"] or "").lower())
     skipped = sorted(health.get("skipped_folders") or [], key=lambda f: -(f.get("files") or 0))
     return {"read_at": health.get("read_at"),
             "skipped_folders": skipped,
             "loose_files": health.get("loose_files") or [],
             "empty": empty, "no_product": no_product, "no_segment": no_segment,
-            "same_name_archives": archives}
+            "same_name_archives": archives,
+            "consensus_no_product": consensus_no_product,
+            "consensus_differs": consensus_differs}
 
 
 # ───────────────────────────────────────────────────────────── searches

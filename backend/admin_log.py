@@ -80,6 +80,8 @@ ACTIONS: dict[tuple[str, str], str] = {
     ("PUT", "/api/assets/{asset_id}/archive"): "Archived or restored a demo",
     ("PUT", "/api/admin/report-owners/{segment}"): "Changed a segment's report owners",
     ("PUT", "/api/assets/{asset_id}/metadata"): "Edited a demo's metadata",
+    ("PUT", "/api/assets/{asset_id}/consensus-metadata"):
+        "Set a Consensus demo's values on the Hub",
     ("PUT", "/api/assets/{asset_id}/preview-video"): "Chose a demo's preview video",
     ("PUT", "/api/assets/{asset_id}/thumbnail"): "Chose a demo's picture",
     ("DELETE", "/api/assets/{asset_id}/thumbnail"): "Reset a demo's picture",
@@ -122,7 +124,7 @@ CATEGORIES: list[tuple[str, re.Pattern]] = [
     ("Home page", re.compile(r"^/api/admin/(promoted|hub-settings)$")),
     ("Sync", re.compile(r"^/api/(graph/sync|consensus/(sync|oauth)|admin/auto-sync)")),
     ("Metadata", re.compile(r"^/api/(graph/writeback|curation/)"
-                            r"|^/api/assets/[^/]+/(metadata|preview-video|thumbnail)$"
+                            r"|^/api/assets/[^/]+/(metadata|consensus-metadata|preview-video|thumbnail)$"
                             r"|^/api/assets/[^/]+/(related|not-related)/[^/]+$")),
     ("Migration", re.compile(r"^/api/migration/")),
     ("Reports", re.compile(r"^/api/admin/report-owners")),

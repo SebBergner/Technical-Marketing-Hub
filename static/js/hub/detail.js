@@ -1158,16 +1158,17 @@ function renderFactsTable(page, asset) {
   // Products by family only: the detailed names repeated them (Liwei, 2026-10-29).
   var families = (asset.product_families || []).map(familyDisplayName);
   var yesNo = function (v) { return v === true ? "Yes" : v === false ? "No" : null; };
+  // r[2]: the field a row shows, for the "assumed" and "set on the Hub" marks.
   var rows = [
     ["Asset type", TYPE_LONG[asset.type] || asset.type],
-    ["Video type", videoTypeOf(asset)],
-    ["Products", families.join(", ")],
+    ["Video type", videoTypeOf(asset), "content_depth"],
+    ["Products", families.join(", "), "products"],
     // "N/A" says no version applies (A11): nothing to show.
     ["Product version", /^n\/?a$/i.test((asset.product_version || "").trim()) ? null
                         : asset.product_version],
-    ["Segment", asset.segment],
-    ["Stage", asset.funnel_stage],
-    ["Industry", asset.industry],
+    ["Segment", asset.segment, "segment"],
+    ["Stage", asset.funnel_stage, "funnel_stage"],
+    ["Industry", asset.industry, "industry"],
     ["Customer", asset.named_customer],
     ["Language", asset.language ? (LANGUAGE_LABEL[asset.language] || asset.language.toUpperCase()) : null,
      "language"],
@@ -1198,6 +1199,18 @@ function renderFactsTable(page, asset) {
         + (r[2] === "language" ? "(English when none is set)" : "from the file names")
         + ". Edit sets it for good.";
       cell.appendChild(mark);
+    }
+    // A Consensus demo's value set on the Hub (2026-11-18, edit.js).
+    if (r[2] && (asset.hub_set || []).indexOf(r[2]) >= 0) {
+      var hubMark = document.createElement("span");
+      hubMark.className = "hub-facts__assumed";
+      hubMark.textContent = "set on the Hub";
+      var theirs = (asset.consensus_values || {})[r[2]];
+      hubMark.title = "Consensus says "
+        + (Array.isArray(theirs) ? (theirs.length ? theirs.join(", ") : "nothing")
+                                 : (theirs || "nothing"))
+        + "; the Hub shows this instead.";
+      cell.appendChild(hubMark);
     }
   });
   // Who to ask (A4, 2026-10-26): the Demo Owner, as a mail link.

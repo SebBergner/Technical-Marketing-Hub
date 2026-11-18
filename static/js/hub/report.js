@@ -138,7 +138,7 @@ function sentNote(answer) {
   box.innerHTML = '<svg class="orion-ico orion-ico--sm"><use href="#i-check"/></svg>';
   box.appendChild(el("span", null, "Sent to the " + (answer.segment === "General"
     ? "Hub team" : answer.segment + " owners") + ". "));
-  var a = el("a", null, "See it on My Hub");
+  var a = el("a", null, "See it on My TMH");
   a.href = "#/help";
   box.appendChild(a);
   return box;
@@ -206,7 +206,7 @@ function buildPage() {
     + '</div></div>'
     + '<div class="hub-rpt"><section class="hub-rpt__card" id="hubHelpForm"></section>'
     + '<p class="hub-rpt__moved">What you have reported, and where it stands, is on '
-    + '<a href="#/me">My Hub</a>.</p></div>';
+    + '<a href="#/me">My TMH</a>.</p></div>';
   var anchor = document.getElementById("videoPreviewPage");
   if (anchor) anchor.parentNode.insertBefore(page, anchor);
   else document.body.appendChild(page);

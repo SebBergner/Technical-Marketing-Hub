@@ -70,7 +70,7 @@ def test_a_partner_is_recorded_as_external_never_by_name(client, tmp_path):
 
 def test_the_list_is_the_eleven_features_liwei_chose():
     assert [label for _, label in feature_usage.FEATURES] == [
-        "My Hub", "Favorites", "Playlists", "Advanced Search", "Table view", "User guide",
+        "My TMH", "Favorites", "Playlists", "Advanced Search", "Table view", "User guide",
         "Get help", "New Asset Inquiry", "Share Internally", "Create DemoBoard", "Report asset"]
 
 

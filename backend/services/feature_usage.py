@@ -26,7 +26,7 @@ from datetime import date, datetime, timedelta, timezone
 
 #: id, label -- Liwei, 2026-11-16. Order is the order of the Admin table.
 FEATURES: tuple[tuple[str, str], ...] = (
-    ("my_hub", "My Hub"),
+    ("my_hub", "My TMH"),
     ("favorites", "Favorites"),
     ("playlists", "Playlists"),
     ("advanced_search", "Advanced Search"),

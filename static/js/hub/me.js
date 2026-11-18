@@ -59,14 +59,14 @@ function buildPage() {
       '<button class="vp-back" type="button"><svg class="orion-ico orion-ico--sm">'
     +   '<use href="#i-chevron-left"/></svg>Back to Technical Marketing Hub</button>'
     + '<div class="vp-head"><div>'
-    +   '<div class="vp-title">My Hub</div>'
+    +   '<div class="vp-title">My TMH</div>'
     +   '<div class="orion-subtle">What you viewed, starred and asked for. Only you see this page.</div>'
     + '</div></div>'
     + '<div class="hub-me"></div>';
   var host = page.querySelector(".hub-me");
   host.appendChild(section("meRecent", "Recently viewed"));
   host.appendChild(section("meFavorites", "Favorites", "Star a demo on its card or page"));
-  host.appendChild(section("mePlaylists", "My playlists", "Add to playlist on a demo's page adds to one"));
+  host.appendChild(section("mePlaylists", "My playlists", "Use Add to playlist on a demo's page"));
   host.appendChild(section("meRequests", "My requests", "New Asset Inquiries"));
   host.appendChild(section("meFeedback", "My feedback"));
   host.appendChild(section("meDemos", "My demos", "Demos you created in the Hub"));
@@ -207,7 +207,7 @@ function loadCards() {
     return d;
   }).catch(function (err) {
     document.querySelector("#meRecent .hub-me__body").textContent =
-      "Could not load My Hub: " + err.message;
+      "Could not load My TMH: " + err.message;
   });
 }
 
@@ -409,7 +409,7 @@ function addMyHubNav() {
     var item = el("div", "orion-navitem");
     item.id = "navMyHub";
     item.innerHTML = '<span class="label"><svg class="orion-ico orion-ico--sm">'
-      + '<use href="#i-star"/></svg> My Hub</span>';
+      + '<use href="#i-star"/></svg> My TMH</span>';
     item.addEventListener("click", function () { location.hash = "#/me"; });
     home.parentNode.insertBefore(item, home);
     if (location.hash === "#/me") markNav(true);

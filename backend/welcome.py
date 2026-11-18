@@ -38,11 +38,11 @@ VERSION = "2026-11-13"
 #: What the big update brought: a few short points, each an icon from the
 #: page's sprite, a title and one line.
 WHATS_NEW: tuple[dict, ...] = (
-    {"icon": "i-star", "title": "My Hub",
+    {"icon": "i-star", "title": "My TMH",
      "text": "Your own page, first in the menu: what you viewed lately, your favorites, "
              "and your requests, feedback and demos."},
     {"icon": "i-layers", "title": "Favorites and playlists",
-     "text": "Star a demo to keep it. Save demos into playlists, and share one with a link."},
+     "text": "Star a demo to keep it. Add demos to playlists, and share one with a link."},
     {"icon": "i-search", "title": "Search that forgives",
      "text": "Finds part of a word and small typos, such as lambo or jestream."},
     {"icon": "i-play", "title": "Click the picture",

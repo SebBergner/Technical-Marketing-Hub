@@ -151,8 +151,8 @@ function drawSaveButton(saved) {
     ? '<svg class="orion-ico--sm orion-ico"><use href="#i-check"/></svg>In a playlist'
     : '<svg class="orion-ico--sm orion-ico"><use href="#i-plus"/></svg>Add to playlist';
   saveBtn.title = saved
-    ? "This demo is in one of your playlists (My Hub). Click to change."
-    : "Add this demo to one of your playlists (My Hub)";
+    ? "This demo is in one of your playlists (My TMH). Click to change."
+    : "Add this demo to one of your playlists (My TMH)";
 }
 
 /* A menu opened from a card (My Hub's Favorites) must not repaint the demo
@@ -304,7 +304,7 @@ function buildPage() {
   page.id = "hubPlPage";
   page.innerHTML =
       '<button class="vp-back" type="button"><svg class="orion-ico orion-ico--sm">'
-    +   '<use href="#i-chevron-left"/></svg>Back to My Hub</button>'
+    +   '<use href="#i-chevron-left"/></svg>Back to My TMH</button>'
     + '<div class="vp-head"><div><div class="vp-title" id="plTitle"></div>'
     +   '<div class="orion-subtle" id="plSub"></div></div>'
     +   '<div class="vp-actions" id="plActions"></div></div>'

@@ -174,7 +174,7 @@ function renderMyDemos(box, here) {
       box.appendChild(el("h3", "hub-up__h", "Waiting on you"));
       var all = el("p", "hub-up__muted");
       all.appendChild(document.createTextNode("Everything you created is on "));
-      var link = el("a", null, "My Hub");
+      var link = el("a", null, "My TMH");
       link.href = "#/me";
       all.appendChild(link);
       all.appendChild(document.createTextNode("."));

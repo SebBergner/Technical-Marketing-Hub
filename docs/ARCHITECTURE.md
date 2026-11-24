@@ -981,6 +981,22 @@ for this work is *"it looks identical, but the data is real."*
 | Value Roadmap: authoritative guidance, or exploratory aid? | you | accuracy bar for G |
 
 Two carried-over engineering items, unchanged: the deploy workflow uses a `publish-profile` secret where
-the stated intent was OIDC federated login; and `gunicorn` is in `requirements.txt` with no visible
-startup command — confirm App Service runs
-`gunicorn -w 4 -k uvicorn.workers.UvicornWorker app:app`.
+the stated intent was OIDC federated login. The gunicorn startup command is now known (read in the
+Azure portal 2026-11-22, both slots):
+`gunicorn --bind=0.0.0.0 --timeout 600 -k uvicorn.workers.UvicornWorker app:app`, with no `-w` and no
+`WEB_CONCURRENCY` / `GUNICORN_CMD_ARGS` setting, so each slot runs gunicorn's default of **1 worker**
+(inferred; the log stream's "Booting worker with pid" lines confirm it). Plan ASP-tddagent-b60f, P1v3,
+1 instance, shared by both slots.
+
+**Decision (2026-11-24): stay on 1 worker.**
+- The load is small and was measured on this setup: after D18, 100 mixed requests at once finished
+  in 4.2 s; 10 simulated users on production (2026-11-05): 240 requests, 0 errors. Server CPU
+  during the 11/06 usage contest was not recorded.
+- Syncs and migrations run in threads (`asyncio.to_thread`, sync `def` routes), so they do not block
+  the event loop; requests only share the CPU with them.
+- More workers mean the multi-process file paths on Azure Files (`backend/file_safety.py`, the
+  auto-sync lock, `migration_jobs` lock) go live for the first time, and each worker builds its own
+  catalogue and caches (more memory, more "first visit" slow requests).
+- Revisit when App Service Metrics show sustained CPU above ~70 % or slow requests during working
+  hours. Then the order is: step 2 of `docs/database-migration-plan-2026-11-22.md` (shared state out
+  of JSON files), then `-w 2` (P1v3 has 2 vCPUs), then more instances.

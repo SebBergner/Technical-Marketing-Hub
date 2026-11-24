@@ -104,7 +104,7 @@ _LOGGED_READS = {route for (method, route) in ACTIONS if method == "GET"}
 WATCHED = re.compile(r"^/api/(admin|graph|consensus/(sync|oauth)|curation/proposals|migration)/"
                      r"|^/api/content-health/(hidden|access-requests|searches/refresh)(/|$)"
                      r"|^/api/assets/[^/]+/(access|still-current|archive"
-                     r"|metadata|preview-video|thumbnail)$"
+                     r"|metadata|consensus-metadata|preview-video|thumbnail)$"
                      r"|^/api/assets/[^/]+/(related|not-related)/[^/]+$"
                      r"|^/api/assets/[^/]+/access-requests(/|$)"
                      r"|^/api/uploads(/|$)")

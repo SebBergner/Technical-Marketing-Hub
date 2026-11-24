@@ -119,6 +119,18 @@ def test_the_admin_log_names_it(client):
     assert admin_log.category_of("/api/assets/x/consensus-metadata") == "Metadata"
 
 
+def test_a_save_is_written_to_the_admin_log(client):
+    # Found on staging 2026-11-24: the save worked but left no Admin log line,
+    # because the path was missing from admin_log.WATCHED.
+    from backend import admin_log
+    assert _put(client, "ptc-ignition", {"products": ["PTC Ignition"]}).status_code == 200
+    rows = [r for r in admin_log.read(limit=50)["items"]
+            if r["path"] == "/api/assets/ptc-ignition/consensus-metadata"]
+    assert len(rows) == 1
+    assert rows[0]["action"] == "Set a Consensus demo's values on the Hub"
+    assert rows[0]["actor"] == "user:keeper@ptc.com" and rows[0]["category"] == "Metadata"
+
+
 def test_content_health_lists_no_product_and_disagreements(client):
     d = client.get("/api/content-health/checks", headers=KEEPER).json()
     assert [r["asset_id"] for r in d["consensus_no_product"]] == ["ptc-ignition"]

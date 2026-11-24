@@ -47,7 +47,7 @@ def test_parses_amps_own_format():
     assert index["value_drivers"] == ["Efficiency", "Innovation", "Quality & Regulatory"]
     assert len(index["initiatives"]) == 6 and index["initiatives"][0]["evidence"]
     assert len(index["metrics"]) == 5 and index["challenges"] == []
-    assert [s["start_s"] for s in index["scenes"]] == [2.0, 67.9, 134.0, 201.0]
+    assert [s["start_s"] for s in index["scenes"]] == [1.5, 67.9, 134.3, 200.8]
     assert index["scenes"][1]["tags"][2]["name"] == "Asset Health"
     assert index["used_audio"] is True and index["source"] == "claude"
 

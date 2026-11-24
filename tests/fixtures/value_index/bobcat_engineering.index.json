@@ -1,5 +1,5 @@
 {
-  "_note": "Test fixture reconstructed from AMP's page for 'Bobcat Technical Overview: Engineering' (amp.ptcxc.com, read 2026-11-19). Text is AMP's; the parent process of capabilities after the first three is inferred, and scene tags are assumed to be tag objects.",
+  "_note": "Test fixture for 'Bobcat Technical Overview: Engineering' in AMP's format (amp.ptcxc.com). Text from AMP's page (2026-11-19); tag ids, capability parents, scene times and scene tag objects checked against AMP's GET /videos/{id} on 2026-11-24.",
   "name": "Bobcat Technical Overview: Engineering",
   "analysis": {
     "description": "This video demonstrates how Bobcat engineering teams use a connected PTC toolchain to optimize the E17z excavator boom swing frame across the full engineering lifecycle. It shows how Windchill, Creo, Codebeamer, and ServiceMax work together to trace changes from real-world service insights through design, simulation, and physical validation.",
@@ -106,8 +106,8 @@
     ],
     "scenes": [
       {
-        "start_s": 2.0,
-        "end_s": 35.0,
+        "start_s": 1.5,
+        "end_s": 34.7,
         "description": "A branded intro sequence introduces the Bobcat E17z excavator boom swing frame as the subject of an engineering optimization workflow.",
         "tags": [
           {
@@ -140,8 +140,8 @@
         ]
       },
       {
-        "start_s": 134.0,
-        "end_s": 168.0,
+        "start_s": 134.3,
+        "end_s": 167.6,
         "description": "Creo Parametric shows a live structural simulation of the swing frame with load cases applied, followed by Windchill displaying the engineering BOM for the Bobcat E17z mini excavator.",
         "tags": [
           {
@@ -162,7 +162,7 @@
         ]
       },
       {
-        "start_s": 201.0,
+        "start_s": 200.8,
         "end_s": 234.0,
         "description": "A mobile structural inspection checklist on a tablet captures weld integrity findings during physical prototype validation, followed by the PTC closing logo card.",
         "tags": [

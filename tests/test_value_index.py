@@ -62,6 +62,28 @@ def test_scene_tags_may_be_ids_or_names():
     assert tags[0]["type"] == "capability"
 
 
+def test_copilots_index_of_the_same_video():
+    """Web Copilot's output for the Bobcat video, 2026-11-24 (run 1 of 2): it
+    listed only processes at the file level and named its capabilities on the
+    scenes. Those still count, or the Hub's filters would miss them."""
+    raw = (FIXTURE.parent / "bobcat_engineering_copilot.index.json").read_bytes()
+    index = vi.parse(raw)
+    assert index["source"] == "copilot" and index["used_visuals"] is False
+    assert len(index["scenes"]) == 8 and index["scenes"][-1]["end_s"] == 235.456
+    ids = {t["id"] for t in index["processes"] + index["capabilities"]}
+    assert "analytics-reporting" in ids and "verification-validation--test-management" in ids
+    assert len(index["processes"]) == 8 and len(index["capabilities"]) == 10
+    assert index["value_drivers"] == bobcat()["value_roadmap"]["value_drivers"]
+
+
+def test_a_bare_unknown_scene_tag_stays_on_its_scene():
+    data = bobcat()
+    data["analysis"]["scenes"] = [{"start_s": 1, "tags": ["Unknown thing"]}]
+    index = vi.parse(data)
+    assert len(index["capabilities"]) == 12
+    assert index["scenes"][0]["tags"][0]["name"] == "Unknown thing"
+
+
 def test_the_two_parts_may_sit_at_the_top_level():
     data = bobcat()
     flat = {**data["analysis"], **data["value_roadmap"]}

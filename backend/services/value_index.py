@@ -147,10 +147,6 @@ def parse(raw: bytes | str | dict) -> dict:
             tags.append(tag)
             known[tag["id"].lower()] = tag
             known.setdefault(tag["name"].lower(), tag)
-    processes = [t for t in tags if t["type"] == "process"]
-    capabilities = [{**t, "process_id": t["id"].split("--", 1)[0] if "--" in t["id"] else None}
-                    for t in tags if t["type"] != "process"]
-
     scenes = []
     for item in (analysis.get("scenes") or [])[:_MAX_SCENES]:
         if not isinstance(item, dict):
@@ -159,10 +155,26 @@ def parse(raw: bytes | str | dict) -> dict:
         if start is None:
             continue
         end = _number(item.get("end_s"))
-        scene_tags = [t for t in (_tag(x, known) for x in (item.get("tags") or [])[:_MAX_TAGS]) if t]
+        scene_tags = []
+        for raw_tag in (item.get("tags") or [])[:_MAX_TAGS]:
+            tag = _tag(raw_tag, known)
+            if not tag:
+                continue
+            scene_tags.append(tag)
+            # A tag object named only on a scene still describes the video.
+            # Copilot did this on 2026-11-24 (scene capabilities, file-level
+            # processes only), which would hide them from filters and facets.
+            if isinstance(raw_tag, dict) and tag["id"].lower() not in known \
+                    and len(tags) < _MAX_TAGS:
+                tags.append(tag)
+                known[tag["id"].lower()] = tag
+                known.setdefault(tag["name"].lower(), tag)
         scenes.append({"start_s": start, "end_s": end if end is None or end >= start else None,
                        "description": _text(item.get("description")), "tags": scene_tags})
     scenes.sort(key=lambda s: s["start_s"])
+    processes = [t for t in tags if t["type"] == "process"]
+    capabilities = [{**t, "process_id": t["id"].split("--", 1)[0] if "--" in t["id"] else None}
+                    for t in tags if t["type"] != "process"]
 
     products = [p for p in (_text(x) for x in (analysis.get("products") or [])[:_MAX_TERMS]) if p]
     drivers = [d for d in (_text(x) for x in (roadmap.get("value_drivers") or [])[:_MAX_TERMS]) if d]

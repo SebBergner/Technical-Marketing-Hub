@@ -1,0 +1,258 @@
+{
+  "analysis": {
+    "description": "Technical overview of the Bobcat E17z engineering lifecycle, showing how field and service insight initiates an engineering change to the boom swing frame and how PTC Orbit, Windchill, Codebeamer, Creo, NVIDIA Omniverse, and ServiceMax connect requirements, design, simulation, BOM updates, design review, and prototype validation in a traceable intelligent product lifecycle.",
+    "products": [
+      "PTC Orbit",
+      "Windchill",
+      "Codebeamer",
+      "Creo",
+      "NVIDIA Omniverse",
+      "ServiceMax"
+    ],
+    "primary_area": "Engineering",
+    "confidence": "Medium",
+    "tags": [
+      {
+        "type": "process",
+        "id": "enterprise-change-management",
+        "name": "Enterprise Change Management"
+      },
+      {
+        "type": "process",
+        "id": "requirements-management-review",
+        "name": "Requirements Management & Review"
+      },
+      {
+        "type": "process",
+        "id": "model-based-design-engineering",
+        "name": "Model-Based Design & Engineering"
+      },
+      {
+        "type": "process",
+        "id": "verification-validation",
+        "name": "Verification & Validation"
+      },
+      {
+        "type": "process",
+        "id": "bom-configuration-management",
+        "name": "BOM & Configuration Management"
+      }
+    ],
+    "scenes": [
+      {
+        "start_s": 0,
+        "end_s": 38,
+        "description": "Introduces industrial-equipment engineering pressures and the move toward an AI-enabled connected product lifecycle, then frames optimization of the Bobcat E17z boom swing frame as the engineering use case.",
+        "tags": [
+          {
+            "type": "process",
+            "id": "model-based-design-engineering",
+            "name": "Model-Based Design & Engineering"
+          }
+        ]
+      },
+      {
+        "start_s": 38,
+        "end_s": 74,
+        "description": "PTC Orbit combines connected fleet and service information to expose recurring swing-frame wear and identify opportunities to improve performance, cost, and serviceability.",
+        "tags": [
+          {
+            "type": "process",
+            "id": "analytics-reporting",
+            "name": "Analytics & Reporting"
+          },
+          {
+            "type": "capability",
+            "id": "analytics-reporting--trending",
+            "name": "Trending"
+          }
+        ]
+      },
+      {
+        "start_s": 74,
+        "end_s": 119,
+        "description": "The identified opportunity becomes a controlled Windchill change process, with impacted product data traced into Codebeamer requirements; Codebeamer AI helps identify requirement issues and generate supporting tests.",
+        "tags": [
+          {
+            "type": "process",
+            "id": "enterprise-change-management",
+            "name": "Enterprise Change Management"
+          },
+          {
+            "type": "capability",
+            "id": "enterprise-change-management--change-impact-analysis",
+            "name": "Change Impact Analysis"
+          },
+          {
+            "type": "process",
+            "id": "requirements-management-review",
+            "name": "Requirements Management & Review"
+          }
+        ]
+      },
+      {
+        "start_s": 119,
+        "end_s": 151,
+        "description": "Engineers modify the 3D swing-frame design in Creo, including geometry optimization with generative design, while model-based tolerances and annotations remain associated with the changing geometry.",
+        "tags": [
+          {
+            "type": "process",
+            "id": "model-based-design-engineering",
+            "name": "Model-Based Design & Engineering"
+          },
+          {
+            "type": "capability",
+            "id": "model-based-design-engineering--3d-design",
+            "name": "3D Design"
+          },
+          {
+            "type": "capability",
+            "id": "model-based-design-engineering--design-optimization",
+            "name": "Design Optimization"
+          }
+        ]
+      },
+      {
+        "start_s": 151,
+        "end_s": 178,
+        "description": "Creo simulation applies load cases and evaluates stress concentration in real time; results are captured in Codebeamer and linked back to requirements for traceable validation.",
+        "tags": [
+          {
+            "type": "process",
+            "id": "verification-validation",
+            "name": "Verification & Validation"
+          },
+          {
+            "type": "capability",
+            "id": "verification-validation--product-verification",
+            "name": "Product Verification"
+          },
+          {
+            "type": "capability",
+            "id": "verification-validation--select-link-artifacts",
+            "name": "Select & Link Artifacts"
+          }
+        ]
+      },
+      {
+        "start_s": 178,
+        "end_s": 204,
+        "description": "The finalized design updates the engineering BOM in Windchill, where old and new configurations can be compared, followed by a shared 3D design-review workflow through the Windchill connection to NVIDIA Omniverse.",
+        "tags": [
+          {
+            "type": "process",
+            "id": "bom-configuration-management",
+            "name": "BOM & Configuration Management"
+          },
+          {
+            "type": "capability",
+            "id": "bom-configuration-management--multidisciplinary-bom-management",
+            "name": "Multidisciplinary BOM Management"
+          },
+          {
+            "type": "process",
+            "id": "enterprise-collaboration",
+            "name": "Enterprise Collaboration"
+          }
+        ]
+      },
+      {
+        "start_s": 204,
+        "end_s": 229,
+        "description": "Physical validation moves to a prototype environment where ServiceMax supports endurance-test activity and technicians inspect components such as weld seams and check for deformation; results return to Codebeamer.",
+        "tags": [
+          {
+            "type": "process",
+            "id": "verification-validation",
+            "name": "Verification & Validation"
+          },
+          {
+            "type": "capability",
+            "id": "verification-validation--test-management",
+            "name": "Test Management"
+          },
+          {
+            "type": "capability",
+            "id": "verification-validation--virtual-physical-prototyping",
+            "name": "Virtual & Physical Prototyping"
+          }
+        ]
+      },
+      {
+        "start_s": 229,
+        "end_s": 235.456,
+        "description": "Concludes that connecting field insight, requirements, design, simulation, and testing enables faster iteration, stronger validation, and greater confidence in engineering decisions.",
+        "tags": [
+          {
+            "type": "process",
+            "id": "integrate-cross-domain-product-architecture",
+            "name": "Integrate Cross-Domain Product Architecture"
+          },
+          {
+            "type": "capability",
+            "id": "integrate-cross-domain-product-architecture--cross-domain-product-architecture-synchronization",
+            "name": "Cross-Domain Product Architecture Synchronization"
+          }
+        ]
+      }
+    ],
+    "used_audio": true,
+    "used_visuals": false
+  },
+  "value_roadmap": {
+    "summary": "The video presents a closed-loop engineering approach in which real-world product insight triggers controlled change, requirements remain connected to design and validation, and simulation plus prototype testing provide evidence before the revised product definition moves downstream.",
+    "value_drivers": [
+      "Efficiency",
+      "Innovation",
+      "Quality & Regulatory"
+    ],
+    "initiatives": [
+      {
+        "term": "Closed-loop engineering change",
+        "evidence": "Field and service insight about recurring swing-frame wear is converted into a controlled Windchill change whose affected product data and requirements remain traceable through engineering."
+      },
+      {
+        "term": "AI-assisted requirements engineering",
+        "evidence": "Codebeamer AI identifies missing conditions, inconsistencies, and coverage gaps and generates supporting test cases for the engineering change."
+      },
+      {
+        "term": "Simulation-driven design",
+        "evidence": "Creo lets engineers optimize swing-frame geometry and evaluate load cases and stress distributions during design rather than waiting for physical testing."
+      },
+      {
+        "term": "Connected design validation",
+        "evidence": "Simulation results are captured in Codebeamer against requirements, followed by ServiceMax-supported prototype endurance testing whose findings close the loop with engineering."
+      }
+    ],
+    "challenges": [
+      {
+        "term": "Product complexity",
+        "evidence": "The introduction identifies increasing product complexity as a pressure on industrial-equipment engineering teams."
+      },
+      {
+        "term": "Engineering rework",
+        "evidence": "The connected intelligent product lifecycle is positioned as a way to accelerate innovation and reduce rework across changes, requirements, design, and validation."
+      },
+      {
+        "term": "Real-world component wear",
+        "evidence": "Connected fleet and service data reveal recurring wear around the E17z swing-frame pivot after extended operation, initiating the improvement workflow."
+      }
+    ],
+    "metrics": [
+      {
+        "term": "Stress distribution",
+        "evidence": "Creo simulation evaluates stress distributions under applied load cases and shows where forces concentrate around pivot joints and connection points."
+      },
+      {
+        "term": "Endurance operating hours",
+        "evidence": "Prototype validation operates the excavator over hundreds of hours while physical components are inspected at defined intervals."
+      },
+      {
+        "term": "Requirement traceability",
+        "evidence": "Simulation results are linked in Codebeamer to their requirements, preserving end-to-end traceability through validation."
+      }
+    ]
+  },
+  "source": "copilot",
+  "generated_at": "2026-11-24T16:50:00Z"
+}

@@ -69,6 +69,9 @@ def get_facets(
     source: list[str] = Query(default=[]),
     tag: list[str] = Query(default=[]),
     published: list[str] = Query(default=[]),
+    driver: list[str] = Query(default=[]),
+    process: list[str] = Query(default=[]),
+    capability: list[str] = Query(default=[]),
     archived: bool = False,
     customer_facing: bool | None = None,
     include_older_vms: bool = False,
@@ -85,7 +88,11 @@ def get_facets(
 
     With no filters it behaves exactly as before.
     """
+    roadmap = user.can(Perm.VIEW_ROADMAP)
+    if not roadmap:
+        driver, process, capability = [], [], []
     query = AssetQuery(
+        value_drivers=driver, processes=process, capabilities=capability,
         text=q, types=type, products=product, product_families=family,
         umbrella_families=umbrella,
         funnel_stages=stage, segments=segment, languages=language,
@@ -96,8 +103,13 @@ def get_facets(
     )
     any_filter = any([q, type, product, family, umbrella, stage, segment,
                       language, depth, source, tag, published, include_older_vms,
-                      archived])         or customer_facing is not None
-    return repo.facets(query if any_filter else None)
+                      archived, driver, process, capability]) or customer_facing is not None
+    facets = repo.facets(query if any_filter else None)
+    if not roadmap:
+        # Unreviewed AI output (2026-11-24): not even its names or counts.
+        facets = facets.model_copy(update={"processes": [], "capabilities": [],
+                                           "value_drivers": []})
+    return facets
 
 
 @router.get("/video-levels")

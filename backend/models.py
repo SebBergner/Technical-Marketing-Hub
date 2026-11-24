@@ -145,6 +145,65 @@ class ValueRoadmap(BaseModel):
     model: str | None = None
 
 
+class IndexTag(BaseModel):
+    """A process or capability from the Value Roadmap taxonomy. Capability ids
+    are `<process id>--<capability id>`, AMP's own spelling."""
+    type: str = "capability"
+    id: str
+    name: str
+    process_id: str | None = None
+
+
+class IndexScene(BaseModel):
+    """A stretch of a video, in seconds, with what it shows."""
+    start_s: float
+    end_s: float | None = None
+    description: str | None = None
+    tags: list[IndexTag] = Field(default_factory=list)
+
+
+class IndexTerm(BaseModel):
+    """A business initiative, challenge or metric, with the evidence the
+    analysis quoted from the video."""
+    term: str
+    evidence: str | None = None
+
+
+class VideoIndex(BaseModel):
+    """One video's index, as its `<video>.index.json` holds it
+    (services/value_index.py; AMP's format)."""
+    video: str | None = None            # the file it describes; None if none matched
+    video_item_id: str | None = None
+    subfolder: str | None = None
+    file: str | None = None             # the index file's own name
+    description: str | None = None
+    primary_area: str | None = None
+    products: list[str] = Field(default_factory=list)
+    confidence: str | None = None
+    processes: list[IndexTag] = Field(default_factory=list)
+    capabilities: list[IndexTag] = Field(default_factory=list)
+    scenes: list[IndexScene] = Field(default_factory=list)
+    summary: str | None = None
+    value_drivers: list[str] = Field(default_factory=list)
+    initiatives: list[IndexTerm] = Field(default_factory=list)
+    challenges: list[IndexTerm] = Field(default_factory=list)
+    metrics: list[IndexTerm] = Field(default_factory=list)
+    used_audio: bool | None = None
+    used_visuals: bool | None = None
+    source: str | None = None
+    generated_at: str | None = None
+    model: str | None = None
+
+
+class ValueIndex(BaseModel):
+    """A demo's Value Roadmap index: each indexed video, and the names the
+    filters use. AI output, shown only with "Preview the Value Roadmap"."""
+    videos: list[VideoIndex] = Field(default_factory=list)
+    processes: list[str] = Field(default_factory=list)
+    capabilities: list[str] = Field(default_factory=list)
+    value_drivers: list[str] = Field(default_factory=list)
+
+
 class AssetResource(BaseModel):
     """One file inside an asset folder."""
     name: str
@@ -516,6 +575,9 @@ class RelatedDemo(AssetSummary):
 class Asset(AssetBase):
     """Full detail, including the derived index."""
     value_roadmap: ValueRoadmap | None = None
+    #: From the demo folder's `*.index.json` files (2026-11-24); None until
+    #: one exists, and for anyone without "Preview the Value Roadmap".
+    value_index: ValueIndex | None = None
     rails: list[str] = Field(default_factory=list)
     is_editor_pick: bool = False
 
@@ -666,6 +728,10 @@ class Facets(BaseModel):
     segments: list[FacetValue] = Field(default_factory=list)
     industries: list[FacetValue] = Field(default_factory=list)
     value_drivers: list[FacetValue] = Field(default_factory=list)
+    #: The Value Roadmap index's processes and capabilities (2026-11-24);
+    #: empty for anyone without "Preview the Value Roadmap".
+    processes: list[FacetValue] = Field(default_factory=list)
+    capabilities: list[FacetValue] = Field(default_factory=list)
     languages: list[FacetValue] = Field(default_factory=list)
     content_depths: list[FacetValue] = Field(default_factory=list)
     #: Which platform results come from. Always present, so the UI can label

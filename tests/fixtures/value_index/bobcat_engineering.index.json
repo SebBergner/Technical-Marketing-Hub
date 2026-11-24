@@ -1,0 +1,246 @@
+{
+  "_note": "Test fixture reconstructed from AMP's page for 'Bobcat Technical Overview: Engineering' (amp.ptcxc.com, read 2026-11-19). Text is AMP's; the parent process of capabilities after the first three is inferred, and scene tags are assumed to be tag objects.",
+  "name": "Bobcat Technical Overview: Engineering",
+  "analysis": {
+    "description": "This video demonstrates how Bobcat engineering teams use a connected PTC toolchain to optimize the E17z excavator boom swing frame across the full engineering lifecycle. It shows how Windchill, Creo, Codebeamer, and ServiceMax work together to trace changes from real-world service insights through design, simulation, and physical validation.",
+    "products": [
+      "Windchill",
+      "Creo",
+      "Codebeamer",
+      "ServiceMax",
+      "AI"
+    ],
+    "primary_area": "PLM / Product Lifecycle Management",
+    "confidence": "High",
+    "tags": [
+      {
+        "type": "process",
+        "id": "requirements-management-review",
+        "name": "Requirements Management & Review"
+      },
+      {
+        "type": "process",
+        "id": "model-based-design-engineering",
+        "name": "Model-Based Design & Engineering"
+      },
+      {
+        "type": "process",
+        "id": "verification-validation",
+        "name": "Verification & Validation"
+      },
+      {
+        "type": "process",
+        "id": "bom-configuration-management",
+        "name": "BOM & Configuration Management"
+      },
+      {
+        "type": "process",
+        "id": "enterprise-change-management",
+        "name": "Enterprise Change Management"
+      },
+      {
+        "type": "process",
+        "id": "analytics-reporting",
+        "name": "Analytics & Reporting"
+      },
+      {
+        "type": "capability",
+        "id": "requirements-management-review--intelligent-requirements-assistance",
+        "name": "Intelligent Requirements Assistance"
+      },
+      {
+        "type": "capability",
+        "id": "requirements-management-review--requirements-definition-governance",
+        "name": "Requirements Definition & Governance"
+      },
+      {
+        "type": "capability",
+        "id": "model-based-design-engineering--intelligent-design-assistance",
+        "name": "Intelligent Design Assistance"
+      },
+      {
+        "type": "capability",
+        "id": "model-based-design-engineering--3d-design",
+        "name": "3D Design"
+      },
+      {
+        "type": "capability",
+        "id": "model-based-design-engineering--multi-physics-simulation",
+        "name": "Multi-Physics Simulation"
+      },
+      {
+        "type": "capability",
+        "id": "model-based-design-engineering--design-optimization",
+        "name": "Design Optimization"
+      },
+      {
+        "type": "capability",
+        "id": "verification-validation--test-management",
+        "name": "Test Management"
+      },
+      {
+        "type": "capability",
+        "id": "verification-validation--product-verification",
+        "name": "Product Verification"
+      },
+      {
+        "type": "capability",
+        "id": "bom-configuration-management--multidisciplinary-bom-management",
+        "name": "Multidisciplinary BOM Management"
+      },
+      {
+        "type": "capability",
+        "id": "enterprise-change-management--closed-loop-change-management",
+        "name": "Closed-Loop Change Management"
+      },
+      {
+        "type": "capability",
+        "id": "enterprise-change-management--change-impact-analysis",
+        "name": "Change Impact Analysis"
+      },
+      {
+        "type": "capability",
+        "id": "analytics-reporting--asset-health",
+        "name": "Asset Health"
+      }
+    ],
+    "scenes": [
+      {
+        "start_s": 2.0,
+        "end_s": 35.0,
+        "description": "A branded intro sequence introduces the Bobcat E17z excavator boom swing frame as the subject of an engineering optimization workflow.",
+        "tags": [
+          {
+            "type": "capability",
+            "id": "model-based-design-engineering--intelligent-design-assistance",
+            "name": "Intelligent Design Assistance"
+          }
+        ]
+      },
+      {
+        "start_s": 67.9,
+        "end_s": 101.1,
+        "description": "PTC Orbit surfaces fleet and service data to identify swing frame wear patterns, then Codebeamer displays hardware design requirements with AI-assisted test type suggestions linked to the swing frame component.",
+        "tags": [
+          {
+            "type": "capability",
+            "id": "requirements-management-review--intelligent-requirements-assistance",
+            "name": "Intelligent Requirements Assistance"
+          },
+          {
+            "type": "capability",
+            "id": "requirements-management-review--requirements-definition-governance",
+            "name": "Requirements Definition & Governance"
+          },
+          {
+            "type": "capability",
+            "id": "analytics-reporting--asset-health",
+            "name": "Asset Health"
+          }
+        ]
+      },
+      {
+        "start_s": 134.0,
+        "end_s": 168.0,
+        "description": "Creo Parametric shows a live structural simulation of the swing frame with load cases applied, followed by Windchill displaying the engineering BOM for the Bobcat E17z mini excavator.",
+        "tags": [
+          {
+            "type": "capability",
+            "id": "model-based-design-engineering--multi-physics-simulation",
+            "name": "Multi-Physics Simulation"
+          },
+          {
+            "type": "capability",
+            "id": "model-based-design-engineering--design-optimization",
+            "name": "Design Optimization"
+          },
+          {
+            "type": "capability",
+            "id": "bom-configuration-management--multidisciplinary-bom-management",
+            "name": "Multidisciplinary BOM Management"
+          }
+        ]
+      },
+      {
+        "start_s": 201.0,
+        "end_s": 234.0,
+        "description": "A mobile structural inspection checklist on a tablet captures weld integrity findings during physical prototype validation, followed by the PTC closing logo card.",
+        "tags": [
+          {
+            "type": "capability",
+            "id": "verification-validation--product-verification",
+            "name": "Product Verification"
+          },
+          {
+            "type": "capability",
+            "id": "verification-validation--test-management",
+            "name": "Test Management"
+          }
+        ]
+      }
+    ],
+    "generated_at": "2026-08-18T07:53:51.713074+00:00",
+    "used_visuals": true,
+    "used_audio": true
+  },
+  "value_roadmap": {
+    "summary": "This Bobcat E17z demo showcases PTC's connected intelligent product lifecycle (Orbit, Windchill, Creo, Codebeamer, ServiceMax) applied to an engineering change for the boom swing frame, covering data-driven change management, requirements traceability, simulation-driven design, and closed-loop validation from field service data back to design.",
+    "value_drivers": [
+      "Efficiency",
+      "Innovation",
+      "Quality & Regulatory"
+    ],
+    "initiatives": [
+      {
+        "term": "Accelerate product innovation throughout lifecycle",
+        "evidence": "The video demonstrates an end-to-end AI-enabled lifecycle connecting fleet insights, requirements, design, simulation, and physical testing to accelerate innovation on the boom swing frame."
+      },
+      {
+        "term": "Streamline product development",
+        "evidence": "The demo shows how Windchill, Codebeamer, and Creo are connected to streamline the engineering change process from scope definition through BOM update, reducing rework."
+      },
+      {
+        "term": "Enhance governance & lifecycle traceability",
+        "evidence": "The video explicitly shows end-to-end traceability maintained between product changes, impacted requirements, and simulation results across Windchill and Codebeamer."
+      },
+      {
+        "term": "Ensure product & service quality",
+        "evidence": "Structural inspection forms in ServiceMax and simulation validation in Creo are shown as embedded quality steps closing the loop between design intent and real-world performance."
+      },
+      {
+        "term": "Strengthen service monetization",
+        "evidence": "PTC Orbit surfaces recurring wear patterns from connected fleet/service data to identify serviceability optimization opportunities for the swing frame."
+      },
+      {
+        "term": "Improve velocity of new product introduction (NPI)",
+        "evidence": "The narrator states the result is \"faster iteration, stronger validation, and greater confidence in every design decision,\" directly linking the toolchain to faster NPI."
+      }
+    ],
+    "challenges": [],
+    "metrics": [
+      {
+        "term": "Number of ECOs to fix quality / compliance / launch costs issues (#)",
+        "evidence": "The controlled change process in Windchill is demonstrated as a way to manage and reduce costly engineering changes driven by real-world performance issues on the swing frame."
+      },
+      {
+        "term": "Number of physical prototypes (#)",
+        "evidence": "The use of Creo simulation live and NVIDIA Omniverse for virtual design reviews is presented as a way to reduce reliance on physical prototypes before validation testing."
+      },
+      {
+        "term": "Development cycle time (hours)",
+        "evidence": "The narrator states the outcome is \"faster iteration\" and the toolchain is shown compressing the time from field insight to validated design change."
+      },
+      {
+        "term": "Warranty costs as a % of revenue, warranty ($)(%)",
+        "evidence": "Recurring wear patterns identified via fleet data and addressed through design optimization directly target reduction of field failures and associated warranty exposure."
+      },
+      {
+        "term": "Service / Maintenance (MRO) costs ($)(%)",
+        "evidence": "PTC Orbit highlights that maintenance costs on the E17z fleet are driven by access challenges during lubrication, and the redesign aims to reduce service time vs. benchmark."
+      }
+    ],
+    "source": "claude",
+    "frames_analyzed": 8,
+    "generated_at": "2026-08-18T07:53:51.713074+00:00"
+  }
+}

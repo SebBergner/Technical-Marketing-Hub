@@ -472,6 +472,23 @@ class GraphClient:
         item = self.get_item(drive_id, item_id)
         return (item or {}).get("@microsoft.graph.downloadUrl")
 
+    def download_bytes(self, drive_id: str, item_id: str, max_bytes: int) -> bytes | None:
+        """A small file's content (a Value Roadmap index, ~kB), through its
+        pre-authenticated URL. None when the item is gone; GraphError when it
+        is larger than `max_bytes` or the download fails."""
+        url = self.download_url(drive_id, item_id)
+        if not url:
+            return None
+        # Pre-authenticated: no bearer token, and httpx accepts an absolute URL.
+        response = self._client.get(url, headers={"Accept": "*/*"})
+        if response.status_code == 404:
+            return None
+        if response.status_code >= 400:
+            raise GraphError(f"HTTP {response.status_code} downloading item {item_id}")
+        if len(response.content) > max_bytes:
+            raise GraphError(f"item {item_id} is larger than {max_bytes} bytes")
+        return response.content
+
     def preview(self, drive_id: str, item_id: str) -> str | None:
         """An embeddable viewer URL -- unlike download_url(), this one does not
         force a download.

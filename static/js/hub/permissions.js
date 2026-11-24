@@ -47,6 +47,10 @@ function applyPermissions() {
       ["download", "preview", "create_demo"].forEach(function (p) {
         document.documentElement.classList.toggle("hub-no-" + p, granted.indexOf(p) < 0);
       });
+      // Shown only once granted, so nothing flashes before the answer:
+      // the Value Roadmap filters (2026-11-24, unreviewed AI output).
+      document.documentElement.classList.toggle(
+        "hub-can-view_value_roadmap", granted.indexOf("view_value_roadmap") >= 0);
       return granted;
     })
     .catch(function () { return []; });

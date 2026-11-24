@@ -34,6 +34,9 @@ class AssetQuery:
     segments: list[str] = field(default_factory=list)
     industries: list[str] = field(default_factory=list)
     value_drivers: list[str] = field(default_factory=list)
+    #: The Value Roadmap index's processes and capabilities, by name.
+    processes: list[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
     languages: list[str] = field(default_factory=list)
     content_depths: list[str] = field(default_factory=list)
     #: Which platforms to include: "sharepoint", "consensus".

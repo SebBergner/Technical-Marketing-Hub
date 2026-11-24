@@ -24,6 +24,7 @@ from backend.integrations.graph.client import (
 )
 from backend.models import Asset
 from backend.services import sharepoint_mapping as m
+from backend.services import value_index
 from backend.tables import utcnow
 
 log = logging.getLogger(__name__)
@@ -147,6 +148,10 @@ class SyncResult:
     preview_videos: int = 0
     preview_conflicts: list[str] = field(default_factory=list)
     preview_error: str | None = None
+    #: The demo folders' Value Roadmap index files (services/value_index.py),
+    #: set aside from the resources; then what reading them did.
+    index_files: list[dict] = field(default_factory=list)
+    value_index: dict | None = None
     errors: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
@@ -169,6 +174,7 @@ class SyncResult:
                 "preview_videos": self.preview_videos,
                 "preview_conflicts": self.preview_conflicts,
                 "preview_error": self.preview_error,
+                "value_index": self.value_index,
                 "has_delta_token": bool(self.delta_token),
                 "errors": self.errors,
             },
@@ -357,6 +363,14 @@ def build_assets(items: list[dict]) -> tuple[list[Asset], SyncResult]:
                 skipped[folder]["files"] += 1
             continue
         filename = m.clean_text(item.get("name")) or ""
+        if value_index.is_index_file(filename):
+            # Data for the Hub, not a file for people (value_index_sync).
+            result.index_files.append({
+                "folder": folder, "folder_id": owner.get("source_item_id"),
+                "subfolder": subfolder or None, "name": filename, "item_id": item.get("id"),
+                "etag": item.get("eTag") or item.get("cTag"),
+                "modified_at": item.get("lastModifiedDateTime")})
+            continue
         owner["resources"].append(m.build_resource(filename, subfolder, item))
         result.resources += 1
 
@@ -455,6 +469,11 @@ def sync_catalogue(client: GraphClient, repo, site: SiteRef | None = None,
     result.full_resync = full
 
     repo.replace_source_rows(assets, source_system=SOURCE_SYSTEM)
+    if store_index := getattr(repo, "replace_value_index", None):
+        from backend.integrations.graph import value_index_sync
+        store, result.value_index = value_index_sync.refresh(
+            client, drive.drive_id, result.index_files, assets, repo.value_index_store())
+        store_index(store)
     if keep := getattr(repo, "set_sync_field", None):
         keep(SOURCE_SYSTEM, "health", {"read_at": read_at,
                                        "skipped_folders": result.skipped_folders,

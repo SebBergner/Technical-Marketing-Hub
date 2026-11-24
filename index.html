@@ -278,6 +278,26 @@
           </select>
           <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
         </label>
+        <!-- The Value Roadmap index (2026-11-24): "Preview the Value Roadmap" only;
+             filled from the facets, under More filters. -->
+        <label class="filter-pill hub-roadmap-only">Process:
+          <select id="hubFilterProcess">
+            <option value="">Any</option>
+          </select>
+          <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
+        </label>
+        <label class="filter-pill hub-roadmap-only">Capability:
+          <select id="hubFilterCapability">
+            <option value="">Any</option>
+          </select>
+          <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
+        </label>
+        <label class="filter-pill hub-roadmap-only">Value driver:
+          <select id="hubFilterDriver">
+            <option value="">Any</option>
+          </select>
+          <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-chevron-down"/></svg>
+        </label>
         <button class="hub-reset-cta" id="hubResetBtn" data-action="reset-filters" style="display:none;">Reset filters</button>
       </div>
       <div class="hub-suggest" id="hubSuggest" style="display:none;"></div>
@@ -333,15 +353,17 @@
            rather than inside the Value Roadmap box below. -->
       <div class="vp-desc" id="vpDesc"></div>
 
-      <div class="vp-card">
+      <!-- The Value Roadmap index (2026-11-24): from the demo folder's
+           *.index.json files, for "Preview the Value Roadmap" only; drawn by
+           renderValueIndex() in static/js/hub/detail.js. #vpValueDrivers
+           stays as the card's anchor (ensureDetailLayout, vm.js). -->
+      <div class="vp-card vr-card">
         <div class="vp-card__head">
-          <div class="vp-card__head-title"><svg class="orion-ico"><use href="#i-target"/></svg>Value Roadmap index</div>
-          <button class="vp-reindex"><svg class="orion-ico--sm orion-ico"><use href="#i-clock"/></svg>Re-index</button>
+          <div class="vp-card__head-title"><svg class="orion-ico"><use href="#i-target"/></svg>Value Roadmap</div>
+          <span class="vr-badge" title="Made by AI from the video, and not reviewed by the team yet">AI-generated &middot; not reviewed</span>
         </div>
-        <div class="vp-label">Value Drivers</div>
-        <div class="vp-value-drivers" id="vpValueDrivers"></div>
-        <div class="vp-label">Processes &amp; Capabilities</div>
-        <div id="vpCapabilities"></div>
+        <div class="vp-value-drivers" id="vpValueDrivers" hidden></div>
+        <div id="vpRoadmapBody"></div>
       </div>
     </div>
 

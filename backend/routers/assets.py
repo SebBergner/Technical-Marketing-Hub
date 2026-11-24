@@ -29,7 +29,12 @@ def list_assets(
     stage: list[str] = Query(default=[]),
     segment: list[str] = Query(default=[]),
     industry: list[str] = Query(default=[]),
-    driver: list[str] = Query(default=[]),
+    driver: list[str] = Query(default=[], description="value driver (Preview the Value "
+                              "Roadmap only; ignored otherwise)"),
+    process: list[str] = Query(default=[], description="Value Roadmap process, by name "
+                               "(Preview the Value Roadmap only)"),
+    capability: list[str] = Query(default=[], description="Value Roadmap capability, by "
+                                  "name (Preview the Value Roadmap only)"),
     language: list[str] = Query(default=[]),
     depth: list[str] = Query(default=[]),
     source: list[str] = Query(default=[], description="sharepoint | consensus"),
@@ -73,10 +78,12 @@ def list_assets(
     repo: AssetRepository = Depends(get_repo),
     user: CurrentUser = Depends(get_current_user),
 ):
+    roadmap = user.can(Perm.VIEW_ROADMAP)
     return _with_share_tokens(repo.list(AssetQuery(
         include_archived=archived and user.can(Perm.MAINTAIN),
+        processes=process if roadmap else [], capabilities=capability if roadmap else [],
         text=q, types=type, products=product, funnel_stages=stage, segments=segment,
-        industries=industry, value_drivers=driver, languages=language, content_depths=video_type_filter(depth),
+        industries=industry, value_drivers=driver if roadmap else [], languages=language, content_depths=video_type_filter(depth),
         sources=source, product_families=family,
         umbrella_families=umbrella, tags=tag, published=published,
         customer_facing=customer_facing, has_narrated_audio=has_narrated_audio,
@@ -289,6 +296,9 @@ def get_asset(asset_id: str, repo: AssetRepository = Depends(get_repo),
     # Likewise which of a Consensus demo's values were set on the Hub (2026-11-18).
     if (asset.hub_set or asset.consensus_values) and not user.can(Perm.MAINTAIN):
         asset = asset.model_copy(update={"hub_set": [], "consensus_values": None})
+    # The Value Roadmap index is unreviewed AI output: a test group's (2026-11-24).
+    if asset.value_index is not None and not user.can(Perm.VIEW_ROADMAP):
+        asset = asset.model_copy(update={"value_index": None})
     return asset
 
 

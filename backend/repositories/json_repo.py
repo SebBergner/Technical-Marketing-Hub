@@ -46,6 +46,7 @@ from backend.models import (
     Page, ProposalState, ProposalSummary, RelatedDemo, ValueRoadmap, video_type,
 )
 from backend.repositories.base import AssetQuery, AssetRepository
+from backend.services import value_index
 from backend.services import content_age, listing, relevance, taxonomy, thumbnails
 from backend.tables import utcnow
 
@@ -127,6 +128,10 @@ DIVESTED_SOURCES = ("sharepoint", "demo_video")
 PRIVATE_DIR = "private"
 VM_SECRETS_FILE = "vm_credentials.json"
 PARTNER_ACCESS_FILE = "partner_access.json"
+#: The demo folders' Value Roadmap index files, as the sync last read them
+#: (integrations/graph/value_index_sync.py). Mirror data, but not catalogue
+#: rows, so it lives beside partner_access rather than among the sources.
+VALUE_INDEX_FILE = "value_index.json"
 
 #: The Type filter's own options, in the order Elio's dropdown shows them --
 #: always present in facets().types, even at zero, same reasoning as
@@ -417,6 +422,34 @@ def _upload_people(records) -> dict[str, str]:
     return out
 
 
+def _drivers(record: dict) -> list[str]:
+    """The Value Driver filter's values: the record's own and its index's."""
+    return list(dict.fromkeys([*(record.get("value_drivers") or []),
+                               *(record.get("vi_value_drivers") or [])]))
+
+
+def _with_value_index(rows: list[dict], store: dict) -> list[dict]:
+    """Each demo with its Value Roadmap index (services/value_index.py),
+    keyed by its SharePoint folder: the index itself for its page, and the
+    names its filters and facets count (`vi_processes`, `vi_capabilities`,
+    `vi_value_drivers`). Kept apart from the record's own `value_drivers`, so
+    unreviewed AI output never reaches text search, cards or the search API;
+    the Value Driver filter reads both (`_drivers`)."""
+    grouped = value_index.by_folder(store) if store else {}
+    if not grouped:
+        return rows
+    out = []
+    for r in rows:
+        index = value_index.for_asset(grouped.get(r.get("source_item_id")) or [])
+        if index is None:
+            out.append(r)
+            continue
+        out.append({**r, "value_index": index, "vi_value_drivers": index["value_drivers"],
+                    "vi_processes": index["processes"],
+                    "vi_capabilities": index["capabilities"]})
+    return out
+
+
 class JsonAssetRepository(AssetRepository):
     #: Guards read-modify-write within the process. See the module docstring on
     #: why this is not sufficient across processes.
@@ -493,6 +526,7 @@ class JsonAssetRepository(AssetRepository):
         from backend import access
         paths = [os.path.join(self.mirror_dir, n) for n in names]
         paths.append(os.path.join(self.mirror_dir, PRIVATE_DIR, PARTNER_ACCESS_FILE))
+        paths.append(self._value_index_path())
         paths += [self._owned_path(n) for n in _CATALOGUE_OWNED]
         paths.append(access._owned(access.USERS_FILE))
         return (os.path.abspath(self.dir), _catalogue_generation[0],
@@ -660,7 +694,7 @@ class JsonAssetRepository(AssetRepository):
                      "customer_facing_stated_yes": r.get("customer_facing", True) is not False}
                     if r.get("partner_restricted") or r["id"] in marked else r
                     for r in rows]
-        return rows
+        return _with_value_index(rows, self.value_index_store())
 
     def _load(self, name: str) -> dict[str, dict]:
         return _read(self._owned_path(name), {})
@@ -712,10 +746,13 @@ class JsonAssetRepository(AssetRepository):
                     return False
 
             for field, wanted in (("products", query.products),
-                                  ("value_drivers", query.value_drivers),
+                                  ("vi_processes", query.processes),
+                                  ("vi_capabilities", query.capabilities),
                                   ("tags", query.tags)):
                 if wanted and not (set(record.get(field) or []) & set(wanted)):
                     return False
+            if query.value_drivers and not (set(_drivers(record)) & set(query.value_drivers)):
+                return False
 
             if query.product_families and not (
                     set(taxonomy.families_of(record.get("products")))
@@ -760,7 +797,7 @@ class JsonAssetRepository(AssetRepository):
                 if r["id"] in wanted]
         rows.sort(key=lambda r: wanted[r["id"]])
         stats = self._load("stats")
-        indexed = set(self._load("roadmap"))
+        indexed = self._indexed_ids()
         return [AssetSummary(**self._common(r, stats), has_roadmap=r["id"] in indexed)
                 for r in rows]
 
@@ -772,7 +809,7 @@ class JsonAssetRepository(AssetRepository):
     def list(self, query: AssetQuery) -> Page[AssetSummary]:
         rows = self._rows(query)
         stats = self._load("stats")
-        indexed = set(self._load("roadmap"))
+        indexed = self._indexed_ids()
 
         def recency(record: dict) -> date:
             return _as_date(record.get("uploaded_at")) or date.min
@@ -1119,7 +1156,7 @@ class JsonAssetRepository(AssetRepository):
 
         hits.sort(key=lambda h: h[0], reverse=True)
         window = hits[query.offset: query.offset + query.limit]
-        indexed = set(self._load("roadmap"))
+        indexed = self._indexed_ids()
         return Page[AdvancedSearchHit](
             items=[AdvancedSearchHit(
                        asset=AssetSummary(**self._common(r, stats),
@@ -1177,7 +1214,7 @@ class JsonAssetRepository(AssetRepository):
 
         scored.sort(key=lambda s: s[0], reverse=True)
         found = [r for _, r in scored[:max(0, limit - len(picked))]]
-        indexed = set(self._load("roadmap"))
+        indexed = self._indexed_ids()
         return [RelatedDemo(**self._common(r, stats), has_roadmap=r["id"] in indexed,
                             picked=i < len(picked))
                 for i, r in enumerate(picked + found)]
@@ -1272,7 +1309,8 @@ class JsonAssetRepository(AssetRepository):
 
         data = self._common(record, self._load("stats"))
         data.update(
-            has_roadmap=roadmap is not None,
+            has_roadmap=roadmap is not None or bool(record.get("value_index")),
+            value_index=record.get("value_index"),
             resources=record.get("resources") or [],
             main_video=record.get("main_video"),
             long_description=record.get("long_description"),
@@ -1386,7 +1424,10 @@ class JsonAssetRepository(AssetRepository):
             funnel_stages=scalar("funnel_stage", "funnel_stages"),
             segments=scalar("segment", "segments"),
             industries=scalar("industry", "industries"),
-            value_drivers=multi("value_drivers", "value_drivers"),
+            value_drivers=[FacetValue(value=v, count=n) for v, n in sorted(Counter(
+                d for r in rows_for("value_drivers") for d in _drivers(r)).items())],
+            processes=multi("vi_processes", "processes"),
+            capabilities=multi("vi_capabilities", "capabilities"),
             languages=scalar("language", "languages"),
             content_depths=scalar("content_depth", "content_depths"),
             sources=scalar("source", "sources"),
@@ -1647,6 +1688,27 @@ class JsonAssetRepository(AssetRepository):
             roadmaps = self._load("roadmap")
             roadmaps[asset_id] = roadmap
             self._save("roadmap", roadmaps)
+
+    # ------------------------------------------------- Value Roadmap index
+    def _value_index_path(self) -> str:
+        return os.path.join(self.mirror_dir, PRIVATE_DIR, VALUE_INDEX_FILE)
+
+    def value_index_store(self) -> dict:
+        """The index files as the last sync read them ({"files": {item id:
+        entry}}; services/value_index.py)."""
+        return _read(self._value_index_path(), {}) or {}
+
+    def replace_value_index(self, store: dict) -> None:
+        """Written by the SharePoint sync only, like the rest of the mirror."""
+        path = self._value_index_path()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        _atomic_write(path, store)
+        self._invalidate()
+
+    def _indexed_ids(self) -> set[str]:
+        """Demos with a Value Roadmap: the legacy owned one, or an index."""
+        return set(self._load("roadmap")) | {
+            r["id"] for r in self._shared_catalogue() if r.get("value_index")}
 
     def set_stats(self, asset_id: str, stats: dict) -> None:
         with self._lock:

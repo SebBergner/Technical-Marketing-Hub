@@ -216,41 +216,7 @@ async function openAssetDetail(id, fileItemId, linkToken) {
   settleSectionTabs(asset);
   renderRelated(page, asset);
 
-  var drivers = document.getElementById("vpValueDrivers");
-  if (drivers) {
-    drivers.innerHTML = "";
-    (asset.value_drivers || []).forEach(function (d) {
-      var chip = document.createElement("span");
-      chip.className = "value-driver-chip";
-      chip.textContent = d;
-      drivers.appendChild(chip);
-    });
-    if (!(asset.value_drivers || []).length) {
-      drivers.innerHTML = '<span class="hub-empty">Not indexed yet.</span>';
-    }
-  }
-
-  /* The Value Roadmap is the feature Serge called "very powerful", and
-   * nothing in the catalogue has been indexed -- 0 of 946. A placeholder
-   * rather than a hidden panel, because the panel is the point: Serge should
-   * see where it will be, and that it is empty for a reason rather than
-   * missing. Seb is going to show how AMP does the indexing; when that lands
-   * this branch stops being taken and nothing else changes.
-   */
-  var caps = document.getElementById("vpCapabilities");
-  var indexed = asset.value_roadmap && asset.value_roadmap.capabilities
-                && asset.value_roadmap.capabilities.length;
-  if (caps && !indexed) {
-    caps.innerHTML =
-        '<div class="vr-placeholder">'
-      +   '<svg class="orion-ico"><use href="#i-target"/></svg>'
-      +   '<div><strong>Not indexed yet.</strong>'
-      +     '<div>The Value Roadmap index maps a demo onto the processes and '
-      +     'capabilities it demonstrates. Nothing in the catalogue carries '
-      +     'one yet &mdash; the indexing approach is being reused from AMP.</div>'
-      +   '</div>'
-      + '</div>';
-  }
+  renderValueIndex(page, asset);
 
   /* Velocity is hidden — it cannot act as the person pressing it — and so
    * is our own Share modal. What replaces them are two plain links out to
@@ -1046,7 +1012,6 @@ function previewSiblings(asset, f) {
  * Built once by moving Elio's own elements -- his .vp-player and his
  * Value Roadmap card -- into wrappers, so index.html is untouched and the
  * page is reused for every asset as before. */
-var ROADMAP_SHOWN = false;
 var SECTIONS = [{ key: "files", label: "Files", icon: "i-file-text", pane: "vpPaneFiles" },
                 { key: "roadmap", label: "Value Roadmap", icon: "i-target", pane: "vpPaneRoadmap" }];
 
@@ -1100,6 +1065,156 @@ function ensureDetailLayout(page) {
   if (roadmap) document.getElementById("vpPaneRoadmap").appendChild(roadmap);
 }
 
+/* ── the Value Roadmap tab (2026-11-24) ───────────────────────────────
+ *
+ * What the demo folder's `<video>.index.json` files say (AMP's format,
+ * backend/services/value_index.py): per indexed video, a summary, value
+ * drivers, processes with their capabilities, timestamped scenes -- a
+ * click plays the video from there -- and the business initiatives and
+ * metrics with the evidence quoted from the video. AI output nobody has
+ * reviewed yet: the card says so, and the server sends it only to
+ * "Preview the Value Roadmap".
+ */
+function renderValueIndex(page, asset) {
+  var body = document.getElementById("vpRoadmapBody");
+  if (!body) return;
+  body.innerHTML = "";
+  var videos = (asset.value_index && asset.value_index.videos) || [];
+  if (!videos.length) return;
+
+  var holder = document.createElement("div");
+  if (videos.length > 1) {
+    var pick = document.createElement("label");
+    pick.className = "filter-pill vr-video-pick";
+    pick.appendChild(document.createTextNode("Video: "));
+    var select = document.createElement("select");
+    videos.forEach(function (v, i) {
+      var o = document.createElement("option");
+      o.value = String(i);
+      o.textContent = v.video || v.file || ("Index " + (i + 1));
+      select.appendChild(o);
+    });
+    select.addEventListener("change", function () { draw(Number(select.value)); });
+    pick.appendChild(select);
+    body.appendChild(pick);
+  }
+  body.appendChild(holder);
+
+  function draw(i) {
+    var v = videos[i];
+    holder.innerHTML = videoIndexHtml(v);
+    holder.querySelectorAll("[data-seek]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        seekVideo(page, asset, v.video_item_id, Number(b.dataset.seek));
+      });
+    });
+  }
+  draw(0);
+}
+
+function vrTime(seconds) {
+  var s = Math.max(0, Math.round(seconds || 0));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+function vrChips(names, cls) {
+  return names.map(function (n) {
+    return '<span class="' + (cls || "vr-chip") + '">' + escapeHtml(n) + "</span>";
+  }).join("");
+}
+
+function vrTerms(title, terms) {
+  if (!terms || !terms.length) return "";
+  return '<details class="vr-terms"><summary>' + escapeHtml(title) + " (" + terms.length
+    + ")</summary><ul>" + terms.map(function (t) {
+      return "<li><strong>" + escapeHtml(t.term) + "</strong>"
+        + (t.evidence ? '<div class="vr-evidence">' + escapeHtml(t.evidence) + "</div>" : "")
+        + "</li>";
+    }).join("") + "</ul></details>";
+}
+
+function videoIndexHtml(v) {
+  var html = [];
+  var summary = v.summary || v.description;
+  if (summary) html.push('<p class="vr-summary">' + escapeHtml(summary) + "</p>");
+
+  if ((v.value_drivers || []).length) {
+    html.push('<div class="vp-label">Value drivers</div><div class="vp-value-drivers">'
+              + vrChips(v.value_drivers, "value-driver-chip") + "</div>");
+  }
+
+  var caps = v.capabilities || [];
+  if ((v.processes || []).length || caps.length) {
+    var used = {};
+    var groups = (v.processes || []).map(function (p) {
+      var mine = caps.filter(function (c) { return c.process_id === p.id; });
+      mine.forEach(function (c) { used[c.id] = true; });
+      return '<div class="vr-process"><div class="vr-process__name">' + escapeHtml(p.name)
+        + "</div><div>" + vrChips(mine.map(function (c) { return c.name; })) + "</div></div>";
+    });
+    var rest = caps.filter(function (c) { return !used[c.id]; });
+    if (rest.length) {
+      groups.push('<div class="vr-process"><div class="vr-process__name">Other capabilities</div><div>'
+        + vrChips(rest.map(function (c) { return c.name; })) + "</div></div>");
+    }
+    html.push('<div class="vp-label">Processes &amp; capabilities</div>' + groups.join(""));
+  }
+
+  if ((v.scenes || []).length) {
+    var canSeek = !!v.video_item_id;
+    html.push('<div class="vp-label">Scenes</div><ol class="vr-scenes">'
+      + v.scenes.map(function (sc) {
+        var when = vrTime(sc.start_s) + (sc.end_s != null ? "–" + vrTime(sc.end_s) : "");
+        var time = canSeek
+          ? '<button type="button" class="vr-scene__time" data-seek="' + sc.start_s
+            + '" title="Play from here"><svg class="orion-ico orion-ico--sm"><use href="#i-play"/></svg>'
+            + when + "</button>"
+          : '<span class="vr-scene__time">' + when + "</span>";
+        return '<li class="vr-scene">' + time + '<div class="vr-scene__text">'
+          + escapeHtml(sc.description || "")
+          + '<div class="vr-scene__tags">' + vrChips((sc.tags || []).map(function (t) { return t.name; }))
+          + "</div></div></li>";
+      }).join("") + "</ol>");
+  }
+
+  html.push(vrTerms("Business initiatives", v.initiatives));
+  html.push(vrTerms("Metrics", v.metrics));
+  html.push(vrTerms("Challenges", v.challenges));
+
+  var facts = [];
+  if (v.video) facts.push("Video: " + v.video);
+  if ((v.products || []).length) facts.push("Products seen: " + v.products.join(", "));
+  if (v.confidence) facts.push("Confidence: " + v.confidence);
+  var from = [v.used_audio ? "audio" : null, v.used_visuals ? "visuals" : null].filter(Boolean);
+  if (from.length) facts.push("From " + from.join(" and "));
+  if (v.source || v.model) facts.push("By " + [v.source, v.model].filter(Boolean).join(" / "));
+  if (v.generated_at) facts.push("Indexed " + String(v.generated_at).slice(0, 10));
+  if (v.file) facts.push("File: " + v.file);
+  html.push('<div class="vr-meta">' + facts.map(escapeHtml).join(" · ") + "</div>");
+  return html.join("");
+}
+
+/* Play the scene's video in the header from `seconds`: the one playing if
+ * it is that file, else that file in its place. */
+function seekVideo(page, asset, itemId, seconds) {
+  var player = page.querySelector(".vp-player");
+  if (!player || !itemId) return;
+  var url = filePlayUrl(asset.id, itemId);
+  var media = player.querySelector("video.hub-inline-player__media");
+  if (!media || media.getAttribute("src") !== url) {
+    stopInlinePlayer(player);
+    embedInlinePlayer(player, url, "video");
+    media = player.querySelector("video.hub-inline-player__media");
+  }
+  if (!media) return;
+  var go = function () {
+    try { media.currentTime = seconds; media.play(); } catch (e) { /* not seekable */ }
+  };
+  if (media.readyState >= 1) go();
+  else media.addEventListener("loadedmetadata", go, { once: true });
+  player.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function selectSection(key) {
   var sections = document.getElementById("vpSections");
   if (!sections) return;
@@ -1122,9 +1237,10 @@ function settleSectionTabs(asset) {
   var sections = document.getElementById("vpSections");
   if (!sections) return;
   var hasFiles = !!document.querySelector("#vpPaneFiles .vp-files");
-  // Hidden until the indexing is ready (Seb, 2026-10-28: nothing is
-  // indexed for the first release). Back: asset.type !== "vm".
-  var hasRoadmap = ROADMAP_SHOWN && asset.type !== "vm";
+  // Only where there is an index, and the server sends one only to
+  // "Preview the Value Roadmap" (2026-11-24); hidden for everyone else, as
+  // it has been since Seb's 2026-10-28 release list.
+  var hasRoadmap = !!asset.value_index && asset.type !== "vm";
   var counts = asset.resource_counts || {};
   var fileTotal = Object.keys(counts).reduce(function (n, k) { return n + (counts[k] || 0); }, 0)
                   || (asset.resources || []).length;
@@ -1134,7 +1250,7 @@ function settleSectionTabs(asset) {
       t.querySelector("span").textContent = "Files" + (hasFiles ? " (" + fileTotal + ")" : "");
     } else {
       t.disabled = !hasRoadmap;
-      t.style.display = ROADMAP_SHOWN ? "" : "none";
+      t.style.display = hasRoadmap ? "" : "none";
     }
   });
   sections.style.display = hasFiles || hasRoadmap ? "" : "none";

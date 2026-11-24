@@ -682,6 +682,42 @@ video.hub-inline-player__media { object-fit: contain; }
     margin-bottom:2px; }
   .vr-placeholder svg { flex:0 0 auto; margin-top:1px; }
 
+  /* The Value Roadmap tab (2026-11-24): AI output from the folder's
+     *.index.json, so the badge says it is not reviewed yet. */
+  .vr-badge { font-size:11px; font-weight:600; color:var(--orion-text-3);
+    border:1px solid var(--orion-border-md); border-radius:var(--orion-radius-pill);
+    padding:2px 9px; white-space:nowrap; }
+  .vr-video-pick { margin-bottom:12px; }
+  .vr-summary { margin:0 0 14px; font-size:13px; line-height:1.6; color:var(--orion-text-2); }
+  .vr-card .vp-label { margin-top:14px; }
+  .vr-card .vp-value-drivers { display:flex; flex-wrap:wrap; gap:6px; }
+  .vr-chip { display:inline-block; font-size:12px; padding:3px 10px; margin:0 6px 6px 0;
+    border-radius:var(--orion-radius-pill); background:var(--orion-surface-2, #f3f4f6);
+    border:1px solid var(--orion-border); color:var(--orion-text-2); }
+  .vr-process { display:grid; grid-template-columns:minmax(150px, 220px) 1fr; gap:10px;
+    padding:8px 0; border-bottom:1px solid var(--orion-border); }
+  .vr-process:last-child { border-bottom:none; }
+  .vr-process__name { font-size:12.5px; font-weight:600; color:var(--orion-text); padding-top:3px; }
+  @media (max-width: 700px) { .vr-process { grid-template-columns:1fr; gap:4px; } }
+  .vr-scenes { list-style:none; margin:0; padding:0; }
+  .vr-scene { display:flex; gap:12px; padding:9px 0; border-bottom:1px solid var(--orion-border);
+    font-size:12.5px; line-height:1.55; color:var(--orion-text-2); }
+  .vr-scene:last-child { border-bottom:none; }
+  .vr-scene__time { flex:0 0 auto; display:inline-flex; align-items:center; gap:4px;
+    font-variant-numeric:tabular-nums; font-size:12px; font-weight:600; color:var(--orion-text-3);
+    background:none; border:1px solid var(--orion-border); border-radius:var(--orion-radius-sm);
+    padding:2px 8px; height:fit-content; }
+  button.vr-scene__time { cursor:pointer; color:var(--orion-link); }
+  button.vr-scene__time:hover { border-color:var(--orion-link); }
+  .vr-scene__tags { margin-top:6px; }
+  .vr-terms { margin-top:12px; border:1px solid var(--orion-border);
+    border-radius:var(--orion-radius-sm); padding:8px 12px; }
+  .vr-terms summary { cursor:pointer; font-size:12.5px; font-weight:600; color:var(--orion-text); }
+  .vr-terms ul { margin:8px 0 0; padding-left:18px; }
+  .vr-terms li { margin-bottom:8px; font-size:12.5px; color:var(--orion-text); }
+  .vr-evidence { color:var(--orion-text-3); margin-top:2px; line-height:1.5; }
+  .vr-meta { margin-top:14px; font-size:11.5px; color:var(--orion-text-3); line-height:1.6; }
+
   /* What is in the folder. An asset IS a folder, so this is most of what
      someone wants before opening it. */
   .vp-files__summary { margin-left:auto; font-size:12px; color:var(--orion-text-3);
@@ -1207,6 +1243,8 @@ video.hub-inline-player__media { object-fit: contain; }
 /* ── Controls hidden by permission (html.hub-no-*) (was PERMISSION_CSS in hub-api.js) ── */
 .hub-no-download a[href$='/download']{display:none !important}
 .hub-no-preview a[href$='/preview']{display:none !important}
+/* The Value Roadmap filters: until "Preview the Value Roadmap" is known to be granted. */
+html:not(.hub-can-view_value_roadmap) .hub-roadmap-only{display:none !important}
 
 
 /* ── A demo's page (was DETAIL_CSS in hub-api.js) ── */

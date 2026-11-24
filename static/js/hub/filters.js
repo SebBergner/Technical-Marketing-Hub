@@ -320,7 +320,8 @@ function fillSidebarCounts(facets) {
 var CONTROLS = ["hubSearchInput", "hubFilterType", "hubFilterProduct",
                 "hubFilterSegment", "hubFilterStage", "hubFilterLanguage",
                 "hubFilterCf", "hubFilterVideoType", "hubFilterPublished",
-                "hubFilterArchived"];
+                "hubFilterArchived", "hubFilterProcess", "hubFilterCapability",
+                "hubFilterDriver"];
 var LANDING = ["hubHome"];
 //: Cards per page of a grid; "Load more" fetches the next page. 200 until
 //: 2026-11-04 (the server's ceiling, `le=200` in assets.py): nobody looks
@@ -378,6 +379,9 @@ function currentQuery() {
   if (val("hubFilterStage")) params.append("stage", val("hubFilterStage"));
   if (val("hubFilterLanguage")) params.append("language", val("hubFilterLanguage"));
   if (val("hubFilterPublished")) params.append("published", val("hubFilterPublished"));
+  if (val("hubFilterProcess")) params.append("process", val("hubFilterProcess"));
+  if (val("hubFilterCapability")) params.append("capability", val("hubFilterCapability"));
+  if (val("hubFilterDriver")) params.append("driver", val("hubFilterDriver"));
   if (val("hubFilterArchived")) params.set("archived", "true");
   // Elio's "Video Type", which is `content_depth` under its own name.
   if (val("hubFilterVideoType")) params.append("depth", val("hubFilterVideoType"));
@@ -406,6 +410,37 @@ function effectiveSort() {
  * current filters exclude entirely shows as (0) rather than disappearing:
  * options vanishing as you type is disorienting, and (0) is the honest
  * answer to "what would I get". */
+/* The Value Roadmap filters (2026-11-24): their options ARE the facets --
+ * the index's own names, A-Z with their counts -- so they are rebuilt each
+ * time, keeping the choice. Empty for anyone without "Preview the Value
+ * Roadmap" (the server sends nothing), and hidden for them by CSS. */
+function fillRoadmapFilters(facets) {
+  [["hubFilterProcess", "processes"], ["hubFilterCapability", "capabilities"],
+   ["hubFilterDriver", "value_drivers"]].forEach(function (pair) {
+    var el = document.getElementById(pair[0]);
+    if (!el || !facets) return;
+    var chosen = el.value;
+    var found = false;
+    while (el.options.length > 1) el.remove(1);
+    (facets[pair[1]] || []).slice()
+      .sort(function (a, b) { return a.value.localeCompare(b.value); })
+      .forEach(function (f) {
+        var o = document.createElement("option");
+        o.value = f.value;
+        o.textContent = f.value + " (" + f.count + ")";
+        el.appendChild(o);
+        if (f.value === chosen) found = true;
+      });
+    if (chosen && !found) {
+      var keep = document.createElement("option");
+      keep.value = chosen;
+      keep.textContent = chosen + " (0)";
+      el.appendChild(keep);
+    }
+    el.value = chosen;
+  });
+}
+
 function rescoreSelect(id, facet) {
   var el = document.getElementById(id);
   if (!el || !facet) return;
@@ -721,7 +756,9 @@ function ensureArchivedFilter() {
 var URL_CONTROLS = [["q", "hubSearchInput"], ["type", "hubFilterType"],
                     ["family", "hubFilterProduct"], ["segment", "hubFilterSegment"],
                     ["stage", "hubFilterStage"], ["language", "hubFilterLanguage"],
-                    ["published", "hubFilterPublished"], ["depth", "hubFilterVideoType"]];
+                    ["published", "hubFilterPublished"], ["depth", "hubFilterVideoType"],
+                    ["process", "hubFilterProcess"], ["capability", "hubFilterCapability"],
+                    ["driver", "hubFilterDriver"]];
 
 /* A sidebar click is a place to go Back to; a dropdown or a keystroke is
  * not (Liwei, 2026-11-05: Back after Creo stayed on Creo). exitOverlays()
@@ -770,6 +807,14 @@ function restoreFiltersFromUrl() {
     var value = p.get(pair[0]);
     var el = document.getElementById(pair[1]);
     if (!value || !el) return;
+    // The Value Roadmap filters get their options from the facets, which
+    // may not be in yet: give the linked value one to land on.
+    if (/^hubFilter(Process|Capability|Driver)$/.test(pair[1])
+        && !Array.prototype.some.call(el.options, function (o) { return o.value === value; })) {
+      var o = document.createElement("option");
+      o.value = o.textContent = value;
+      el.appendChild(o);
+    }
     el.value = value;
     // A select keeps its old value for an option it does not have.
     if (el.value === value) any = true;
@@ -834,6 +879,7 @@ async function applyFilters() {
       rescoreSelect("hubFilterVideoType", baselineFacets.content_depths);
       rescoreSelect("hubFilterLanguage", baselineFacets.languages);
       fillPublished(baselineFacets.published);
+      fillRoadmapFilters(baselineFacets);
       fillSidebarCounts(baselineFacets);
     }
     loadMoreState = null;
@@ -904,6 +950,7 @@ async function applyFilters() {
   rescoreSelect("hubFilterVideoType", facets.content_depths);
   rescoreSelect("hubFilterLanguage", facets.languages);
   fillPublished(facets.published);
+  fillRoadmapFilters(facets);
   // The sidebar shows the same three dimensions, so it takes the same
   // numbers. Leaving it on whole-catalogue counts would reintroduce, one
   // panel over, exactly the contradiction this is meant to remove.
@@ -1091,7 +1138,8 @@ function takeOverControls() {
  *
  * Elio's controls are moved, not rebuilt, so his markup and the existing
  * filter wiring (takeOverControls) are untouched. */
-var MORE_FILTERS = ["hubFilterStage", "hubFilterLanguage", "hubFilterCf"];
+var MORE_FILTERS = ["hubFilterStage", "hubFilterLanguage", "hubFilterCf",
+                    "hubFilterProcess", "hubFilterCapability", "hubFilterDriver"];
 
 //: Chip label per control. Values come from the option the person sees,
 //: minus its count: "Windchill (156)" -> "Windchill".
@@ -1100,7 +1148,8 @@ var CHIP_LABELS = [
   ["hubFilterProduct", "Product"], ["hubFilterSegment", "Segment"],
   ["hubFilterStage", "Stage"], ["hubFilterLanguage", "Language"],
   ["hubFilterCf", "Customer-facing"], ["hubFilterPublished", "Published"],
-  ["hubFilterArchived", "Archived"]
+  ["hubFilterArchived", "Archived"], ["hubFilterProcess", "Process"],
+  ["hubFilterCapability", "Capability"], ["hubFilterDriver", "Value driver"]
 ];
 
 function wireFilterBar() {

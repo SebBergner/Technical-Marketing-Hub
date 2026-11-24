@@ -79,6 +79,7 @@ class Perm(str, Enum):
     MANAGE_HOME = "manage_home"
     VIEW_GXC = "view_gxc"
     VIEW_REPORTS = "view_reports"
+    VIEW_ROADMAP = "view_value_roadmap"
     RUN_SYNC = "run_sync"
     VIEW_ADMIN = "view_admin"
     MANAGE_USERS = "manage_users"
@@ -99,6 +100,10 @@ CATALOGUE: list[tuple[str, list[tuple[Perm, str, str]]]] = [
          "when Admin -> GXC videos switches that on. Without it they are never listed "
          "or found; a PTC person opens one only through a personal link somebody shared, "
          "and the Hub records who passed it on. Never given to partner (guest) accounts."),
+        (Perm.VIEW_ROADMAP, "Preview the Value Roadmap",
+         "See a demo's Value Roadmap index -- processes, capabilities, value drivers, "
+         "scenes -- and filter by them. AI-generated and not reviewed yet (2026-11-24), "
+         "so for a test group first. Never given to partner (guest) accounts."),
         (Perm.VIEW_REPORTS, "View Hub activity",
          "See the Hub activity page: the most used content, the most active PTC "
          "people and team totals. Never partners' names."),

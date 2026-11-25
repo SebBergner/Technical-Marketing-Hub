@@ -26,8 +26,10 @@ var CHECKS = [
    "Upload the files, or archive the demo. Demos known only from a SharePoint page, and "
    + "virtual machines, are not counted."],
   ["no_product", "No product",
-   "Not under any product in the navigation, and never among related demos by product.",
-   "Fill in Product in SharePoint (or Edit metadata on the demo's page)."],
+   "Not under any product in the navigation, and never among related demos by product. "
+   + "GXC videos are not counted: IoT and AR videos keep Product empty on purpose.",
+   "Use Fix products above, or fill in Product in SharePoint (or Edit metadata on the "
+   + "demo's page)."],
   ["no_segment", "No segment",
    "Not under any segment, with no related demos by segment, and its feedback reaches no "
    + "segment owner. CAD datasets have no Segment column and are not counted.",

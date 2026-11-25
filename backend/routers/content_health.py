@@ -114,7 +114,11 @@ def checks(repo: AssetRepository = Depends(get_repo)):
         library = _library(r.get("id") or "")
         if not r.get("resource_count") and r.get("type") != "vm"                 and library != "Demo page":
             empty.append(_row(r))
-        if not r.get("products"):
+        # GXC videos are not asked for one (Liwei, 2026-11-25): the IoT/AR rows
+        # keep Product empty on purpose (2026-11-02), and they made
+        # production's count 335 where 87 could be fixed.
+        if not r.get("products") and not r.get("gxc") \
+                and not (r.get("id") or "").startswith("gxc-"):
             no_product.append(_row(r))
         # A CAD dataset has no Segment column (sync.py), so it is never asked for one.
         if not r.get("segment") and r.get("type") != "cad_model":

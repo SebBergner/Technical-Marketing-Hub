@@ -40,6 +40,9 @@ def client(tmp_path, monkeypatch):
         {"id": "cad", "type": "cad_model", "title": "Bracket", "products": ["Creo Parametric"],
          "segment": None, "resource_count": 1,
          "resources": [_res("a.zip", "One"), _res("a.rar", "Two")]},
+        # An IoT/AR GXC video keeps Product empty on purpose: not a "No product".
+        {"id": "gxc-iot", "type": "video", "title": "IoT thing", "products": [],
+         "segment": None, "resource_count": 1, "gxc": True, "resources": [_res("a.mp4")]},
     ]
     for r in rows:
         r["source"] = "sharepoint"
@@ -54,7 +57,8 @@ def client(tmp_path, monkeypatch):
     # Under a filter: counted, never as finding little (Bobcat, 2026-11-12).
     repo.record_usage_event("search", q="Full Kit", results=0, filters={"type": ["vm"]},
                             user="p@ptc.com")
-    access.create_group("Keepers", "", ["view_hub", "maintain_content"], ["keeper@ptc.com"], "t")
+    access.create_group("Keepers", "", ["view_hub", "maintain_content", "view_gxc"],
+                        ["keeper@ptc.com"], "t")
     access.create_group("Viewers", "", ["view_hub", "view_admin"], ["viewer@ptc.com"], "t")
     return TestClient(app, base_url="http://localhost")
 
@@ -72,7 +76,8 @@ def test_the_checks(client):
     assert [r["asset_id"] for r in d["empty"]] == ["empty"], "a page-only demo has no folder"
     assert d["empty"][0]["library"] == "Demo Catalog"
     assert [r["asset_id"] for r in d["no_product"]] == ["empty"]
-    assert [r["asset_id"] for r in d["no_segment"]] == ["empty"], "a CAD dataset has no Segment"
+    assert [r["asset_id"] for r in d["no_segment"]] == ["empty", "gxc-iot"], \
+        "a CAD dataset has no Segment"
     archives = d["same_name_archives"]
     assert [(r["asset_id"], r["files"]) for r in archives] == [("full", ["foot bath.rar/.zip"])]
     assert archives[0]["owner"] == "Ann Lee"

@@ -421,3 +421,56 @@ def test_one_left_from_before_can_be_cancelled_by_a_reviewer(client, sp):
     assert done["status"] == "cancelled"
     waiting = client.get("/api/uploads?status=pending,sent_back", headers=BOSS).json()
     assert waiting == [], "nothing left: the Admin card goes"
+
+
+# ───────────────────────────── several at once (bulk, 2026-11-25)
+VIDEO = {k: v for k, v in KIT.items() if k not in ("language", "owned_by")}
+VIDEO.update(video_type="Technical Overview", video_subtype="Feature")
+
+
+def item(title, file=None, **values):
+    return {"target": "demo_video", "kind": "video", "values": {**VIDEO, "title": title, **values},
+            "files": [{"path": file or f"{title}.mp4", "size": 10}]}
+
+
+def test_a_batch_is_checked_row_by_row_and_nothing_is_created(client, sp):
+    r = client.post("/api/uploads/check", headers=MAKER, json={"items": [
+        item("AI Portfolio Clip - Windchill - AI Assistant"),
+        item("Existing Kit"),
+        item("Bad: title"),
+        item("No description", description=""),
+        item("Pigeons", products=["Pigeon CAD"]),
+    ]})
+    assert r.status_code == 200, r.text
+    rows = r.json()["items"]
+    assert r.json()["ok"] is False
+    assert rows[0] == {"ok": True, "problems": [],
+                       "folder_name": "AI Portfolio Clip - Windchill - AI Assistant"}
+    assert "already exists" in rows[1]["problems"][0]
+    assert "Title cannot contain" in rows[2]["problems"][0]
+    assert "Description is required" in rows[3]["problems"][0]
+    assert "Pigeon CAD" in rows[4]["problems"][0]
+    assert sp.created == [] and sp.sessions == [], "a check creates nothing"
+
+
+def test_two_rows_with_the_same_folder_are_both_refused(client, sp):
+    r = client.post("/api/uploads/check", headers=MAKER, json={"items": [
+        item("Creo AI Render", "a.mp4"), item("Creo  AI Render", "b.mp4"), item("Other")]})
+    rows = r.json()["items"]
+    assert [x["ok"] for x in rows] == [False, False, True]
+    assert "row 2" in rows[0]["problems"][0] and "row 1" in rows[1]["problems"][0]
+
+
+def test_a_clean_batch_passes_and_each_row_is_then_created_as_usual(client, sp):
+    batch = [item("Clip one"), item("Clip two")]
+    r = client.post("/api/uploads/check", headers=MAKER, json={"items": batch})
+    assert r.json()["ok"] is True
+    for b in batch:
+        assert client.post("/api/uploads", json=b, headers=MAKER).status_code == 201
+    assert [n for _, n in sp.created] == ["Clip one", "Clip two"]
+
+
+def test_checking_a_batch_needs_upload_permission(client, sp):
+    assert client.post("/api/uploads/check", headers=ANN,
+                       json={"items": [item("x")]}).status_code == 403
+    assert client.post("/api/uploads/check", headers=MAKER, json={"items": []}).status_code == 422

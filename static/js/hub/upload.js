@@ -20,14 +20,17 @@ import { report } from "./util.js";
 import { hubPermissions } from "./permissions.js";
 import { closeActivity } from "./activity.js";
 import { closeAdvancedSearch } from "./search.js";
+import { drawBulk, BULK_STEPS } from "./bulk.js";
 
 //: 32 x 320 KiB: Graph wants chunks in multiples of 320 KiB, under 60 MiB.
 var CHUNK = 32 * 320 * 1024;
 var STATUS_WORD = { uploading: "Uploading", pending: "Waiting (from before review was removed)",
                     sent_back: "Sent back", published: "Published", cancelled: "Cancelled" };
 
+/* `bulk`: several videos at once, one demo each (bulk.js, 2026-11-25). */
 var up = { platforms: null, targets: null, platform: null, target: null, kind: null,
-           values: {}, internal: false, files: [], preview: null, busy: false, step: 1 };
+           values: {}, internal: false, files: [], preview: null, busy: false, step: 1,
+           bulk: null };
 var VIDEO_EXT = ["mp4", "mov", "m4v", "webm", "wmv", "avi", "mkv"];
 
 function isVideo(path) {
@@ -243,7 +246,7 @@ function button(text, primary) {
 /* ── the wizard ───────────────────────────────────────────────────────── */
 function steps(box) {
   var strip = el("ol", "hub-up__steps");
-  ["Destination", "Metadata", "Files", "Create"].forEach(function (s, i) {
+  (up.bulk ? BULK_STEPS : ["Destination", "Metadata", "Files", "Create"]).forEach(function (s, i) {
     var li = el("li", i + 1 === up.step ? "on" : (i + 1 < up.step ? "done" : ""), s);
     strip.appendChild(li);
   });
@@ -253,9 +256,11 @@ function steps(box) {
 function drawWizard() {
   var box = document.getElementById("hubUpWizard");
   box.innerHTML = "";
-  box.appendChild(el("h3", "hub-up__h", "New demo"));
+  box.appendChild(el("h3", "hub-up__h", up.bulk && up.step > 1 ? "New demos, several at once"
+                                                                : "New demo"));
   steps(box);
   if (up.step === 1) stepWhere(box);
+  else if (up.bulk) drawBulk(box);
   else if (up.step === 2) stepMetadata(box);
   else if (up.step === 3) stepFiles(box);
   else stepUpload(box);
@@ -287,7 +292,7 @@ function stepWhere(box) {
       card.type = "button";
       card.disabled = !!t.unavailable;
       if (t.unavailable) card.title = t.unavailable;
-      var on = up.target && up.target.key === t.key && up.kind === k.key;
+      var on = up.target && up.target.key === t.key && up.kind === k.key && !up.bulk;
       if (on) card.classList.add("on");
       card.appendChild(el("b", null, k.label));
       card.appendChild(el("span", null, t.single_video
@@ -297,10 +302,30 @@ function stepWhere(box) {
         if (!up.target || up.target.key !== t.key) { up.values = {}; up.files = []; }
         up.target = t;
         up.kind = k.key;
+        up.bulk = null;
         up.step = 2;
         drawWizard();
       });
       grid.appendChild(card);
+      // Several videos at once, one demo each (Seb's 34 clips, 2026-11-25).
+      if (!t.single_video) return;
+      var many = el("button", "hub-up__choice");
+      many.type = "button";
+      many.disabled = !!t.unavailable;
+      if (up.target && up.target.key === t.key && up.kind === k.key && up.bulk) {
+        many.classList.add("on");
+      }
+      many.appendChild(el("b", null, k.label + "s, several at once"));
+      many.appendChild(el("span", null, "Many video files, one demo each. Shared values "
+        + "filled once; details per video or from a sheet."));
+      many.addEventListener("click", function () {
+        if (!up.bulk || up.target !== t) up.bulk = { shared: {}, internal: false, rows: [] };
+        up.target = t;
+        up.kind = k.key;
+        up.step = 2;
+        drawWizard();
+      });
+      grid.appendChild(many);
     });
   });
   box.appendChild(grid);
@@ -777,7 +802,7 @@ function stepUpload(box) {
     }).then(function (record) {
       up = { platforms: up.platforms, targets: up.targets, platform: null, target: null,
              kind: null, values: {}, internal: false, files: [], preview: null, busy: false,
-             step: 1 };
+             step: 1, bulk: null };
       var done = document.getElementById("hubUpWizard");
       done.innerHTML = "";
       var live = record.status === "published";
@@ -809,10 +834,13 @@ function stepUpload(box) {
 /* ── sending ──────────────────────────────────────────────────────────── */
 function warnLeaving(e) { e.preventDefault(); e.returnValue = ""; return ""; }
 
-/* Every file not yet confirmed, one after another, then Finish. */
-function sendAll(record, picked, progress) {
-  up.busy = true;
-  window.addEventListener("beforeunload", warnLeaving);
+/* Every file not yet confirmed, one after another, then Finish. `quiet`:
+   the caller (bulk) keeps the busy flag and the leaving warning itself. */
+function sendAll(record, picked, progress, quiet) {
+  if (!quiet) {
+    up.busy = true;
+    window.addEventListener("beforeunload", warnLeaving);
+  }
   var rows = record.files.map(function (f) {
     var row = el("div", "hub-up__prow");
     row.appendChild(el("span", "hub-up__path", f.path));
@@ -838,11 +866,13 @@ function sendAll(record, picked, progress) {
   return chain.then(function () {
     return api("POST", "/api/uploads/" + record.id + "/finish");
   }).then(function (done) {
-    window.removeEventListener("beforeunload", warnLeaving);
-    up.busy = false;
+    if (!quiet) {
+      window.removeEventListener("beforeunload", warnLeaving);
+      up.busy = false;
+    }
     return done;
   }, function (err) {
-    window.removeEventListener("beforeunload", warnLeaving);
+    if (!quiet) window.removeEventListener("beforeunload", warnLeaving);
     err.partial = true;
     throw err;
   });
@@ -997,3 +1027,6 @@ function markNav(on) {
 }
 
 export { addUploadNav, closeUpload, openUpload, renderMyDemos };
+// For bulk.js.
+export { api, button, drawWizard, el, isVideo, loadMine, metadataForm, requiredNow, sendAll,
+         size, up, walkDrop, warnLeaving };

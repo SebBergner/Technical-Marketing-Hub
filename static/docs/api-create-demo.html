@@ -89,6 +89,12 @@ each stands (<code>uploading</code>, <code>published</code>; an upload from befo
 <tr><td>—</td><td><code>POST /api/uploads/{id}/resubmit</code></td><td>For one sent back
 before 2026-10-28: <code>{"values": {...}}</code> with the metadata corrected (the title
 stays); it is then published.</td></tr>
+<tr><td>—</td><td><code>POST /api/uploads/check</code></td><td>Several demos at once,
+checked before any is created: <code>{"items": [ ... ]}</code>, each item the body of step 2
+(at most 200). Nothing is created. The answer gives each item's <code>problems</code> (empty
+when it can be created) and the <code>folder_name</code> it would get; two items that would get
+the same folder are both refused. Then create them one by one with steps 2–6, as the page's
+"several at once" mode does.</td></tr>
 </table>
 
 <h3>Where the demo is</h3>

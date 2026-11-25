@@ -3,6 +3,8 @@
 The flow, as the upload page drives it:
 
     GET  /api/uploads/targets          where uploads may go, and each one's form
+    POST /api/uploads/check            several at once (bulk): each checked as
+                                       below, nothing created
     POST /api/uploads                  metadata + file list; checked, then the
                                        new folder is created in SharePoint
     POST /api/uploads/{id}/files/{n}/session   a pre-authorised URL the browser
@@ -169,13 +171,12 @@ class UploadIn(BaseModel):
     submitted_by: str | None = None
 
 
-@router.post("", status_code=201)
-def start(body: UploadIn, repo: AssetRepository = Depends(get_repo),
-          actor: str = Depends(UPLOAD), user: CurrentUser = Depends(get_current_user)):
+def _prepare(client, body: UploadIn, user: CurrentUser):
+    """Everything start() checks before it creates a folder, shared with
+    check(): (spec, kind, target, values, files, preview, folder name).
+    Raises HTTPException -- 422 for what is wrong, 409 for a name taken."""
     from backend.integrations.graph import upload_writer as uw
     from backend.integrations.graph.migration_writer import safe_folder_name
-    submitted_by = _submitted_by(body.submitted_by, user)
-    client = _client()
     from backend.services import taxonomy
     divested = [p for p in (body.values.get("products") or [])
                 if isinstance(p, str) and taxonomy.is_excluded([p])]
@@ -208,6 +209,61 @@ def start(body: UploadIn, repo: AssetRepository = Depends(get_repo),
         if uw.name_taken(client, target, name):
             raise HTTPException(status_code=409, detail=f'"{name}" already exists in '
                                 f"{spec.library}. Choose another title.")
+    except GraphError as exc:
+        raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
+    return spec, kind, target, values, files, preview, name
+
+
+class BatchIn(BaseModel):
+    """Several demos at once (Seb's 34 AI Portfolio clips, 2026-11-25): the
+    page checks them all before the first is created."""
+    items: list[UploadIn]
+
+
+#: More than this in one check is a mistake, not a batch.
+BATCH_MAX = 200
+
+
+@router.post("/check")
+def check(body: BatchIn, actor: str = Depends(UPLOAD),
+          user: CurrentUser = Depends(get_current_user)):
+    """Checks a batch of uploads exactly as start() would, creating nothing:
+    each item's problems (an empty list when it can be created) and the
+    folder name it would get. Two items of the batch that would get the same
+    folder are both refused -- the second would fail half-way otherwise."""
+    if not body.items:
+        raise HTTPException(status_code=422, detail="Nothing to check.")
+    if len(body.items) > BATCH_MAX:
+        raise HTTPException(status_code=422, detail=f"At most {BATCH_MAX} at once.")
+    client = _client()
+    out, by_name = [], {}
+    for i, item in enumerate(body.items):
+        try:
+            *_, name = _prepare(client, item, user)
+            out.append({"ok": True, "problems": [], "folder_name": name})
+            by_name.setdefault((item.target, name.lower()), []).append(i)
+        except HTTPException as exc:
+            if exc.status_code == 502:
+                raise
+            out.append({"ok": False, "problems": [str(exc.detail)], "folder_name": None})
+    for rows in by_name.values():
+        if len(rows) > 1:
+            for i in rows:
+                others = ", ".join(str(j + 1) for j in rows if j != i)
+                out[i]["ok"] = False
+                out[i]["problems"].append(f'Same title as row {others}: "{out[i]["folder_name"]}" '
+                                          "can be created only once.")
+    return {"ok": all(r["ok"] for r in out), "items": out}
+
+
+@router.post("", status_code=201)
+def start(body: UploadIn, repo: AssetRepository = Depends(get_repo),
+          actor: str = Depends(UPLOAD), user: CurrentUser = Depends(get_current_user)):
+    from backend.integrations.graph import upload_writer as uw
+    submitted_by = _submitted_by(body.submitted_by, user)
+    client = _client()
+    spec, kind, target, values, files, preview, name = _prepare(client, body, user)
+    try:
         folder = uw.create_folder(client, target, name)
     except GraphError as exc:
         raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")

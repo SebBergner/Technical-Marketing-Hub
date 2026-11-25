@@ -260,6 +260,8 @@ a:hover { text-decoration: underline; }
 }
 .filter-pill select:focus { outline: none; }.hub-noresults { display: none; padding: 30px 10px; text-align: center; color: var(--orion-text-3); font-size: 13.5px; }
 .hub-noresults.show { display: block; }
+.hub-searched-as { margin: 10px 2px 0; font-size: 13px; color: var(--orion-text-2); }
+.hub-searched-as[hidden] { display: none; }
 .hub-reset-cta { font-size: 13px; font-weight: 700; color: var(--orion-indigo); cursor: pointer; background: none; border: none; padding: 6px 2px; white-space: nowrap; }
 .hub-reset-cta:hover { text-decoration: underline; }
 

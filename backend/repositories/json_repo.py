@@ -712,9 +712,30 @@ class JsonAssetRepository(AssetRepository):
 
     # ------------------------------------------------------------------- read
     def _rows(self, query: AssetQuery) -> list[dict]:
+        return self._search(query)[0]
+
+    def _search(self, query: AssetQuery) -> tuple[list[dict], "relevance.Rewrite | None"]:
+        """The demos a query finds, and the rewrite used when the search as
+        typed found nothing (relevance.rescue, search round 2, 2026-11-25).
+
+        A search that finds anything is answered exactly as typed. Only an
+        empty one -- filters included -- is tried again in other words, and
+        the caller says so on the page. Lists, counts, facets and the search
+        API all come through here, so they cannot disagree."""
+        tolerance = self._tolerance() if query.text else None
+        rows = self._filter(query, tolerance)
+        if rows or not query.text:
+            return rows, None
+        rewrite = relevance.rescue(query.text, tolerance)
+        if rewrite is None:
+            return rows, None
+        rows = self._filter(replace(query, text=rewrite.text), rewrite.tolerance, rewrite)
+        return rows, (rewrite if rows else None)
+
+    def _filter(self, query: AssetQuery, tolerance: "relevance.Tolerance | None",
+                rewrite: "relevance.Rewrite | None" = None) -> list[dict]:
         curation = self._load("curation")
         rows = self._load_mirror()
-        tolerance = self._tolerance() if query.text else None
 
         def keep(record: dict) -> bool:
             # Reachable by id, never met while browsing -- listing.py says why.
@@ -733,6 +754,9 @@ class JsonAssetRepository(AssetRepository):
             if query.text and not relevance.matches(
                     query.text, record.get("title"), _searchable(record),
                     tolerance=tolerance):
+                return False
+            if rewrite is not None and not rewrite.holds(record.get("title"),
+                                                          _searchable(record)):
                 return False
 
             for field, wanted in (("type", query.types),
@@ -807,7 +831,7 @@ class JsonAssetRepository(AssetRepository):
         return len(self._rows(query))
 
     def list(self, query: AssetQuery) -> Page[AssetSummary]:
-        rows = self._rows(query)
+        rows, rewrite = self._search(query)
         stats = self._load("stats")
         indexed = self._indexed_ids()
 
@@ -821,8 +845,9 @@ class JsonAssetRepository(AssetRepository):
             rows.sort(key=lambda r: (recency(r) == date.min, recency(r)))
         elif query.sort == "relevance" and query.text:
             # Band first, then newest first (relevance.order_key, 2026-09-30).
-            tolerance = self._tolerance()
-            rows.sort(key=lambda r: relevance.order_key(query.text, r.get("title"),
+            text = rewrite.text if rewrite else query.text
+            tolerance = rewrite.tolerance if rewrite else self._tolerance()
+            rows.sort(key=lambda r: relevance.order_key(text, r.get("title"),
                                                         _searchable(r), recency(r),
                                                         tolerance),
                       reverse=True)
@@ -834,6 +859,7 @@ class JsonAssetRepository(AssetRepository):
             items=[AssetSummary(**self._common(r, stats),
                                 has_roadmap=r["id"] in indexed) for r in window],
             total=len(rows), limit=query.limit, offset=query.offset,
+            searched_as=rewrite.text if rewrite else None,
         )
 
     # ─────────────────────────────────────────── partner access

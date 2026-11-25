@@ -930,6 +930,7 @@ async function applyFilters() {
 
   var count = document.getElementById("allAssetsCount");
   if (count) count.textContent = formatAssetCount(page.items.length, page.total);
+  showSearchedAs(page.searched_as);
 
   // The next page repeats this exact question with a moving offset, so what
   // is saved is the query BEFORE limit/sort were added to it, not
@@ -980,6 +981,27 @@ async function applyFilters() {
     (filters[k] = filters[k] || []).push(v);
   });
   noteSearch(val("hubSearchInput"), page.total, filters);
+}
+
+/* The search as typed found nothing and the Hub searched other words
+ * ("Creo13" -> "creo 13", relevance.rescue, 2026-11-25): say so, as web
+ * search does, so nobody wonders why the results do not say "Creo13". */
+function showSearchedAs(searchedAs) {
+  var host = document.getElementById("hubSearchedAs");
+  if (!host) {
+    var anchor = document.getElementById("hubNoResults");
+    if (!anchor) return;
+    host = document.createElement("div");
+    host.id = "hubSearchedAs";
+    host.className = "hub-searched-as";
+    host.setAttribute("role", "status");
+    anchor.parentNode.insertBefore(host, anchor);
+  }
+  var typed = (val("hubSearchInput") || "").trim();
+  if (!searchedAs || !typed) { host.hidden = true; host.textContent = ""; return; }
+  host.textContent = "No results for “" + typed + "”. Showing results for “"
+    + searchedAs + "”.";
+  host.hidden = false;
 }
 
 /* What somebody searched for, once they have stopped typing.

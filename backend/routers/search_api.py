@@ -74,6 +74,10 @@ class SearchResponse(BaseModel):
     limit: int
     offset: int
     items: list[SearchHit]
+    #: Set when `q` as given found nothing and the Hub searched these words
+    #: instead ("creo13" -> "creo 13"), as its own search page does
+    #: (2026-11-25). Absent otherwise.
+    searched_as: str | None = None
 
 
 def _require_view_hub(user: CurrentUser = Depends(require_authenticated)) -> CurrentUser:
@@ -143,4 +147,4 @@ def search(
             files_available=any(f.preview_url or f.download_url for f in files),
             files=files))
     return SearchResponse(query=q, total=page.total, limit=page.limit,
-                          offset=page.offset, items=items)
+                          offset=page.offset, items=items, searched_as=page.searched_as)

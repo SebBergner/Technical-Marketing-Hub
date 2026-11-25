@@ -399,6 +399,163 @@ _ADVANCED_BAND = {EXACT_TITLE: 5, TITLE_PREFIX: 4, TITLE_WORD: 4,
 FILE_NAME_BAND = 2
 
 
+# ─────────────────────────────────────── rescue: a search that found nothing
+#
+# Search round 2 (Liwei, 2026-11-25). Of the 323 different searches people made
+# on production (Content health -> Searches, to 2026-11-25), 67 find nothing
+# in today's catalogue. Some are real gaps (Deere, Waypoint), but several are
+# the same words written differently: "Creo13" and "Creo7" for Creo 13 and
+# Creo 7, "service max" for ServiceMax, "Part man" for Part management,
+# "Technical OverviewLambo" with a space missed.
+#
+# What search products do about it, and what is taken from each:
+#   * Algolia ("splitting and concatenation"): joins adjacent query words and
+#     splits a long one, and uses a split only when both halves are words of
+#     the index -- never an invented word.
+#   * Meilisearch ("concatenated and split queries"): the parts of a split
+#     word must stand next to each other in the record, and such a match
+#     ranks below an exact one.
+#   * Elasticsearch (word_delimiter_graph, split_on_numerics): a letter-digit
+#     boundary is a word boundary, "j2se" -> "j 2 se".
+#
+# And one rule of our own, for precision (Liwei's question: does "service max"
+# start finding unrelated things?): **none of this runs while the search, as
+# typed, finds anything.** A search with results is answered exactly as
+# before. Only a search that would show an empty page is tried again,
+# rewritten, and the page says what it searched for instead ("Showing
+# results for creo 13"), the way web search engines say it.
+
+#: "creo13" / "13creo": letters then digits, or digits then letters. At least
+#: two letters, so a part number like "844J" is left alone.
+_LETTERS_DIGITS = re.compile(r"^([^\W\d_]{2,})(\d+)$|^(\d+)([^\W\d_]{2,})$", re.UNICODE)
+#: A word this long may be two catalogue words run together ("overviewlambo").
+SPLIT_MIN = 6
+#: Neither half of such a split may be shorter than this.
+SPLIT_PART_MIN = 3
+#: The last word of a several-word search, this short, may be a word still
+#: being typed ("Part man", "Life Sc") -- but only right after the word before
+#: it, so "man" cannot reach "manufacturing" somewhere else in the text.
+PREFIX_LAST_MIN = 2
+
+
+class Rewrite:
+    """A search tried again in other words (rescue)."""
+
+    def __init__(self, text: str, phrases: tuple = (), tolerance: "Tolerance | None" = None):
+        #: The query as searched, shown to the person.
+        self.text = text
+        #: Patterns every hit must also hold, in its title or description.
+        self.phrases = phrases
+        #: The tolerance to match with (a word still being typed adds its
+        #: completions).
+        self.tolerance = tolerance
+
+    def holds(self, title: str | None, description: str | None) -> bool:
+        if not self.phrases:
+            return True
+        text = f"{_normal(title)} {_normal(description)}"
+        return all(p.search(text) for p in self.phrases)
+
+
+class _PrefixLast(Tolerance):
+    """A Tolerance in which one short word also stands for every catalogue
+    word it begins."""
+
+    def __init__(self, base: Tolerance, term: str, completions: frozenset):
+        self.words = base.words
+        self._close = dict(base._close)
+        self._close[term] = completions | base.close_words(term)
+
+
+def _two_words(word: str, tolerance: Tolerance) -> tuple[str, str] | None:
+    """A long unknown word as two catalogue words run together, the split
+    with the longer shorter half winning ("overviewlambo" -> overview, lambo).
+    The second half may be the start of a catalogue word ("lambo")."""
+    if len(word) < SPLIT_MIN or _CJK.search(word):
+        return None
+    best = None
+    for i in range(SPLIT_PART_MIN, len(word) - SPLIT_PART_MIN + 1):
+        left, right = word[:i], word[i:]
+        if left not in tolerance.words:
+            continue
+        if right not in tolerance.words and not tolerance.close_words(right):
+            continue
+        rank = (min(len(left), len(right)), len(left))
+        if best is None or rank > best[0]:
+            best = (rank, (left, right))
+    return best[1] if best else None
+
+
+def rescue(text: str | None, tolerance: "Tolerance | None") -> Rewrite | None:
+    """The search in other words, or None when there is nothing to try.
+
+    Call it only when the search as typed found nothing (see above). Each
+    step uses words the catalogue really has:
+
+    1. two neighbouring words that are one catalogue word: "service max" ->
+       "servicemax", "med tech" -> "medtech";
+    2. a word that is letters and digits run together: "creo13" ->
+       "creo 13", the two next to each other in the record;
+    3. a long word that is two catalogue words run together:
+       "overviewlambo" -> "overview lambo";
+    4. a short last word of a longer search, as the start of a word that
+       follows the one before it: "part man" -> "part management".
+    """
+    words = terms(text)
+    if not words or tolerance is None:
+        return None
+    vocabulary = tolerance.words
+    changed = False
+
+    joined: list[str] = []
+    i = 0
+    while i < len(words):
+        if i + 1 < len(words) and words[i] + words[i + 1] in vocabulary:
+            joined.append(words[i] + words[i + 1])
+            i += 2
+            changed = True
+        else:
+            joined.append(words[i])
+            i += 1
+
+    final: list[str] = []
+    phrases: list[re.Pattern] = []
+    for word in joined:
+        if word in vocabulary or _CJK.search(word) or tolerance.close_words(word):
+            final.append(word)
+            continue
+        m = _LETTERS_DIGITS.match(word)
+        if m:
+            a, b = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
+            if a in vocabulary and b in vocabulary:
+                final += [a, b]
+                phrases.append(re.compile(r"(?<!\S)" + re.escape(a) + " "
+                                          + re.escape(b) + r"(?!\S)"))
+                changed = True
+                continue
+        split = _two_words(word, tolerance)
+        if split:
+            final += list(split)
+            changed = True
+            continue
+        final.append(word)
+
+    use = tolerance
+    last = final[-1]
+    if (len(final) >= 2 and PREFIX_LAST_MIN <= len(last) < PREFIX_MIN
+            and not _CJK.search(last)):
+        completions = frozenset(w for w in vocabulary if w.startswith(last) and w != last)
+        if completions:
+            use = _PrefixLast(tolerance, last, completions)
+            phrases.append(re.compile(r"(?<!\S)" + _word(final[-2], False) + " "
+                                      + re.escape(last) + r"\S*"))
+            changed = True
+
+    if not changed:
+        return None
+    return Rewrite(" ".join(final), tuple(phrases), use)
+
+
 def advanced_order_key(text: str | None, title: str | None,
                        description: str | None, file_hits: int, recency,
                        partial: bool = False, tolerance: "Tolerance | None" = None) -> tuple:

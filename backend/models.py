@@ -759,6 +759,9 @@ class Page(BaseModel, Generic[T]):
     total: int
     limit: int
     offset: int
+    #: Set when the search as typed found nothing and was tried again in
+    #: other words ("creo13" -> "creo 13"; relevance.rescue, 2026-11-25).
+    searched_as: str | None = None
 
 
 # ------------------------------------------------------------------ requests

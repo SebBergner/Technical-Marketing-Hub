@@ -198,8 +198,16 @@ def products_to_fix(repo: AssetRepository = Depends(get_repo)):
     rank = {"title": 0, "description": 1}
     out.sort(key=lambda x: (rank.get((x["suggested"] or {}).get("from"), 2),
                             (x["title"] or "").lower()))
+    # {product: its family's segment}, so the page suggests the segment again
+    # when a person changes the products (2026-11-25: changing Codebeamer AI
+    # to Arbortext kept "ALM (suggested)").
+    product_segments = {}
+    for p in sorted({p for c in choices.values() for p in c}):
+        segment = pf.segment_for([p], by_family)
+        if segment:
+            product_segments[p] = segment
     return {"rows": out, "choices": choices, "fallback": fallback,
-            "libraries": _FIX_LABELS,
+            "libraries": _FIX_LABELS, "product_segments": product_segments,
             "segments": [s for s in taxonomy.SEGMENTS if s not in taxonomy.RETIRED_SEGMENTS]}
 
 

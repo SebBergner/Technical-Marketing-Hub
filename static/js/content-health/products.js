@@ -44,6 +44,23 @@ function chip(text, cls) {
   return el("span", "pf-chip" + (cls ? " " + cls : ""), text);
 }
 
+/* The one segment the products' families agree on, or null. */
+function segmentFor(products) {
+  var map = state.product_segments || {};
+  var found = [];
+  products.forEach(function (p) {
+    if (map[p] && found.indexOf(map[p]) < 0) found.push(map[p]);
+  });
+  return found.length === 1 ? found[0] : null;
+}
+
+/* After the products change, suggest the segment again -- unless the demo
+ * has one, or a person chose it (2026-11-25: changing Codebeamer AI to
+ * Arbortext kept "ALM (suggested)", which Accept all would have written). */
+function productsChanged(item) {
+  if (!item.row.segment && !item.segmentPicked) item.segment = segmentFor(item.products);
+}
+
 /* ------------------------------------------------------------- saving */
 
 function save(items) {
@@ -96,6 +113,7 @@ function editor(item) {
     var c = chip(p);
     c.appendChild(button("×", "pf-chip__x", function () {
       item.products = item.products.filter(function (q) { return q !== p; });
+      productsChanged(item);
       render();
     }));
     chips.appendChild(c);
@@ -107,7 +125,7 @@ function editor(item) {
     if (item.products.indexOf(p) < 0) option(add, p);
   });
   add.addEventListener("change", function () {
-    if (add.value) { item.products.push(add.value); render(); }
+    if (add.value) { item.products.push(add.value); productsChanged(item); render(); }
   });
   chips.appendChild(add);
   box.appendChild(chips);
@@ -117,7 +135,11 @@ function editor(item) {
     option(seg, "", "No segment");
     state.segments.forEach(function (v) { option(seg, v); });
     seg.value = item.segment || "";
-    seg.addEventListener("change", function () { item.segment = seg.value || null; });
+    seg.addEventListener("change", function () {
+      item.segment = seg.value || null;
+      item.segmentPicked = true;
+      render();
+    });
     box.appendChild(seg);
   }
   return box;
@@ -127,7 +149,10 @@ function summary(item) {
   var box = el("div", "pf-chips");
   item.products.forEach(function (p) { box.appendChild(chip(p, "pf-chip--on")); });
   var seg = item.row.segment || item.segment;
-  if (seg) box.appendChild(el("span", "faint", seg + (item.row.segment ? "" : " (suggested)")));
+  if (seg) {
+    box.appendChild(el("span", "faint",
+      seg + (item.row.segment || item.segmentPicked ? "" : " (suggested)")));
+  }
   return box;
 }
 
@@ -139,8 +164,9 @@ function line(item, actions) {
     [TYPE_WORD[item.row.type] || item.row.type, item.row.library].filter(Boolean).join(" · ")));
   r.appendChild(who);
   var what = el("div", "pf-what");
-  what.appendChild(item.editing || !item.products.length && group(item) === "none"
-    ? editor(item) : summary(item));
+  // A row with no suggestion stays open until saved: a second product, the
+  // segment, or a different choice (2026-11-25: it closed after one pick).
+  what.appendChild(item.editing || group(item) === "none" ? editor(item) : summary(item));
   if (item.error) what.appendChild(el("div", "pf-err", item.error));
   r.appendChild(what);
   var act = el("div", "pf-act");
@@ -190,6 +216,8 @@ function descriptionGroup(items) {
          button("Cancel", null, function () {
            it.editing = false;
            it.products = it.row.suggested.products.slice();
+           it.segment = it.row.segment ? null : (it.row.suggested_segment || null);
+           it.segmentPicked = false;
            render();
          })]
       : [button("Accept", null, function () { save([it]); }),
@@ -226,7 +254,12 @@ function noneGroup(items) {
       if (!prod.value) { msg.textContent = "Choose a product first."; return; }
       picked.forEach(function (it) {
         it.products = [prod.value];
-        if (seg.value && !it.row.segment) it.segment = seg.value;
+        if (seg.value && !it.row.segment) {
+          it.segment = seg.value;
+          it.segmentPicked = true;
+        } else {
+          productsChanged(it);
+        }
       });
       save(picked);
     }));
@@ -297,7 +330,7 @@ function loadProducts() {
         var s = r.suggested;
         return { row: r, products: s ? s.products.slice() : [],
                  segment: r.segment ? null : (r.suggested_segment || null),
-                 editing: false, error: null, picked: false };
+                 segmentPicked: false, editing: false, error: null, picked: false };
       });
       render();
     });

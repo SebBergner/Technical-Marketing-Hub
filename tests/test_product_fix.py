@@ -147,6 +147,14 @@ def test_the_list_offers_what_can_be_fixed_and_suggests(client):
     assert d["segments"] == ["CAD", "PLM", "ALM", "SLM"]
 
 
+def test_the_page_can_suggest_the_segment_again_after_a_change(client):
+    # Changing a demo's products must not keep the old product's segment.
+    d = client.get("/api/content-health/products", headers=KEEPER).json()
+    assert d["product_segments"] == {"Creo": "CAD", "Creo Generative Design": "CAD",
+                                     "Creo Parametric": "CAD"}, \
+        "only products whose family agrees on a segment (Windchill, Codebeamer: none)"
+
+
 def test_only_people_who_maintain_content(client):
     assert client.get("/api/content-health/products", headers=VIEWER).status_code == 403
     r = client.post("/api/content-health/products", headers=VIEWER,

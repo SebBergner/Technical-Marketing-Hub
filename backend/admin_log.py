@@ -63,6 +63,7 @@ ACTIONS: dict[tuple[str, str], str] = {
     ("POST", "/api/admin/access-requests/{request_id}/decision"): "Decided an access request",
     ("POST", "/api/content-health/searches/refresh"): "Refreshed the search figures",
     ("POST", "/api/content-health/hidden"): "Hid a demo",
+    ("POST", "/api/content-health/products"): "Set the product of demos that had none",
     ("DELETE", "/api/content-health/hidden/{asset_id}"): "Unhid a demo",
     ("POST", "/api/content-health/access-requests/{request_id}/decision"):
         "Decided an access request",
@@ -102,7 +103,7 @@ ACTIONS: dict[tuple[str, str], str] = {
 #: Reads worth a line: about one person, not about the catalogue.
 _LOGGED_READS = {route for (method, route) in ACTIONS if method == "GET"}
 WATCHED = re.compile(r"^/api/(admin|graph|consensus/(sync|oauth)|curation/proposals|migration)/"
-                     r"|^/api/content-health/(hidden|access-requests|searches/refresh)(/|$)"
+                     r"|^/api/content-health/(hidden|access-requests|searches/refresh|products)(/|$)"
                      r"|^/api/assets/[^/]+/(access|still-current|archive"
                      r"|metadata|consensus-metadata|preview-video|thumbnail)$"
                      r"|^/api/assets/[^/]+/(related|not-related)/[^/]+$"
@@ -125,6 +126,7 @@ CATEGORIES: list[tuple[str, re.Pattern]] = [
     ("Sync", re.compile(r"^/api/(graph/sync|consensus/(sync|oauth)|admin/auto-sync)")),
     ("Metadata", re.compile(r"^/api/(graph/writeback|curation/)"
                             r"|^/api/assets/[^/]+/(metadata|consensus-metadata|preview-video|thumbnail)$"
+                            r"|^/api/content-health/products$"
                             r"|^/api/assets/[^/]+/(related|not-related)/[^/]+$")),
     ("Migration", re.compile(r"^/api/migration/")),
     ("Reports", re.compile(r"^/api/admin/report-owners")),

@@ -134,6 +134,161 @@ def checks(repo: AssetRepository = Depends(get_repo)):
             "consensus_differs": consensus_differs}
 
 
+# ─────────────────────────────────────────────── fix products, many at once
+#: Where each kind of demo takes its product list from, and its label.
+_FIX_LABELS = {"demo_catalog": "Demo Catalog", "demo_video": "Demo Video",
+               "consensus": "Consensus"}
+#: At most this many demos per save, so one request stays short.
+MAX_FIX_ITEMS = 100
+
+
+def _product_choices(rows: list[dict]) -> tuple[dict[str, list[str]], list[str]]:
+    """{fix key: the products that library accepts}, and the keys whose list
+    could not be read from SharePoint (then the catalogue's own products of
+    that library stand in, and the save still checks against SharePoint)."""
+    from backend.services import consensus_overrides as co
+    out = {"consensus": co.choices(rows)["products"]}
+    fallback = []
+    for key in ("demo_catalog", "demo_video"):
+        try:
+            from backend.routers.uploads import _client, _target
+            out[key] = list((_target(_client(), key).choices or {}).get("products") or [])
+        except Exception as exc:                            # noqa: BLE001
+            log.warning("Fix products: %s product list not read: %s", key, exc)
+            prefix = "video-" if key == "demo_video" else None
+            out[key] = sorted({p for r in rows for p in (r.get("products") or [])
+                               if r.get("source") == "sharepoint"
+                               and (r.get("id") or "").startswith("video-") == bool(prefix)})
+            fallback.append(key)
+    return out, fallback
+
+
+def _fix_key(record: dict, where: str) -> str:
+    if where == "consensus":
+        return "consensus"
+    return "demo_video" if (record.get("id") or "").startswith("video-") else "demo_catalog"
+
+
+@router.get("/products")
+def products_to_fix(repo: AssetRepository = Depends(get_repo)):
+    """Content health -> Fix products: every demo with no product that the
+    Hub can fill in, with a suggestion where its title or description names
+    one (services/product_fix.py)."""
+    from backend.services import product_fix as pf
+    from backend.services import taxonomy
+    records = repo.listed_records() if hasattr(repo, "listed_records") else {}
+    rows = list(records.values())
+    choices, fallback = _product_choices(rows)
+    by_family = pf.family_segments(rows)
+    out = []
+    for r in rows:
+        where = pf.needs_product(r)
+        if not where:
+            continue
+        key = _fix_key(r, where)
+        hint = pf.suggestion(r, choices.get(key) or [])
+        segment = None if r.get("segment") else (
+            pf.segment_for(hint["products"], by_family) if hint else None)
+        out.append(_row(r, fix=key, library=_FIX_LABELS[key], suggested=hint,
+                        suggested_segment=segment))
+    rank = {"title": 0, "description": 1}
+    out.sort(key=lambda x: (rank.get((x["suggested"] or {}).get("from"), 2),
+                            (x["title"] or "").lower()))
+    return {"rows": out, "choices": choices, "fallback": fallback,
+            "libraries": _FIX_LABELS,
+            "segments": [s for s in taxonomy.SEGMENTS if s not in taxonomy.RETIRED_SEGMENTS]}
+
+
+class FixItem(BaseModel):
+    asset_id: str
+    products: list[str]
+    segment: str | None = None
+
+
+class FixIn(BaseModel):
+    items: list[FixItem]
+
+
+@router.post("/products")
+def fix_products(body: FixIn, repo: AssetRepository = Depends(get_repo),
+                 actor: str = Depends(require_perm(Perm.MAINTAIN))):
+    """Write each demo's product (and its segment, if it has none), one by
+    one; a failure stops only its own demo. SharePoint demos are written to
+    their folder as Edit does; Consensus demos are set on the Hub. Each
+    result says what changed or why not."""
+    from backend.integrations.graph.client import GraphError
+    from backend.services import consensus_overrides as co
+    from backend.services import metadata_edit as me
+    from backend.services import product_fix as pf
+    from backend.services import upload_targets as ut
+    if not body.items or len(body.items) > MAX_FIX_ITEMS:
+        raise HTTPException(status_code=422,
+                            detail=f"Send between 1 and {MAX_FIX_ITEMS} demos at a time.")
+    records = repo.listed_records() if hasattr(repo, "listed_records") else {}
+    mirror = repo._load_mirror() if hasattr(repo, "_load_mirror") else list(records.values())
+    client, targets, wrote, results = None, {}, False, []
+    for item in body.items:
+        result = {"asset_id": item.asset_id, "ok": False}
+        results.append(result)
+        record = records.get(item.asset_id)
+        products = [p.strip() for p in item.products if p and p.strip()]
+        where = pf.needs_product(record) if record else None
+        if record is None:
+            result["error"] = "Not a listed demo."
+            continue
+        if record.get("products"):
+            result["error"] = "It has a product already; change it with Edit on its page."
+            continue
+        if where is None:
+            result["error"] = "This demo's product is not set here."
+            continue
+        if not products:
+            result["error"] = "Choose at least one product."
+            continue
+        segment = item.segment if item.segment and not record.get("segment") else None
+        try:
+            if where == "consensus":
+                values = {"products": products}
+                if segment:
+                    values["segment"] = segment
+                changed = co.save(repo, record, values, actor, mirror)
+            else:
+                from backend.routers.uploads import _client, _target
+                key = me.target_key(record)
+                client = client or _client()
+                target = targets.get(key) or targets.setdefault(key, _target(client, key))
+                folder = record["source_item_id"]
+                current = me.values_of(target.spec, (client.get_list_item(
+                    target.drive_id, folder) or {}).get("fields") or {})
+                if current.get("products"):
+                    result["error"] = ("SharePoint already has a product for it ("
+                                       + ", ".join(current["products"])
+                                       + "); the Hub shows it after the next sync.")
+                    continue
+                values = {"products": products}
+                if segment and not current.get("segment"):
+                    values["segment"] = [segment]
+                changed = me.changes(target.spec, target, values, current)
+                if changed:
+                    me.write(client, target, folder, changed, None)
+                    me.remember(repo, item.asset_id, me.hub_values(key, changed))
+                    wrote = True
+                changed = sorted(changed)
+        except (ut.UploadInvalid, co.OverrideInvalid, me.EditConflict, me.NotEditable) as exc:
+            result["error"] = str(exc)
+            continue
+        except GraphError as exc:
+            result["error"] = f"SharePoint: {exc}"
+            continue
+        result.update(ok=True, changed=list(changed))
+    if wrote:
+        from backend.routers.uploads import _sync_soon
+        _sync_soon(repo, actor)
+    done = sum(1 for r in results if r["ok"])
+    log.info("Fix products by %s: %d of %d saved", actor, done, len(results))
+    return {"saved": done, "results": results}
+
+
 # ───────────────────────────────────────────────────────────── searches
 @router.get("/searches")
 def searches(days: int | None = Query(None, ge=1, le=3650),

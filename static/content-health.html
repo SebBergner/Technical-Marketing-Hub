@@ -18,6 +18,17 @@
   .hc-card > summary h2::before { content: "▸ "; color: var(--faint, #888); }
   .hc-card[open] > summary h2::before { content: "▾ "; }
   .hc-card--ok { opacity: .75; }
+  /* Fix products (2026-11-25) */
+  .pf-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+  .pf-bar select, .pf-table select { font: inherit; font-size: 12.5px; padding: 3px 6px; border-radius: 6px; }
+  .pf-table td { vertical-align: top; }
+  .pf-chip { display: inline-flex; align-items: center; gap: 4px; margin: 0 4px 4px 0; padding: 2px 4px 2px 8px;
+    border-radius: 999px; background: var(--surface-2); font-size: 12.5px; }
+  .pf-chip__x { border: 0; background: none; padding: 0 4px; font-size: 14px; line-height: 1; color: var(--faint); }
+  .pf-from { font-size: 11.5px; margin-top: 2px; }
+  .pf-res { font-size: 12.5px; max-width: 260px; }
+  .pf-res--ok { color: var(--green); font-weight: 600; }
+  .pf-res--bad { color: var(--red); }
   .hc-why { margin: 2px 0 4px; font-size: 13px; }
   .hc-fix { margin: 0 0 10px; font-size: 12.5px; }
   .hc-bar { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin: -6px 0 14px; }
@@ -122,6 +133,7 @@
         <label><input type="checkbox" id="hcMine"> Only demos I own</label>
       </div>
       <p class="faint" id="hcIntro" style="margin:0 0 14px;font-size:12.5px"></p>
+      <div id="hcFix"></div>
       <div id="hcBody"></div>
     </section>
   </div>

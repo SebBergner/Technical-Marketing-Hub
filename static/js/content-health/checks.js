@@ -7,6 +7,7 @@
  * Part of the Content health page's script (static/content-health.html). */
 
 import { $, demoLink, el, session, TYPE_WORD } from "../admin/util.js";
+import { loadProducts } from "./products.js";
 
 var data = null;
 var onlyMine = false;
@@ -152,6 +153,7 @@ function loadChecks() {
     box.dataset.wired = "1";
     box.addEventListener("change", function () { onlyMine = box.checked; if (data) render(); });
   }
+  loadProducts();
   return fetch("/api/content-health/checks")
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (d) { if (d) { data = d; render(); } });

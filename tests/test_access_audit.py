@@ -45,7 +45,9 @@ def test_every_answer_carries_the_security_headers(client, monkeypatch):
         h = client.get(url, headers=easyauth_headers("someone@ptc.com")).headers
         assert h["X-Content-Type-Options"] == "nosniff", url
         assert h["X-Frame-Options"] == "SAMEORIGIN", url
-        assert h["Content-Security-Policy"] == "frame-ancestors 'self'", url
+        # script-src, object-src and base-uri added 2026-11-26 (WS-D).
+        assert h["Content-Security-Policy"] == (
+            "frame-ancestors 'self'; script-src 'self'; object-src 'none'; base-uri 'self'"), url
         assert h["Referrer-Policy"] == "strict-origin-when-cross-origin", url
     assert "Strict-Transport-Security" not in client.get("/api/version").headers
     monkeypatch.setattr(settings, "https_only", True)

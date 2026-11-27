@@ -398,6 +398,7 @@ class RunRefused(RuntimeError):
 
 
 def _pause_path(batch_id: str) -> str:
+    run.check_batch_id(batch_id)        # before it becomes part of a path
     return os.path.join(_control_dir(), f"{batch_id}.pause")
 
 

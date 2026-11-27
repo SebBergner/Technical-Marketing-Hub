@@ -45,19 +45,19 @@ import base64
 import binascii
 import json
 import logging
-import os
 import time
 from dataclasses import dataclass, field
 from enum import Enum
 
 from fastapi import Depends, HTTPException, Request
 
-from backend.config import settings
+from backend.config import on_app_service as _on_app_service, settings
 
 log = logging.getLogger(__name__)
 
 #: Set by Azure App Service on every instance. Its presence means we are
-#: running in the platform that provides Easy Auth.
+#: running in the platform that provides Easy Auth. WEBSITE_INSTANCE_ID
+#: counts too (config.on_app_service); this one is what tests set.
 APP_SERVICE_MARKER = "WEBSITE_SITE_NAME"
 
 PRINCIPAL_NAME_HEADER = "x-ms-client-principal-name"
@@ -435,7 +435,7 @@ def security_warnings() -> list[str]:
     set, which would make every caller a curator without anything looking wrong.
     """
     warnings: list[str] = []
-    on_app_service = bool(os.environ.get(APP_SERVICE_MARKER))
+    on_app_service = _on_app_service()
     # Not "!= easyauth": oidc enforces too, and treating it as disabled would
     # raise the loudest warning on exactly the deployments doing it right.
     disabled = settings.auth_mode not in ENFORCING_MODES
@@ -445,7 +445,8 @@ def security_warnings() -> list[str]:
         warnings.append(
             "AUTH IS DISABLED ON APP SERVICE. Every caller is treated as a curator. "
             "Set AUTH_MODE=oidc (the app's own sign-in) or AUTH_MODE=easyauth "
-            "(App Service Authentication with 'Require authentication').")
+            "(App Service Authentication with 'Require authentication'). The app "
+            "refuses to start like this unless AUTH_ALLOW_DISABLED_ON_AZURE=true.")
     if oidc and not settings.oidc_configured:
         warnings.append(
             "AUTH_MODE=oidc but OIDC_TENANT_ID, OIDC_CLIENT_ID and "
@@ -485,6 +486,37 @@ def security_warnings() -> list[str]:
     return warnings
 
 
+def startup_refusal() -> str | None:
+    """Why this process must not start, or None (2026-11-26).
+
+    On App Service with access control off, every visitor is the full-rights
+    development principal; a warning in a log nobody reads is not enough for
+    that, so the app refuses to start instead. Local runs are never refused.
+    AUTH_ALLOW_DISABLED_ON_AZURE=true is the deliberate way past it.
+    """
+    if not _on_app_service() or settings.auth_mode in ENFORCING_MODES:
+        return None
+    if settings.auth_allow_disabled_on_azure:
+        return None
+    return (f"Refusing to start: running on App Service with AUTH_MODE="
+            f"{settings.auth_mode!r}, which gives every visitor full rights. Set "
+            "AUTH_MODE=oidc (or easyauth). To start without sign-in on purpose, "
+            "set AUTH_ALLOW_DISABLED_ON_AZURE=true, and remove it afterwards.")
+
+
 def log_security_warnings() -> None:
+    """Called at startup (app.py's lifespan). Logs every warning, then raises
+    when startup_refusal() says the process must not run -- after the
+    reasons are out, so the log says why it stopped."""
     for warning in security_warnings():
         log.warning("SECURITY: %s", warning)
+    reason = startup_refusal()
+    if reason:
+        log.critical("SECURITY: %s", reason)
+        # print as well: the logging config may not be up yet under gunicorn,
+        # and this line is the only explanation of a slot that will not start.
+        print(f"[startup] SECURITY: {reason}", flush=True)
+        raise RuntimeError(reason)
+    if _on_app_service() and settings.auth_mode not in ENFORCING_MODES:
+        log.critical("SECURITY: AUTH_ALLOW_DISABLED_ON_AZURE is set and auth is off: "
+                     "every visitor has full rights until AUTH_MODE is set.")

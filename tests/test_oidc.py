@@ -314,6 +314,34 @@ def test_sign_in_never_sends_you_somewhere_else(oidc, fake, client, next_path):
     assert response.headers["location"] == "/"
 
 
+@pytest.mark.parametrize("next_path", [
+    "//evil.example", r"/\evil", "https://evil", "//evil.example/%2F..", "/\t/evil",
+    r"\\evil", "http:/evil", " //evil",
+])
+def test_login_when_already_signed_in_never_sends_you_somewhere_else(
+        oidc, fake, client, next_path):
+    """The other place next= is used: /login with a live session redirects
+    straight on (oidc.py, login), without going through Microsoft."""
+    sign_in(client)
+    response = client.get("/login", params={"next": next_path})
+    assert response.status_code == 302
+    assert response.headers["location"] == "/"
+
+
+def test_login_when_already_signed_in_keeps_a_path_on_this_site(oidc, fake, client):
+    sign_in(client)
+    response = client.get("/login", params={"next": "/admin?tab=usage"})
+    assert response.headers["location"] == "/admin?tab=usage"
+
+
+def test_a_state_outside_ascii_is_refused_not_a_500(oidc, fake, client):
+    """compare_digest raises TypeError on non-ASCII str (audit, 2026-11-26)."""
+    client.get("/login")
+    response = client.get("/auth/callback", params={"code": "c", "state": "état-ü"})
+    assert response.status_code == 400
+    assert fake.completed == []
+
+
 # ───────────────────────────────────────────────────── how long it lasts
 def test_logout_ends_the_session(oidc, fake, client):
     sign_in(client)

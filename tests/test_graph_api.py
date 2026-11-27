@@ -381,6 +381,33 @@ def test_preview_without_graph_configured_is_503(client, repo_with_a_file):
     assert response.status_code == 503
 
 
+def refusing(handler, method=None):
+    """The handler, except Graph refuses the file call with words of its own."""
+    def wrapped(request: httpx.Request) -> httpx.Response:
+        if FILE_ITEM_ID in request.url.path and (method is None or request.method == method):
+            return httpx.Response(403, json={"error": {"code": "accessDenied",
+                                                       "message": "denied"}})
+        return handler(request)
+    return wrapped
+
+
+@pytest.mark.parametrize("kind,handler", [("download", download_handler),
+                                          ("preview", preview_handler)])
+def test_graphs_own_words_stay_in_the_log(client, repo_with_a_file, caplog, kind, handler):
+    """A 502 says SharePoint failed, not what Graph said: that names drives
+    and items, and nothing in it helps the visitor (audit, 2026-11-26)."""
+    with_graph(refusing(handler()))
+    with caplog.at_level("WARNING", logger="backend.routers.assets"):
+        response = client.get(f"/api/assets/a-kit/files/{FILE_ITEM_ID}/{kind}",
+                              follow_redirects=False)
+    assert response.status_code == 502
+    # GraphError's text names the drive and item, and IT's grant steps.
+    for leak in (DRIVE_ID, FILE_ITEM_ID, "Sites.Selected", "403"):
+        assert leak not in response.text, leak
+    assert response.json()["detail"].startswith("SharePoint did not answer")
+    assert DRIVE_ID in caplog.text and "Sites.Selected" in caplog.text
+
+
 # ─────────────────────── a Demo Video asset's files live in that library
 VIDEO_DRIVE_ID = "drive-demo-video"
 

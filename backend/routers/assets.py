@@ -619,6 +619,10 @@ def asset_thumbnail(asset_id: str, repo: AssetRepository = Depends(get_repo),
                     headers={"Cache-Control": "private, max-age=86400"})
 
 
+#: What a visitor sees when SharePoint fails; the detail goes to the log.
+GRAPH_UNAVAILABLE = "SharePoint did not answer as expected. Try again in a moment."
+
+
 def _signed_file_url(client: GraphClient, asset_id: str, item_id: str) -> str:
     """Graph's pre-authenticated URL for one file, minted on demand.
 
@@ -634,7 +638,10 @@ def _signed_file_url(client: GraphClient, asset_id: str, item_id: str) -> str:
             drive = _asset_drive(client, asset_id)
             url = client.download_url(drive.drive_id, item_id)
     except GraphError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        # Graph's own words stay in the log: they name drives, items and
+        # sometimes the tenant, and say nothing a visitor can act on.
+        log.warning("download link for %s/%s failed: %s", asset_id, item_id, exc)
+        raise HTTPException(status_code=502, detail=GRAPH_UNAVAILABLE) from exc
     if not url:
         raise HTTPException(
             status_code=502,
@@ -718,7 +725,8 @@ def preview_file(asset_id: str, item_id: str,
             drive = _asset_drive(client, asset_id)
             url = client.preview(drive.drive_id, item_id)
     except GraphError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        log.warning("preview of %s/%s failed: %s", asset_id, item_id, exc)
+        raise HTTPException(status_code=502, detail=GRAPH_UNAVAILABLE) from exc
 
     if not url:
         raise HTTPException(
@@ -783,7 +791,8 @@ def _not_customer_facing(repo: AssetRepository, asset_id: str) -> None:
             return
         me.write(client, target, asset.source_item_id, {"customer_facing": False}, None)
     except GraphError as exc:
-        raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
+        log.warning("marking %s not customer facing failed: %s", asset_id, exc)
+        raise HTTPException(status_code=502, detail=GRAPH_UNAVAILABLE) from exc
     values = me.hub_values(key, {"customer_facing": False})
     values["assumed"] = [a for a in asset.assumed if a != "customer_facing"]
     me.remember(repo, asset_id, values)

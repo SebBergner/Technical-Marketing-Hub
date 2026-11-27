@@ -80,3 +80,17 @@ def test_a_folder_closed_in_sharepoint_but_customer_facing_is_on_the_data_clean_
     rows = manager.get("/api/reports/content-to-review", headers=EDITOR).json()["items"]
     kit, = [r for r in rows if r["asset_id"] == "kit"]
     assert "customer_facing" in kit["missing"]
+
+
+def test_a_sharepoint_failure_says_so_without_graphs_words(manager, fake, monkeypatch, caplog):
+    """The 502 is generic; Graph's text goes to the log (audit, 2026-11-26)."""
+    from backend.integrations.graph.client import GraphError
+
+    def refuse(*a, **k):
+        raise GraphError("403 accessDenied on drive b!x9-secret-drive")
+    monkeypatch.setattr(fake, "update_list_item_fields", refuse)
+    with caplog.at_level("WARNING", logger="backend.routers.assets"):
+        r = manager.put("/api/assets/kit/access", headers=EDITOR, json={"level": "internal"})
+    assert r.status_code == 502
+    assert "b!x9" not in r.text and r.json()["detail"].startswith("SharePoint did not answer")
+    assert "b!x9-secret-drive" in caplog.text

@@ -388,6 +388,20 @@ def test_the_wrong_password_does_not_sign_anyone_in(enforcing, admin_configured,
     assert client.get("/api/admin/overview").status_code == 401
 
 
+def test_a_password_outside_ascii_is_refused_not_a_500(enforcing, admin_configured, client):
+    """compare_digest raises TypeError on non-ASCII str (audit, 2026-11-26)."""
+    for body in ({"username": ADMIN_USER, "password": "mot-de-passe-é"},
+                 {"username": "администратор", "password": ADMIN_PASS}):
+        assert client.post("/api/admin/login", json=body).status_code == 401
+
+
+def test_a_password_outside_ascii_can_be_the_right_one(enforcing, client, monkeypatch):
+    monkeypatch.setattr(settings, "admin_username", "tdd-admin")
+    monkeypatch.setattr(settings, "admin_password", "pässwörd-long-enough")
+    assert client.post("/api/admin/login", json={
+        "username": "tdd-admin", "password": "pässwörd-long-enough"}).status_code == 200
+
+
 def test_an_admin_session_opens_the_overview_and_closes_on_sign_out(
         enforcing, admin_configured, client):
     assert client.get("/api/admin/overview").status_code == 401

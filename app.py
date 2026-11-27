@@ -10,7 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from backend.config import settings
 from backend.version import app_version
 from backend.db import SessionLocal, create_all
-from backend import admin_log, api_docs, oidc, view_as
+from backend import admin_log, api_docs, csrf, oidc, view_as
 from backend.routers import (
     admin, assets, auth, consensus, content_health, curation, debug, disclaimer, graph, me,
     migration,
@@ -179,6 +179,10 @@ app.add_middleware(
     https_only=settings.https_only,
 )
 app.middleware("http")(oidc.canonical_host)
+# Writes only from the Hub's own pages (backend/csrf.py): outside everything
+# but the security headers, so a forged write never reaches a cookie or a
+# route, and its 403 still carries the headers.
+app.middleware("http")(csrf.check_origin)
 
 
 CONTENT_SECURITY_POLICY = ("frame-ancestors 'self'; script-src 'self'; "

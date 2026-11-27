@@ -16,6 +16,7 @@ The first edit writes them all to the file, so later ones change the file.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import secrets
@@ -25,6 +26,8 @@ from datetime import datetime, timezone
 from functools import lru_cache
 
 from backend.config import settings
+
+log = logging.getLogger(__name__)
 
 FILE = "search_terms.json"
 MAX_GROUPS = 500
@@ -98,16 +101,23 @@ def _default_groups() -> list[dict]:
             for i, (t, n) in enumerate(DEFAULTS)]
 
 
-def load(data_dir: str | None = None) -> dict:
-    """{"groups": [...], "saved": bool}: the file's, or DEFAULTS until the first edit."""
+def load(data_dir: str | None = None, strict: bool = False) -> dict:
+    """{"groups": [...], "saved": bool}: the file's, or DEFAULTS until the first edit.
+
+    An unreadable file reads as the defaults for searching, logged; `strict`
+    (before an edit is written back) raises instead, so one bad read never
+    replaces the saved groups with the defaults plus one change (2026-11-26)."""
+    from backend.file_safety import UnreadableFile, read_json
     try:
-        with open(_path(data_dir), encoding="utf-8") as fh:
-            data = json.load(fh)
-        if isinstance(data, dict) and isinstance(data.get("groups"), list):
-            return {"groups": data["groups"], "saved": True,
-                    "changed_at": data.get("changed_at"), "changed_by": data.get("changed_by")}
-    except (FileNotFoundError, ValueError):
-        pass
+        data = read_json(_path(data_dir), None)
+    except UnreadableFile:
+        if strict:
+            raise
+        log.error("could not read the search terms; using the defaults", exc_info=True)
+        data = None
+    if isinstance(data, dict) and isinstance(data.get("groups"), list):
+        return {"groups": data["groups"], "saved": True,
+                "changed_at": data.get("changed_at"), "changed_by": data.get("changed_by")}
     return {"groups": _default_groups(), "saved": False}
 
 
@@ -159,7 +169,7 @@ def _save(data_dir, groups, actor) -> dict:
 def add(terms_in, note, actor, data_dir: str | None = None) -> dict:
     from backend.file_safety import locked
     with _lock, locked(_path(data_dir)):
-        groups = load(data_dir)["groups"]
+        groups = load(data_dir, strict=True)["groups"]
         if len(groups) >= MAX_GROUPS:
             raise TermsError(f"At most {MAX_GROUPS} groups.")
         terms_out, note_out = _clean(terms_in, note, groups)
@@ -172,7 +182,7 @@ def add(terms_in, note, actor, data_dir: str | None = None) -> dict:
 def update(group_id, terms_in, note, actor, data_dir: str | None = None) -> dict:
     from backend.file_safety import locked
     with _lock, locked(_path(data_dir)):
-        groups = load(data_dir)["groups"]
+        groups = load(data_dir, strict=True)["groups"]
         found = next((g for g in groups if g.get("id") == group_id), None)
         if found is None:
             raise KeyError(group_id)
@@ -186,7 +196,7 @@ def update(group_id, terms_in, note, actor, data_dir: str | None = None) -> dict
 def remove(group_id, actor, data_dir: str | None = None) -> None:
     from backend.file_safety import locked
     with _lock, locked(_path(data_dir)):
-        groups = load(data_dir)["groups"]
+        groups = load(data_dir, strict=True)["groups"]
         kept = [g for g in groups if g.get("id") != group_id]
         if len(kept) == len(groups):
             raise KeyError(group_id)

@@ -18,7 +18,6 @@ request is a row in the Hub Tasks list (integrations/graph/hub_tasks.py).
 """
 from __future__ import annotations
 
-import json
 import os
 import secrets
 import threading
@@ -42,12 +41,11 @@ def _path(repo) -> str:
 
 
 def _load(repo) -> list[dict]:
-    try:
-        with open(_path(repo), encoding="utf-8") as fh:
-            items = json.load(fh)
-        return items if isinstance(items, list) else []
-    except (FileNotFoundError, ValueError):
-        return []
+    # Unreadable raises rather than reading as []: written back, it would
+    # drop every open request (2026-11-26).
+    from backend.file_safety import read_json
+    items = read_json(_path(repo), [])
+    return items if isinstance(items, list) else []
 
 
 def _save(repo, items: list[dict]) -> None:

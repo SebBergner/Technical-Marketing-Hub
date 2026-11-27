@@ -227,8 +227,14 @@ def _run_sync(client: GraphClient, repo: AssetRepository, actor: str,
     token = None if (full or stale) else _load_token(repo)
     try:
         result = sync_catalogue(client, repo, delta_token=token)
-    except (GraphPermissionError, GraphError, ValueError) as exc:
-        _record_attempt(repo, ok=False, error=str(exc))
+    except Exception as exc:                                # noqa: BLE001
+        # Every failure is recorded, not only Graph's own: a sync refused by
+        # the shrink guard (WouldShrinkMirror) or a file that could not be
+        # read left Admin's "Last attempt" on the previous success
+        # (2026-11-26).
+        known = isinstance(exc, (GraphPermissionError, GraphError, ValueError))
+        _record_attempt(repo, ok=False,
+                        error=str(exc) if known else f"{type(exc).__name__}: {exc}")
         raise
 
     _save_token(repo, result.delta_token)

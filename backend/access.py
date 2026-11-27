@@ -277,19 +277,32 @@ def _normalise(state: dict) -> dict:
             "grants": sorted(set(GRANTED_ONCE) | granted)}
 
 
-def load_state() -> dict:
+def load_state(strict: bool = False) -> dict:
+    """The groups. A missing file is the built-in groups.
+
+    An unreadable one (2026-11-26): `strict` -- before a change is written
+    back -- raises file_safety.UnreadableFile, so one bad read never saves
+    the built-in groups plus one change over everyone's real groups. Reads
+    for a permission check use the last good copy, or the built-in groups
+    if there is none, logged."""
+    from backend.file_safety import UnreadableFile, read_json
     path = _owned(STATE_FILE)
+    cached = _cache.get(path)
     try:
         mtime = os.path.getmtime(path)
-    except OSError:
+        if cached and cached[0] == mtime:
+            return cached[1]
+        state = _normalise(read_json(path, {}) or {})
+    except FileNotFoundError:
         return _normalise(_defaults())
-    cached = _cache.get(path)
-    if cached and cached[0] == mtime:
-        return cached[1]
-    try:
-        with open(path, encoding="utf-8") as fh:
-            state = _normalise(json.load(fh) or {})
-    except (OSError, ValueError):
+    except (OSError, UnreadableFile) as exc:
+        if strict:
+            if isinstance(exc, UnreadableFile):
+                raise
+            raise UnreadableFile(f"{path} could not be read: {exc}") from exc
+        if cached:
+            log.exception("could not read %s; using the last good copy", path)
+            return cached[1]
         log.exception("could not read %s; using the built-in groups", path)
         return _normalise(_defaults())
     _cache[path] = (mtime, state)
@@ -360,7 +373,7 @@ def create_group(name: str, description: str, permissions, members, actor: str) 
     if not name:
         raise AccessError("A group needs a name.")
     with _lock:
-        state = load_state()
+        state = load_state(strict=True)
         if any(g["name"].lower() == name.lower() for g in state["groups"]):
             raise AccessError(f"There is already a group called {name!r}.")
         group = {"id": _slug(name, {g["id"] for g in state["groups"]}), "name": name,
@@ -376,7 +389,7 @@ def create_group(name: str, description: str, permissions, members, actor: str) 
 def update_group(group_id: str, actor: str, *, name: str | None = None,
                  description: str | None = None, permissions=None, members=None) -> dict:
     with _lock:
-        state = load_state()
+        state = load_state(strict=True)
         group = dict(_group(state, group_id))
         changes: dict = {}
         if name is not None and not group["builtin"]:
@@ -426,7 +439,7 @@ def update_group(group_id: str, actor: str, *, name: str | None = None,
 
 def delete_group(group_id: str, actor: str) -> None:
     with _lock:
-        state = load_state()
+        state = load_state(strict=True)
         group = _group(state, group_id)
         if group["builtin"]:
             raise AccessError(f"{group['name']} is built in and cannot be deleted.")

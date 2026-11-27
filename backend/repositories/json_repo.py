@@ -34,13 +34,13 @@ import logging
 import os
 import re
 import threading
-import time
 from collections import Counter
 from dataclasses import replace
 from datetime import date, datetime
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
+from backend.file_safety import UnreadableFile, read_json
 from backend.models import (
     AdvancedSearchHit, Asset, AssetRequest, AssetStats, AssetSummary, AssetType, Capability, Facets, FacetValue, MetadataProposal,
     Page, ProposalState, ProposalSummary, RelatedDemo, ValueRoadmap, video_type,
@@ -186,22 +186,26 @@ def _ts(stamp: str | None) -> float:
         return 0.0
 
 
-def _read(path: str, default: Any) -> Any:
-    """`default` for a file that is missing or unreadable. A file another
-    worker is replacing at this instant (Windows and SMB shares refuse it
-    for a few milliseconds) is tried again first: the catalogue is cached
-    per worker, so a read lost here would stay lost until the next change."""
-    for attempt in range(10):
-        if not os.path.exists(path):
-            return default
-        try:
-            with open(path, encoding="utf-8") as fh:
-                return json.load(fh)
-        except PermissionError:
-            time.sleep(0.05)
-        except (ValueError, OSError):
-            return default
-    return default
+def _read(path: str, default: Any, *, strict: bool = True) -> Any:
+    """`default` for a file that is missing.
+
+    A file that exists but cannot be read (tried again for half a second
+    first: Windows and SMB refuse a file another worker is replacing) raises
+    file_safety.UnreadableFile. Until 2026-11-26 it read as `default`, and a
+    read-modify-write then saved that over the real file -- identity.json,
+    hidden, archived, access -- and the access files read as empty showed
+    Internal and hidden demos as open.
+
+    `strict=False` only for rebuildable mirror data, where an empty answer is
+    survivable and the next sync repairs it: logged as an error, not hidden."""
+    try:
+        return read_json(path, default, attempts=10)
+    except UnreadableFile:
+        if strict:
+            raise
+        log.error("could not read %s; treated as empty until the next sync",
+                  path, exc_info=True)
+        return default
 
 
 def _as_date(value: Any) -> date | None:
@@ -483,7 +487,17 @@ class JsonAssetRepository(AssetRepository):
         stamp = os.path.getmtime(path)
         cached = self._mirror_cache.get(path)
         if cached is None or cached[0] != stamp:
-            records = _read(path, [])
+            try:
+                records = _read(path, [])
+            except UnreadableFile:
+                # Never cache "empty" for a whole source: that hid it until
+                # the file next changed. Keep the last good copy, or fail
+                # this request and try again on the next one (2026-11-26).
+                if cached is not None:
+                    log.error("could not read %s; serving the last good copy",
+                              path, exc_info=True)
+                    return cached[1]
+                raise
             # A mirror written before the five Video Types (2026-09-30)
             # still says "Overview"; filters and facets read these raw
             # records, so they are brought up to date here rather than
@@ -1375,7 +1389,7 @@ class JsonAssetRepository(AssetRepository):
 
     def vm_secrets(self, asset_id: str) -> dict | None:
         path = os.path.join(self.mirror_dir, PRIVATE_DIR, VM_SECRETS_FILE)
-        return (_read(path, {}) or {}).get(asset_id)
+        return (_read(path, {}, strict=False) or {}).get(asset_id)
 
     def facets(self, query: AssetQuery | None = None) -> Facets:
         """Every filter value with a real count, each scoped to its own slice.
@@ -1722,7 +1736,7 @@ class JsonAssetRepository(AssetRepository):
     def value_index_store(self) -> dict:
         """The index files as the last sync read them ({"files": {item id:
         entry}}; services/value_index.py)."""
-        return _read(self._value_index_path(), {}) or {}
+        return _read(self._value_index_path(), {}, strict=False) or {}
 
     def replace_value_index(self, store: dict) -> None:
         """Written by the SharePoint sync only, like the rest of the mirror."""
@@ -1874,7 +1888,8 @@ class JsonAssetRepository(AssetRepository):
 
     def count_source_rows(self, source_system: str) -> int:
         """How many mirror rows one source currently contributes."""
-        return len(_read(os.path.join(self.mirror_dir, f"{source_system}.json"), []))
+        return len(_read(os.path.join(self.mirror_dir, f"{source_system}.json"), [],
+                         strict=False))
 
     # ------------------------------------------------------------ sync state
     def get_sync_token(self, source_system: str) -> str | None:

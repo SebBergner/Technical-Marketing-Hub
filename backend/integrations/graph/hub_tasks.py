@@ -76,12 +76,11 @@ def _path(repo) -> str:
 
 
 def _load(repo) -> dict:
-    try:
-        with open(_path(repo), encoding="utf-8") as fh:
-            value = json.load(fh)
-        return value if isinstance(value, dict) else {}
-    except (FileNotFoundError, ValueError):
-        return {}
+    # Unreadable raises rather than reading as {}: written back, it would
+    # forget which rows were already sent, and send them again (2026-11-26).
+    from backend.file_safety import read_json
+    value = read_json(_path(repo), {})
+    return value if isinstance(value, dict) else {}
 
 
 def _save(repo, state: dict) -> None:

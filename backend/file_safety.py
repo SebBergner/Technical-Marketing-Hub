@@ -22,13 +22,14 @@ died mid-write and is taken over -- what it guards takes milliseconds.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import secrets
 import threading
 import time
 from contextlib import contextmanager
-from typing import Iterator
+from typing import Any, Iterator
 
 log = logging.getLogger(__name__)
 
@@ -77,6 +78,37 @@ def replace(tmp: str, path: str) -> None:
             if attempt == 19:
                 raise
             time.sleep(0.05)
+
+
+class UnreadableFile(RuntimeError):
+    """A data file exists but could not be read or parsed.
+
+    Never "empty": read as empty and then written back, one bad read would
+    replace the real file with a single change (identity, groups, tokens,
+    playlists...). Raised instead, so the request fails and the file stays
+    as it was (2026-11-26, optimisation plan WS-A)."""
+
+
+def read_json(path: str, default: Any, attempts: int = 3) -> Any:
+    """`path`'s JSON, or `default` only when the file does not exist.
+
+    A file that exists but cannot be read is tried again briefly (Windows
+    and SMB refuse a file another process is replacing for milliseconds),
+    then raises UnreadableFile."""
+    last: Exception | None = None
+    for attempt in range(attempts):
+        if not os.path.exists(path):
+            return default
+        try:
+            with open(path, encoding="utf-8") as fh:
+                return json.load(fh)
+        except FileNotFoundError:
+            return default                  # removed between the two calls
+        except (OSError, ValueError) as exc:
+            last = exc
+            if attempt < attempts - 1:
+                time.sleep(0.05)
+    raise UnreadableFile(f"{path} exists but could not be read: {last}") from last
 
 
 def _entry(lock_path: str) -> tuple[threading.RLock, threading.local]:

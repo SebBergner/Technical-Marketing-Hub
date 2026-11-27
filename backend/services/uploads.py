@@ -25,7 +25,6 @@ column for them -- the Demo Catalog).
 """
 from __future__ import annotations
 
-import json
 import os
 import secrets
 import threading
@@ -54,12 +53,11 @@ def _path(repo, name: str) -> str:
 
 
 def _load(repo, name: str, empty):
-    try:
-        with open(_path(repo, name), encoding="utf-8") as fh:
-            value = json.load(fh)
-        return value if isinstance(value, type(empty)) else empty
-    except (FileNotFoundError, ValueError):
-        return empty
+    # Unreadable raises rather than reading as empty: written back, it
+    # would drop every earlier entry (2026-11-26).
+    from backend.file_safety import read_json
+    value = read_json(_path(repo, name), empty)
+    return value if isinstance(value, type(empty)) else empty
 
 
 def _save(repo, name: str, value) -> None:

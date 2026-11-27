@@ -52,12 +52,12 @@ def _now() -> datetime:
 
 
 def _load() -> list[dict]:
-    try:
-        with open(_path(), encoding="utf-8") as fh:
-            items = json.load(fh)
-        return items if isinstance(items, list) else []
-    except (FileNotFoundError, ValueError):
-        return []
+    # An unreadable file raises (file_safety.UnreadableFile) rather than
+    # reading as [] -- create() would then save the list with only the new
+    # token, revoking everyone else's (2026-11-26).
+    from backend.file_safety import read_json
+    items = read_json(_path(), [])
+    return items if isinstance(items, list) else []
 
 
 def _save(items: list[dict]) -> None:

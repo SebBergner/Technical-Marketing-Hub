@@ -19,7 +19,6 @@ never wait on each other, and nothing here can list what anyone else saved.
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import threading
 from datetime import datetime, timezone
@@ -55,12 +54,11 @@ def _now() -> str:
 
 
 def load(key: str, data_dir: str | None = None) -> dict:
-    try:
-        with open(_path(key, data_dir), encoding="utf-8") as fh:
-            state = json.load(fh)
-        return state if isinstance(state, dict) else {}
-    except (FileNotFoundError, ValueError):
-        return {}
+    # Unreadable raises rather than reading as {}: written back, it would
+    # forget the person's favourites (2026-11-26).
+    from backend.file_safety import read_json
+    state = read_json(_path(key, data_dir), {})
+    return state if isinstance(state, dict) else {}
 
 
 def _save(key: str, state: dict, data_dir: str | None = None) -> None:

@@ -2,15 +2,15 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from backend.config import settings
 from backend.version import app_version
 from backend.db import SessionLocal, create_all
-from backend import admin_log, oidc, view_as
+from backend import admin_log, oidc, static_delivery, view_as
 from backend.routers import (
     admin, assets, auth, consensus, content_health, curation, debug, disclaimer, graph, me,
     migration,
@@ -156,6 +156,14 @@ app.include_router(me.router)
 # Outside oidc mode the session is never written, so no cookie is ever set.
 # The Admin log is innermost: by the time an answer passes it, the route is
 # known and require_perm() has said who acted (backend/admin_log.py).
+# Compression is innermost of all (WS-C, 2026-11-26: the Hub's scripts and
+# /api/assets went out uncompressed). Here it sees each answer whole; the
+# @app.middleware("http") layers outside re-send bodies in pieces, which
+# would hide the size from minimum_size and gzip even a 15-byte /health.
+# Pictures, video, 206 range answers and downloads are left alone
+# (static_delivery.GZIP_EXCLUDE).
+app.add_middleware(GZipMiddleware, minimum_size=1024,
+                   exclude_content_types=static_delivery.GZIP_EXCLUDE)
 app.add_middleware(admin_log.middleware)
 # A preview ("View the Hub as a group", A9) is read-only: inside the session,
 # outside the Admin log, so a refused attempt is neither run nor logged.
@@ -195,22 +203,22 @@ async def security_headers(request, call_next):
 
 
 @app.get("/admin", include_in_schema=False)
-async def admin_page():
+async def admin_page(request: Request):
     """The Admin page. Its own file because it is ours, index.html is
     Elio's, and the two must not collide.
 
     Served to anyone — the page itself decides what to show, and every figure
     on it comes from /api/admin/overview, which does not."""
-    return FileResponse(os.path.join(BASE_DIR, "static", "admin.html"))
+    return static_delivery.page_response(request, os.path.join(BASE_DIR, "static", "admin.html"))
 
 
 @app.get("/content-health", include_in_schema=False)
-async def content_health_page():
+async def content_health_page(request: Request):
     """Content health (2026-11-11): the content tools, for Maintain content.
     Served like /admin; every figure comes from /api/content-health/..., which
     checks the permission."""
-    return FileResponse(os.path.join(BASE_DIR, "static", "content-health.html"),
-                        headers={"Cache-Control": "no-cache"})
+    return static_delivery.page_response(request, os.path.join(BASE_DIR, "static",
+                                                               "content-health.html"))
 
 
 @app.get("/reports", include_in_schema=False)
@@ -241,7 +249,7 @@ async def demo_of_upload(upload_id: str):
 
 
 @app.get("/migration", include_in_schema=False)
-async def migration_page():
+async def migration_page(request: Request):
     """Content migrations into SharePoint, one section per source
     (Brightcove Gallery first). Its own page, like /admin, and not linked
     from index.html or /admin (Liwei, 2026-09-28).
@@ -250,41 +258,23 @@ async def migration_page():
     show, and every figure on it comes from /api/migration/..., which is
     behind the admin sign-in.
 
-    `no-cache` for the reason RevalidatingStatic gives below: without it the
-    browser kept serving a superseded copy of this page after it changed
-    (seen 2026-09-28, a new element missing from the DOM while the server
-    was already returning it)."""
-    return FileResponse(os.path.join(BASE_DIR, "static", "migration.html"),
-                        headers={"Cache-Control": "no-cache"})
+    `no-cache` (backend/static_delivery.py): without it the browser kept
+    serving a superseded copy of this page after it changed (seen 2026-09-28,
+    a new element missing from the DOM while the server was already
+    returning it)."""
+    return static_delivery.page_response(request, os.path.join(BASE_DIR, "static", "migration.html"))
 
 
 # /debug, the plain data inspector, was removed 2026-09-28 for security at
 # Liwei's request: it was served to anyone, with buttons for sync and
 # SharePoint write-back. Its duties live on /admin, behind the admin sign-in.
 # /api/debug/backend (the read-only diagnostics) is unchanged.
-class RevalidatingStatic(StaticFiles):
-    """Static files that must be revalidated on every request.
-
-    Without this the browser applies its own heuristic freshness and happily
-    serves a stale script for minutes. That cost real time here -- the page
-    kept running a superseded hub-api.js while the file on disk and the one the
-    server returned were both current -- and it would cost Elio the same every
-    time he edits and reloads.
-
-    `no-cache` is not `no-store`: the response is still cached and still
-    revalidated with an ETag, so an unchanged file is a 304 and costs nothing.
-    """
-
-    def is_not_modified(self, response_headers, request_headers) -> bool:
-        return super().is_not_modified(response_headers, request_headers)
-
-    async def get_response(self, path: str, scope):
-        response = await super().get_response(path, scope)
-        response.headers["Cache-Control"] = "no-cache"
-        return response
-
-
-app.mount("/static", RevalidatingStatic(directory=os.path.join(BASE_DIR, "static")),
+#
+# Static files: `/static/v<build>/...` is immutable for a year, plain
+# `/static/...` is revalidated every time (it used to be RevalidatingStatic:
+# a stale hub-api.js once kept running after a change). Why, and what a local
+# checkout gets: backend/static_delivery.py.
+app.mount("/static", static_delivery.VersionedStatic(directory=os.path.join(BASE_DIR, "static")),
           name="static")
 
 
@@ -305,7 +295,7 @@ async def version():
 
 
 @app.get("/")
-async def index():
+async def index(request: Request):
     """The Hub's page, fed from the live API by static/js/hub/ (main.js).
 
     It began as Elio's concept mock-up; since 2026-10-14 it is ours (Liwei:
@@ -313,5 +303,4 @@ async def index():
     """
     # no-cache: revalidate every time, so a deploy never leaves a browser on
     # an old page that names scripts or styles which have since changed.
-    return FileResponse(os.path.join(BASE_DIR, "index.html"),
-                        headers={"Cache-Control": "no-cache"})
+    return static_delivery.page_response(request, os.path.join(BASE_DIR, "index.html"))

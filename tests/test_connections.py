@@ -468,3 +468,64 @@ def test_an_upload_closes_the_client_it_made(monkeypatch):
     with pytest.raises(w.UploadSessionExpired):
         w.upload(Bytes(), "https://upload.example/session", size=3)
     assert len(made) == 1 and made[0].is_closed, "closed even when the upload fails"
+
+
+# ───────────────────────────────────────── 7. Brightcove rides out a blip
+def brightcove_for(handler):
+    from backend.integrations.brightcove import BrightcoveClient
+
+    def routed(request):
+        if request.url.host == "oauth.brightcove.com":
+            return httpx.Response(200, json={"access_token": "tok", "expires_in": 300})
+        return handler(request)
+    return BrightcoveClient("123", "id", "secret", transport=httpx.MockTransport(routed),
+                            verify=False)
+
+
+def test_one_brightcove_timeout_no_longer_fails_the_sync():
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        if len(calls) == 1:
+            raise httpx.ReadTimeout("slow", request=request)
+        return httpx.Response(200, json={"id": "v1"})
+
+    assert brightcove_for(handler).video("v1") == {"id": "v1"}
+    assert len(calls) == 2
+
+
+def test_brightcove_honours_retry_after_on_429(no_sleeping):
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        if len(calls) == 1:
+            return httpx.Response(429, headers={"Retry-After": "7"})
+        return httpx.Response(200, json={"id": "v1"})
+
+    assert brightcove_for(handler).video("v1") == {"id": "v1"}
+    assert no_sleeping == [7]
+
+
+def test_brightcove_renews_an_expired_token_once():
+    from backend.integrations.brightcove import BrightcoveError
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        return httpx.Response(401)
+
+    with pytest.raises(BrightcoveError, match="401"):
+        brightcove_for(handler).video("v1")
+    assert len(calls) == 2
+
+
+def test_brightcove_gives_up_with_its_own_error():
+    from backend.integrations.brightcove import BrightcoveError
+
+    def handler(request):
+        raise httpx.ConnectError("down", request=request)
+
+    with pytest.raises(BrightcoveError, match="kept failing"):
+        brightcove_for(handler).video("v1")

@@ -604,3 +604,27 @@ def test_a_404_on_a_delta_next_link_raises_too():
 def test_a_missing_first_page_is_still_an_empty_listing():
     """Unchanged: a folder that is not there has no children."""
     assert graph_for(lambda r: httpx.Response(404, json={})).list_children("d", "gone") == []
+
+
+def test_a_download_link_is_minted_on_the_interactive_budget():
+    from types import SimpleNamespace
+
+    from backend.routers.assets import _signed_file_url
+    seen = []
+
+    class Fake:
+        def resolve_site(self, *a):
+            seen.append(http_policy.is_interactive())
+            return SimpleNamespace(site_id="s")
+
+        def find_drive(self, site_id, name):
+            seen.append(http_policy.is_interactive())
+            return SimpleNamespace(drive_id="d")
+
+        def download_url(self, drive_id, item_id):
+            seen.append(http_policy.is_interactive())
+            return "https://example.sharepoint.com/file"
+
+    assert _signed_file_url(Fake(), "asset-1", "item-1").startswith("https://")
+    assert seen == [True, True, True]
+    assert not http_policy.is_interactive(), "and the budget ends with the call"

@@ -624,10 +624,15 @@ def _signed_file_url(client: GraphClient, asset_id: str, item_id: str) -> str:
 
     It expires in about an hour, so it is never stored. 502 when Graph fails
     or returns none -- before anything is recorded, so an error is never
-    counted as a use."""
+    counted as a use.
+
+    Someone clicked and is waiting: the interactive budget (http_policy),
+    not a sync's minutes of retries."""
+    from backend.integrations import http_policy
     try:
-        drive = _asset_drive(client, asset_id)
-        url = client.download_url(drive.drive_id, item_id)
+        with http_policy.interactive():
+            drive = _asset_drive(client, asset_id)
+            url = client.download_url(drive.drive_id, item_id)
     except GraphError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     if not url:
@@ -707,9 +712,11 @@ def preview_file(asset_id: str, item_id: str,
     _require_perm(user, Perm.PREVIEW)
     _require_listed_file(asset_id, item_id, repo)
     _require_partner_access(asset_id, repo, user)
+    from backend.integrations import http_policy
     try:
-        drive = _asset_drive(client, asset_id)
-        url = client.preview(drive.drive_id, item_id)
+        with http_policy.interactive():                 # someone is waiting on it
+            drive = _asset_drive(client, asset_id)
+            url = client.preview(drive.drive_id, item_id)
     except GraphError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

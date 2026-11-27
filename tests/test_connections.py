@@ -574,3 +574,33 @@ def test_two_threads_never_refresh_with_the_same_refresh_token(tmp_path):
         t.join()
     assert errors == [] and used == ["r0"], "one refresh, and everyone shares its token"
     assert set(results) == {"a1"} and store.read()["refresh_token"] == "r1"
+
+
+# ───────────────────────────────────── 9. a broken page is not the end
+def test_a_404_on_a_next_link_raises_instead_of_returning_half_a_list():
+    def handler(request):
+        if request.url.path.endswith("/page2"):
+            return httpx.Response(404, json={})
+        return httpx.Response(200, json={
+            "value": [{"id": "d1", "name": "A"}],
+            "@odata.nextLink": "https://graph.microsoft.com/v1.0/page2"})
+
+    with pytest.raises(GraphError, match="incomplete"):
+        graph_for(handler).list_drives("site")
+
+
+def test_a_404_on_a_delta_next_link_raises_too():
+    def handler(request):
+        if request.url.path.endswith("/page2"):
+            return httpx.Response(404, json={})
+        return httpx.Response(200, json={
+            "value": [{"id": "i1"}],
+            "@odata.nextLink": "https://graph.microsoft.com/v1.0/page2"})
+
+    with pytest.raises(GraphError, match="incomplete"):
+        graph_for(handler).delta("drive")
+
+
+def test_a_missing_first_page_is_still_an_empty_listing():
+    """Unchanged: a folder that is not there has no children."""
+    assert graph_for(lambda r: httpx.Response(404, json={})).list_children("d", "gone") == []

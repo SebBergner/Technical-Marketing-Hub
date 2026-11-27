@@ -301,16 +301,30 @@ class GraphClient:
         except ValueError as exc:
             raise GraphError(f"non-JSON response from Graph for {url}") from exc
 
+    def _next_page(self, next_link: str, url: str, pages: int) -> dict:
+        """The page a nextLink points at. A 404 there is NOT the end of the
+        data -- the listing broke halfway -- so it raises rather than handing
+        back the pages read so far as if they were everything. A partial
+        list taken for the whole one is how a sync retires live demos."""
+        # nextLink is absolute and already carries every parameter.
+        payload = self._request("GET", next_link)
+        if not payload:
+            raise GraphError(
+                f"page {pages + 1} of {http_policy.log_path(url)} answered 404: the "
+                f"listing is incomplete, so none of it is used")
+        return payload
+
     def _paged(self, url: str, params: dict | None = None) -> Iterator[dict]:
         """Follow @odata.nextLink until exhausted."""
         payload = self._request("GET", url, params=params)
+        pages = 1
         while payload:
             yield from payload.get("value", [])
             next_link = payload.get("@odata.nextLink")
             if not next_link:
                 return
-            # nextLink is absolute and already carries every parameter.
-            payload = self._request("GET", next_link)
+            payload = self._next_page(next_link, url, pages)
+            pages += 1
 
     # ----------------------------------------------------------- diagnostics
     def verify_access(self, site_url: str | None = None) -> dict[str, Any]:
@@ -463,10 +477,12 @@ class GraphClient:
 
         items: list[dict] = []
         payload = self._request("GET", url, params={"$top": PAGE_SIZE} if not token else None)
+        pages = 1
         while payload:
             items.extend(payload.get("value", []))
             if link := payload.get("@odata.nextLink"):
-                payload = self._request("GET", link)
+                payload = self._next_page(link, url, pages)
+                pages += 1
                 continue
             delta_link = payload.get("@odata.deltaLink") or ""
             new_token = None

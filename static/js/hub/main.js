@@ -9,13 +9,12 @@
  * 6,000-line static/hub-api.js.
  *
  * This file boots the page: the sign-in watch on fetch, the person's
- * permissions, then load(), which fetches the catalogue, builds the cards
- * (window.HUB_ASSET_POOL, which hub-ui.js reads) and wires every view.
+ * permissions, then load(), which fetches the catalogue, builds Home and
+ * wires every view.
  */
 
 import { getJSON } from "./util.js";
 import { applyPermissions } from "./permissions.js";
-import { buildCard } from "./cards.js";
 import {
   enhanceSearchableSelect, fillPublished, fillSelect, fillSidebarCounts,
   HIDDEN_SEGMENTS, restoreFiltersFromUrl, takeOverControls, wireFilterBar
@@ -134,11 +133,9 @@ async function load() {
     return;
   }
 
-  // Setting this is the whole integration: hubApplyFilters() builds from the
-  // hardcoded cards only when it is still unset.
-  // hubApplyFilters() has already run once on load and filled the pool from
-  // the hardcoded cards, so this replaces rather than pre-empts it.
-  window.HUB_ASSET_POOL = assets.map(buildCard);
+  // No window.HUB_ASSET_POOL any more (2026-11-26): ~950 cards, each
+  // thumbnail registered with the lazy-load observer, built at boot for a
+  // pool nothing has read since hub-ui.js stopped filtering.
   buildHome(assets, facets);
 
   fillSelect("hubFilterProduct", (facets.product_families || facets.products || [])

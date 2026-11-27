@@ -152,3 +152,21 @@ def test_a_sync_the_shrink_guard_refuses_is_recorded_as_failed(data, monkeypatch
     state = repo.sync_state("sharepoint")
     assert state.get("last_attempt_ok") is False
     assert "WouldShrinkMirror" in (state.get("last_error") or "")
+
+
+# ─────────────────────────────────────────────── the shrink guard's floor
+def test_the_2026_09_02_partial_sync_is_now_refused(data, monkeypatch):
+    """455 -> 308 (68 %) passed the old floor of 0.5; 0.85 refuses it, and
+    the app setting lets a real cleanup through for one run."""
+    from backend.models import Asset, AssetType
+    from backend.repositories.json_repo import WouldShrinkMirror
+    repo = JsonAssetRepository(str(data))
+    full = [Asset(id=f"a{n}", type=AssetType.LDK, title=f"Kit {n}") for n in range(455)]
+    repo.replace_source_rows(full, "demo_catalog_test")
+    with pytest.raises(WouldShrinkMirror, match="SYNC_SHRINK_FLOOR"):
+        repo.replace_source_rows(full[:308], "demo_catalog_test")
+    assert repo.count_source_rows("demo_catalog_test") == 455
+    assert repo.replace_source_rows(full[:400], "demo_catalog_test") is not None  # 88 %: fine
+    monkeypatch.setattr(settings, "sync_shrink_floor", 0.5)
+    repo.replace_source_rows(full[:250], "demo_catalog_test")
+    assert repo.count_source_rows("demo_catalog_test") == 250

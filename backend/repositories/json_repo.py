@@ -1571,8 +1571,13 @@ class JsonAssetRepository(AssetRepository):
     #:
     #: So a shrink past this fraction is refused. It is not a data-integrity
     #: guarantee — the mirror is rebuildable — it is a tripwire on the one
-    #: mistake that looks like a normal run.
-    _SHRINK_FLOOR = 0.5
+    #: mistake that looks like a normal run. The fraction is the app setting
+    #: SYNC_SHRINK_FLOOR (0.85 since 2026-11-26; 0.5 before, which the
+    #: 455 -> 308 run above would have passed).
+    @property
+    def _SHRINK_FLOOR(self) -> float:
+        from backend.config import settings
+        return settings.sync_shrink_floor
 
     def replace_source_rows(self, assets: list[Asset], source_system: str,
                             allow_shrink: bool = False) -> int:
@@ -1581,8 +1586,9 @@ class JsonAssetRepository(AssetRepository):
         Rewrites one source's mirror file and maintains identity. Everything
         under owned/ is left completely alone — that is the whole point.
 
-        Raises `WouldShrinkMirror` when the replacement holds less than half of
-        what is already there, unless `allow_shrink` says the caller means it.
+        Raises `WouldShrinkMirror` when the replacement holds less than
+        SYNC_SHRINK_FLOOR (0.85) of what is already there, unless
+        `allow_shrink` says the caller means it.
         A source really can shrink — content gets deleted — so this is a
         question, not a prohibition.
         """
@@ -1593,8 +1599,9 @@ class JsonAssetRepository(AssetRepository):
                 f"a sync of {source_system!r} would replace {previous} assets "
                 f"with {len(assets)}, discarding "
                 f"{previous - len(assets)}. That is what a partial page looks "
-                f"like when it is mistaken for a full enumeration. Re-run with "
-                f"allow_shrink=True if the source really did lose them.")
+                f"like when it is mistaken for a full enumeration. If the source "
+                f"really did lose them, lower the app setting SYNC_SHRINK_FLOOR "
+                f"(now {self._SHRINK_FLOOR}) for one sync.")
         with self._lock:
             identity = self._load("identity")
             now = utcnow().isoformat(timespec="seconds")

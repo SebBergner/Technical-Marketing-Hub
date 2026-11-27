@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     #: if the catalogue outgrows files.
     storage_backend: str = "json"
 
+    #: A sync may not replace a source's mirror with less than this fraction
+    #: of what it holds (json_repo.replace_source_rows). 0.5 until 2026-11-26,
+    #: which would not have caught the 455 -> 308 partial sync of 2026-09-02;
+    #: 0.85 does. A real cleanup that removes more than 15 % of a source at
+    #: once is then refused and shown as a failed attempt on Admin: lower
+    #: this app setting for that one run (e.g. SYNC_SHRINK_FLOOR=0.5), sync,
+    #: and set it back.
+    sync_shrink_floor: float = 0.85
+
     #: Where file-backed data lives. Local disk on App Service is EPHEMERAL —
     #: it does not survive a restart, a redeploy or scale-out. Point this at an
     #: Azure Files mount before real users submit anything, or every intake

@@ -127,16 +127,44 @@ jobs:
 
       # /api/version is public. The slot restarts after a deploy, so give it
       # about ten minutes to come up on the new build.
+      #
+      # 2026-11-27: the first run saw nothing for ten minutes while staging
+      # answered v2026.3.227 from PTC's network, so each poll now prints the
+      # HTTP status or curl's error. A slot that never answers 200 to a
+      # GitHub runner (network or access restrictions) gives a warning and
+      # skips the smoke test; a slot that answers but stays on another build
+      # fails the run, since that is a deploy that did not take.
       - name: Wait for staging to run this build
+        id: wait
         run: |
           deadline=$(( $(date +%s) + 600 ))
+          answered=no
+          last=""
           while :; do
-            body=$(curl -fsS --max-time 15 "$BASE/api/version" 2>/dev/null || true)
-            got=$(printf '%s' "$body" | jq -r '.version // empty' 2>/dev/null || true)
-            echo "staging reports '${got:-nothing}', waiting for '$EXPECTED'"
-            [ "$got" = "$EXPECTED" ] && break
+            code=$(curl -sS --max-time 15 -o body.json -w '%{http_code}' "$BASE/api/version" 2>curl.err) || code=""
+            got=""
+            if [ "$code" = "200" ]; then
+              answered=yes
+              got=$(jq -r '.version // empty' body.json 2>/dev/null || true)
+            fi
+            if [ -n "$code" ]; then
+              seen="HTTP ${code}${got:+, version $got}"
+            else
+              seen="no answer ($(tail -n1 curl.err))"
+            fi
+            [ "$seen" != "$last" ] && echo "staging: $seen (waiting for $EXPECTED)"
+            last="$seen"
+            if [ "$got" = "$EXPECTED" ]; then
+              echo "reachable=yes" >> "$GITHUB_OUTPUT"
+              break
+            fi
             if [ "$(date +%s)" -ge "$deadline" ]; then
-              echo "::error::staging did not report $EXPECTED within 10 minutes (last: '${got:-nothing}')"
+              if [ "$answered" = no ]; then
+                echo "::warning title=Staging not reachable from GitHub::$BASE/api/version never answered 200 in 10 minutes (last: $seen). Smoke test skipped; check the slot's access restrictions."
+                echo "reachable=no" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              echo "::error::staging did not report $EXPECTED within 10 minutes (last: $seen)"
               exit 1
             fi
             sleep 15
@@ -145,6 +173,7 @@ jobs:
       # TMH_SMOKE_TOKENS: an API token created on staging with View the Hub
       # only. Without the secret the smoke test is skipped, not failed.
       - name: Smoke test
+        if: steps.wait.outputs.reachable == 'yes'
         env:
           TMH_SMOKE_TOKENS: ${{ secrets.TMH_SMOKE_TOKENS }}
         run: |

@@ -315,8 +315,8 @@ def test_sign_in_never_sends_you_somewhere_else(oidc, fake, client, next_path):
 
 
 @pytest.mark.parametrize("next_path", [
-    "//evil.example", "/\evil", "https://evil", "//evil.example/%2F..", "/	evil",
-    "\evil", "http:/evil", " //evil",
+    "//evil.example", r"/\evil", "https://evil", "//evil.example/%2F..", "/\t/evil",
+    r"\\evil", "http:/evil", " //evil",
 ])
 def test_login_when_already_signed_in_never_sends_you_somewhere_else(
         oidc, fake, client, next_path):

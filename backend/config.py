@@ -8,9 +8,17 @@ from __future__ import annotations
 
 import os
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+#: Set by Azure App Service on every instance; either one means we are on it.
+APP_SERVICE_MARKERS = ("WEBSITE_SITE_NAME", "WEBSITE_INSTANCE_ID")
+
+
+def on_app_service() -> bool:
+    return any(os.environ.get(name) for name in APP_SERVICE_MARKERS)
 
 
 class Settings(BaseSettings):
@@ -123,6 +131,13 @@ class Settings(BaseSettings):
     #: "oidc" is the app signing people in itself (backend/oidc.py): /login,
     #: /auth/callback, /logout, and a gate in front of every other route.
     auth_mode: str = "disabled"
+    #: The escape hatch from refusing to start (2026-11-26). On App Service
+    #: the app will not start unless AUTH_MODE is oidc or easyauth, because
+    #: anything else makes every visitor a full-rights developer. Set this to
+    #: true only to bring a slot up deliberately without sign-in -- for
+    #: minutes, never as a standing setting -- and the startup log still
+    #: shouts about it (backend/auth.py, startup_refusal).
+    auth_allow_disabled_on_azure: bool = False
 
     #: Entra ID group object ids (or app role names) whose members may curate —
     #: decide metadata proposals and trigger a sync. Comma-separated.
@@ -173,9 +188,10 @@ class Settings(BaseSettings):
     #: forgeable, but every restart signs everyone out and two instances would
     #: not recognise each other's cookies. security_warnings() says so.
     secret_key: str = ""
-    #: Marks the session cookie Secure. True on Azure; false locally, where
-    #: a Secure cookie over plain http would simply never be stored.
-    https_only: bool = False
+    #: Marks the session cookie Secure (and turns on HSTS). Defaults to true
+    #: on App Service and false locally, where a Secure cookie over plain
+    #: http would simply never be stored; HTTPS_ONLY overrides either way.
+    https_only: bool = Field(default_factory=on_app_service)
     #: Idle timeout, sliding: any request within the window extends it.
     session_timeout_hours: int = 12
     #: Hard ceiling, however active the session is. The identity provider has

@@ -117,8 +117,10 @@ def verify_password(username: str, password: str) -> bool:
     """Constant-time on both halves, and False whenever no admin is configured."""
     if not settings.admin_configured:
         return False
-    ok_user = hmac.compare_digest(username or "", settings.admin_username)
-    ok_pass = hmac.compare_digest(password or "", settings.admin_password)
+    # As bytes: on str, compare_digest raises TypeError for anything outside
+    # ASCII, which turned a typed "é" into a 500 (audit, 2026-11-26).
+    ok_user = hmac.compare_digest((username or "").encode(), settings.admin_username.encode())
+    ok_pass = hmac.compare_digest((password or "").encode(), settings.admin_password.encode())
     return ok_user and ok_pass          # no short-circuit: both always compared
 
 

@@ -265,7 +265,9 @@ def auth_callback(request: Request):
         return _page("That sign-in has expired",
                      "The sign-in you're returning from wasn't started in this "
                      "browser session. Start again and it will go through.", 400)
-    if not secrets.compare_digest(str(params.get("state", "")), str(flow["state"])):
+    # Bytes, not str: compare_digest raises on non-ASCII str, a 500.
+    if not secrets.compare_digest(str(params.get("state", "")).encode(),
+                                  str(flow["state"]).encode()):
         log.warning("sign-in callback with a state that does not match its flow")
         return _page("That sign-in couldn't be verified",
                      "The response didn't match the sign-in this browser "

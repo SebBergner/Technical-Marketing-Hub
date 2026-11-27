@@ -27,7 +27,7 @@ var CHUNK = 32 * 320 * 1024;
 var STATUS_WORD = { uploading: "Uploading", pending: "Waiting (from before review was removed)",
                     sent_back: "Sent back", published: "Published", cancelled: "Cancelled" };
 
-/* `bulk`: several videos at once, one demo each (bulk.js, 2026-11-25). */
+/* `bulk`: multi-video upload, one demo per video (bulk.js, 2026-11-25). */
 var up = { platforms: null, targets: null, platform: null, target: null, kind: null,
            values: {}, internal: false, files: [], preview: null, busy: false, step: 1,
            bulk: null };
@@ -256,7 +256,7 @@ function steps(box) {
 function drawWizard() {
   var box = document.getElementById("hubUpWizard");
   box.innerHTML = "";
-  box.appendChild(el("h3", "hub-up__h", up.bulk && up.step > 1 ? "New demos, several at once"
+  box.appendChild(el("h3", "hub-up__h", up.bulk && up.step > 1 ? "Multi-video upload"
                                                                 : "New demo"));
   steps(box);
   if (up.step === 1) stepWhere(box);
@@ -315,9 +315,10 @@ function stepWhere(box) {
       if (up.target && up.target.key === t.key && up.kind === k.key && up.bulk) {
         many.classList.add("on");
       }
-      many.appendChild(el("b", null, k.label + "s, several at once"));
-      many.appendChild(el("span", null, "Many video files, one demo each. Shared values "
-        + "filled once; details per video or from a sheet."));
+      // Named "Multi-video upload" at Liwei's request (2026-11-27).
+      many.appendChild(el("b", null, "Multi-" + k.label.toLowerCase() + " upload"));
+      many.appendChild(el("span", null, "One demo per video. Fill in the details from a "
+        + "sheet."));
       many.addEventListener("click", function () {
         if (!up.bulk || up.target !== t) up.bulk = { shared: {}, internal: false, rows: [] };
         up.target = t;

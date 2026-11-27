@@ -1359,8 +1359,16 @@ a.hub-up__title:hover{text-decoration:underline}
 .hub-up__summary dt{color:var(--orion-text-3)}
 .hub-up__summary dd{margin:0;color:var(--orion-text)}
 .hub-up__progress{display:grid;gap:4px}
-/* Create New Demo, several at once (bulk.js, 2026-11-25) */
-.hub-bulk__sheet{margin-top:14px;display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid var(--orion-border-md);border-radius:10px}
+/* Create New Demo -> Multi-video upload (bulk.js, 2026-11-25; reordered 2026-11-27) */
+.hub-bulk__sheet{margin-top:4px;display:flex;flex-direction:column;gap:8px;padding:14px 16px;border:1px solid var(--orion-border-md);border-radius:10px}
+.hub-bulk__sheet-h{font-size:14px;color:var(--orion-text)}
+.hub-bulk__guide{margin:0;padding-left:22px;display:grid;gap:10px;font-size:13px;color:var(--orion-text)}
+.hub-bulk__guide li{padding-left:4px}
+.hub-bulk__guide li>.hub-up__btn,.hub-bulk__guide li>.hub-up__picks{margin-right:10px}
+.hub-bulk__guide li>.hub-up__muted{display:block;margin-top:4px}
+.hub-bulk__guide .hub-bulk__paste{margin-top:8px}
+.hub-bulk__or{margin:14px 0 0}
+.hub-up__ok{color:var(--orion-green,#1a7f37);font-size:13px;margin:0}
 .hub-bulk__paste{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
 .hub-bulk__paste[hidden]{display:none}
 .hub-bulk__paste textarea{width:100%;box-sizing:border-box;font:inherit;font-size:12.5px;padding:7px 9px;border:1px solid var(--orion-border-md);border-radius:7px;background:var(--orion-surface);color:var(--orion-text)}

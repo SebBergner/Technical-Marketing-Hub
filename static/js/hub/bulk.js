@@ -1,21 +1,24 @@
-/* Create New Demo, several at once (#/upload, 2026-11-25).
+/* Create New Demo -> Multi-video upload (#/upload, 2026-11-25; reordered
+ * 2026-11-27 at Liwei's request).
  *
  * Seb had 34 AI Portfolio clips to add as Demo Videos, one demo each. The
- * one-demo wizard (upload.js) would take 34 passes; this takes one:
+ * one-demo wizard (upload.js) would take 34 passes; this takes one, in a
+ * fixed order:
  *
- *   2. Shared values -- filled once (video type, audio, date, ...): every
- *      video starts from them.
- *   3. Videos -- drop the files (or a folder); a row per video, its title
- *      made from the file name. Title and description are edited in the row;
- *      "Details" changes any other field for that video alone. A sheet fills
- *      the rows: paste from Excel or import a CSV, matched on the File
- *      column; "Download sheet" gives the columns, filled with the rows.
- *      "Check all" asks the server (POST /api/uploads/check) about every row
- *      at once -- required fields, options, names taken, two rows with the
- *      same title -- before anything is created.
- *   4. Create -- each row exactly as the one-demo wizard does it (POST
- *      /api/uploads, the file in chunks, finish), two at a time; a failed
- *      row can be tried again, the others are not held up.
+ *   2. Videos -- drop the files (or a folder); a row per video, its title
+ *      made from the file name.
+ *   3. Details -- (1) download the sheet: the File column already lists the
+ *      videos; (2) fill it in, in Excel; (3) import it, or paste it. Rows are
+ *      matched on the File column. Or edit each video here: title and
+ *      description in the row, any other field under "Details". A value the
+ *      same for every video is filled down in the sheet (a "Shared values"
+ *      step before the videos read as unclear and was dropped, 2026-11-27).
+ *   4. Check & create -- the server checks every row at once (POST
+ *      /api/uploads/check: required fields, options, names taken, two rows
+ *      with the same title) before anything is created; then each row exactly
+ *      as the one-demo wizard does it (POST /api/uploads, the file in chunks,
+ *      finish), two at a time; a failed row can be tried again, the others
+ *      are not held up.
  *
  * Videos only for now; a kit per dropped folder is the obvious next target.
  * Part of the Hub page's script; upload.js draws it. */
@@ -23,7 +26,7 @@
 import { api, button, drawWizard, el, isVideo, loadMine, metadataForm, requiredNow, sendAll,
          size, up, walkDrop, warnLeaving } from "./upload.js";
 
-var BULK_STEPS = ["Destination", "Shared values", "Videos", "Create"];
+var BULK_STEPS = ["Destination", "Videos", "Details", "Check & create"];
 //: Said per video, never shared.
 var OWN_ONLY = { title: true, description: true, long_description: true, named_customer: true };
 //: Edited in the row itself; the rest under "Details".
@@ -62,8 +65,8 @@ function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
 /* Anything edited makes the last check stale. */
 function stale() {
   bulk().checked = false;
-  var go = document.getElementById("hubBulkNext");
-  if (go) go.disabled = true;
+  bulk().asked = false;
+  bulk().checkError = "";
 }
 
 /* ── names ─────────────────────────────────────────────────────────────── */
@@ -268,57 +271,6 @@ function downloadSheet() {
   setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
 
-/* ── step 2: shared values ─────────────────────────────────────────────── */
-function stepShared(box) {
-  var b = bulk();
-  box.appendChild(el("p", "hub-up__muted", "Filled in once for every video. Each video can "
-    + "still change any of them in the next step, or from a sheet. Title, description and "
-    + "long description are said per video."));
-  var target = Object.assign({}, up.target, {
-    fields: up.target.fields.filter(function (f) { return !OWN_ONLY[f.key]; }) });
-  var note = el("span", "hub-up__muted");
-  var refresh = function () {
-    stale();
-    var empty = target.fields.filter(function (f) {
-      if (!requiredNow(target, b.shared, f)) return false;
-      var v = b.shared[f.key];
-      return f.kind === "yesno" ? (v !== true && v !== false)
-        : (v == null || v === "" || (Array.isArray(v) && !v.length));
-    });
-    note.textContent = empty.length ? "Required, still empty here: "
-      + empty.map(function (f) { return f.label; }).join(", ")
-      + ". Fill them here, per video, or from a sheet." : "";
-  };
-  box.appendChild(metadataForm(target, b.shared, { onChange: refresh }));
-  var internal = el("label", "hub-up__check");
-  var tick = el("input");
-  tick.type = "checkbox";
-  tick.checked = b.internal;
-  tick.addEventListener("change", function () {
-    b.internal = tick.checked;
-    if (tick.checked && b.shared.customer_facing !== false) {
-      b.shared.customer_facing = false;
-      drawWizard();
-    }
-    stale();
-  });
-  internal.appendChild(tick);
-  internal.appendChild(document.createTextNode(" PTC Only — partners cannot open the files, "
-    + "and none is customer facing"));
-  box.appendChild(internal);
-  var bar = el("div", "hub-up__bar");
-  var back = button("Back");
-  back.addEventListener("click", function () { up.step = 1; drawWizard(); });
-  var next = button("Next: videos", true);
-  next.addEventListener("click", function () { up.step = 3; drawWizard(); });
-  bar.appendChild(back);
-  bar.appendChild(next);
-  bar.appendChild(note);
-  box.appendChild(bar);
-  refresh();
-}
-
-/* ── step 3: the videos ────────────────────────────────────────────────── */
 function dropZone() {
   var drop = el("div", "hub-up__drop");
   drop.appendChild(el("b", null, "Drop the videos, or a folder of them, here"));
@@ -352,25 +304,37 @@ function dropZone() {
   return drop;
 }
 
+/* Step 3's guide: the sheet, in the order it is used. */
 function sheetTools() {
   var b = bulk();
   var box = el("div", "hub-bulk__sheet");
-  var bar = el("div", "hub-up__picks");
-  var paste = button("Paste from Excel");
+  box.appendChild(el("b", "hub-bulk__sheet-h", "Fill in the details from a sheet"));
+  var steps = el("ol", "hub-bulk__guide");
+
+  var one = el("li");
+  var dl = button("Download the sheet");
+  dl.addEventListener("click", downloadSheet);
+  one.appendChild(dl);
+  one.appendChild(el("span", "hub-up__muted", "The File column already lists your "
+    + b.rows.length + " video" + (b.rows.length === 1 ? "" : "s") + "; there is a column for "
+    + "every field."));
+  steps.appendChild(one);
+
+  steps.appendChild(el("li", null, "Fill it in, in Excel. A value that is the same for every "
+    + "video: type it once and drag it down. Several products: separate them with ;"));
+
+  var three = el("li");
   var csvIn = el("input");
   csvIn.type = "file";
   csvIn.accept = ".csv,.tsv,.txt,text/csv";
   csvIn.hidden = true;
-  var csv = button("Import CSV");
-  var dl = button(b.rows.length ? "Download sheet" : "Download empty sheet");
-  var msg = el("span", "hub-up__muted", b.sheetNote || "");
+  var csv = button("Import the sheet (CSV)", true);
+  var paste = button("Or paste from Excel");
   var area = el("div", "hub-bulk__paste");
   area.hidden = true;
   var text = el("textarea");
   text.rows = 6;
-  text.placeholder = "Copy the rows from Excel, header row included, and paste here. "
-    + "Columns: File, Title, Description, Long description, Products, … (Download sheet "
-    + "shows them all). Products: separate several with ;";
+  text.placeholder = "Copy the rows from Excel, header row included, and paste here.";
   var apply = button("Fill in the rows", true);
   area.appendChild(text);
   area.appendChild(apply);
@@ -385,12 +349,16 @@ function sheetTools() {
     if (!f) return;
     f.text().then(function (t) { b.sheetNote = applySheet(t); drawWizard(); });
   });
-  dl.addEventListener("click", downloadSheet);
-  [paste, csv, csvIn, dl].forEach(function (n) { bar.appendChild(n); });
-  box.appendChild(el("span", "hub-up__label", "Fill in from a sheet"));
-  box.appendChild(bar);
-  box.appendChild(msg);
-  box.appendChild(area);
+  var picks = el("div", "hub-up__picks");
+  [csv, paste, csvIn].forEach(function (n) { picks.appendChild(n); });
+  three.appendChild(picks);
+  three.appendChild(el("span", "hub-up__muted", "Rows are matched on the File column. Already "
+    + "have a sheet? Start here."));
+  three.appendChild(area);
+  steps.appendChild(three);
+
+  box.appendChild(steps);
+  if (b.sheetNote) box.appendChild(el("p", "hub-up__ok", b.sheetNote));
   return box;
 }
 
@@ -490,68 +458,113 @@ function itemOf(row) {
            files: [{ path: row.name, size: row.size || 0 }] };
 }
 
-function checkAll(msg, go) {
+/* Asks the server about every row not created yet (nothing is created). A
+   row whose demo was already made, but whose video failed, is not asked: it
+   only continues. Calls done() when the answer is in. */
+function checkAll(done) {
   var b = bulk();
   var todo = b.rows.filter(function (r) { return r.state !== "done"; });
-  var sendable = todo.filter(function (r) { return r.file; });
+  var ask = todo.filter(function (r) { return r.file && !r.record; });
   todo.forEach(function (r) {
-    if (!r.file) r.problems = ["No video file: drop " + r.name + " to add it."];
+    r.problems = r.file ? null : ["No video file: go back to Videos and add " + r.name + "."];
   });
-  if (!sendable.length) { b.checked = false; drawWizard(); return; }
-  go.disabled = true;
-  msg.textContent = "Checking " + sendable.length + "…";
-  api("POST", "/api/uploads/check", { items: sendable.map(itemOf) }).then(function (res) {
+  b.checking = true;
+  b.asked = true;
+  b.checkError = "";
+  var answer = ask.length ? api("POST", "/api/uploads/check", { items: ask.map(itemOf) })
+    : Promise.resolve({ items: [], ok: true });
+  answer.then(function (res) {
     res.items.forEach(function (r, i) {
-      sendable[i].problems = r.problems;
-      sendable[i].folder = r.folder_name;
+      ask[i].problems = r.problems;
+      ask[i].folder = r.folder_name;
     });
-    b.checked = sendable.length === todo.length && res.ok;
-    b.checkNote = b.checked ? "All " + todo.length + " can be created."
-      : todo.filter(function (r) { return r.problems && r.problems.length; }).length
-        + " of " + todo.length + " need a change (in red).";
-    drawWizard();
+    b.checked = !todo.some(function (r) { return r.problems && r.problems.length; });
   }).catch(function (e) {
-    go.disabled = false;
-    msg.textContent = e.message;
+    b.checked = false;
+    b.checkError = e.message;
+  }).then(function () {
+    b.checking = false;
+    done();
   });
 }
 
-function stepRows(box) {
+function bar(box, back, backTo, next) {
+  var row = el("div", "hub-up__bar");
+  var b = button(back);
+  b.addEventListener("click", function () {
+    if (bulk().running) return;
+    up.step = backTo;
+    drawWizard();
+  });
+  row.appendChild(b);
+  if (next) row.appendChild(next);
+  box.appendChild(row);
+  return row;
+}
+
+/* ── step 2: the videos ────────────────────────────────────────────────── */
+function stepVideos(box) {
   var b = bulk();
+  box.appendChild(el("p", "hub-up__muted", "First add the videos: each one becomes its own "
+    + "demo. Next you fill in their details, from a sheet or one by one."));
   box.appendChild(dropZone());
   if (b.note) box.appendChild(el("p", "hub-up__err", b.note));
-  box.appendChild(sheetTools());
-  var list = el("div", "hub-bulk__rows");
+  var withFile = b.rows.filter(function (r) { return r.file; });
   if (b.rows.length) {
-    var head = el("div", "hub-bulk__line hub-bulk__head");
-    ["#", "Video", "Title *", "Description *", ""].forEach(function (h) {
-      head.appendChild(el("span", "hub-up__label", h));
+    var list = el("div", "hub-bulk__rows");
+    b.rows.forEach(function (row) {
+      var line = el("div", "hub-up__file");
+      line.appendChild(el("span", "hub-up__path", row.name));
+      line.appendChild(el("span", row.file ? "hub-up__muted" : "hub-up__err",
+                          row.file ? size(row.size) : "Named in the sheet, not added yet"));
+      var x = button("Remove");
+      x.disabled = row.state === "done";
+      x.addEventListener("click", function () {
+        b.rows = b.rows.filter(function (r) { return r !== row; });
+        stale();
+        drawWizard();
+      });
+      line.appendChild(x);
+      list.appendChild(line);
     });
-    list.appendChild(head);
+    box.appendChild(list);
+    var total = withFile.reduce(function (s, r) { return s + (r.size || 0); }, 0);
+    box.appendChild(el("p", "hub-up__muted", withFile.length + " video"
+      + (withFile.length === 1 ? "" : "s") + " · " + size(total)));
   }
-  b.rows.forEach(function (row, i) { drawRow(list, row, i); });
-  box.appendChild(list);
-  var total = b.rows.reduce(function (s, r) { return s + (r.size || 0); }, 0);
-  if (b.rows.length) {
-    box.appendChild(el("p", "hub-up__muted", b.rows.length + " video"
-      + (b.rows.length === 1 ? "" : "s") + " · " + size(total)));
-  }
-  var bar = el("div", "hub-up__bar");
-  var back = button("Back");
-  back.addEventListener("click", function () { up.step = 2; drawWizard(); });
-  var check = button("Check all");
-  var next = button("Next: create", true);
-  next.id = "hubBulkNext";
-  next.disabled = !b.checked;
-  var msg = el("span", b.checked ? "hub-up__muted" : "hub-up__err", b.checkNote || "");
-  check.disabled = !b.rows.some(function (r) { return r.state !== "done"; });
-  check.addEventListener("click", function () { b.checkNote = ""; checkAll(msg, check); });
-  next.addEventListener("click", function () { up.step = 4; drawWizard(); });
-  [back, check, next, msg].forEach(function (n) { bar.appendChild(n); });
-  box.appendChild(bar);
+  var next = button("Next: details", true);
+  next.disabled = !withFile.length;
+  next.addEventListener("click", function () { up.step = 3; drawWizard(); });
+  bar(box, "Back", 1, next);
 }
 
-/* ── step 4: create ────────────────────────────────────────────────────── */
+/* ── step 3: the details ───────────────────────────────────────────────── */
+function stepDetails(box) {
+  var b = bulk();
+  box.appendChild(sheetTools());
+  box.appendChild(el("p", "hub-up__muted hub-bulk__or", "Or fill in each video below: title "
+    + "and description here, everything else under Details."));
+  var missing = b.rows.filter(function (r) { return !r.file && r.state !== "done"; }).length;
+  if (missing) {
+    box.appendChild(el("p", "hub-up__err", missing + " row" + (missing === 1 ? " names a video"
+      : "s name videos") + " not added yet: go back to Videos and add " + (missing === 1
+      ? "it" : "them") + ", or remove the row."));
+  }
+  var list = el("div", "hub-bulk__rows");
+  var head = el("div", "hub-bulk__line hub-bulk__head");
+  ["#", "Video", "Title *", "Description *", ""].forEach(function (h) {
+    head.appendChild(el("span", "hub-up__label", h));
+  });
+  list.appendChild(head);
+  b.rows.forEach(function (row, i) { drawRow(list, row, i); });
+  box.appendChild(list);
+  var next = button("Next: check & create", true);
+  next.disabled = !b.rows.some(function (r) { return r.state !== "done"; });
+  next.addEventListener("click", function () { up.step = 4; drawWizard(); });
+  bar(box, "Back", 2, next);
+}
+
+/* ── step 4: check, then create ────────────────────────────────────────── */
 function createOne(row) {
   row.state = "running";
   row.error = "";
@@ -599,6 +612,45 @@ function runAll(rows, after) {
 function stepCreate(box) {
   var b = bulk();
   var todo = b.rows.filter(function (r) { return r.state !== "done"; });
+  // Checked once on the way in; anything edited since makes it check again.
+  if (!b.asked && !b.checking && !b.running && todo.length) {
+    checkAll(drawWizard);
+  }
+  if (b.checking) {
+    box.appendChild(el("p", "hub-up__muted", "Checking " + todo.length + " video"
+      + (todo.length === 1 ? "" : "s") + "… nothing is created yet."));
+    bar(box, "Back", 3);
+    return;
+  }
+  if (b.checkError) {
+    box.appendChild(el("p", "hub-up__err", "The check did not finish: " + b.checkError));
+    var again = button("Check again", true);
+    again.addEventListener("click", function () { b.checkError = ""; b.asked = false; drawWizard(); });
+    bar(box, "Back", 3, again);
+    return;
+  }
+  if (!b.checked && todo.length) {
+    var bad = todo.filter(function (r) { return r.problems && r.problems.length; });
+    box.appendChild(el("p", "hub-up__err", bad.length + " of " + todo.length + " video"
+      + (todo.length === 1 ? "" : "s") + (bad.length === 1 ? " needs" : " need")
+      + " a change before anything is created. "
+      + "Change them in the sheet or under Details, then come back here."));
+    var probs = el("div", "hub-bulk__rows");
+    bad.forEach(function (row) {
+      var line = el("div", "hub-bulk__crow");
+      var head = el("div", "hub-bulk__chead");
+      head.appendChild(el("b", "hub-up__title", effective(row).title || row.name));
+      head.appendChild(el("span", "hub-up__muted", row.name));
+      line.appendChild(head);
+      line.appendChild(el("div", "hub-up__err", row.problems.join(" ")));
+      probs.appendChild(line);
+    });
+    box.appendChild(probs);
+    bar(box, "Back to details", 3);
+    return;
+  }
+  box.appendChild(el("p", "hub-up__ok", todo.length === 1 ? "Checked: it can be created."
+    : "Checked: all " + todo.length + " videos can be created."));
   var total = todo.reduce(function (s, r) { return s + (r.size || 0); }, 0);
   box.appendChild(el("p", null, todo.length + " demo" + (todo.length === 1 ? "" : "s")
     + " to create in " + up.target.library + " (" + size(total) + "), each published as soon "
@@ -619,14 +671,14 @@ function stepCreate(box) {
     list.appendChild(line);
   });
   box.appendChild(list);
-  var bar = el("div", "hub-up__bar");
-  var back = button("Back");
-  back.addEventListener("click", function () { if (!b.running) { up.step = 3; drawWizard(); } });
   var go = button(b.rows.some(function (r) { return r.state === "failed"; })
     ? "Try the failed ones again" : "Create " + todo.length + " demo" + (todo.length === 1 ? "" : "s"),
     true);
   go.disabled = !todo.length || b.running;
   var msg = el("span", "hub-up__muted");
+  var foot = bar(box, "Back", 3, go);
+  var back = foot.firstChild;
+  foot.appendChild(msg);
   go.addEventListener("click", function () {
     go.disabled = back.disabled = true;
     runAll(b.rows.filter(function (r) { return r.state !== "done"; }), function () {
@@ -642,20 +694,18 @@ function stepCreate(box) {
         var again = button("Start another batch", true);
         again.addEventListener("click", function () {
           up.bulk = { shared: b.shared, internal: b.internal, rows: [] };
-          up.step = 3;
+          up.step = 2;
           drawWizard();
         });
-        bar.appendChild(again);
+        foot.appendChild(again);
       }
     });
   });
-  [back, go, msg].forEach(function (n) { bar.appendChild(n); });
-  box.appendChild(bar);
 }
 
 function drawBulk(box) {
-  if (up.step === 2) stepShared(box);
-  else if (up.step === 3) stepRows(box);
+  if (up.step === 2) stepVideos(box);
+  else if (up.step === 3) stepDetails(box);
   else stepCreate(box);
 }
 

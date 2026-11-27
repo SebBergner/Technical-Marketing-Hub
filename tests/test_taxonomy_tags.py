@@ -178,3 +178,13 @@ def test_ptc_ignition_in_the_consensus_title_convention():
     parsed = parse_internal_title("PLM | PTC Ignition | Overview | Walkthrough | 5:00")
     assert parsed["product"] == "PTC Ignition"
     assert taxonomy.umbrella_of(parsed["product"]) == "IPE"
+
+
+def test_flexplm_is_its_own_product_under_the_windchill_umbrella():
+    """FlexPLM joined HubProducts for Seb's AI Portfolio clips (2026-11-26)
+    and is browsed under Windchill, like Arbortext."""
+    from backend.services import taxonomy
+    assert classify_tag("FlexPLM") == ("product", "FlexPLM")
+    assert taxonomy.family_of("FlexPLM") == "FlexPLM"
+    assert taxonomy.umbrella_of("FlexPLM") == "Windchill"
+    assert taxonomy.umbrellas_of(["FlexPLM", "Windchill"]) == ["Windchill"]

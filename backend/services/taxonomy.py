@@ -40,6 +40,9 @@ _FAMILY_PREFIXES = (
     # is its own family, so a Consensus tag of either is read as a product;
     # FAMILY_ROLLUP puts Ignition under the IPE umbrella.
     "PTC Ignition", "IPE",
+    # Retail PLM, a Windchill product (FAMILY_ROLLUP); on Demo Video's
+    # HubProducts since 2026-11-26 for Seb's AI Portfolio clips.
+    "FlexPLM",
 )
 
 #: One family per product, whichever way it is spelled. The full-name
@@ -320,6 +323,8 @@ FAMILY_ROLLUP = {
     # A product of the IPE portfolio (2026-11-18): the demo keeps "PTC
     # Ignition" as its product and family; only its umbrella is IPE.
     "PTC Ignition": "IPE",
+    # Its own product and family, browsed under Windchill (Liwei, 2026-11-26).
+    "FlexPLM": "Windchill",
     # Not rollups -- the same product spelled two ways. Seb's list carries the
     # brand prefix and SharePoint's Product column does not, so without these
     # both families read zero while 6 assets each sit in the catalogue.

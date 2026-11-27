@@ -10,7 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from backend.config import settings
 from backend.version import app_version
 from backend.db import SessionLocal, create_all
-from backend import admin_log, oidc, view_as
+from backend import admin_log, api_docs, oidc, view_as
 from backend.routers import (
     admin, assets, auth, consensus, content_health, curation, debug, disclaimer, graph, me,
     migration,
@@ -117,6 +117,11 @@ app = FastAPI(
     description="Unified catalogue for PTC Technical Demo Development content.",
     version="0.2.0",
     lifespan=lifespan,
+    # FastAPI's own /docs, /redoc and /openapi.json are open to anyone who
+    # gets in; backend/api_docs.py serves them to View Admin only (D4).
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 app.include_router(auth.router)
@@ -143,6 +148,7 @@ app.include_router(disclaimer.welcome_router)
 app.include_router(status.router)
 app.include_router(content_health.router)
 app.include_router(me.router)
+app.include_router(api_docs.router)
 
 # Middleware, innermost first. Starlette wraps each new one around the ones
 # already added, so the order below is the reverse of the order a request
@@ -175,6 +181,10 @@ app.add_middleware(
 app.middleware("http")(oidc.canonical_host)
 
 
+CONTENT_SECURITY_POLICY = ("frame-ancestors 'self'; script-src 'self'; "
+                           "object-src 'none'; base-uri 'self'")
+
+
 @app.middleware("http")
 async def security_headers(request, call_next):
     """On every answer, redirects and errors included (D3, 2026-10-30).
@@ -183,11 +193,17 @@ async def security_headers(request, call_next):
     not work in another site's frame anyway. No fuller Content-Security-Policy:
     the pages frame SharePoint and Consensus and use inline styles, and one
     wrong source would break previews for everybody. HSTS only where the slot
-    is HTTPS, so a local run on http is untouched."""
+    is HTTPS, so a local run on http is untouched.
+
+    Scripts, plugins and <base> are locked to the Hub (2026-11-26): none of
+    the pages has an inline script, an on*= attribute or an eval, so
+    `script-src 'self'` costs nothing and turns an injected <script> into
+    a dead one. frame-src, style-src and img-src stay open for the reason
+    above. The API reference sends its own policy (backend/api_docs.py)."""
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-    response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'self'")
+    response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     if settings.https_only:
         response.headers.setdefault("Strict-Transport-Security", "max-age=15552000")

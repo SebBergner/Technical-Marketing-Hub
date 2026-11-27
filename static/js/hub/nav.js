@@ -263,7 +263,7 @@ function markUnavailable(facets) {
     if (!reason || live[name]) return;
     // An inline style, not a class: Elio's .orion-navitem sets its own
     // display, and a stylesheet rule of equal specificity loses to whichever
-    // is declared later in a 2.5 MB file. Inline always wins.
+    // is declared later in static/css/hub.css. Inline always wins.
     if (HIDE_UNAVAILABLE.indexOf(name) !== -1) {
       item.style.display = "none";
       return;
@@ -316,7 +316,7 @@ function markNavActive() {
     }
     item.classList.toggle("is-active", on);
     // The class that actually shows. `is-active` is ours and has no rule
-    // behind it in 2.5 MB of stylesheet; orion-navitem--active is Elio's and
+    // behind it in static/css/hub.css; orion-navitem--active is Elio's and
     // is what draws the highlight. Toggling only ours meant the highlight
     // sat wherever his markup left it, which was Home, for ever.
     item.classList.toggle("orion-navitem--active", on);

@@ -35,6 +35,7 @@ Known documentation gaps, handled explicitly rather than guessed at:
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Protocol
@@ -348,6 +349,9 @@ class HttpConsensusClient:
 
     def is_configured(self) -> bool:
         return True
+
+    def close(self) -> None:
+        self._client.close()
 
     # -------------------------------------------------------------- plumbing
     def _post(self, path: str, body: dict[str, Any] | None = None,
@@ -728,18 +732,41 @@ class HttpConsensusClient:
 
 
 # ------------------------------------------------------------------ factory
+_shared_lock = threading.Lock()
+_shared: tuple[tuple, HttpConsensusClient] | None = None
+
+
 def get_consensus_client() -> ConsensusClient:
     """Real client when credentials exist, stub otherwise.
 
     Swapping one for the other is a config change, never a code change.
+
+    The real one is shared by the whole process and keyed on the settings it
+    was built from (2026-11-26): it used to be a new connection pool per
+    call, never closed. The acting user travels per call (`as_user`), so
+    sharing it changes nobody's identity.
     """
-    if settings.consensus_configured:
-        return HttpConsensusClient(
-            base_url=settings.consensus_base_url,
-            api_key=settings.consensus_api_key,
-            api_secret=settings.consensus_api_secret,
-            user_email=settings.consensus_user_email,
-            source_name=settings.consensus_source_name,
-            viewer_url_template=settings.consensus_viewer_url_template,
-        )
-    return StubConsensusClient()
+    global _shared
+    if not settings.consensus_configured:
+        return StubConsensusClient()
+    key = (settings.consensus_base_url, settings.consensus_api_key,
+           settings.consensus_api_secret, settings.consensus_user_email,
+           settings.consensus_source_name, settings.consensus_viewer_url_template)
+    with _shared_lock:
+        if _shared is None or _shared[0] != key:
+            _shared = (key, HttpConsensusClient(
+                base_url=settings.consensus_base_url,
+                api_key=settings.consensus_api_key,
+                api_secret=settings.consensus_api_secret,
+                user_email=settings.consensus_user_email,
+                source_name=settings.consensus_source_name,
+                viewer_url_template=settings.consensus_viewer_url_template,
+            ))
+        return _shared[1]
+
+
+def reset_consensus_client() -> None:
+    """Forget the shared client; the next get_consensus_client() builds afresh."""
+    global _shared
+    with _shared_lock:
+        _shared = None

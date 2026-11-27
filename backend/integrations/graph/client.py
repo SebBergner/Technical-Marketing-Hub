@@ -30,6 +30,7 @@ import base64
 import binascii
 import json
 import logging
+import threading
 from dataclasses import dataclass, field
 from typing import Any, Iterator
 from urllib.parse import quote, urlparse
@@ -46,6 +47,10 @@ SCOPE = "https://graph.microsoft.com/.default"
 
 #: Graph caps page size; 999 is the practical maximum for list/drive children.
 PAGE_SIZE = 200
+
+#: Seconds MSAL may wait on login.microsoftonline.com. It had no timeout, so
+#: a hung token endpoint could hold a request thread indefinitely.
+MSAL_TIMEOUT = 10
 
 
 class GraphError(RuntimeError):
@@ -133,6 +138,7 @@ class GraphClient:
         #: or a real tenant.
         self._token_provider = token_provider
         self._msal_app = None
+        self._msal_lock = threading.Lock()
         self._client = httpx.Client(
             base_url=GRAPH_ROOT, timeout=timeout,
             headers={"Accept": "application/json"},
@@ -146,14 +152,22 @@ class GraphClient:
 
         import msal
 
-        if self._msal_app is None:
-            self._msal_app = msal.ConfidentialClientApplication(
-                client_id=self._client_id,
-                client_credential=self._client_secret,
-                authority=f"https://login.microsoftonline.com/{self._tenant_id}",
-            )
-        # MSAL caches and refreshes internally; asking every call is correct.
-        result = self._msal_app.acquire_token_for_client(scopes=[scope])
+        try:
+            with self._msal_lock:      # one app per client, shared by all threads
+                if self._msal_app is None:
+                    self._msal_app = msal.ConfidentialClientApplication(
+                        client_id=self._client_id,
+                        client_credential=self._client_secret,
+                        authority=f"https://login.microsoftonline.com/{self._tenant_id}",
+                        timeout=MSAL_TIMEOUT,
+                    )
+            # MSAL caches and refreshes internally (thread-safe); asking every
+            # call is correct.
+            result = self._msal_app.acquire_token_for_client(scopes=[scope])
+        except GraphError:
+            raise
+        except Exception as exc:                     # noqa: BLE001 - network, not auth
+            raise GraphError(f"could not reach the Microsoft token endpoint: {exc}") from exc
         if "access_token" not in result:
             raise GraphAuthError(
                 f"{result.get('error', 'unknown')}: "
@@ -575,19 +589,49 @@ class GraphClient:
         return headers
 
 
+    def close(self) -> None:
+        self._client.close()
+
+
 # ------------------------------------------------------------------ factory
+_shared_lock = threading.Lock()
+_shared: tuple[tuple, GraphClient] | None = None
+
+
 def get_graph_client() -> GraphClient | None:
     """Configured client, or None while the IT request is outstanding.
 
     Returning None rather than a stub is deliberate: unlike Consensus, there is
     nothing useful to fake here. A caller must decide what to do without Graph,
     and a silent stub would hide that Graph is simply not available yet.
+
+    One client for the whole process (2026-11-26). It used to be built per
+    call -- per thumbnail, preview and upload -- each with its own connection
+    pool and MSAL app, none ever closed, and each paying a fresh TLS
+    handshake and token lookup. httpx.Client and MSAL's token cache are both
+    thread-safe. The client is keyed on the settings it was built from, so a
+    changed secret (or a test that changes settings) gets a new one.
     """
+    global _shared
     if not settings.graph_configured:
         return None
-    return GraphClient(
-        tenant_id=settings.graph_tenant_id,
-        client_id=settings.graph_client_id,
-        client_secret=settings.graph_client_secret,
-        site_url=settings.graph_site_url,
-    )
+    key = (settings.graph_tenant_id, settings.graph_client_id,
+           settings.graph_client_secret, settings.graph_site_url)
+    with _shared_lock:
+        if _shared is None or _shared[0] != key:
+            # The one it replaces is not closed: another thread may be
+            # mid-call on it. It is collected when the last user lets go.
+            _shared = (key, GraphClient(
+                tenant_id=settings.graph_tenant_id,
+                client_id=settings.graph_client_id,
+                client_secret=settings.graph_client_secret,
+                site_url=settings.graph_site_url,
+            ))
+        return _shared[1]
+
+
+def reset_graph_client() -> None:
+    """Forget the shared client; the next get_graph_client() builds afresh."""
+    global _shared
+    with _shared_lock:
+        _shared = None

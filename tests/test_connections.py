@@ -325,3 +325,146 @@ def test_a_request_takes_at_most_ten_files_and_reports_the_true_size(api):
                  files=[("files", ("big.pdf", b"x" * (MAX_ATTACHMENT_BYTES + 3 * 1024 * 1024),
                                    "application/pdf"))])
     assert "7.0 MB is over" in " ".join(r.json()["attachments_rejected"])
+
+
+# ─────────────────────────────────────────────── 5. one client per process
+def _configure_graph(monkeypatch, secret="s1"):
+    from backend.config import settings
+    monkeypatch.setattr(settings, "graph_tenant_id", "t")
+    monkeypatch.setattr(settings, "graph_client_id", "c")
+    monkeypatch.setattr(settings, "graph_client_secret", secret)
+    monkeypatch.setattr(settings, "graph_site_url", SITE_URL)
+
+
+def test_get_graph_client_is_shared_and_follows_the_settings(monkeypatch):
+    from backend.integrations.graph.client import get_graph_client, reset_graph_client
+    _configure_graph(monkeypatch)
+    first = get_graph_client()
+    assert first is not None and get_graph_client() is first
+    _configure_graph(monkeypatch, secret="rotated")
+    assert get_graph_client() is not first, "a changed secret gets a new client"
+    reset_graph_client()
+    assert get_graph_client() is not None
+
+
+def test_the_shared_graph_client_is_safe_across_threads(monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    from backend.integrations.graph.client import get_graph_client
+    _configure_graph(monkeypatch)
+    with ThreadPoolExecutor(8) as pool:
+        clients = set(map(id, pool.map(lambda _: get_graph_client(), range(32))))
+    assert len(clients) == 1
+
+
+def test_msal_gets_a_timeout_and_one_app_per_client(monkeypatch):
+    import msal
+    made = []
+
+    class FakeApp:
+        def __init__(self, **kwargs):
+            made.append(kwargs)
+
+        def acquire_token_for_client(self, scopes):
+            return {"access_token": "tok"}
+
+    monkeypatch.setattr(msal, "ConfidentialClientApplication", FakeApp)
+    client = GraphClient("t", "c", "s", transport=httpx.MockTransport(
+        lambda r: httpx.Response(200, json={})))
+    client._token()
+    client._token()
+    assert len(made) == 1 and made[0]["timeout"] == 10
+
+
+def test_an_unreachable_token_endpoint_is_a_graph_error_not_a_crash(monkeypatch):
+    import msal
+
+    class Down:
+        def __init__(self, **kwargs):
+            pass
+
+        def acquire_token_for_client(self, scopes):
+            raise ConnectionError("login.microsoftonline.com unreachable")
+
+    monkeypatch.setattr(msal, "ConfidentialClientApplication", Down)
+    with pytest.raises(GraphError, match="token endpoint"):
+        GraphClient("t", "c", "s")._token()
+
+
+def test_get_consensus_client_is_shared_and_follows_the_settings(monkeypatch):
+    from backend.config import settings
+    from backend.integrations.consensus import StubConsensusClient, get_consensus_client
+    for name, value in (("consensus_api_key", "k"), ("consensus_api_secret", "s"),
+                        ("consensus_user_email", "svc@example.com"),
+                        ("consensus_base_url", "https://app.goconsensus.com")):
+        monkeypatch.setattr(settings, name, value)
+    if not settings.consensus_configured:
+        pytest.skip("consensus_configured needs more settings here")
+    first = get_consensus_client()
+    assert isinstance(first, HttpConsensusClient) and get_consensus_client() is first
+    monkeypatch.setattr(settings, "consensus_api_secret", "rotated")
+    assert get_consensus_client() is not first
+    monkeypatch.setattr(settings, "consensus_api_key", "")
+    assert isinstance(get_consensus_client(), StubConsensusClient)
+
+
+def test_v2_reuses_one_connection_pool_across_pages():
+    from backend.integrations.consensus_v2 import ConsensusV2Client
+    pages = [{"data": {"items": [{"id": 1}], "next": "c2"}},
+             {"data": {"items": [{"id": 2}], "next": None}}]
+    seen = []
+
+    def handler(request):
+        seen.append(str(request.url))
+        return httpx.Response(200, json=pages[len(seen) - 1])
+
+    client = ConsensusV2Client(token="t", base_url="https://app.goconsensus.com",
+                               transport=httpx.MockTransport(handler))
+    pool = client._http
+    assert [d["id"] for d in client.all_demos()] == [1, 2]
+    assert client._http is pool and len(seen) == 2
+
+
+def test_a_cached_thumbnail_never_builds_a_client(tmp_path):
+    from backend.services import thumbnails
+    url = "https://ptccloud.sharepoint.com/sites/x/SiteAssets/a.jpg"
+    asked = []
+
+    def factory():
+        asked.append(1)
+        return None
+
+    assert thumbnails.get(str(tmp_path), factory, url) is None   # empty cache: asked
+    assert asked == [1]
+    data_path, meta_path = thumbnails._paths(str(tmp_path), url)
+    import json
+    import os
+    os.makedirs(os.path.dirname(data_path), exist_ok=True)
+    with open(data_path, "wb") as fh:
+        fh.write(b"img")
+    with open(meta_path, "w", encoding="utf-8") as fh:
+        json.dump({"content_type": "image/png", "compact": thumbnails.COMPACT_VERSION}, fh)
+    assert thumbnails.get(str(tmp_path), factory, url) == (b"img", "image/png")
+    assert asked == [1], "a cache hit does not touch Graph at all"
+
+
+def test_an_upload_closes_the_client_it_made(monkeypatch):
+    from backend.integrations.graph import migration_writer as w
+    made = []
+    real = httpx.Client
+
+    class Tracking(real):
+        def __init__(self, **kwargs):
+            super().__init__(transport=httpx.MockTransport(
+                lambda r: httpx.Response(404)), **kwargs)
+            made.append(self)
+
+    monkeypatch.setattr(w.httpx, "Client", Tracking)
+
+    class Bytes:
+        def open(self, offset=0, block=0):
+            yield b"abc"
+
+    with pytest.raises(w.UploadSessionExpired):
+        w.upload(Bytes(), "https://upload.example/session", size=3)
+    assert len(made) == 1 and made[0].is_closed, "closed even when the upload fails"

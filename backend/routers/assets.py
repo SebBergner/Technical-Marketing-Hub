@@ -595,6 +595,7 @@ def asset_thumbnail(asset_id: str, repo: AssetRepository = Depends(get_repo),
     """A SharePoint-hosted picture, fetched by the Hub so every viewer sees it,
     signed into SharePoint or not (services/thumbnails.py, 2026-10-20). Seen by
     whoever may see the demo; 404 lets the card fall back to its cover."""
+    from backend.integrations import http_policy
     from backend.integrations.graph.client import get_graph_client
     from backend.services import thumbnails
     get_asset(asset_id, repo, user)                      # the same 404s as the page
@@ -602,7 +603,11 @@ def asset_thumbnail(asset_id: str, repo: AssetRepository = Depends(get_repo),
     if not thumbnails.is_sharepoint(source):
         raise HTTPException(status_code=404, detail="No SharePoint picture for this demo.")
     try:
-        picture = thumbnails.get(repo.mirror_dir, get_graph_client(), source, wait=False)
+        # The client only when the cache cannot answer; a viewer is waiting,
+        # so the short budget (a refresh behind it runs in its own thread,
+        # on the background one).
+        with http_policy.interactive():
+            picture = thumbnails.get(repo.mirror_dir, get_graph_client, source, wait=False)
     except thumbnails.Busy:
         # Never queue a viewer behind SharePoint: the cover now, the picture
         # once the background warm-up has it (not cached, so no-store).

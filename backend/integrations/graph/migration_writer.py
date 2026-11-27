@@ -29,6 +29,7 @@ from urllib.parse import quote
 import httpx
 
 from backend.config import settings
+from backend.integrations import http_policy
 from backend.integrations.graph.client import GraphClient, GraphError
 from backend.integrations.tls import system_trust
 from backend.services import sharepoint_mapping as m
@@ -333,9 +334,14 @@ class ByteSource:
         if not self.is_url:
             import os
             return os.path.getsize(self.location)
+        own = self._http is None
         http = self._http or httpx.Client(follow_redirects=True, timeout=60,
                                           verify=system_trust())
-        r = http.head(self.location)
+        try:
+            r = http.head(self.location)
+        finally:
+            if own:                 # one HEAD: the pool is not wanted after it
+                http.close()
         r.raise_for_status()
         length = r.headers.get("content-length")
         if not length:
@@ -349,18 +355,23 @@ class ByteSource:
                 while chunk := fh.read(block):
                     yield chunk
             return
+        own = self._http is None
         http = self._http or httpx.Client(follow_redirects=True, timeout=120,
                                           verify=system_trust())
         headers = {"Range": f"bytes={offset}-"} if offset else {}
-        with http.stream("GET", self.location, headers=headers) as r:
-            r.raise_for_status()
-            skip = offset if (offset and r.status_code != 206) else 0   # no Range support
-            for chunk in r.iter_bytes(block):
-                if skip:
-                    drop = min(skip, len(chunk))
-                    chunk, skip = chunk[drop:], skip - drop
-                if chunk:
-                    yield chunk
+        try:
+            with http.stream("GET", self.location, headers=headers) as r:
+                r.raise_for_status()
+                skip = offset if (offset and r.status_code != 206) else 0   # no Range support
+                for chunk in r.iter_bytes(block):
+                    if skip:
+                        drop = min(skip, len(chunk))
+                        chunk, skip = chunk[drop:], skip - drop
+                    if chunk:
+                        yield chunk
+        finally:
+            if own:
+                http.close()
 
 
 class BrightcoveSource:
@@ -421,7 +432,12 @@ def upload(source: ByteSource, upload_url: str, *, size: int,
     The upload URL is pre-authorised: sending our bearer token to it is both
     unnecessary and, per Graph's guidance, wrong. Returns the driveItem.
     """
-    up = uploader or httpx.Client(timeout=httpx.Timeout(120.0, connect=30.0))
+    if uploader is None:
+        # Built here, so closed here: one pool per upload, not one leaked.
+        with httpx.Client(timeout=httpx.Timeout(120.0, connect=30.0)) as own:
+            return upload(source, upload_url, size=size, uploader=own,
+                          chunk_size=chunk_size, on_progress=on_progress)
+    up = uploader
     status = up.get(upload_url)
     if status.status_code in (404, 410):
         raise UploadSessionExpired(f"upload session gone (HTTP {status.status_code})")
@@ -442,7 +458,8 @@ def upload(source: ByteSource, upload_url: str, *, size: int,
                 time.sleep(min(2 ** attempt, 30))
                 continue
             if r.status_code == 429 or r.status_code >= 500:
-                time.sleep(min(float(r.headers.get("Retry-After", 2 ** attempt)), 60))
+                wait = http_policy.parse_retry_after(r.headers.get("Retry-After"))
+                time.sleep(min(2 ** attempt if wait is None else wait, 60))
                 continue
             break
         else:

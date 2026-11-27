@@ -221,9 +221,13 @@ class GraphClient:
         retried — they are meaningful states, not transient faults.
         """
         last: Exception | None = None
+        # Popped ONCE, before the loop. Popping inside it sent If-Match and
+        # Content-Type on the first attempt only, so a throttled PATCH was
+        # retried without its ETag and could overwrite a concurrent edit.
+        extra_headers = dict(kwargs.pop("headers", None) or {})
         for attempt in range(4):
             headers = {"Authorization": f"Bearer {self._token()}"}
-            headers.update(kwargs.pop("headers", {}) or {})
+            headers.update(extra_headers)
             try:
                 response = self._client.request(method, url, headers=headers, **kwargs)
             except httpx.HTTPError as exc:

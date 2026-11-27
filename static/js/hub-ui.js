@@ -1,5 +1,5 @@
 /* The page's own behaviour: the request form, the share and style-example
- * modals, the card pool static/js/hub/ fills, and the sidebar's view switches.
+ * modals, and the sidebar's view switches.
  * Split out of index.html 2026-10-14; loaded before static/js/hub/main.js. */
 function openShareModal(title, meta, uuid) {
   document.getElementById('shareAssetTitle').textContent = title;
@@ -26,106 +26,9 @@ function copyShareLink() {
 }
 
 
-var videoData = {
-  'dup-parts': {
-    title: 'Eliminate Duplicate Parts with Windchill AI Parts Classification',
-    logo: 'windchill', logoViewBox: '0 0 1299.67 299.6', metaText: 'Consideration · EN',
-    stats: '214 views · Uploaded Jul 21', uuid: '7a19-3c02', duration: '4:12',
-    desc: 'Walks through detecting and eliminating duplicate parts with Windchill AI Parts Classification — searching the part library, reviewing AI-ranked similarity candidates, and consolidating matches into a single canonical part.',
-    drivers: ['Efficiency', 'Quality & Regulatory'],
-    capabilities: [
-      { phase: 'DEFINE', title: 'Parts Classification & Reuse', chips: ['AI Similarity Search', 'Attribute-Based Classification', 'Reuse Recommendations'], narration: 'Narration runs the AI classifier against the part library and reviews similarity-ranked candidates.' },
-      { phase: 'DESIGN', title: 'Duplicate Resolution & Consolidation', chips: ['Part Merge', 'Where-Used Impact Check'], narration: 'Demo merges the duplicate into the canonical part and checks where-used impact across active assemblies.' }
-    ]
-  },
-  'creo-composites': {
-    title: 'Creo Chapters S1E4 — Composites Deep Dive (Replay)',
-    logo: 'creo', logoViewBox: '0 0 1334.88 449.9', metaText: 'Awareness · EN',
-    stats: '402 views · Uploaded Jul 14', uuid: '4f61-88ab', duration: '6:47',
-    desc: 'Fourth episode of the Creo Chapters series — a deep dive into composite layup design, core-zone modeling, and a generative pass to trim laminate mass.',
-    drivers: ['Innovation', 'Efficiency'],
-    capabilities: [
-      { phase: 'DESIGN', title: 'Composite Layup Design', chips: ['Ply Definition', 'Core Zone Modeling', 'Flat Pattern Output'], narration: 'Episode builds up composite plies and core zones directly on the bracket model.' },
-      { phase: 'IMPROVE', title: 'Structural Optimization', chips: ['Generative Design', 'Topology Study'], narration: 'Replay covers a generative design pass to trim laminate mass while holding the load case.' }
-    ]
-  },
-  'walkthrough-audio': {
-    title: 'Windchill AI Parts Rationalization — Walkthrough with Audio',
-    logo: 'windchill', logoViewBox: '0 0 1299.67 299.6', metaText: 'Consideration · EN',
-    stats: '1,204 views · 38 shares', uuid: '8f3c-19ea', duration: '6:58',
-    desc: 'Narrated walkthrough of the Windchill AI Parts Rationalization flow — searching, classifying, and consolidating duplicate parts, then routing the change for review.',
-    drivers: ['Efficiency', 'Quality & Regulatory'],
-    capabilities: [
-      { phase: 'DEFINE', title: 'Parts Classification & Reuse', chips: ['AI Similarity Search', 'Attribute-Based Classification', 'Reuse Recommendations'], narration: 'Narration runs the AI classifier against the part library and reviews similarity-ranked candidates.' },
-      { phase: 'VALIDATE', title: 'Rationalization Review & Sign-off', chips: ['Review Queue', 'Approval Workflow'], narration: 'Walkthrough finishes by routing the consolidated part through review and capturing sign-off.' }
-    ]
-  },
-  'exec-overview': {
-    title: 'The Intelligent Product Lifecycle — Executive Overview',
-    logo: 'windchill', logoViewBox: '0 0 1299.67 299.6', metaText: 'Awareness · EN',
-    stats: '967 views · 51 shares', uuid: 'c015-6b7d', duration: '3:35',
-    desc: 'A single narrative arc across Windchill, CodeBeamer, and Creo — built for first-call, cross-portfolio pitches on the intelligent product lifecycle.',
-    drivers: ['Efficiency', 'Innovation', 'Quality & Regulatory'],
-    capabilities: [
-      { phase: 'PLAN', title: 'Enterprise Change Management', chips: ['Closed-Loop Change Management', 'Change Impact Analysis', 'Release Management'], narration: 'Frames show the Windchill Change Request workflow — reviewing and approving the ECR, then creating a change notice with an implementation plan.' },
-      { phase: 'DEFINE', title: 'Requirements Management & Review', chips: ['Requirements Definition & Governance', 'Compliance-Driven Requirements'], narration: 'CodeBeamer frames show updating requirements and validating them with the AI requirements assistant against customer and industry rules.' },
-      { phase: 'DESIGN', title: 'Detailed Design in Creo', chips: ['Generative Design', 'MBD', 'GD&T Advisor'], narration: 'Creo frames cover generative design, model-based definition, and the GD&T advisor on the updated part.' },
-      { phase: 'VALIDATE', title: 'Verification & Validation', chips: ['Test Management', 'Product Verification'], narration: 'Closes with the CodeBeamer test coverage report and a traceability view linking requirements to tests and changes.' }
-    ]
-  },
-  'cad-illustrations': {
-    title: 'Rapid CAD-Based Illustrations — Demo Script',
-    logo: 'creo', logoViewBox: '0 0 1334.88 449.9', metaText: 'Decision · EN',
-    stats: '640 views · 22 shares', uuid: 'a207-f453', duration: '2:48',
-    desc: 'Demo script for generating exploded, callout-annotated illustrations directly from the Creo model for sales and support collateral.',
-    drivers: ['Efficiency'],
-    capabilities: [
-      { phase: 'DESIGN', title: '3D PDF & Illustration Export', chips: ['3D PDF Export', 'Exploded Views', 'Auto-Callouts'], narration: 'Script covers generating an exploded, callout-annotated illustration straight from the Creo model.' }
-    ]
-  },
-  'zh-overview': {
-    title: 'Windchill AI Parts Rationalization Overview — Chinese',
-    logo: 'windchill', logoViewBox: '0 0 1299.67 299.6', metaText: 'Awareness · ZH',
-    stats: '588 views · 14 shares', uuid: '', duration: '3:50',
-    desc: 'Localized (Chinese) overview cut of the Windchill AI Parts Rationalization story, covering search, classification, and consolidation.',
-    drivers: ['Efficiency', 'Quality & Regulatory'],
-    capabilities: [
-      { phase: 'DEFINE', title: 'Parts Classification & Reuse', chips: ['AI Similarity Search', 'Attribute-Based Classification'], narration: 'Overview reuses the same classification and consolidation flow as the English walkthrough, translated for the ZH region.' }
-    ]
-  }
-};
-
-function openVideoPreview(id) {
-  var v = videoData[id];
-  if (!v) return;
-  document.getElementById('vpTitle').textContent = v.title;
-  document.getElementById('vpDuration').textContent = v.duration;
-  document.getElementById('vpMeta').innerHTML = '<span class="meta-logo-chip"><svg class="meta-logo" viewBox="' + v.logoViewBox + '"><use href="#logo-' + v.logo + '"/></svg></span> ' + v.metaText;
-  document.getElementById('vpStats').innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-eye"/></svg> ' + v.stats +
-    (v.uuid ? ' <span>·</span> Consensus UUID <span class="orion-mono">' + v.uuid + '</span>' : '');
-  document.getElementById('vpDesc').textContent = v.desc;
-  var vpShareBtn = document.getElementById('vpShareBtn');
-  vpShareBtn.style.display = v.uuid ? '' : 'none';
-  vpShareBtn.onclick = function() { openShareModal(v.title, v.metaText, v.uuid); };
-
-  document.getElementById('vpValueDrivers').innerHTML = v.drivers.map(function(d) {
-    return '<span class="value-driver-chip">' + d + '</span>';
-  }).join('');
-
-  document.getElementById('vpCapabilities').innerHTML = v.capabilities.map(function(c) {
-    var chips = c.chips.map(function(ch) { return '<span class="capability-chip">' + ch + '</span>'; }).join('');
-    return '<div class="capability-card"><div class="capability-card__head"><span class="phase-tag">' + c.phase + '</span>' +
-      '<span class="capability-card__title">' + c.title + '</span></div>' +
-      '<div class="capability-chips">' + chips + '</div>' +
-      '<div class="capability-narration">' + c.narration + '</div></div>';
-  }).join('');
-
-  document.getElementById('requestViewPage').classList.remove('active');
-  document.getElementById('mainTopbar').style.display = 'none';
-  document.getElementById('mainThread').style.display = 'none';
-  document.getElementById('videoPreviewPage').classList.add('active');
-  document.getElementById('videoPreviewPage').scrollTop = 0;
-}
+/* The demo page's Back ("close-detail"). Elio's mock opener beside it, fed
+ * from a hard-coded videoData object, was removed 2026-11-26: the page is
+ * filled by openAssetDetail() in static/js/hub/detail.js. */
 function closeVideoPreview() {
   document.getElementById('videoPreviewPage').classList.remove('active');
   document.getElementById('mainTopbar').style.display = '';
@@ -323,72 +226,6 @@ function computeKindOfDemo() {
       '</div>';
   }).join('');
 }
-var EXISTING_ASSET_MATCHES = {
-  'Windchill|Teaser': {
-    title: 'Windchill Launch',
-    subtitle: 'Windchill 13 Launch Sizzle Video',
-    meta: 'Single video · Windchill · Teaser',
-    stats: '38 uses · 38 DemoBoards',
-    updated: 'Updated Nov 4, 2025',
-    owner: 'Elio Nicolosi'
-  },
-  'Windchill|Overview': {
-    title: 'Windchill AI Parts Rationalization',
-    subtitle: 'PLM | Windchill | Overview | 4:48',
-    meta: 'Single video · Windchill · Overview',
-    stats: '27 uses · 22 DemoBoards · 5 public link views',
-    updated: 'Updated Feb 23, 2026',
-    owner: 'Elio Nicolosi'
-  },
-  'Windchill|Walkthrough': {
-    title: 'Windchill PDM Overview',
-    subtitle: 'PLM | Windchill | Walkthrough | 12:29',
-    meta: 'Single video · Windchill · Walkthrough',
-    stats: '27 uses · 26 DemoBoards · 1 public link view',
-    updated: 'Updated Jul 3, 2025',
-    owner: 'Cody Wiltrout'
-  }
-};
-function checkExistingAsset(btn, level) {
-  btn.disabled = true;
-  btn.style.opacity = '.6';
-  btn.textContent = 'Checking Demo Database…';
-  var resultEl = document.getElementById('existingCheck-' + level);
-  var products = Array.from(document.querySelectorAll('#productScopeRow .stage-pill--active')).map(function(p) { return p.dataset.value; });
-  var key = (products[0] || 'Other') + '|' + level;
-  setTimeout(function() {
-    var match = EXISTING_ASSET_MATCHES[key];
-    btn.style.display = 'none';
-    resultEl.style.display = '';
-    if (match) {
-      resultEl.innerHTML =
-        '<div class="modal__note" style="align-items:flex-start; background:var(--orion-warn-bg);">' +
-          '<svg class="orion-ico orion-ico--sm" style="color:var(--orion-warn-ink); margin-top:2px;"><use href="#i-info"/></svg>' +
-          '<div>' +
-            '<div style="font-weight:700; margin-bottom:4px; color:var(--orion-warn-ink);">Found something similar in the Demo Database</div>' +
-            '<div style="font-weight:600;">' + match.title + '</div>' +
-            '<div class="orion-subtle" style="margin:2px 0 6px; font-size:12px;">' + match.subtitle + '</div>' +
-            '<div style="font-size:12px; color:var(--orion-text-2);">' + match.meta + ' · ' + match.stats + '<br>' + match.updated + ' · owner ' + match.owner + '</div>' +
-            '<div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">' +
-              '<button class="btn-ghost" style="flex:none; padding:6px 12px;" data-action="asset-decision" data-level="' + level + '" data-decision="use-as-is">Use as-is</button>' +
-              '<button class="btn-ghost" style="flex:none; padding:6px 12px;" data-action="asset-decision" data-level="' + level + '" data-decision="refresh">Needs a quick refresh</button>' +
-              '<button class="btn-primary-sm" style="flex:none; padding:6px 12px;" data-action="asset-decision" data-level="' + level + '" data-decision="new">Create new anyway</button>' +
-            '</div>' +
-          '</div>' +
-        '</div>';
-    } else {
-      resultEl.innerHTML =
-        '<div class="modal__note"><svg class="orion-ico orion-ico--sm" style="color:var(--orion-green-ink);"><use href="#i-check"/></svg>' +
-        '<span>No similar asset found in the Demo Database for this product and style — clear to create something new.</span></div>';
-    }
-  }, 700);
-}
-function recordAssetDecision(level, decision) {
-  var resultEl = document.getElementById('existingCheck-' + level);
-  var labels = { 'use-as-is': 'Use the existing asset as-is', 'refresh': 'Refresh the existing asset', 'new': 'Create a new asset anyway' };
-  resultEl.innerHTML = '<div class="share-result"><div class="share-result__label"><svg class="orion-ico orion-ico--sm"><use href="#i-check"/></svg>Decision recorded</div>' +
-    '<div class="share-result__meta">' + labels[decision] + ' — the content team will see this when they review your request.</div></div>';
-}
 function computeProductScope() {
   var active = Array.from(document.querySelectorAll('#productScopeRow .stage-pill--active')).map(function(p) { return p.dataset.value; });
   var valueEl = document.getElementById('productScopeValue');
@@ -423,10 +260,6 @@ function submitAssetRequest(e) {
   }
 }
 
-// Filled with real cards by static/js/hub/, which owns searching,
-// filtering and Reset (window.hubApplyFilters / window.hubResetFilters).
-var HUB_ASSET_POOL = null;
-
 /* ── One listener for every control on the page (2026-10-14) ──────────────
  * The markup names what a control does (data-action="..."); this table says
  * how. Functions are looked up on window at click time, so static/js/hub/
@@ -454,9 +287,11 @@ var HUB_ACTIONS = {
   "copy-share-link": function () { window.copyShareLink(); },
   "style-example": function (el) { window.openStyleExampleModal(el.dataset.level); },
   "close-style-example": function () { window.closeStyleExampleModal(); },
-  "check-existing": function (el) { window.checkExistingAsset(el, el.dataset.level); },
-  "asset-decision": function (el) {
-    window.recordAssetDecision(el.dataset.level, el.dataset.decision);
+  // Defined by static/js/hub/request.js, which asks the catalogue. The mock
+  // that answered from three hard-coded matches is gone (2026-11-26), and
+  // with it the "asset-decision" buttons only it drew.
+  "check-existing": function (el) {
+    if (window.checkExistingAsset) window.checkExistingAsset(el, el.dataset.level);
   }
 };
 

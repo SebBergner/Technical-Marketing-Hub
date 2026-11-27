@@ -75,10 +75,14 @@ var LANGUAGE_LABEL = { en: "English", zh: "Chinese", de: "German",
                       fr: "French", es: "Spanish", it: "Italian",
                       ja: "Japanese", ko: "Korean" };
 
+/* Safe in text AND in a quoted attribute (2026-11-26). The textContent /
+ * innerHTML round trip it replaces left " and ' as they were, so a title
+ * with a quote could close a title="..." or data-x='...' it was put in. */
+var HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 function escapeHtml(text) {
-  var d = document.createElement("div");
-  d.textContent = text == null ? "" : String(text);
-  return d.innerHTML;
+  return (text == null ? "" : String(text)).replace(/[&<>"']/g, function (c) {
+    return HTML_ESCAPES[c];
+  });
 }
 
 /* Fetch and parse, treating a non-2xx as the failure it is. Reading `.items`

@@ -4,11 +4,12 @@
 <!-- ============================================================
      Hoisted deliberately, and it has to stay here.
 
-     This file has no <head>: the markup begins immediately and the main style
-     block sits 2.5 MB further down, AFTER the sidebar and the card rails it
-     would hide. The browser parses those, paints them, and only then reaches
-     the rule — which is precisely the flash of Elio's placeholder data Liwei
-     kept seeing. A rule has to precede what it hides.
+     This file has no <head>: the markup begins immediately. The main style
+     block once sat 2.5 MB further down (it is static/css/hub.css now), AFTER
+     the sidebar and the card rails it would hide. The browser parsed those,
+     painted them, and only then reached the rule — which is precisely the
+     flash of Elio's placeholder data Liwei kept seeing. A rule has to
+     precede what it hides.
 
      What is hidden is what static/js/hub/ rewrites from the live catalogue: the
      centre rails, and the sidebar navigation with its hardcoded product list,
@@ -139,10 +140,9 @@
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-trend"/></svg> Most Viewed</span></div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-star"/></svg> Favorites</span> <span class="count">12</span></div>
       <div class="orion-group">Browse by Product</div>
-      <div class="orion-navitem"><span class="label"><svg class="nav-mark" viewBox="0.00 0.00 259.46 299.60"><use href="#logo-windchill-mark"/></svg> Windchill</span> <span class="count">38</span></div>
-      <div class="orion-navitem"><span class="label"><svg class="nav-mark" viewBox="0.00 0.00 397.21 449.90"><use href="#logo-creo-mark"/></svg> Creo</span> <span class="count">24</span></div>
-      <div class="orion-navitem"><span class="label"><svg class="nav-mark" viewBox="0.00 0.00 71.14 82.15"><use href="#logo-servicemax-mark"/></svg> ServiceMax</span> <span class="count">19</span></div>
-      <div class="orion-navitem"><span class="label"><svg class="nav-mark" viewBox="0.00 0.00 261.71 300.76"><use href="#logo-codebeamer-mark"/></svg> Codebeamer</span> <span class="count">11</span></div>
+      <!-- Filled from the catalogue by buildFamilyNav() (static/js/hub/nav.js);
+           the four hard-coded products and counts that sat here were always
+           replaced before the sidebar showed, and were removed 2026-11-26. -->
 
       <div class="orion-group">Browse by Type</div>
       <div class="orion-navitem"><span class="label"><svg class="orion-ico orion-ico--sm"><use href="#i-video"/></svg> Videos</span> <span class="count">86</span></div>

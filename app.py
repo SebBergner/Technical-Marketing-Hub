@@ -309,8 +309,14 @@ app.mount("/static", RevalidatingStatic(directory=os.path.join(BASE_DIR, "static
 
 
 @app.get("/health")
-async def health():
-    return {"status": "ok"}
+def health():
+    """503 when the data is not there (backend/health.py). A plain def, so
+    the look at the share runs in the thread pool, not on the event loop."""
+    from fastapi.responses import JSONResponse
+    from backend import health as checks
+    ok, body = checks.check()
+    return JSONResponse(body, status_code=200 if ok else 503,
+                        headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/version")

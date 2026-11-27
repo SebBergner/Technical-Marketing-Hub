@@ -93,3 +93,32 @@ def test_no_working_token_stops_early(hub, monkeypatch):
     rep = smoke_test.run("http://localhost", None)
     assert levels(rep)["API token"] == "FAIL"
     assert len(rep.rows) == 2
+
+
+# ─────────────────────────────── on a fresh CI runner (2026-11-26)
+def test_a_clean_run_whose_baseline_cannot_be_saved_still_passes(hub, monkeypatch, capsys):
+    """A CI runner may have nowhere to keep ~/.tmh-smoke; that is no failure."""
+    monkeypatch.setattr(smoke_test.Report, "fail", smoke_test.Report.warn)
+    blocker = hub / "not-a-dir"
+    blocker.write_text("x", encoding="utf-8")
+    monkeypatch.setattr(smoke_test, "BASELINE_DIR", blocker / "baseline")
+    rep = smoke_test.run("http://localhost", None)
+    assert rep.failed == 0
+    assert levels(rep)["Counts vs last run"] == "PASS"
+    assert "baseline not saved" in capsys.readouterr().out
+
+
+def test_an_unreachable_slot_is_a_failure_not_a_traceback(monkeypatch, tmp_path):
+    monkeypatch.setattr(smoke_test, "BASELINE_DIR", tmp_path)
+    monkeypatch.setenv(smoke_test.TOKEN_ENV, "tmh_x")
+    rep = smoke_test.run("http://127.0.0.1:9", None)    # discard port: refused
+    assert rep.failed >= 1 and levels(rep)["Version"] == "FAIL"
+
+
+def test_the_script_only_reads():
+    """No POST, PUT, PATCH or DELETE anywhere in it."""
+    import inspect
+    source = inspect.getsource(smoke_test)
+    assert "method=" not in source
+    for verb in ("POST", "PUT", "PATCH", "DELETE"):
+        assert f'"{verb}"' not in source and f"'{verb}'" not in source

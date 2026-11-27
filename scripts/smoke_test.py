@@ -15,7 +15,8 @@ separated by a comma; the script uses whichever the slot knows.
 
 Counts are compared with the last run against the same host (kept in
 ~/.tmh-smoke/), so a slot that lost half its catalogue shows up even though
-nobody wrote the number down.
+nobody wrote the number down. Without one (a fresh CI runner) that check
+says "first run" and passes.
 
 Exit code 0 when nothing failed (warnings allowed), 1 otherwise.
 """
@@ -74,6 +75,11 @@ class Hub:
                 status, raw = resp.status, resp.read()
         except urllib.error.HTTPError as err:
             status, raw = err.code, err.read()
+        except (urllib.error.URLError, OSError) as err:
+            # Unreachable, refused, timed out: a FAIL row saying so, not a
+            # traceback (status 0 is never a pass).
+            print(f"  ....  {path}: {getattr(err, 'reason', err)}", flush=True)
+            status, raw = 0, b""
         elapsed = time.monotonic() - started
         try:
             body = json.loads(raw) if raw else None
@@ -243,10 +249,15 @@ def run(base: str, expect_version: str | None) -> Report:
     rep.check(status in (200, 302, 307), "Guide video cover", f"HTTP {status} ({secs:.1f}s)")
 
     if rep.failed == 0:
-        BASELINE_DIR.mkdir(exist_ok=True)
-        path.write_text(json.dumps({"at": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                                    "version": version, "counts": counts}, indent=2),
-                        encoding="utf-8")
+        # A fresh CI runner has no ~/.tmh-smoke and keeps nothing; failing to
+        # write the baseline must not turn a clean run into a failed one.
+        try:
+            BASELINE_DIR.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({"at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                        "version": version, "counts": counts}, indent=2),
+                            encoding="utf-8")
+        except OSError as err:
+            print(f"\n(baseline not saved: {err})")
     return rep
 
 

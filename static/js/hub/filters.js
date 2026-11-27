@@ -837,6 +837,11 @@ async function applyFilters() {
     if (granted.indexOf("maintain_content") >= 0) ensureArchivedFilter();
   });
   reflectSort();
+  // Taken on EVERY call, before the Home branch returns (2026-11-26): taken
+  // after it, clearing the box left a reply still in flight free to land on
+  // Home -- its scoped counts over the sidebar and dropdowns, and a search
+  // logged that nobody was looking at any more.
+  var ticket = ++inFlight;
   var params = currentQuery();
   var active = params.toString().length > 0 || !!navFilter.sort;
   writeUrl(params);
@@ -888,7 +893,6 @@ async function applyFilters() {
   }
   if (all) all.style.display = "";
 
-  var ticket = ++inFlight;
   var assetParams = fetchParams(params);
   assetParams.set("limit", RESULT_LIMIT);
   var sort = effectiveSort();
@@ -900,6 +904,7 @@ async function applyFilters() {
     page = both[0];
     facets = both[1];
   } catch (err) {
+    if (ticket !== inFlight) return;   // a question nobody is asking any more
     console.error("[hub-api] filter request failed", err);
     report("Filtering failed - " + err.message, true);
     return;

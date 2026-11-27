@@ -49,6 +49,9 @@ import { closeOtherViews } from "./views.js";
  * the shareable link Seb asked for.
  */
 var detailAsset = null;
+//: Bumped by every openAssetDetail() and closeAssetDetail(); a reply that
+//: comes back to a different number is dropped.
+var detailSeq = 0;
 
 function assetUrl(id) {
   return location.origin + location.pathname + "#/asset/" + encodeURIComponent(id)
@@ -103,6 +106,9 @@ function recordView(id) {
 /* `fileItemId`: arrived on a shared file link (fileHash) -- open the page
  * and then that file's preview. */
 async function openAssetDetail(id, fileItemId, linkToken) {
+  // Newest open wins (2026-11-26): click A, then B before A has loaded, and
+  // A's slower reply used to land last and show A under B's address.
+  var seq = ++detailSeq;
   var page0 = document.getElementById("videoPreviewPage");
   if (fileItemId && detailAsset && detailAsset.id === id
       && page0 && page0.classList.contains("active")) {
@@ -130,6 +136,7 @@ async function openAssetDetail(id, fileItemId, linkToken) {
     asset = await getJSON("/api/assets/" + encodeURIComponent(id)
                           + (linkToken ? "?s=" + encodeURIComponent(linkToken) : ""));
   } catch (err) {
+    if (seq !== detailSeq) return;   // superseded: not this one's error to show
     console.error("[hub-api] could not load asset", id, err);
     // A link to a demo that has been hidden or removed used to do nothing
     // at all (2026-10-06): say so, and go back to the catalogue.
@@ -142,6 +149,7 @@ async function openAssetDetail(id, fileItemId, linkToken) {
     }
     return;
   }
+  if (seq !== detailSeq) return;   // another demo was opened, or the page closed
   // An old GXC link (B10, 2026-11-03) answers with the video's new id.
   var asked = id;
   id = asset.id;
@@ -1813,6 +1821,8 @@ var listScrollTop = null;
  * where it was left -- same cards, same scroll (Liwei, 2026-11-05). A nav
  * click leaves without it: a new list starts at the top. */
 function closeAssetDetail(keepPlace) {
+  // Back while a demo is still loading: it must not open once it arrives.
+  detailSeq++;
   var page = document.getElementById("videoPreviewPage");
   if (page) {
     page.classList.remove("active");

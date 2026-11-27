@@ -386,3 +386,31 @@ def test_without_a_gxc_library_gxc_rows_wait(client, tmp_path, monkeypatch):
     p = client.get(f"/api/migration/brightcove/sheets/{sid}").json()
     assert p["counts"]["invalid"] == 1
     assert "MIGRATION_GXC_LIBRARY" in p["problems"][0]["rows"][0]["detail"]
+
+
+# ─────────────────────────────── batch ids from a URL never become a path
+@pytest.mark.parametrize("bad", ["..", "../owned/access", r"..\..\x", "a/b", "a.json",
+                                 "20260929-141500-upload\n", "", "-x", "x" * 129])
+def test_a_batch_id_of_another_shape_names_no_batch(tmp_path, bad):
+    """An id from a URL is checked before it goes into a path (audit,
+    2026-11-26): a file outside the batches folder is never opened."""
+    outside = tmp_path / "outside.json"
+    outside.write_text(json.dumps({"batch_id": "x", "items": []}), encoding="utf-8")
+    with pytest.raises(FileNotFoundError):
+        jobs.run.BatchLog.load(bad)
+    with pytest.raises(FileNotFoundError):
+        jobs._pause_path(bad)
+    assert jobs.run_status(bad) is None
+
+
+def test_a_real_batch_id_passes():
+    assert jobs.run.check_batch_id("20260929-141500-upload") == "20260929-141500-upload"
+    assert jobs._pause_path("20260929-141500-upload").endswith("20260929-141500-upload.pause")
+
+
+def test_the_run_routes_answer_404_for_a_path_like_id(client):
+    admin(client)
+    for path in ("/api/migration/brightcove/runs/..%2F..%2Fowned%2Faccess",
+                 "/api/migration/brightcove/runs/a.b"):
+        assert client.get(path).status_code == 404, path
+        assert client.post(path + "/pause").status_code == 404, path

@@ -51,6 +51,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import re
 import threading
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
@@ -309,6 +310,21 @@ def _now() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
+#: What a batch id looks like: BatchLog.new() makes 20260929-141500-upload.
+#: Checked before an id from a URL becomes part of a path, so it cannot
+#: climb out of the batches folder (audit, 2026-11-26).
+BATCH_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}")
+
+
+def check_batch_id(batch_id: object) -> str:
+    """The id itself, or FileNotFoundError: an id of another shape names no
+    batch, so callers that answer "no such run" for a missing file answer
+    the same for it."""
+    if not isinstance(batch_id, str) or not BATCH_ID.fullmatch(batch_id):
+        raise FileNotFoundError(f"no batch {batch_id!r}")
+    return batch_id
+
+
 class BatchLog:
     """One JSON file per run under owned/migration/brightcove/batches/, the
     shape the /migration page reads. Rewritten atomically after every step.
@@ -331,6 +347,7 @@ class BatchLog:
 
     @classmethod
     def load(cls, batch_id: str) -> "BatchLog":
+        check_batch_id(batch_id)
         with open(os.path.join(batches_dir(), f"{batch_id}.json"), encoding="utf-8") as fh:
             return cls(json.load(fh))
 

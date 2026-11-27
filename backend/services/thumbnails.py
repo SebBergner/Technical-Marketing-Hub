@@ -237,7 +237,11 @@ def get(mirror_dir: str, client, url: str, wait: bool = True) -> tuple[bytes, st
     """From the cache while it is fresh, else from SharePoint (and cached).
     A stale copy is still served when SharePoint cannot be reached; a picture
     SharePoint does not have is remembered for MISS_HOURS. `wait=False`
-    (a viewer's request): raise Busy rather than queue for a fetch slot."""
+    (a viewer's request): raise Busy rather than queue for a fetch slot.
+
+    `client` may be a Graph client or a function returning one (or None),
+    called only once the cache cannot answer -- a cache hit never builds or
+    looks up a client."""
     data_path, meta_path = _paths(mirror_dir, url)
     cached = None
     if os.path.exists(data_path) and os.path.exists(meta_path):
@@ -253,6 +257,8 @@ def get(mirror_dir: str, client, url: str, wait: bool = True) -> tuple[bytes, st
             cached = None
         if cached and _young(data_path, CACHE_DAYS * 86400):
             return cached
+    if callable(client):
+        client = client()
     if client is None or _young(_miss_path(mirror_dir, url), MISS_HOURS * 3600):
         return cached
     if cached is not None and not wait:

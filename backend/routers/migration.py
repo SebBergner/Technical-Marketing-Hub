@@ -102,12 +102,15 @@ def brightcove_status(client: GraphClient | None = Depends(graph_client_or_none)
 
 # ─────────────────────────────────────────────────────────────── sheets
 @router.post("/brightcove/sheets")
-async def upload_sheet(file: UploadFile = File(...), actor: str = Depends(RUN_MIGRATION)):
+def upload_sheet(file: UploadFile = File(...), actor: str = Depends(RUN_MIGRATION)):
     """Keep the workbook, convert it, and start its preview. Writes nothing
-    to SharePoint or Brightcove."""
+    to SharePoint or Brightcove.
+
+    A plain `def`: openpyxl parsing up to 20 MB in an `async def` held the
+    single worker's event loop for its whole duration (audit 2026-11-26)."""
     if not (file.filename or "").lower().endswith(".xlsx"):
         raise HTTPException(status_code=415, detail="Upload the gallery workbook as .xlsx.")
-    content = await file.read(MAX_SHEET_BYTES + 1)
+    content = file.file.read(MAX_SHEET_BYTES + 1)
     if len(content) > MAX_SHEET_BYTES:
         raise HTTPException(status_code=413, detail="That workbook is over 20 MB.")
     try:

@@ -39,12 +39,14 @@ so the indexing boundary tightens rather than loosens — see `is_indexable`.
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
 import httpx
 
 from backend.config import settings
+from backend.integrations import http_policy
 
 log = logging.getLogger(__name__)
 
@@ -83,6 +85,12 @@ class ConsensusV2Client:
         self._token_provider = token_provider
         self.base_url = (base_url or settings.consensus_base_url).rstrip("/")
         self._transport = transport
+        #: One connection pool per client, reused by every page of a sync;
+        #: it used to be a new httpx.Client (and TLS handshake) per page.
+        self._http = httpx.Client(timeout=60, transport=transport)
+
+    def close(self) -> None:
+        self._http.close()
 
     def _bearer(self) -> str:
         if self._token_provider is not None:
@@ -104,9 +112,14 @@ class ConsensusV2Client:
         # header turns a working call into a 502. See the module docstring.
         if self._token_provider is None:
             headers["platform"] = PLATFORM_HEADER
-        with httpx.Client(timeout=60, transport=self._transport) as client:
-            response = client.get(f"{self.base_url}{V2_ROOT}{path}",
-                                  params=params, headers=headers)
+        url = f"{self.base_url}{V2_ROOT}{path}"
+        try:
+            response = http_policy.send(
+                lambda extra: self._http.get(url, params=params, headers=headers, **extra),
+                service="consensus-v2", method="GET", url=url, idempotent=True,
+                policy=http_policy.budget(http_policy.CONSENSUS_BACKGROUND), logger=log)
+        except http_policy.GaveUp as exc:
+            raise ConsensusV2Error(f"V2 {path} failed: {exc}") from (exc.cause or exc)
 
         if response.status_code in (401, 403):
             raise ConsensusV2Unauthorised(
@@ -254,8 +267,31 @@ def get_v2_client() -> ConsensusV2Client | None:
 
     oauth = get_oauth()
     if oauth.configured and oauth.status().get("authorised"):
-        return ConsensusV2Client(token_provider=oauth.access_token)
+        return _shared_v2(("oauth", oauth, settings.consensus_base_url),
+                          lambda: ConsensusV2Client(token_provider=oauth.access_token))
     if settings.consensus_v2_token:
         log.info("consensus v2: using the hand-supplied token; it will expire")
-        return ConsensusV2Client(token=settings.consensus_v2_token)
+        return _shared_v2(("token", settings.consensus_v2_token, settings.consensus_base_url),
+                          lambda: ConsensusV2Client(token=settings.consensus_v2_token))
     return None
+
+
+_shared_lock = threading.Lock()
+_shared: tuple[tuple, ConsensusV2Client] | None = None
+
+
+def _shared_v2(key: tuple, build) -> ConsensusV2Client:
+    """One client per way in, kept while that way in stays the same. The key
+    holds the OAuth object itself, so a new one (a test, a reset) is a new
+    key rather than a recycled id()."""
+    global _shared
+    with _shared_lock:
+        if _shared is None or _shared[0] != key:
+            _shared = (key, build())
+        return _shared[1]
+
+
+def reset_v2_client() -> None:
+    global _shared
+    with _shared_lock:
+        _shared = None

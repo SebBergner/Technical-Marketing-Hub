@@ -28,6 +28,7 @@ from backend.admin_auth import require_perm
 from backend.auth import CurrentUser, get_current_user, require_authenticated
 from backend.config import settings
 from backend.deps import get_repo
+from backend.integrations import http_policy
 from backend.integrations.graph.client import get_graph_client
 from backend.integrations.graph.requests_list import (
     ATTACHMENT_FOLDER, ATTACHMENT_LIBRARY, MAX_ATTACHMENT_BYTES,
@@ -69,7 +70,7 @@ async def may_submit(user: CurrentUser = Depends(get_current_user)) -> CurrentUs
 
 
 @router.post("", response_model=RequestAccepted, status_code=201)
-async def submit_request(
+def submit_request(
     body: AssetRequestCreate,
     repo: AssetRepository = Depends(get_repo),
     # Deliberately get_current_user, not require_authenticated: "Require
@@ -83,12 +84,19 @@ async def submit_request(
     # 2026-09-09.
     user: CurrentUser = Depends(may_submit),
 ) -> RequestAccepted:
-    """Record a request locally, then push it to SharePoint."""
-    return await _submit(body, [], repo, user)
+    """Record a request locally, then push it to SharePoint.
+
+    A plain `def`, so FastAPI runs it in its thread pool: _submit waits on
+    Graph (token, site, POST, a PUT per file), and on the event loop that
+    froze every other request on the single worker (audit 2026-11-26).
+    Someone is waiting on the form, so the calls get the interactive budget;
+    the request is saved locally first, so giving up early loses nothing."""
+    with http_policy.interactive():
+        return _submit(body, [], repo, user)
 
 
 @router.post("/with-files", response_model=RequestAccepted, status_code=201)
-async def submit_request_with_files(
+def submit_request_with_files(
     request: str = Form(...),
     files: list[UploadFile] = File(default=[]),
     repo: AssetRepository = Depends(get_repo),
@@ -106,10 +114,16 @@ async def submit_request_with_files(
     except ValueError as exc:
         raise HTTPException(status_code=422,
                             detail=f"The request could not be read: {exc}") from exc
-    return await _submit(body, files, repo, user)
+    with http_policy.interactive():
+        return _submit(body, files, repo, user)
 
 
-async def _submit(body: AssetRequestCreate, files: list, repo, user) -> RequestAccepted:
+#: More than this many files in one request are refused, unread. The form
+#: offers a few; a client sending hundreds is not filling in a form.
+MAX_ATTACHMENTS = 10
+
+
+def _submit(body: AssetRequestCreate, files: list, repo, user) -> RequestAccepted:
     # "Other" says nothing about what is wanted; the brief has to (Elio,
     # Liwei, 2026-11-09). The form checks it too; this is for any caller.
     if body.asset_type == "other" and not (body.brief or "").strip():
@@ -153,9 +167,18 @@ async def _submit(body: AssetRequestCreate, files: list, repo, user) -> RequestA
     # discovered afterwards.
     accepted: list[tuple[str, bytes]] = []
     rejected: list[str] = []
-    for upload in files or []:
-        content = await upload.read()
-        reason = attachment_rejection(upload.filename or "attachment", len(content))
+    files = list(files or [])
+    for upload in files[MAX_ATTACHMENTS:]:
+        rejected.append(f"{upload.filename or 'attachment'}: only {MAX_ATTACHMENTS} "
+                        f"files can go with one request.")
+    for upload in files[:MAX_ATTACHMENTS]:
+        # Never more than one byte past the limit into memory: that byte is
+        # enough to know the file is too large.
+        content = upload.file.read(MAX_ATTACHMENT_BYTES + 1)
+        size = len(content)
+        if size > MAX_ATTACHMENT_BYTES and getattr(upload, "size", None):
+            size = upload.size
+        reason = attachment_rejection(upload.filename or "attachment", size)
         if reason:
             rejected.append(reason)
         else:

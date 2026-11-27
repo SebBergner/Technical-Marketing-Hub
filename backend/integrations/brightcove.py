@@ -13,11 +13,13 @@ starts or resumes, because they expire.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 
 import httpx
 
 from backend.config import settings
+from backend.integrations import http_policy
 from backend.integrations.tls import system_trust
 
 log = logging.getLogger(__name__)
@@ -39,38 +41,58 @@ class BrightcoveClient:
         self._http = httpx.Client(timeout=30, verify=self._verify, transport=transport)
         self._token: str | None = None
         self._token_until = 0.0
+        #: The migration runs uploads in parallel on one client: one renewal
+        #: at a time, and the others take the token it got.
+        self._token_lock = threading.Lock()
 
     # ─────────────────────────────────────────────────────────── plumbing
+    def _send(self, method: str, url: str, do) -> httpx.Response:
+        """One call under the shared retry policy (http_policy): transport
+        errors and 5xx are retried -- a single timeout used to fail the whole
+        Demo Video sync -- and 429 waits as long as Retry-After says, within
+        the cap. Both calls here are safe to repeat: the CMS reads, and the
+        token request, which only mints another short-lived token."""
+        try:
+            return http_policy.send(
+                do, service="brightcove", method=method, url=url, idempotent=True,
+                policy=http_policy.budget(http_policy.BRIGHTCOVE_BACKGROUND), logger=log)
+        except http_policy.GaveUp as exc:
+            raise BrightcoveError(
+                f"Brightcove {method} {http_policy.log_path(url)} kept failing: {exc}"
+            ) from (exc.cause or exc)
+
     def _bearer(self) -> str:
         """Tokens live 300 s; renew a minute early rather than mid-request."""
-        if self._token and time.time() < self._token_until:
+        with self._token_lock:
+            if self._token and time.time() < self._token_until:
+                return self._token
+            r = self._send("POST", TOKEN_URL, lambda extra: self._http.post(
+                TOKEN_URL, data={"grant_type": "client_credentials"}, auth=self._auth,
+                **extra))
+            if r.status_code != 200:
+                raise BrightcoveError(f"Brightcove token refused: HTTP {r.status_code}")
+            body = r.json()
+            self._token = body["access_token"]
+            self._token_until = time.time() + int(body.get("expires_in", 300)) - 60
             return self._token
-        r = self._http.post(TOKEN_URL, data={"grant_type": "client_credentials"}, auth=self._auth)
-        if r.status_code != 200:
-            raise BrightcoveError(f"Brightcove token refused: HTTP {r.status_code}")
-        body = r.json()
-        self._token = body["access_token"]
-        self._token_until = time.time() + int(body.get("expires_in", 300)) - 60
-        return self._token
 
     def _get(self, path: str, **params):
         """The only call this client makes to the CMS API, and it is a GET."""
         url = f"{CMS_ROOT}/{self.account_id}{path}"
-        for attempt in range(4):
-            r = self._http.get(url, params=params or None,
-                               headers={"Authorization": f"Bearer {self._bearer()}"})
-            if r.status_code == 401 and attempt == 0:
-                self._token = None                 # expired early; renew once
+        for renewed in (False, True):
+            r = self._send("GET", url, lambda extra: self._http.get(
+                url, params=params or None,
+                headers={"Authorization": f"Bearer {self._bearer()}"}, **extra))
+            if r.status_code == 401 and not renewed:
+                with self._token_lock:
+                    self._token = None             # expired early; renew once
                 continue
-            if r.status_code == 429 or r.status_code >= 500:
-                time.sleep(min(2 ** attempt, 10))
-                continue
-            if r.status_code == 404:
-                return None
-            if r.status_code >= 400:
-                raise BrightcoveError(f"Brightcove GET {path}: HTTP {r.status_code}")
-            return r.json()
-        raise BrightcoveError(f"Brightcove GET {path} kept failing")
+            break
+        if r.status_code == 404:
+            return None
+        if r.status_code >= 400:
+            raise BrightcoveError(f"Brightcove GET {path}: HTTP {r.status_code}")
+        return r.json()
 
     # ─────────────────────────────────────────────────────────── reads
     def video(self, video_id: str) -> dict | None:

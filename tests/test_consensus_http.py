@@ -223,7 +223,7 @@ def test_non_json_response_is_a_clean_error_not_a_traceback():
 
 def test_server_error_is_retried_then_reported(monkeypatch):
     # Don't actually sleep through the backoff — it would add seconds to every run.
-    monkeypatch.setattr("backend.integrations.consensus.time.sleep", lambda _: None)
+    monkeypatch.setattr("backend.integrations.http_policy.time.sleep", lambda _: None)
     calls = []
 
     def handler(request):

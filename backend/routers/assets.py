@@ -595,6 +595,7 @@ def asset_thumbnail(asset_id: str, repo: AssetRepository = Depends(get_repo),
     """A SharePoint-hosted picture, fetched by the Hub so every viewer sees it,
     signed into SharePoint or not (services/thumbnails.py, 2026-10-20). Seen by
     whoever may see the demo; 404 lets the card fall back to its cover."""
+    from backend.integrations import http_policy
     from backend.integrations.graph.client import get_graph_client
     from backend.services import thumbnails
     get_asset(asset_id, repo, user)                      # the same 404s as the page
@@ -602,7 +603,11 @@ def asset_thumbnail(asset_id: str, repo: AssetRepository = Depends(get_repo),
     if not thumbnails.is_sharepoint(source):
         raise HTTPException(status_code=404, detail="No SharePoint picture for this demo.")
     try:
-        picture = thumbnails.get(repo.mirror_dir, get_graph_client(), source, wait=False)
+        # The client only when the cache cannot answer; a viewer is waiting,
+        # so the short budget (a refresh behind it runs in its own thread,
+        # on the background one).
+        with http_policy.interactive():
+            picture = thumbnails.get(repo.mirror_dir, get_graph_client, source, wait=False)
     except thumbnails.Busy:
         # Never queue a viewer behind SharePoint: the cover now, the picture
         # once the background warm-up has it (not cached, so no-store).
@@ -619,10 +624,15 @@ def _signed_file_url(client: GraphClient, asset_id: str, item_id: str) -> str:
 
     It expires in about an hour, so it is never stored. 502 when Graph fails
     or returns none -- before anything is recorded, so an error is never
-    counted as a use."""
+    counted as a use.
+
+    Someone clicked and is waiting: the interactive budget (http_policy),
+    not a sync's minutes of retries."""
+    from backend.integrations import http_policy
     try:
-        drive = _asset_drive(client, asset_id)
-        url = client.download_url(drive.drive_id, item_id)
+        with http_policy.interactive():
+            drive = _asset_drive(client, asset_id)
+            url = client.download_url(drive.drive_id, item_id)
     except GraphError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     if not url:
@@ -702,9 +712,11 @@ def preview_file(asset_id: str, item_id: str,
     _require_perm(user, Perm.PREVIEW)
     _require_listed_file(asset_id, item_id, repo)
     _require_partner_access(asset_id, repo, user)
+    from backend.integrations import http_policy
     try:
-        drive = _asset_drive(client, asset_id)
-        url = client.preview(drive.drive_id, item_id)
+        with http_policy.interactive():                 # someone is waiting on it
+            drive = _asset_drive(client, asset_id)
+            url = client.preview(drive.drive_id, item_id)
     except GraphError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -1074,11 +1086,15 @@ def frame_source(asset_id: str, item_id: str, repo: AssetRepository = Depends(ge
 
 
 @router.put("/{asset_id}/thumbnail")
-async def set_thumbnail(asset_id: str, file: UploadFile = File(...),
+def set_thumbnail(asset_id: str, file: UploadFile = File(...),
                         repo: AssetRepository = Depends(get_repo), actor: str = EDIT):
     """The card's picture (B5): an image uploaded, or a frame the page took
     from a video -- either way a picture saved in the demo's folder and
-    ticked HubThumbnail, any picture ticked before cleared."""
+    ticked HubThumbnail, any picture ticked before cleared.
+
+    A plain `def`: the SharePoint calls below block, and in an `async def`
+    they blocked the event loop of the single worker (audit 2026-11-26)."""
+    from backend.integrations import http_policy
     from backend.routers.uploads import _sync_soon
     from backend.services import metadata_edit as me
     from backend.services import upload_targets as ut
@@ -1089,13 +1105,15 @@ async def set_thumbnail(asset_id: str, file: UploadFile = File(...),
     content_type = (file.content_type or "").lower()
     if content_type not in me.IMAGE_TYPES:
         raise HTTPException(status_code=422, detail="A JPG, PNG or WebP picture, please.")
-    content = await file.read(me.MAX_IMAGE_BYTES + 1)
+    content = file.file.read(me.MAX_IMAGE_BYTES + 1)
     if not content or len(content) > me.MAX_IMAGE_BYTES:
         raise HTTPException(status_code=422, detail="A picture of at most 5 MB, please.")
     try:
-        item = me.put_thumbnail(client, target, asset.source_item_id, content, content_type)
-        me.tick(client, target, ut.THUMBNAIL_COLUMN, item["id"],
-                [r.item_id for r in asset.resources if r.hub_thumbnail and r.item_id])
+        with http_policy.interactive():
+            item = me.put_thumbnail(client, target, asset.source_item_id, content,
+                                    content_type)
+            me.tick(client, target, ut.THUMBNAIL_COLUMN, item["id"],
+                    [r.item_id for r in asset.resources if r.hub_thumbnail and r.item_id])
     except GraphError as exc:
         raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
     me.remember(repo, asset_id, {"thumbnail_url": item.get("webUrl"), "thumbnail_chosen": True})

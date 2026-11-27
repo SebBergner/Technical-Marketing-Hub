@@ -241,7 +241,7 @@ def test_next_link_is_followed():
 
 
 def test_429_is_retried_honouring_retry_after(monkeypatch):
-    monkeypatch.setattr("backend.integrations.graph.client.time.sleep", lambda _: None)
+    monkeypatch.setattr("backend.integrations.http_policy.time.sleep", lambda _: None)
     calls = []
 
     def handler(request):
@@ -256,7 +256,7 @@ def test_429_is_retried_honouring_retry_after(monkeypatch):
 
 def test_403_is_never_retried(monkeypatch):
     """A permission failure is a state, not a transient fault."""
-    monkeypatch.setattr("backend.integrations.graph.client.time.sleep", lambda _: None)
+    monkeypatch.setattr("backend.integrations.http_policy.time.sleep", lambda _: None)
     calls = []
 
     def handler(request):

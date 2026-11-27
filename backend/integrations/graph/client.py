@@ -30,7 +30,7 @@ import base64
 import binascii
 import json
 import logging
-import time
+import threading
 from dataclasses import dataclass, field
 from typing import Any, Iterator
 from urllib.parse import quote, urlparse
@@ -38,6 +38,7 @@ from urllib.parse import quote, urlparse
 import httpx
 
 from backend.config import settings
+from backend.integrations import http_policy
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +47,10 @@ SCOPE = "https://graph.microsoft.com/.default"
 
 #: Graph caps page size; 999 is the practical maximum for list/drive children.
 PAGE_SIZE = 200
+
+#: Seconds MSAL may wait on login.microsoftonline.com. It had no timeout, so
+#: a hung token endpoint could hold a request thread indefinitely.
+MSAL_TIMEOUT = 10
 
 
 class GraphError(RuntimeError):
@@ -133,6 +138,7 @@ class GraphClient:
         #: or a real tenant.
         self._token_provider = token_provider
         self._msal_app = None
+        self._msal_lock = threading.Lock()
         self._client = httpx.Client(
             base_url=GRAPH_ROOT, timeout=timeout,
             headers={"Accept": "application/json"},
@@ -146,14 +152,22 @@ class GraphClient:
 
         import msal
 
-        if self._msal_app is None:
-            self._msal_app = msal.ConfidentialClientApplication(
-                client_id=self._client_id,
-                client_credential=self._client_secret,
-                authority=f"https://login.microsoftonline.com/{self._tenant_id}",
-            )
-        # MSAL caches and refreshes internally; asking every call is correct.
-        result = self._msal_app.acquire_token_for_client(scopes=[scope])
+        try:
+            with self._msal_lock:      # one app per client, shared by all threads
+                if self._msal_app is None:
+                    self._msal_app = msal.ConfidentialClientApplication(
+                        client_id=self._client_id,
+                        client_credential=self._client_secret,
+                        authority=f"https://login.microsoftonline.com/{self._tenant_id}",
+                        timeout=MSAL_TIMEOUT,
+                    )
+            # MSAL caches and refreshes internally (thread-safe); asking every
+            # call is correct.
+            result = self._msal_app.acquire_token_for_client(scopes=[scope])
+        except GraphError:
+            raise
+        except Exception as exc:                     # noqa: BLE001 - network, not auth
+            raise GraphError(f"could not reach the Microsoft token endpoint: {exc}") from exc
         if "access_token" not in result:
             raise GraphAuthError(
                 f"{result.get('error', 'unknown')}: "
@@ -214,35 +228,38 @@ class GraphClient:
             return []
 
     # -------------------------------------------------------------- plumbing
-    def _request(self, method: str, url: str, **kwargs) -> Any:
+    def _request(self, method: str, url: str, *, idempotent: bool | None = None,
+                 **kwargs) -> Any:
         """One Graph call, with throttling and transient-failure retries.
 
-        429 and 5xx are retried honouring Retry-After. 403 and 410 are NOT
-        retried — they are meaningful states, not transient faults.
+        The retry rules live in `http_policy`: 429 always, and 5xx or a
+        transport error only when the call is idempotent -- a POST that may
+        already have run is never sent twice. `idempotent` defaults from the
+        method; a caller overrides it for a POST that is really a read
+        (preview) or a PUT that is not repeatable (conflictBehavior=rename).
+        403 and 410 are NOT retried -- they are meaningful states, not
+        transient faults.
         """
-        last: Exception | None = None
-        for attempt in range(4):
-            headers = {"Authorization": f"Bearer {self._token()}"}
-            headers.update(kwargs.pop("headers", {}) or {})
-            try:
-                response = self._client.request(method, url, headers=headers, **kwargs)
-            except httpx.HTTPError as exc:
-                last = exc
-                log.warning("graph %s %s failed: %s", method, url, exc)
-                time.sleep(min(2 ** attempt, 8))
-                continue
+        # Popped ONCE, before the loop. Popping inside it sent If-Match and
+        # Content-Type on the first attempt only, so a throttled PATCH was
+        # retried without its ETag and could overwrite a concurrent edit.
+        extra_headers = dict(kwargs.pop("headers", None) or {})
+        if idempotent is None:
+            idempotent = method.upper() in http_policy.IDEMPOTENT_METHODS
 
-            if response.status_code in (429,) or response.status_code >= 500:
-                wait = float(response.headers.get("Retry-After", 2 ** attempt))
-                log.warning("graph %s %s -> %s, retrying in %.1fs",
-                            method, url, response.status_code, wait)
-                time.sleep(min(wait, 30))
-                last = GraphError(f"HTTP {response.status_code} from Graph")
-                continue
+        def attempt(extra: dict) -> httpx.Response:
+            headers = {"Authorization": f"Bearer {self._token()}", **extra_headers}
+            return self._client.request(method, url, headers=headers, **kwargs, **extra)
 
-            return self._interpret(response, url)
-
-        raise GraphError(f"Graph request to {url} failed: {last}") from last
+        try:
+            response = http_policy.send(
+                attempt, service="graph", method=method, url=url, idempotent=idempotent,
+                policy=http_policy.budget(http_policy.GRAPH_BACKGROUND), logger=log)
+        except http_policy.GaveUp as exc:
+            raise GraphError(
+                f"Graph request to {http_policy.log_path(url)} failed: {exc}") from (
+                exc.cause or exc)
+        return self._interpret(response, url)
 
     @staticmethod
     def _interpret(response: httpx.Response, url: str) -> Any:
@@ -284,16 +301,30 @@ class GraphClient:
         except ValueError as exc:
             raise GraphError(f"non-JSON response from Graph for {url}") from exc
 
+    def _next_page(self, next_link: str, url: str, pages: int) -> dict:
+        """The page a nextLink points at. A 404 there is NOT the end of the
+        data -- the listing broke halfway -- so it raises rather than handing
+        back the pages read so far as if they were everything. A partial
+        list taken for the whole one is how a sync retires live demos."""
+        # nextLink is absolute and already carries every parameter.
+        payload = self._request("GET", next_link)
+        if not payload:
+            raise GraphError(
+                f"page {pages + 1} of {http_policy.log_path(url)} answered 404: the "
+                f"listing is incomplete, so none of it is used")
+        return payload
+
     def _paged(self, url: str, params: dict | None = None) -> Iterator[dict]:
         """Follow @odata.nextLink until exhausted."""
         payload = self._request("GET", url, params=params)
+        pages = 1
         while payload:
             yield from payload.get("value", [])
             next_link = payload.get("@odata.nextLink")
             if not next_link:
                 return
-            # nextLink is absolute and already carries every parameter.
-            payload = self._request("GET", next_link)
+            payload = self._next_page(next_link, url, pages)
+            pages += 1
 
     # ----------------------------------------------------------- diagnostics
     def verify_access(self, site_url: str | None = None) -> dict[str, Any]:
@@ -446,10 +477,12 @@ class GraphClient:
 
         items: list[dict] = []
         payload = self._request("GET", url, params={"$top": PAGE_SIZE} if not token else None)
+        pages = 1
         while payload:
             items.extend(payload.get("value", []))
             if link := payload.get("@odata.nextLink"):
-                payload = self._request("GET", link)
+                payload = self._next_page(link, url, pages)
+                pages += 1
                 continue
             delta_link = payload.get("@odata.deltaLink") or ""
             new_token = None
@@ -503,8 +536,10 @@ class GraphClient:
         Short-lived like download_url(), for the same reason: resolve it when
         someone asks to preview, never earlier.
         """
+        # A POST only by Graph's choice of verb: it creates nothing, so a
+        # retry is harmless.
         payload = self._request("POST", f"/drives/{drive_id}/items/{item_id}/preview",
-                                json={})
+                                json={}, idempotent=True)
         return (payload or {}).get("getUrl")
 
     def thumbnails(self, drive_id: str, item_id: str) -> list[dict]:
@@ -570,19 +605,49 @@ class GraphClient:
         return headers
 
 
+    def close(self) -> None:
+        self._client.close()
+
+
 # ------------------------------------------------------------------ factory
+_shared_lock = threading.Lock()
+_shared: tuple[tuple, GraphClient] | None = None
+
+
 def get_graph_client() -> GraphClient | None:
     """Configured client, or None while the IT request is outstanding.
 
     Returning None rather than a stub is deliberate: unlike Consensus, there is
     nothing useful to fake here. A caller must decide what to do without Graph,
     and a silent stub would hide that Graph is simply not available yet.
+
+    One client for the whole process (2026-11-26). It used to be built per
+    call -- per thumbnail, preview and upload -- each with its own connection
+    pool and MSAL app, none ever closed, and each paying a fresh TLS
+    handshake and token lookup. httpx.Client and MSAL's token cache are both
+    thread-safe. The client is keyed on the settings it was built from, so a
+    changed secret (or a test that changes settings) gets a new one.
     """
+    global _shared
     if not settings.graph_configured:
         return None
-    return GraphClient(
-        tenant_id=settings.graph_tenant_id,
-        client_id=settings.graph_client_id,
-        client_secret=settings.graph_client_secret,
-        site_url=settings.graph_site_url,
-    )
+    key = (settings.graph_tenant_id, settings.graph_client_id,
+           settings.graph_client_secret, settings.graph_site_url)
+    with _shared_lock:
+        if _shared is None or _shared[0] != key:
+            # The one it replaces is not closed: another thread may be
+            # mid-call on it. It is collected when the last user lets go.
+            _shared = (key, GraphClient(
+                tenant_id=settings.graph_tenant_id,
+                client_id=settings.graph_client_id,
+                client_secret=settings.graph_client_secret,
+                site_url=settings.graph_site_url,
+            ))
+        return _shared[1]
+
+
+def reset_graph_client() -> None:
+    """Forget the shared client; the next get_graph_client() builds afresh."""
+    global _shared
+    with _shared_lock:
+        _shared = None

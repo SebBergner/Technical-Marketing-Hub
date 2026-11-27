@@ -103,6 +103,25 @@ def never_reach_consensus(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def fresh_connections():
+    """The circuit breaker counts failures per service across calls
+    (integrations/http_policy.py); one test's simulated outage must not make
+    the next test's calls fail fast. The Graph, Consensus and V2 clients are
+    shared per process too, so each test starts without one."""
+    from backend.integrations import consensus, consensus_v2, http_policy
+    from backend.integrations.graph import client as graph_client
+
+    def reset():
+        http_policy.reset_breakers()
+        graph_client.reset_graph_client()
+        consensus.reset_consensus_client()
+        consensus_v2.reset_v2_client()
+    reset()
+    yield
+    reset()
+
+
+@pytest.fixture(autouse=True)
 def access_files_in_tmp(tmp_path_factory, monkeypatch):
     """Users & groups (backend/access.py) live in owned/ under DATA_DIR, which
     most tests share with the developer's real data. A sign-in in a test

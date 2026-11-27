@@ -35,7 +35,7 @@ Known documentation gaps, handled explicitly rather than guessed at:
 from __future__ import annotations
 
 import logging
-import time
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Protocol
@@ -43,6 +43,7 @@ from typing import Any, Protocol
 import httpx
 
 from backend.config import settings
+from backend.integrations import http_policy
 
 log = logging.getLogger(__name__)
 
@@ -58,6 +59,14 @@ PATHS = {
     "demos_details": "/api/reports/v1.0/demosDetails",
     "track_demoboards": "/api/reports/v1.0/trackDemoBoards",
 }
+
+#: The calls that only read, and so may be retried after a timeout or a 5xx.
+#: Anything not listed -- createsenddemo, createlink, and whatever is added
+#: later -- is treated as a write and resent only when it never ran.
+READ_PATHS = frozenset({
+    PATHS["user_info"], PATHS["demo_search"], PATHS["demo_by_hash"],
+    PATHS["demos_details"], PATHS["track_demoboards"],
+})
 
 #: The API caps page size at 500.
 MAX_PAGE_SIZE = 500
@@ -341,6 +350,9 @@ class HttpConsensusClient:
     def is_configured(self) -> bool:
         return True
 
+    def close(self) -> None:
+        self._client.close()
+
     # -------------------------------------------------------------- plumbing
     def _post(self, path: str, body: dict[str, Any] | None = None,
               *, as_user: str | None = None) -> Any:
@@ -359,36 +371,29 @@ class HttpConsensusClient:
         """
         auth = dict(self._auth, user_email=as_user) if as_user else self._auth
         payload = {"auth": auth, **(body or {})}
-        last: Exception | None = None
 
-        for attempt in range(3):
-            try:
-                response = self._client.post(path, json=payload)
-            except httpx.HTTPError as exc:
-                last = exc
-                log.warning("consensus POST %s failed: %s", path, exc)
-                time.sleep(2 ** attempt)
-                continue
+        try:
+            response = http_policy.send(
+                lambda extra: self._client.post(path, json=payload, **extra),
+                service="consensus", method="POST", url=path,
+                # Every call is a POST, so the verb says nothing: only the
+                # reads may be repeated after a timeout or a 5xx. A second
+                # createsenddemo would be a second DemoBoard.
+                idempotent=path in READ_PATHS,
+                policy=http_policy.budget(http_policy.CONSENSUS_BACKGROUND), logger=log)
+        except http_policy.GaveUp as exc:
+            raise ConsensusError(
+                f"Consensus request to {path} failed: {exc}") from (exc.cause or exc)
 
-            if response.status_code == 429 or response.status_code >= 500:
-                wait = float(response.headers.get("Retry-After", 2 ** attempt))
-                log.warning("consensus POST %s -> %s, retrying in %.1fs",
-                            path, response.status_code, wait)
-                time.sleep(min(wait, 10))
-                last = ConsensusError(f"HTTP {response.status_code} from Consensus")
-                continue
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise ConsensusError(
+                f"Consensus returned non-JSON from {path} "
+                f"(HTTP {response.status_code})"
+            ) from exc
 
-            try:
-                data = response.json()
-            except ValueError as exc:
-                raise ConsensusError(
-                    f"Consensus returned non-JSON from {path} "
-                    f"(HTTP {response.status_code})"
-                ) from exc
-
-            return self._check(data, response.status_code, path)
-
-        raise ConsensusError(f"Consensus request to {path} failed: {last}") from last
+        return self._check(data, response.status_code, path)
 
     @staticmethod
     def _check(payload: Any, http_status: int, path: str) -> Any:  # noqa: D401
@@ -727,18 +732,41 @@ class HttpConsensusClient:
 
 
 # ------------------------------------------------------------------ factory
+_shared_lock = threading.Lock()
+_shared: tuple[tuple, HttpConsensusClient] | None = None
+
+
 def get_consensus_client() -> ConsensusClient:
     """Real client when credentials exist, stub otherwise.
 
     Swapping one for the other is a config change, never a code change.
+
+    The real one is shared by the whole process and keyed on the settings it
+    was built from (2026-11-26): it used to be a new connection pool per
+    call, never closed. The acting user travels per call (`as_user`), so
+    sharing it changes nobody's identity.
     """
-    if settings.consensus_configured:
-        return HttpConsensusClient(
-            base_url=settings.consensus_base_url,
-            api_key=settings.consensus_api_key,
-            api_secret=settings.consensus_api_secret,
-            user_email=settings.consensus_user_email,
-            source_name=settings.consensus_source_name,
-            viewer_url_template=settings.consensus_viewer_url_template,
-        )
-    return StubConsensusClient()
+    global _shared
+    if not settings.consensus_configured:
+        return StubConsensusClient()
+    key = (settings.consensus_base_url, settings.consensus_api_key,
+           settings.consensus_api_secret, settings.consensus_user_email,
+           settings.consensus_source_name, settings.consensus_viewer_url_template)
+    with _shared_lock:
+        if _shared is None or _shared[0] != key:
+            _shared = (key, HttpConsensusClient(
+                base_url=settings.consensus_base_url,
+                api_key=settings.consensus_api_key,
+                api_secret=settings.consensus_api_secret,
+                user_email=settings.consensus_user_email,
+                source_name=settings.consensus_source_name,
+                viewer_url_template=settings.consensus_viewer_url_template,
+            ))
+        return _shared[1]
+
+
+def reset_consensus_client() -> None:
+    """Forget the shared client; the next get_consensus_client() builds afresh."""
+    global _shared
+    with _shared_lock:
+        _shared = None

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from backend.access import Perm
 from backend.admin_auth import require_perm
 from backend.deps import CurrentUser, get_repo, require_authenticated, require_curator
+from backend.integrations import http_policy
 from backend.integrations.consensus_oauth import (
     ConsensusOAuth, ConsensusOAuthError, NotAuthorised, get_oauth,
 )
@@ -242,23 +243,26 @@ def share_to_consensus(
         )
 
     try:
-        link = client.create_share_link(
-            asset.consensus_uuid,
-            trackable=body.trackable,
-            organization=body.organization,
-            recipients=[ShareRecipient(email=r.email, first_name=r.first_name,
-                                       last_name=r.last_name) for r in body.recipients],
-            opportunity=body.opportunity,
-            title=body.title or asset.title,
-            is_test=body.is_test,
-            # The board belongs to whoever is signed in, not to the account in
-            # configuration. A DemoBoard records who sent it and that has to be
-            # true; the api key is organisation-wide and `user_email` is what
-            # selects the acting person, so this is one field, not a per-user
-            # login. The dev principal is a local stand-in and never acts as
-            # anyone -- locally that means the configured account, as before.
-            as_user=None if user.is_dev_principal else user.email,
-        )
+        # Someone is waiting on the dialog: the short budget. createsenddemo
+        # itself is never resent after it may have run (http_policy).
+        with http_policy.interactive():
+            link = client.create_share_link(
+                asset.consensus_uuid,
+                trackable=body.trackable,
+                organization=body.organization,
+                recipients=[ShareRecipient(email=r.email, first_name=r.first_name,
+                                           last_name=r.last_name) for r in body.recipients],
+                opportunity=body.opportunity,
+                title=body.title or asset.title,
+                is_test=body.is_test,
+                # The board belongs to whoever is signed in, not to the account in
+                # configuration. A DemoBoard records who sent it and that has to be
+                # true; the api key is organisation-wide and `user_email` is what
+                # selects the acting person, so this is one field, not a per-user
+                # login. The dev principal is a local stand-in and never acts as
+                # anyone -- locally that means the configured account, as before.
+                as_user=None if user.is_dev_principal else user.email,
+            )
     except ConsensusSchemaUnknown as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
     except ConsensusError as exc:

@@ -339,6 +339,34 @@ def test_a_restart_resumes_an_unfinished_run_but_not_a_paused_one(client, tmp_pa
     assert jobs.run_status(bid)["state"] == "finished"
 
 
+def test_a_restart_waits_for_the_dead_runs_lock_then_resumes(client, tmp_path, monkeypatch):
+    """Right after a restart the dead process's lock is still fresh. Until
+    2026-11-26 auto_resume gave up there; now it waits for the lock to go
+    stale, then resumes."""
+    admin(client)
+    sid = upload(client, tmp_path)
+    monkeypatch.setattr(jobs, "_spawn", lambda bid: None)          # "the server died"
+    bid = client.post("/api/migration/brightcove/runs", json=body(sid, operator="Liwei")).json()["batch_id"]
+    assert jobs._claim(bid), "the dead process's lock, seconds old"
+
+    real_wait = jobs._resume_when_free
+    waiting = []
+    monkeypatch.setattr(jobs, "_resume_when_free", lambda: waiting.append(1))
+    assert jobs.auto_resume() is None
+    for _ in range(100):                               # the waiter runs in a thread
+        if waiting:
+            break
+        time.sleep(0.01)
+    assert waiting == [1], "waits instead of giving up"
+
+    old = time.time() - jobs.STALE_LOCK_SECONDS - 5
+    os.utime(jobs._lock_path(), (old, old))
+    spawned = []
+    monkeypatch.setattr(jobs, "_spawn", lambda b: spawned.append(b))
+    real_wait(poll=0.01)
+    assert spawned == [bid]
+
+
 # ─────────────────────────────────────────────────────── GXC (2026-10-29)
 def gxc_workbook(tmp_path) -> bytes:
     """A GXC sheet as V29 has them: no Customer Facing, Segment or Video Type."""

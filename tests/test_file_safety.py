@@ -234,3 +234,23 @@ def test_a_stale_picture_is_shown_at_once_and_fetched_again_behind_it(tmp_path, 
     monkeypatch.setattr(thumbnails, "fetch", lambda c, u: pytest.fail("the viewer waited"))
     assert thumbnails.get(str(tmp_path), object(), url, wait=False) == (b"old", "image/jpeg")
     assert asked == [url]
+
+
+# ───────────────────────────────────────────── a long-held lock stays fresh
+def test_a_heartbeat_keeps_a_long_held_lock_from_being_taken_over(tmp_path):
+    """A sync holds its lock for minutes; with a heartbeat it can use a short
+    stale time, so a lock left by a dead worker clears in minutes (2026-11-26)."""
+    path = str(tmp_path / "sync")
+    with file_safety.locked(path, stale=0.6, heartbeat=0.1):
+        time.sleep(1.0)                      # longer than `stale`
+        assert file_safety.held(path, stale=0.6), "touched, so still held"
+        with pytest.raises(TimeoutError):
+            file_safety._take(path + ".lock", wait=0.3, stale=0.6)
+    assert not os.path.exists(path + ".lock")
+
+
+def test_without_a_heartbeat_the_same_lock_counts_as_abandoned(tmp_path):
+    path = str(tmp_path / "sync")
+    with file_safety.locked(path, stale=0.6):
+        time.sleep(1.0)
+        assert not file_safety.held(path, stale=0.6)

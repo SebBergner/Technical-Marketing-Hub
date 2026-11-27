@@ -150,26 +150,59 @@ def _take(lock_path: str, wait: float, stale: float = STALE_SECONDS) -> None:
         return
 
 
+class Heartbeat:
+    """Touches a held lock file every `every` seconds, so a long run (a sync)
+    can use a short `stale`: a lock whose worker died stops being touched and
+    is taken over minutes later, not hours (2026-11-26: a restart mid-sync
+    left the SharePoint sync waiting up to three hours)."""
+
+    def __init__(self, lock_path: str, every: float):
+        self._path, self._every = lock_path, every
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True,
+                                        name=f"lock-heartbeat-{os.path.basename(lock_path)}")
+        self._thread.start()
+
+    def _run(self) -> None:
+        while not self._stop.wait(self._every):
+            try:
+                os.utime(self._path, None)
+            except OSError:
+                pass
+
+    def stop(self) -> None:
+        self._stop.set()
+        self._thread.join(timeout=5)
+
+
 @contextmanager
 def locked(path: str, wait: float = WAIT_SECONDS,
-           stale: float = STALE_SECONDS) -> Iterator[None]:
+           stale: float = STALE_SECONDS,
+           heartbeat: float | None = None) -> Iterator[None]:
     """Hold `path`'s lock across every worker for a read-modify-write.
 
     Re-entrant within a thread, so a function holding it may call another
     that takes it too. `stale`: how old a lock must be before it counts as
-    left by a dead worker; raise it for work that takes longer than a write."""
+    left by a dead worker; raise it for work that takes longer than a write,
+    or give a `heartbeat` (seconds, well under `stale`) to keep the lock
+    fresh while it is held."""
     lock_path = path + ".lock"
     rlock, local = _entry(lock_path)
     with rlock:
         depth = getattr(local, "depth", 0)
+        beat = None
         if depth == 0:
             os.makedirs(os.path.dirname(lock_path) or ".", exist_ok=True)
             _take(lock_path, wait, stale)
+            if heartbeat:
+                beat = Heartbeat(lock_path, heartbeat)
         local.depth = depth + 1
         try:
             yield
         finally:
             local.depth -= 1
+            if beat is not None:
+                beat.stop()
             if local.depth == 0:
                 try:
                     os.remove(lock_path)

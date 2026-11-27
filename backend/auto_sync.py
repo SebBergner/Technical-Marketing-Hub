@@ -61,7 +61,11 @@ RUNS_PER_DAY = 2
 DEFAULT_HOURS_UTC = (DEFAULT_HOUR_UTC, (DEFAULT_HOUR_UTC + 12) % 24)
 TICK_SECONDS = 600
 FIRST_TICK_SECONDS = 60
-STALE_LOCK_SECONDS = 3 * 3600
+#: The lock is touched every HEARTBEAT_SECONDS while a run holds it, so one
+#: left by a process that died (a restart, a deploy) is taken over after ten
+#: minutes rather than three hours (2026-11-26).
+STALE_LOCK_SECONDS = 10 * 60
+HEARTBEAT_SECONDS = 60
 
 
 def _owned(name: str, data_dir: str | None = None) -> str:
@@ -165,8 +169,13 @@ def is_due(state: dict, now: datetime | None = None) -> bool:
         return False
     now = now or _now()
     slot = _latest_slot(state, now)
-    covered = [t for t in (_parse((state.get("last_run") or {}).get("started_at")),
-                           _parse(state.get("enabled_at"))) if t]
+    last = state.get("last_run") or {}
+    # A run counts once it has finished. One that started and never
+    # finished was cut off by a restart: until 2026-11-26 it counted as
+    # done, and the next try was twelve hours later. (Two processes never
+    # run at once: tick() takes the lock first.)
+    ran = _parse(last.get("started_at")) if last.get("finished_at") else None
+    covered = [t for t in (ran, _parse(state.get("enabled_at"))) if t]
     return not covered or slot > max(covered)
 
 
@@ -255,10 +264,20 @@ def tick(repo=None, data_dir: str | None = None, now: datetime | None = None,
         started = now or _now()
         state["last_run"] = {"started_at": started.isoformat(timespec="seconds")}
         save_state(state, data_dir)
-        if repo is None:
-            from backend.deps import build_repo
-            repo = build_repo()
-        results = run(repo)
+        from backend.file_safety import Heartbeat
+        beat = Heartbeat(_owned(LOCK_FILE, data_dir), HEARTBEAT_SECONDS)
+        try:
+            if repo is None:
+                from backend.deps import build_repo
+                repo = build_repo()
+            results = run(repo)
+        except Exception as exc:                          # noqa: BLE001
+            # Finished, badly: recorded, so the slot is not retried every
+            # ten minutes, and the page says what broke.
+            log.exception("auto sync: the run failed")
+            results = {"run": {"ok": False, "error": str(exc)[:300]}}
+        finally:
+            beat.stop()
         record = {
             "started_at": started.isoformat(timespec="seconds"),
             "finished_at": _now().isoformat(timespec="seconds"),

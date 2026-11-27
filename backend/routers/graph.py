@@ -112,14 +112,18 @@ def sync_state(repo: AssetRepository = Depends(get_repo)):
 #: Across workers too (2026-11-05): the threading lock covers one gunicorn
 #: worker, and the button, the schedule and a new demo can land in different
 #: ones. So the run also holds a lock file on the shared data directory, the
-#: way auto_sync does. A sync takes minutes, so the file counts as left by a
-#: dead worker only after SYNC_STALE_SECONDS, and a second sync waits for
-#: the first rather than giving up.
+#: way auto_sync does. A sync takes minutes, so the lock is touched every
+#: SYNC_HEARTBEAT_SECONDS while it runs and counts as left by a dead worker
+#: after SYNC_STALE_SECONDS without a touch; a second sync waits for the
+#: first rather than giving up. (Until 2026-11-26 the stale time was three
+#: hours with no heartbeat, so a restart mid-sync blocked syncing for up to
+#: three hours and showed "indexing…" all that time.)
 _run_lock = threading.Lock()
 _queue = {"requested": False, "worker": False, "actor": None, "full": False}
 _queue_lock = threading.Lock()
 LOCK_NAME = "sharepoint_sync"
-SYNC_STALE_SECONDS = 3 * 3600
+SYNC_STALE_SECONDS = 10 * 60
+SYNC_HEARTBEAT_SECONDS = 60
 SYNC_WAIT_SECONDS = 3 * 3600
 
 
@@ -134,7 +138,8 @@ def _exclusive(repo: AssetRepository):
     """This worker's turn, then every worker's."""
     from backend.file_safety import locked
     with _run_lock, locked(_lock_path(repo), wait=SYNC_WAIT_SECONDS,
-                           stale=SYNC_STALE_SECONDS):
+                           stale=SYNC_STALE_SECONDS,
+                           heartbeat=SYNC_HEARTBEAT_SECONDS):
         yield
 
 

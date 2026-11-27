@@ -615,9 +615,34 @@ def latest_page_run() -> str | None:
 
 
 def auto_resume() -> str | None:
-    """On startup: pick up a page-started run that a restart interrupted."""
-    if not settings.migration_runner_enabled or active_run():
+    """On startup: pick up a page-started run that a restart interrupted.
+
+    Right after a restart the dead process's lock is still fresh (its last
+    heartbeat was seconds ago), so active_run() says a run is live. Until
+    2026-11-26 that ended it: the documented resume never happened in the
+    usual case. Now a background check waits for the lock to go stale --
+    or to be released by a process that is in fact still running, as in the
+    overlap of a swap -- and tries once more."""
+    if not settings.migration_runner_enabled:
         return None
+    if active_run():
+        threading.Thread(target=_resume_when_free, daemon=True,
+                         name="migration-resume-wait").start()
+        return None
+    return _resume_now()
+
+
+def _resume_when_free(poll: float = 60.0) -> None:
+    deadline = time.time() + STALE_LOCK_SECONDS + 2 * poll
+    while time.time() < deadline:
+        time.sleep(poll)
+        if not active_run():
+            _resume_now()
+            return
+    log.info("migration: a live run still holds the lock; not resuming here")
+
+
+def _resume_now() -> str | None:
     folder = batches_dir()
     if not os.path.isdir(folder):
         return None

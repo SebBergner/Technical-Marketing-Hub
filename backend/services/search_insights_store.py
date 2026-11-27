@@ -84,9 +84,14 @@ def _save(state: dict, data_dir: str | None = None) -> None:
 
 
 def _update(data_dir: str | None = None, **fields) -> dict:
-    state = load(data_dir)
-    state.update(fields)
-    _save(state, data_dir)
+    """Change some fields, under the file's lock: the scheduled run, a
+    Refresh and the page's state all write this file, and before 2026-11-26
+    one could overwrite the other's fields."""
+    from backend.file_safety import locked
+    with locked(_path(STATE_FILE, data_dir)):
+        state = load(data_dir)
+        state.update(fields)
+        _save(state, data_dir)
     return state
 
 
@@ -187,10 +192,9 @@ def compute_all(data_dir: str | None = None, now: datetime | None = None) -> dic
                 finds_now=lambda q, key, repo=repo: si.finds_now(repo, q, key),
                 vocab=vocab, filters_words=si.filters_words)
     stamp = now.isoformat(timespec="seconds")
-    state = load(data_dir)
-    state.update(computed_at=stamp, seconds=round(time.monotonic() - started, 1),
-                 results=results, running_since=None)
-    _save(state, data_dir)
+    state = _update(data_dir, computed_at=stamp,
+                    seconds=round(time.monotonic() - started, 1),
+                    results=results, running_since=None)
     log.info("search insights worked out in %.1f s", state["seconds"])
     return state
 

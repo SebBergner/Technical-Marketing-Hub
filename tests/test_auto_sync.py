@@ -137,8 +137,10 @@ def test_the_lock_is_released_even_when_the_run_raises(data):
     def boom(repo):
         raise RuntimeError("disk full")
 
-    with pytest.raises(RuntimeError):
-        auto_sync.tick(repo=object(), data_dir=data, now=at(29, 6, 5), run=boom)
+    # Since 2026-11-26 the failure is recorded as a finished run, not
+    # re-raised: an unfinished run now counts as cut off and is tried again.
+    record = auto_sync.tick(repo=object(), data_dir=data, now=at(29, 6, 5), run=boom)
+    assert record["ok"] is False and "disk full" in record["results"]["run"]["error"]
     assert not os.path.exists(os.path.join(data, "owned", auto_sync.LOCK_FILE))
     # And it counts as tried: the loop does not hammer a failing source
     # every ten minutes for the rest of the day.
@@ -250,3 +252,14 @@ def test_the_sharepoint_card_lists_every_library_the_sync_covers(tmp_path, monke
 
     monkeypatch.setattr(settings, "graph_video_library", "")
     assert "Demo Video" not in {r["name"] for r in _sharepoint_libraries(repo)}
+
+
+def test_a_run_cut_off_by_a_restart_is_run_again(data):
+    """It started, the process died, nothing finished it: until 2026-11-26
+    that counted as done and the next try was twelve hours later."""
+    turned_on(data, hours=(6, 18), when=at(28, 10))
+    state = auto_sync.load_state(data)
+    state["last_run"] = {"started_at": at(29, 6, 1).isoformat(timespec="seconds")}
+    auto_sync.save_state(state, data)
+    run = Recorder()
+    assert auto_sync.tick(repo=object(), data_dir=data, now=at(29, 6, 20), run=run) is not None

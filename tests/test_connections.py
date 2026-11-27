@@ -529,3 +529,48 @@ def test_brightcove_gives_up_with_its_own_error():
 
     with pytest.raises(BrightcoveError, match="kept failing"):
         brightcove_for(handler).video("v1")
+
+
+# ─────────────────────────────── 8. one refresh at a time, rotation-safe
+def test_two_threads_never_refresh_with_the_same_refresh_token(tmp_path):
+    """Refresh tokens rotate. Before the lock, two threads that both saw an
+    expired access token both refreshed with the same refresh token; the
+    second was refused (it had just been rotated away)."""
+    import threading
+
+    from backend.integrations.consensus_oauth import ConsensusOAuth, TokenStore
+    store = TokenStore(str(tmp_path))
+    store.write(refresh_token="r0", access_token="old", expires_at=0)
+    used, lock = [], threading.Lock()
+
+    def handler(request):
+        form = dict(x.split("=", 1) for x in request.content.decode().split("&"))
+        with lock:
+            used.append(form["refresh_token"])
+            n = len(used)
+        threading.Event().wait(0.05)        # a slow token endpoint widens the race
+        if form["refresh_token"] != f"r{n - 1}":
+            return httpx.Response(400, json={"error": "invalid_grant"})
+        return httpx.Response(200, json={"access_token": f"a{n}", "refresh_token": f"r{n}",
+                                         "expires_in": 3600})
+
+    oauth = ConsensusOAuth(client_id="c", client_secret="s", redirect_uri="https://x/cb",
+                           base_url="https://app.goconsensus.com", store=store,
+                           transport=httpx.MockTransport(handler))
+    results, errors = [], []
+    start = threading.Barrier(6)
+
+    def worker():
+        start.wait()
+        try:
+            results.append(oauth.access_token())
+        except Exception as exc:                              # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == [] and used == ["r0"], "one refresh, and everyone shares its token"
+    assert set(results) == {"a1"} and store.read()["refresh_token"] == "r1"

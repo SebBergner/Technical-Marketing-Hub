@@ -64,6 +64,20 @@ class ConsensusOAuthError(RuntimeError):
     pass
 
 
+#: One refresh at a time per token file, across every ConsensusOAuth in the
+#: process. Refresh tokens rotate: two threads refreshing with the same one
+#: means the second presents a token the first just retired, and the stored
+#: grant can be lost (audit 2026-11-26). Only one process refreshes in
+#: production (one gunicorn worker); a script run beside it is not covered.
+_refresh_locks: dict[str, threading.Lock] = {}
+_refresh_locks_guard = threading.Lock()
+
+
+def _refresh_lock(path: str) -> threading.Lock:
+    with _refresh_locks_guard:
+        return _refresh_locks.setdefault(os.path.abspath(path), threading.Lock())
+
+
 class NotAuthorised(ConsensusOAuthError):
     """No refresh token stored yet — somebody has to visit the start URL."""
 
@@ -220,27 +234,42 @@ class ConsensusOAuth:
 
     # ----------------------------------------------------------------- step 5
     def access_token(self) -> str:
-        """A valid access token, refreshing first if it is close to expiry."""
-        stored = self.store.read()
-        if not stored.get("refresh_token"):
-            raise NotAuthorised(
-                "Consensus V2 has never been authorised on this instance. There "
-                "is no client-credentials grant, so a person must visit "
-                "/api/consensus/oauth/start once; after that the refresh token "
-                "keeps it alive.")
+        """A valid access token, refreshing first if it is close to expiry.
 
-        expires_at = stored.get("expires_at") or 0
-        if stored.get("access_token") and time.time() < expires_at - _REFRESH_MARGIN_SECONDS:
+        Read, refresh and persist happen under one lock, and the file is read
+        again once the lock is held: a thread that waited behind a refresh
+        finds the new token and uses it, instead of refreshing a second time
+        with the refresh token the first refresh just rotated away.
+        """
+        stored = self.store.read()
+        if self._still_valid(stored):
             return stored["access_token"]
 
-        tokens = self._token_request({
-            "grant_type": "refresh_token",
-            "refresh_token": stored["refresh_token"],
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-        })
-        self._persist(tokens)
-        return tokens["access_token"]
+        with _refresh_lock(self.store.path):
+            stored = self.store.read()
+            if not stored.get("refresh_token"):
+                raise NotAuthorised(
+                    "Consensus V2 has never been authorised on this instance. There "
+                    "is no client-credentials grant, so a person must visit "
+                    "/api/consensus/oauth/start once; after that the refresh token "
+                    "keeps it alive.")
+            if self._still_valid(stored):
+                return stored["access_token"]
+
+            tokens = self._token_request({
+                "grant_type": "refresh_token",
+                "refresh_token": stored["refresh_token"],
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+            })
+            self._persist(tokens)
+            return tokens["access_token"]
+
+    @staticmethod
+    def _still_valid(stored: dict) -> bool:
+        expires_at = stored.get("expires_at") or 0
+        return bool(stored.get("refresh_token") and stored.get("access_token")
+                    and time.time() < expires_at - _REFRESH_MARGIN_SECONDS)
 
     def _persist(self, tokens: dict) -> None:
         """Store what came back.

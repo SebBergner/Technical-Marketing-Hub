@@ -271,3 +271,57 @@ def test_a_404_does_not_count_against_the_breaker():
         with http_policy.interactive():
             assert client._request("GET", "/x") is None
 
+
+# ─────────────────────────────────────── 4. no blocking work on the loop
+def test_no_router_endpoint_is_async():
+    """With one gunicorn worker, an `async def` route that waits on Graph,
+    openpyxl or the disk freezes every other request. Plain `def` routes run
+    in the thread pool. Async *dependencies* that only read the request are
+    fine; this checks the endpoints."""
+    import inspect
+
+    from fastapi.routing import APIRoute
+
+    from app import app
+    offenders = [f"{sorted(r.methods)} {r.path}" for r in app.routes
+                 if isinstance(r, APIRoute)
+                 and r.endpoint.__module__.startswith("backend.routers")
+                 and inspect.iscoroutinefunction(r.endpoint)]
+    assert offenders == []
+
+
+@pytest.fixture
+def api(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from app import app
+    from backend.deps import get_repo
+    from backend.repositories.json_repo import JsonAssetRepository
+    repo = JsonAssetRepository(str(tmp_path))
+    app.dependency_overrides[get_repo] = lambda: repo
+    try:
+        yield TestClient(app, base_url="http://localhost")
+    finally:
+        app.dependency_overrides.pop(get_repo, None)
+
+
+def test_a_request_takes_at_most_ten_files_and_reports_the_true_size(api):
+    import json
+
+    from backend.integrations.graph.requests_list import MAX_ATTACHMENT_BYTES
+    from backend.routers.requests import MAX_ATTACHMENTS
+    body = {"asset_type": "vdk", "products": ["Windchill"], "brief": "A story"}
+    files = [("files", (f"f{i}.pdf", b"%PDF", "application/pdf"))
+             for i in range(MAX_ATTACHMENTS + 2)]
+    files.append(("files", ("big.pdf", b"x" * (MAX_ATTACHMENT_BYTES + 3 * 1024 * 1024),
+                            "application/pdf")))
+    r = api.post("/api/requests/with-files", data={"request": json.dumps(body)}, files=files)
+    assert r.status_code == 201
+    rejected = r.json()["attachments_rejected"]
+    assert sum("only 10 files" in x for x in rejected) == 3
+    assert "big.pdf" in " ".join(rejected)          # over the cap, refused unread
+
+    r = api.post("/api/requests/with-files", data={"request": json.dumps(body)},
+                 files=[("files", ("big.pdf", b"x" * (MAX_ATTACHMENT_BYTES + 3 * 1024 * 1024),
+                                   "application/pdf"))])
+    assert "7.0 MB is over" in " ".join(r.json()["attachments_rejected"])

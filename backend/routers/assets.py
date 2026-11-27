@@ -1074,11 +1074,15 @@ def frame_source(asset_id: str, item_id: str, repo: AssetRepository = Depends(ge
 
 
 @router.put("/{asset_id}/thumbnail")
-async def set_thumbnail(asset_id: str, file: UploadFile = File(...),
+def set_thumbnail(asset_id: str, file: UploadFile = File(...),
                         repo: AssetRepository = Depends(get_repo), actor: str = EDIT):
     """The card's picture (B5): an image uploaded, or a frame the page took
     from a video -- either way a picture saved in the demo's folder and
-    ticked HubThumbnail, any picture ticked before cleared."""
+    ticked HubThumbnail, any picture ticked before cleared.
+
+    A plain `def`: the SharePoint calls below block, and in an `async def`
+    they blocked the event loop of the single worker (audit 2026-11-26)."""
+    from backend.integrations import http_policy
     from backend.routers.uploads import _sync_soon
     from backend.services import metadata_edit as me
     from backend.services import upload_targets as ut
@@ -1089,13 +1093,15 @@ async def set_thumbnail(asset_id: str, file: UploadFile = File(...),
     content_type = (file.content_type or "").lower()
     if content_type not in me.IMAGE_TYPES:
         raise HTTPException(status_code=422, detail="A JPG, PNG or WebP picture, please.")
-    content = await file.read(me.MAX_IMAGE_BYTES + 1)
+    content = file.file.read(me.MAX_IMAGE_BYTES + 1)
     if not content or len(content) > me.MAX_IMAGE_BYTES:
         raise HTTPException(status_code=422, detail="A picture of at most 5 MB, please.")
     try:
-        item = me.put_thumbnail(client, target, asset.source_item_id, content, content_type)
-        me.tick(client, target, ut.THUMBNAIL_COLUMN, item["id"],
-                [r.item_id for r in asset.resources if r.hub_thumbnail and r.item_id])
+        with http_policy.interactive():
+            item = me.put_thumbnail(client, target, asset.source_item_id, content,
+                                    content_type)
+            me.tick(client, target, ut.THUMBNAIL_COLUMN, item["id"],
+                    [r.item_id for r in asset.resources if r.hub_thumbnail and r.item_id])
     except GraphError as exc:
         raise HTTPException(status_code=502, detail=f"SharePoint: {exc}")
     me.remember(repo, asset_id, {"thumbnail_url": item.get("webUrl"), "thumbnail_chosen": True})

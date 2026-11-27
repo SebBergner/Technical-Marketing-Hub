@@ -1040,11 +1040,14 @@ def get_consensus_licenses():
 
 
 @router.post("/consensus-licenses", dependencies=[VIEW_ADMIN])
-async def upload_consensus_licenses(file: UploadFile = File(...),
+def upload_consensus_licenses(file: UploadFile = File(...),
                                     actor: str = Depends(require_perm(Perm.MANAGE_USERS))):
-    """Replace the list with Consensus's Manage users report, as exported."""
+    """Replace the list with Consensus's Manage users report, as exported.
+
+    A plain `def`, so the parse and the write run off the event loop; and
+    never more than one byte past the limit is read into memory."""
     from backend import consensus_licenses
-    content = await file.read()
+    content = file.file.read(5 * 1024 * 1024 + 1)
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="The file is over 5 MB.")
     try:

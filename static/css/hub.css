@@ -110,13 +110,6 @@
     background: #00650A;
   }
 
-  /* Re-index is gone from the details page. Seb: it is an administrator's
-     action and a global one -- re-indexing from a single asset invites 807
-     people to trigger 807 partial runs, and the button implied a per-asset
-     scope the sync does not have. It belongs in the Admin area, which is not
-     built yet, so the honest state is no button rather than a disabled one. */
-  .vp-reindex { display: none !important; }
-
   /* Back to the catalogue, made prominent. Seb's review left the details page
      as the one view with no obvious exit: the link was 13px of secondary grey
      with no affordance, in a layout where everything else that navigates is a
@@ -155,7 +148,6 @@ a { color: var(--orion-link); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 .orion-spark { display: inline-block; width: 18px; height: 18px; color: var(--orion-indigo); vertical-align: -4px; flex: none; }
-.orion-spark--sm { width: 16px; height: 16px; vertical-align: -3px; }
 
 .orion-app {
   display: grid;
@@ -170,7 +162,6 @@ a:hover { text-decoration: underline; }
   overflow: hidden;
 }
 .orion-workarea { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.orion-workbody { flex: 1; display: flex; min-height: 0; }
 
 .orion-side { display: flex; flex-direction: column; background: var(--orion-surface-2); border-right: 1px solid var(--orion-border); min-height: 0; }
 .orion-side__brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 16px 16px 12px; font-weight: 600; font-size: 15px; }
@@ -203,11 +194,7 @@ a:hover { text-decoration: underline; }
 .orion-navitem--active { background: var(--orion-surface); box-shadow: inset 0 0 0 1px var(--orion-border); font-weight: 600; }
 .orion-navitem .count { color: var(--orion-text-3); font-size: 12px; font-variant-numeric: tabular-nums; }
 .orion-divider { height: 1px; background: var(--orion-border); margin: 10px 0; }
-
-.orion-main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--orion-surface); }
 .orion-topbar { padding: 20px 32px 18px; border-bottom: 1px solid var(--orion-border); }
-.orion-breadcrumb { font-size: 13px; color: var(--orion-text-2); margin-bottom: 4px; }
-.orion-breadcrumb a { color: var(--orion-link); }
 .orion-title { font-size: 24px; font-weight: 600; margin: 0 0 4px; }
 .orion-subtle { color: var(--orion-text-2); font-size: 13.5px; }
 
@@ -215,16 +202,11 @@ a:hover { text-decoration: underline; }
 
 .orion-ico { width: 18px; height: 18px; flex: none; vertical-align: -4px; }
 .orion-ico--sm{ width: 15px; height: 15px; vertical-align: -3px; }
-.orion-ico--lg{ width: 22px; height: 22px; vertical-align: -5px; }
 .ico-green { color: var(--orion-green); }
-.ico-amber { color: var(--orion-warn-ink); }
 .ico-indigo { color: var(--orion-indigo); }
 .ico-muted { color: var(--orion-text-3); }
 
 .orion-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: var(--orion-radius-pill); font-size: 11.5px; font-weight: 600; line-height: 1.4; }
-.orion-badge--ok     { background: var(--orion-green-soft); color: var(--orion-green-ink); }
-.orion-badge--risk   { background: var(--orion-danger-bg); color: var(--orion-danger-ink); }
-.orion-badge--open   { background: var(--orion-open-bg);   color: var(--orion-open-ink); }
 /* A badge that does something when clicked — the tag chips on a details page.
    At rest it is identical to the badges beside it, deliberately: Liwei asked
    for one chip style across the row. The affordance appears on hover and on
@@ -272,7 +254,6 @@ a:hover { text-decoration: underline; }
 .section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
 .section-head__title { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 600; }
 .section-head__sub { color: var(--orion-text-3); font-weight: 400; font-size: 12.5px; margin-left: 2px; }
-.section-head__link { font-size: 13px; color: var(--orion-link); display: flex; align-items: center; gap: 3px; }
 
 /* ============================================================
    ASSET CARDS
@@ -303,10 +284,6 @@ a:hover { text-decoration: underline; }
 .duration-chip {
   position: absolute; bottom: 8px; right: 8px; background: rgba(31,35,41,.82); color: #fff;
   font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; font-variant-numeric: tabular-nums;
-}
-.rank-chip {
-  position: absolute; bottom: 8px; left: 8px; background: rgba(31,35,41,.82); color: #fff;
-  font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px;
 }
 .play-btn {
   width: 42px; height: 42px; border-radius: 50%; background: var(--orion-indigo); border: none;
@@ -348,12 +325,8 @@ video.hub-inline-player__media { object-fit: contain; }
 .hub-foot__fresh { font-size: 11px; color: var(--orion-text-3); padding: 0 12px 6px; }
 .asset-card__date { font-size: 11.5px; color: var(--orion-text-3); margin-top: -2px; }
 .asset-card__meta { font-size: 12px; color: var(--orion-text-2); display: flex; align-items: center; gap: 6px; }
-.meta-logo-chip { display: inline-flex; align-items: center; background: #fff; padding: 2px 5px; border-radius: 4px; line-height: 0; flex: none; box-shadow: 0 0 0 1px var(--orion-border); }
 .nav-mark { height: 15px; width: auto; flex: none; }
-.meta-logo { height: 11px; width: auto; display: block; }
 .asset-card__stats { font-size: 11.5px; color: var(--orion-text-3); display: flex; align-items: center; gap: 5px; }
-.asset-card__uuid { font-size: 10.5px; color: var(--orion-text-3); display: flex; align-items: center; gap: 4px; }
-.asset-card__uuid .orion-mono { font-size: 10px; background: var(--orion-surface-2); padding: 1px 6px; border-radius: 4px; color: var(--orion-text-2); }
 .orion-mono { font-family: var(--orion-mono); }
 .asset-card__actions { margin-top: auto; padding-top: 8px; display: flex; gap: 8px; }
 
@@ -365,59 +338,18 @@ video.hub-inline-player__media { object-fit: contain; }
 .btn-ghost:hover { background: var(--orion-surface-2); }
 .btn-primary-sm { background: var(--orion-indigo); color: #fff; border-color: var(--orion-indigo); }
 .btn-primary-sm:hover { background: var(--orion-indigo-strong); }
-.asset-card__actions--3 .btn-ghost, .asset-card__actions--3 .btn-primary-sm { padding: 7px 3px; font-size: 11.5px; gap: 3px; }
 
 /* ============================================================
    COMPACT LIST (Continue where you left off)
    ============================================================ */
-.compact-list { border: 1px solid var(--orion-border); border-radius: var(--orion-radius); overflow: hidden; }
-.compact-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--orion-border); }
-.compact-row:last-child { border-bottom: none; }
-.compact-row__thumb { width: 42px; height: 30px; border-radius: 4px; background: var(--orion-surface-3); display: flex; align-items: center; justify-content: center; flex: none; color: var(--orion-text-3); }
-.compact-row__thumb svg { width: 15px; height: 15px; }
-.compact-row__title { font-size: 13px; font-weight: 500; }
-.compact-row__meta { font-size: 12px; color: var(--orion-text-3); display: flex; align-items: center; gap: 6px; }
-.compact-row__progress { flex: none; width: 70px; height: 4px; background: var(--orion-surface-3); border-radius: 2px; overflow: hidden; margin-left: auto; }
-.compact-row__progress span { display: block; height: 100%; background: var(--orion-indigo); }
 
 /* ============================================================
    PRODUCT TILES
    ============================================================ */
-.product-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-.product-tile {
-  display: flex; align-items: center; gap: 13px; padding: 16px; border: 1px solid var(--orion-border);
-  border-radius: var(--orion-radius); cursor: pointer; background: var(--orion-surface);
-}
-.product-tile:hover { background: var(--orion-surface-2); border-color: var(--orion-border-md); }
-.product-tile__mark {
-  width: 40px; height: 40px; border-radius: var(--orion-radius-sm); background: var(--orion-surface-2);
-  display: flex; align-items: center; justify-content: center; flex: none; color: var(--orion-text);
-}
-.product-tile__name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
-.product-tile__count { font-size: 12px; color: var(--orion-text-3); }
-.product-logo-chip {
-  display: inline-flex; align-items: center; justify-content: center; background: #fff;
-  padding: 8px 12px; border-radius: var(--orion-radius-sm); flex: none; height: 40px;
-  box-shadow: 0 0 0 1px var(--orion-border);
-}
-.product-logo { height: 20px; width: auto; display: block; }
 
 /* ============================================================
    FEATURED / EVANGELIZE
    ============================================================ */
-.featured-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.featured-card {
-  display: flex; gap: 16px; padding: 18px; border: 1px solid var(--orion-border-ink);
-  border-radius: var(--orion-radius); background: var(--orion-surface);
-}
-.featured-card__thumb {
-  flex: none; width: 96px; height: 96px; border-radius: var(--orion-radius-sm); background: var(--orion-surface-2);
-  display: flex; align-items: center; justify-content: center; color: var(--orion-border-md);
-}
-.featured-card__eyebrow { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--orion-green-ink); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
-.featured-card__title { font-size: 14.5px; font-weight: 600; margin-bottom: 5px; }
-.featured-card__body { font-size: 12.5px; color: var(--orion-text-2); margin-bottom: 10px; }
-.featured-card__foot { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--orion-text-3); }
 
 /* ============================================================
    STAGE / TYPE PILLS
@@ -525,18 +457,6 @@ video.hub-inline-player__media { object-fit: contain; }
 .modal__foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--orion-border); }
 .modal__foot .btn-ghost, .modal__foot .btn-primary-sm { flex: none; padding: 8px 16px; }
 
-.dsr-room-list { display: flex; flex-direction: column; gap: 6px; }
-.dsr-room-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--orion-border-md); border-radius: var(--orion-radius-sm); cursor: pointer; }
-.dsr-room-row:hover { background: var(--orion-surface-2); }
-.dsr-room-row--selected { border-color: var(--orion-indigo); background: var(--orion-indigo-soft); }
-.dsr-room-row__radio { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--orion-border-md); flex: none; position: relative; }
-.dsr-room-row--selected .dsr-room-row__radio { border-color: var(--orion-indigo); }
-.dsr-room-row--selected .dsr-room-row__radio::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; background: var(--orion-indigo); }
-.dsr-room-row__name { font-size: 13px; font-weight: 600; }
-.dsr-room-row__meta { font-size: 11.5px; color: var(--orion-text-3); }
-.dsr-room-row--new { border-style: dashed; }
-.dsr-room-row--new .dsr-room-row__name { color: var(--orion-text-2); font-weight: 500; }
-
 /* dark mode */
 @media (prefers-color-scheme: dark) {
   :root {
@@ -610,22 +530,11 @@ video.hub-inline-player__media { object-fit: contain; }
 .vp-card__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .vp-card__head-title { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; }
 .vp-card__head-title svg { color: var(--orion-indigo); width: 19px; height: 19px; }
-.vp-reindex { display: flex; align-items: center; gap: 6px; background: var(--orion-indigo); color: #fff; border: none; padding: 7px 14px; border-radius: var(--orion-radius-sm); font-size: 12.5px; font-weight: 600; cursor: pointer; }
-.vp-reindex:hover { background: var(--orion-indigo-strong); }
 .vp-desc { font-size: 13.5px; color: var(--orion-text); line-height: 1.55; margin-bottom: 20px; }
 
 .vp-label { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--orion-text-3); margin-bottom: 10px; }
 .vp-value-drivers { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
 .value-driver-chip { background: var(--orion-indigo-soft); color: var(--orion-indigo-strong); font-size: 12.5px; font-weight: 600; padding: 5px 13px; border-radius: var(--orion-radius-pill); }
-
-.capability-card { background: var(--orion-surface); border: 1px solid var(--orion-border); border-radius: var(--orion-radius); padding: 16px 18px; margin-bottom: 12px; }
-.capability-card:last-child { margin-bottom: 0; }
-.capability-card__head { margin-bottom: 10px; display: flex; align-items: baseline; gap: 0; }
-.phase-tag { display: inline-flex; align-items: center; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--orion-indigo); border: 1.5px solid var(--orion-indigo); border-radius: 5px; padding: 2px 8px; margin-right: 10px; flex: none; }
-.capability-card__title { font-size: 14.5px; font-weight: 600; }
-.capability-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; }
-.capability-chip { background: var(--orion-surface-3); color: var(--orion-text-2); font-size: 12px; padding: 4px 10px; border-radius: 6px; }
-.capability-narration { font-size: 12.5px; color: var(--orion-text-2); font-style: italic; line-height: 1.5; }
 
 /* ── 2. The Hub's own additions ─────────────────────────────────── */
   .hub-api-status { position:fixed; bottom:10px; right:12px; z-index:9999;
@@ -665,24 +574,10 @@ video.hub-inline-player__media { object-fit: contain; }
   .filter-pill select, .filter-pill option {
     background: var(--orion-surface); color: var(--orion-text);
   }
-  /* One colour per platform. A kit you run and a recording you send are
-     different things; a card that does not say which makes you guess. */
-  .hub-source { margin-right:6px; font-size:10px; }
-  .hub-source--sharepoint { color:#1a5fa8; border-color:#1a5fa8; background:#e8f0f9; }
-  .hub-source--consensus  { color:#c25a10; border-color:#c25a10; background:#fbeee3; }
 
   /* One compact button per platform the asset is actually on. Nothing is
      rendered for platforms it is not on -- with three sources, labelling every
      absence would give each card a row of things it is not. */
-  /* A feature with no data yet, shown as a shape rather than hidden: the
-     panel is where Serge expects it, and says why it is empty. */
-  .vr-placeholder { display:flex; gap:12px; align-items:flex-start;
-    padding:14px 16px; border:1px dashed var(--orion-border-md);
-    border-radius:var(--orion-radius-sm); color:var(--orion-text-3);
-    font-size:12.5px; line-height:1.55; }
-  .vr-placeholder strong { color:var(--orion-text-2); display:block;
-    margin-bottom:2px; }
-  .vr-placeholder svg { flex:0 0 auto; margin-top:1px; }
 
   /* The Value Roadmap tab (2026-11-24): AI output from the folder's
      *.index.json, so the badge says it is not reviewed yet. */
@@ -805,7 +700,6 @@ video.hub-inline-player__media { object-fit: contain; }
   .vp-file__download:hover { background:#00890B; border-color:#00890B; color:#fff; }
   .vp-file__download svg { width:12px; height:12px; }
 
-
   .hub-boot { display: flex; flex-direction: column; align-items: center;
     justify-content: center; gap: 14px; padding: 80px 20px; text-align: center;
     color: var(--orion-text-3); font-size: 13px; }
@@ -902,14 +796,6 @@ video.hub-inline-player__media { object-fit: contain; }
   #hubFilePreviewPosition { font-size:12px; color:var(--orion-text-3);
     font-variant-numeric:tabular-nums; }
 
-  /* Said plainly where there is nothing to show, rather than left blank —
-     an empty panel reads as broken, "not indexed yet" reads as honest. */
-  .hub-empty { color: var(--orion-text-3); font-size: 12.5px; font-style: italic; }
-
-  /* A platform badge that goes somewhere says so, quietly: the card is dense
-     and an underline on every one of them would be louder than the titles. */
-  .hub-source--link { text-decoration: none; cursor: pointer; }
-  .hub-source--link:hover { filter: brightness(.92); text-decoration: underline; }
   /* The name opens the details page and must read as the primary action. */
   .hub-detail-link { color: inherit; text-decoration: none; }
   .hub-detail-link:hover { text-decoration: underline; }
@@ -992,54 +878,6 @@ video.hub-inline-player__media { object-fit: contain; }
   /* ------------------------------------------------- segment landing page */
   .hub-seg { padding:18px 20px; border:1px solid var(--orion-border);
     border-radius:var(--orion-radius); background:var(--orion-surface-2); }
-  /* Collapsed: one line with a chevron, so a search is not pushed below the
-     fold by an introduction nobody is reading at that moment. */
-  .hub-seg__toggle { display:none; align-items:center; gap:8px; width:100%;
-    border:none; background:transparent; color:var(--orion-text); font:inherit;
-    font-size:14px; font-weight:600; cursor:pointer; padding:0; text-align:left; }
-  .hub-seg__toggle svg { transform:rotate(90deg); transition:transform .15s;
-    color:var(--orion-text-3); }
-  .hub-seg__toggle-count { margin-left:auto; font-size:12px; font-weight:400;
-    color:var(--orion-text-3); font-variant-numeric:tabular-nums; }
-  .hub-seg--collapsed { padding:11px 20px; }
-  .hub-seg--collapsed .hub-seg__toggle { display:flex; }
-  .hub-seg--collapsed .hub-seg__toggle svg { transform:rotate(0deg); }
-  .hub-seg--collapsed > *:not(.hub-seg__toggle) { display:none; }
-
-  .hub-seg__back { display:inline-flex; align-items:center; gap:4px; border:none;
-    background:transparent; color:var(--orion-text-3); font:inherit;
-    font-size:12px; cursor:pointer; padding:0 0 8px; }
-  .hub-seg__back:hover { color:var(--orion-text); }
-  /* The chevron points forward in the sprite; this is a way back. */
-  .hub-seg__back svg { transform:rotate(180deg); }
-  .hub-seg__head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
-  .hub-seg__title { margin:0; font-size:22px; font-weight:650;
-    color:var(--orion-text); }
-  .hub-seg__count { font-size:12.5px; color:var(--orion-text-3);
-    font-variant-numeric:tabular-nums; }
-  .hub-seg__blurb { margin:8px 0 14px; font-size:13.5px; line-height:1.55;
-    color:var(--orion-text-2); max-width:70ch; }
-  /* Missing editorial content must look missing. A plausible sentence nobody
-     stands behind is worse than a visible gap. */
-  .hub-seg__blurb--empty { color:var(--orion-text-3); font-style:italic; }
-  .hub-seg__foot { display:flex; align-items:center; justify-content:space-between;
-    gap:14px; flex-wrap:wrap; padding-top:12px;
-    border-top:1px solid var(--orion-border); }
-  .hub-seg__fams { display:flex; gap:6px; flex-wrap:wrap; }
-  .hub-seg__fam { border:1px solid var(--orion-border-md); background:transparent;
-    color:var(--orion-text-2); border-radius:999px; padding:3px 10px;
-    font:inherit; font-size:12px; cursor:pointer; }
-  .hub-seg__fam:hover { border-color:var(--orion-accent, #5b6cff);
-    color:var(--orion-text); }
-  .hub-seg__fam em { font-style:normal; color:var(--orion-text-3);
-    font-variant-numeric:tabular-nums; }
-  .hub-seg__contact { font-size:12.5px; color:var(--orion-text-2); }
-  .hub-seg__empty { color:var(--orion-text-3); font-style:italic; }
-  .hub-seg__stamp { display:block; font-size:11px; color:var(--orion-text-3); }
-  .hub-seg__latest { margin-top:16px; }
-  .hub-seg__latest h3 { margin:0 0 10px; font-size:13.5px; font-weight:600;
-    color:var(--orion-text-2); }
-  .hub-seg__latest .asset-row { overflow-x:auto; }
 
   /* A nav entry with nothing behind it. Dimmed rather than removed, because
      the category is real and may fill up -- and because silently deleting
@@ -1139,8 +977,6 @@ video.hub-inline-player__media { object-fit: contain; }
    rather than one more tag. */
 .hub-pill--internal{color:#b5641a;background:rgba(214,140,40,.13);border-color:rgba(214,140,40,.5);font-weight:600}
 .hub-pill--upload{color:#3730a3;background:rgba(79,70,229,.1);border-color:rgba(79,70,229,.45);font-weight:600}
-.hub-access-btn{margin-left:2px;padding:1px 9px;border-radius:999px;font:inherit;font-size:11.5px;line-height:18px;cursor:pointer;background:none;color:var(--orion-text-2);border:1px dashed var(--orion-border-md)}
-.hub-access-btn:hover{color:var(--orion-text);border-style:solid}
 .hub-card-line{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .hub-facts{margin-top:14px}
 .hub-facts__table{width:100%;border-collapse:collapse;font-size:13px}
@@ -1237,17 +1073,12 @@ video.hub-inline-player__media { object-fit: contain; }
 .asset-card__thumb .hub-age--older{background:rgba(31,35,41,.86)}
 .asset-card__thumb .hub-age--current{background:#1f63b8}
 .asset-card__thumb .hub-age--archived{background:#4b5260}
-/* Elio's ranked cards keep the type chip top-left; go below it. */
-.asset-card__thumb:has(.rank-chip) .hub-age{top:36px}
-.hub-review-btn{margin-left:2px;padding:1px 9px;border-radius:999px;font:inherit;font-size:11.5px;line-height:18px;cursor:pointer;background:none;color:var(--orion-text-2);border:1px dashed var(--orion-border-md)}
-.hub-review-btn:hover{color:var(--orion-text);border-style:solid}
 
 /* ── Controls hidden by permission (html.hub-no-*) (was PERMISSION_CSS in hub-api.js) ── */
 .hub-no-download a[href$='/download']{display:none !important}
 .hub-no-preview a[href$='/preview']{display:none !important}
 /* The Value Roadmap filters: until "Preview the Value Roadmap" is known to be granted. */
 html:not(.hub-can-view_value_roadmap) .hub-roadmap-only{display:none !important}
-
 
 /* ── A demo's page (was DETAIL_CSS in hub-api.js) ── */
 .hub-vp-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,380px);gap:20px;align-items:start;margin-bottom:22px}
@@ -1322,7 +1153,6 @@ html:not(.hub-can-view_value_roadmap) .hub-roadmap-only{display:none !important}
 #hubSuggest .hub-suggest__btn:hover{border-color:var(--orion-indigo)}
 #hubSuggest .hub-suggest__btn--page{border-color:var(--orion-indigo);color:var(--orion-indigo)}
 #hubSuggest .hub-suggest__btn--page:hover{background:var(--orion-indigo-soft)}
-body .hub-seg__fam:hover{border-color:var(--orion-indigo)}
 .hub-adv__bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0 8px}
 .hub-adv__bar .hero-search__field{flex:1 1 320px}
 /* Beside the search field, in the Hub's green, as tall as the Asset Type
@@ -1654,7 +1484,6 @@ a.hub-up__title:hover{text-decoration:underline}
 /* ── Report an issue and Get help (A2, 2026-10-28; static/js/hub/report.js) ── */
 .hub-rpt { display: flex; flex-direction: column; gap: 16px; max-width: 920px; }
 .hub-rpt__card { padding: 18px 20px; border: 1px solid var(--orion-border); border-radius: var(--orion-radius); background: var(--orion-surface); }
-.hub-rpt__h { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
 .hub-rpt__form { display: flex; flex-direction: column; gap: 8px; }
 .hub-rpt__label { font-size: 12px; font-weight: 600; color: var(--orion-text-2); margin-top: 4px; }
 .hub-rpt__cats { display: flex; flex-direction: column; gap: 2px; }
@@ -2034,7 +1863,6 @@ button.hub-guide__video--tour:hover .hub-guide__play { transform: scale(1.08); }
 .hub-welcome__point b { display: block; color: var(--orion-text); font-weight: 650; }
 .hub-welcome__ico { flex: none; width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
   background: var(--orion-indigo-soft); color: var(--orion-indigo); }
-.hub-welcome__new { margin: 6px 0 16px; padding-left: 18px; font-size: 14px; line-height: 1.55; color: var(--orion-text-2); }
 .hub-welcome__guide { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; font-size: 13.5px;
   background: var(--orion-indigo-soft); color: var(--orion-text-2); }
 .hub-welcome__guide b { color: var(--orion-text); }

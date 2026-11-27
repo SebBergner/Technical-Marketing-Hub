@@ -154,37 +154,6 @@
     .main{padding:18px 16px 60px}
   }
 
-  /* content dashboard ----------------------------------------------------- */
-  .dim-row{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) 52px;gap:10px;
-    align-items:center;width:100%;padding:5px 6px;margin:0 -6px;border:none;border-radius:6px;
-    background:none;text-align:left;font:inherit;font-size:13.5px;color:var(--ink);cursor:pointer}
-  .dim-row:hover:not(:disabled){background:var(--surface-2)}
-  .dim-row:focus-visible{outline:2px solid var(--green);outline-offset:1px}
-  .dim-row__label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .dim-row__bar{height:10px;border-radius:0 4px 4px 0;background:var(--surface-2);overflow:hidden}
-  .dim-row__bar>span{display:block;height:100%;border-radius:0 4px 4px 0;background:var(--green)}
-  .dim-row--unset .dim-row__label{color:var(--faint);font-style:italic}
-  .dim-row--unset .dim-row__bar>span{background:var(--faint)}
-  .dim-row__n{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
-  .dim-note{font-size:12.5px;color:var(--faint);margin:8px 0 0}
-  .cmp-row{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr) 150px;gap:16px;
-    align-items:center;width:100%;padding:7px 6px;border:0;border-radius:6px;
-    background:none;font:inherit;color:inherit;text-align:left;cursor:pointer}
-  .cmp-row:hover{background:var(--surface-2)}
-  .cmp-row:focus-visible{outline:2px solid var(--green);outline-offset:1px}
-  .cmp-row:disabled{cursor:default;background:none}
-  .cmp-row__label b{font-weight:600;display:block}
-  .cmp-row__label span{font-size:12px;color:var(--faint)}
-  .cmp-row__n{text-align:right;font-variant-numeric:tabular-nums;font-size:13px}
-  .cmp-row__n span{color:var(--faint);display:block;font-size:12px}
-  .cmp-bar{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden}
-  .cmp-bar>span{display:block;height:100%;border-radius:99px}
-  .cmp-bar--good>span{background:var(--green)}
-  .cmp-bar--fair>span{background:var(--amber)}
-  .cmp-bar--poor>span{background:var(--red)}
-  @media (max-width:640px){.cmp-row{grid-template-columns:1fr 90px}.cmp-bar{grid-column:1/-1;order:3}}
-  .dim-more{margin-top:6px;padding:4px 10px;font-size:12.5px}
-
   /* promoted on Home ----------------------------------------------------- */
   .promo-row{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;
     padding:8px 0;border-top:1px solid var(--border)}

@@ -628,3 +628,66 @@ def test_a_download_link_is_minted_on_the_interactive_budget():
     assert _signed_file_url(Fake(), "asset-1", "item-1").startswith("https://")
     assert seen == [True, True, True]
     assert not http_policy.is_interactive(), "and the budget ends with the call"
+
+# ──────────────────────────────────────────────────────────── 10. logging
+def test_backend_info_lines_reach_stdout_with_time_level_and_logger(tmp_path):
+    """A fresh interpreter, as under gunicorn: no handler on the root logger
+    until logging_setup adds one. Before it, this INFO line was dropped."""
+    import subprocess
+    import sys
+    code = ("import backend.logging_setup, logging; "
+            "logging.getLogger('backend.integrations.graph.client').info('hello'); "
+            "logging.getLogger('httpx').info('library chatter'); "
+            "logging.getLogger('backend.x').warning('careful')")
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                         cwd=str(__import__("pathlib").Path(__file__).parents[1]),
+                         env={**__import__("os").environ, "LOG_LEVEL": ""}, timeout=60)
+    lines = out.stdout.strip().splitlines()
+    assert len(lines) == 2, out.stdout + out.stderr
+    assert lines[0].endswith(" INFO backend.integrations.graph.client: hello")
+    assert lines[0][:4].isdigit(), "starts with a timestamp"
+    assert lines[1].endswith(" WARNING backend.x: careful")
+
+
+def test_running_it_again_keeps_existing_handlers():
+    import logging
+
+    from backend import logging_setup
+    before = list(logging.getLogger().handlers)
+    logging_setup.configure()
+    assert logging.getLogger().handlers == before
+    assert logging.getLogger("backend").getEffectiveLevel() <= logging.INFO
+
+
+def test_a_slow_or_failed_call_is_logged_without_its_query(caplog):
+    import logging
+    caplog.set_level(logging.INFO, logger="backend.integrations.graph.client")
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        if len(calls) == 1:
+            return httpx.Response(503)
+        return httpx.Response(200, json={"value": []})
+
+    graph_for(handler)._request("GET", "/drives/d/root/delta?token=SECRET")
+    text = caplog.text
+    assert "graph GET /drives/d/root/delta -> 503" in text
+    assert "attempt 1/4" in text and " ms " in text
+    assert "SECRET" not in text
+
+
+def test_a_quick_successful_call_is_not_logged(caplog):
+    import logging
+    caplog.set_level(logging.INFO, logger="backend.integrations.graph.client")
+    graph_for(lambda r: httpx.Response(200, json={}))._request("GET", "/sites/x")
+    assert caplog.text == ""
+
+
+def test_a_slow_call_is_logged_even_when_it_succeeds(caplog, monkeypatch):
+    import logging
+    caplog.set_level(logging.INFO, logger="backend.integrations.graph.client")
+    ticks = iter([0.0, 0.0, 2.5, 2.5, 2.5])
+    monkeypatch.setattr(http_policy.time, "monotonic", lambda: next(ticks))
+    graph_for(lambda r: httpx.Response(200, json={}))._request("GET", "/sites/x")
+    assert "graph GET /sites/x -> 200 in 2500 ms (attempt 1/4)" in caplog.text

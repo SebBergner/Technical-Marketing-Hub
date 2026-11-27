@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
+import backend.logging_setup  # noqa: F401 -- configures logging on import
 from backend.config import settings
 from backend.version import app_version
 from backend.db import SessionLocal, create_all

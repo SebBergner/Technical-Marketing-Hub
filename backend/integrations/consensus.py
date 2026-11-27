@@ -35,7 +35,6 @@ Known documentation gaps, handled explicitly rather than guessed at:
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Protocol
@@ -43,6 +42,7 @@ from typing import Any, Protocol
 import httpx
 
 from backend.config import settings
+from backend.integrations import http_policy
 
 log = logging.getLogger(__name__)
 
@@ -58,6 +58,14 @@ PATHS = {
     "demos_details": "/api/reports/v1.0/demosDetails",
     "track_demoboards": "/api/reports/v1.0/trackDemoBoards",
 }
+
+#: The calls that only read, and so may be retried after a timeout or a 5xx.
+#: Anything not listed -- createsenddemo, createlink, and whatever is added
+#: later -- is treated as a write and resent only when it never ran.
+READ_PATHS = frozenset({
+    PATHS["user_info"], PATHS["demo_search"], PATHS["demo_by_hash"],
+    PATHS["demos_details"], PATHS["track_demoboards"],
+})
 
 #: The API caps page size at 500.
 MAX_PAGE_SIZE = 500
@@ -359,36 +367,29 @@ class HttpConsensusClient:
         """
         auth = dict(self._auth, user_email=as_user) if as_user else self._auth
         payload = {"auth": auth, **(body or {})}
-        last: Exception | None = None
 
-        for attempt in range(3):
-            try:
-                response = self._client.post(path, json=payload)
-            except httpx.HTTPError as exc:
-                last = exc
-                log.warning("consensus POST %s failed: %s", path, exc)
-                time.sleep(2 ** attempt)
-                continue
+        try:
+            response = http_policy.send(
+                lambda extra: self._client.post(path, json=payload, **extra),
+                service="consensus", method="POST", url=path,
+                # Every call is a POST, so the verb says nothing: only the
+                # reads may be repeated after a timeout or a 5xx. A second
+                # createsenddemo would be a second DemoBoard.
+                idempotent=path in READ_PATHS,
+                policy=http_policy.budget(http_policy.CONSENSUS_BACKGROUND), logger=log)
+        except http_policy.GaveUp as exc:
+            raise ConsensusError(
+                f"Consensus request to {path} failed: {exc}") from (exc.cause or exc)
 
-            if response.status_code == 429 or response.status_code >= 500:
-                wait = float(response.headers.get("Retry-After", 2 ** attempt))
-                log.warning("consensus POST %s -> %s, retrying in %.1fs",
-                            path, response.status_code, wait)
-                time.sleep(min(wait, 10))
-                last = ConsensusError(f"HTTP {response.status_code} from Consensus")
-                continue
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise ConsensusError(
+                f"Consensus returned non-JSON from {path} "
+                f"(HTTP {response.status_code})"
+            ) from exc
 
-            try:
-                data = response.json()
-            except ValueError as exc:
-                raise ConsensusError(
-                    f"Consensus returned non-JSON from {path} "
-                    f"(HTTP {response.status_code})"
-                ) from exc
-
-            return self._check(data, response.status_code, path)
-
-        raise ConsensusError(f"Consensus request to {path} failed: {last}") from last
+        return self._check(data, response.status_code, path)
 
     @staticmethod
     def _check(payload: Any, http_status: int, path: str) -> Any:  # noqa: D401

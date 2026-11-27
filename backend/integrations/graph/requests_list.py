@@ -225,6 +225,9 @@ def upload_attachment(client: GraphClient, site_id: str, request_id: str,
             "?@microsoft.graph.conflictBehavior=rename",
             content=content,
             headers={"Content-Type": "application/octet-stream"},
+            # conflictBehavior=rename: a repeat after a lost response would
+            # store a second copy, "brief 1.docx".
+            idempotent=False,
         )
     except GraphError as exc:
         raise RequestWriteError(

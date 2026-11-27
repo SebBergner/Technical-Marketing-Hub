@@ -103,6 +103,17 @@ def never_reach_consensus(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def fresh_connections():
+    """The circuit breaker counts failures per service across calls
+    (integrations/http_policy.py); one test's simulated outage must not make
+    the next test's calls fail fast."""
+    from backend.integrations import http_policy
+    http_policy.reset_breakers()
+    yield
+    http_policy.reset_breakers()
+
+
+@pytest.fixture(autouse=True)
 def access_files_in_tmp(tmp_path_factory, monkeypatch):
     """Users & groups (backend/access.py) live in owned/ under DATA_DIR, which
     most tests share with the developer's real data. A sign-in in a test

@@ -30,7 +30,6 @@ import base64
 import binascii
 import json
 import logging
-import time
 from dataclasses import dataclass, field
 from typing import Any, Iterator
 from urllib.parse import quote, urlparse
@@ -38,6 +37,7 @@ from urllib.parse import quote, urlparse
 import httpx
 
 from backend.config import settings
+from backend.integrations import http_policy
 
 log = logging.getLogger(__name__)
 
@@ -214,39 +214,38 @@ class GraphClient:
             return []
 
     # -------------------------------------------------------------- plumbing
-    def _request(self, method: str, url: str, **kwargs) -> Any:
+    def _request(self, method: str, url: str, *, idempotent: bool | None = None,
+                 **kwargs) -> Any:
         """One Graph call, with throttling and transient-failure retries.
 
-        429 and 5xx are retried honouring Retry-After. 403 and 410 are NOT
-        retried — they are meaningful states, not transient faults.
+        The retry rules live in `http_policy`: 429 always, and 5xx or a
+        transport error only when the call is idempotent -- a POST that may
+        already have run is never sent twice. `idempotent` defaults from the
+        method; a caller overrides it for a POST that is really a read
+        (preview) or a PUT that is not repeatable (conflictBehavior=rename).
+        403 and 410 are NOT retried -- they are meaningful states, not
+        transient faults.
         """
-        last: Exception | None = None
         # Popped ONCE, before the loop. Popping inside it sent If-Match and
         # Content-Type on the first attempt only, so a throttled PATCH was
         # retried without its ETag and could overwrite a concurrent edit.
         extra_headers = dict(kwargs.pop("headers", None) or {})
-        for attempt in range(4):
-            headers = {"Authorization": f"Bearer {self._token()}"}
-            headers.update(extra_headers)
-            try:
-                response = self._client.request(method, url, headers=headers, **kwargs)
-            except httpx.HTTPError as exc:
-                last = exc
-                log.warning("graph %s %s failed: %s", method, url, exc)
-                time.sleep(min(2 ** attempt, 8))
-                continue
+        if idempotent is None:
+            idempotent = method.upper() in http_policy.IDEMPOTENT_METHODS
 
-            if response.status_code in (429,) or response.status_code >= 500:
-                wait = float(response.headers.get("Retry-After", 2 ** attempt))
-                log.warning("graph %s %s -> %s, retrying in %.1fs",
-                            method, url, response.status_code, wait)
-                time.sleep(min(wait, 30))
-                last = GraphError(f"HTTP {response.status_code} from Graph")
-                continue
+        def attempt(extra: dict) -> httpx.Response:
+            headers = {"Authorization": f"Bearer {self._token()}", **extra_headers}
+            return self._client.request(method, url, headers=headers, **kwargs, **extra)
 
-            return self._interpret(response, url)
-
-        raise GraphError(f"Graph request to {url} failed: {last}") from last
+        try:
+            response = http_policy.send(
+                attempt, service="graph", method=method, url=url, idempotent=idempotent,
+                policy=http_policy.budget(http_policy.GRAPH_BACKGROUND), logger=log)
+        except http_policy.GaveUp as exc:
+            raise GraphError(
+                f"Graph request to {http_policy.log_path(url)} failed: {exc}") from (
+                exc.cause or exc)
+        return self._interpret(response, url)
 
     @staticmethod
     def _interpret(response: httpx.Response, url: str) -> Any:
@@ -507,8 +506,10 @@ class GraphClient:
         Short-lived like download_url(), for the same reason: resolve it when
         someone asks to preview, never earlier.
         """
+        # A POST only by Graph's choice of verb: it creates nothing, so a
+        # retry is harmless.
         payload = self._request("POST", f"/drives/{drive_id}/items/{item_id}/preview",
-                                json={})
+                                json={}, idempotent=True)
         return (payload or {}).get("getUrl")
 
     def thumbnails(self, drive_id: str, item_id: str) -> list[dict]:

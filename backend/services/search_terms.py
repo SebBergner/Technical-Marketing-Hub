@@ -204,16 +204,21 @@ def remove(group_id, actor, data_dir: str | None = None) -> None:
 
 
 # ─────────────────────────────────────────────────────────── for the search
-_seen: dict = {"path": None, "at": 0.0, "stamp": None, "table": ()}
+_seen: dict = {"dir": None, "path": None, "at": 0.0, "stamp": None, "table": (),
+               "variants": {}}
+#: Distinct queries remembered per table; a search asks once per catalogue row.
+_VARIANTS_KEPT = 512
 
 
 def _table() -> tuple:
     """((words, ...), ...) per group, for this worker; the file is looked at
     again at most every RECHECK_SECONDS, so another worker's edit shows soon."""
-    path = _path()
     now = time.monotonic()
-    if _seen["path"] == path and now - _seen["at"] < RECHECK_SECONDS:
+    # Asked once per catalogue row while a search runs: the quick answer
+    # compares the data dir, not a freshly joined path (2026-11-28, WS-E).
+    if _seen.get("dir") == settings.data_dir and now - _seen["at"] < RECHECK_SECONDS:
         return _seen["table"]
+    path = _path()
     try:
         stamp = os.stat(path).st_mtime_ns
     except OSError:
@@ -221,18 +226,28 @@ def _table() -> tuple:
     if _seen["path"] != path or stamp != _seen["stamp"]:
         table = tuple(tuple(dict.fromkeys(w for w in (words(t) for t in g.get("terms") or []) if w))
                       for g in load()["groups"])
-        _seen.update(table=tuple(g for g in table if len(g) > 1), stamp=stamp)
-    _seen.update(path=path, at=now)
+        _seen.update(table=tuple(g for g in table if len(g) > 1), stamp=stamp, variants={})
+    _seen.update(dir=settings.data_dir, path=path, at=now)
     return _seen["table"]
 
 
 def variants(text: str | None) -> tuple[str, ...]:
     """The query, and the query with each group's term swapped for the
     group's others: "mbse demo" -> ("mbse demo", "model based systems
-    engineering demo"). The query itself always comes first."""
+    engineering demo"). The query itself always comes first.
+
+    Worked out once per query and table: relevance.score asks for every row
+    of the catalogue (2026-11-28, WS-E)."""
     if not text:
         return (text,) if text is not None else ()
-    return _variants(text, _table())
+    table = _table()
+    memo = _seen.setdefault("variants", {})
+    hit = memo.get(text)
+    if hit is None:
+        if len(memo) >= _VARIANTS_KEPT:
+            memo.clear()
+        hit = memo[text] = _variants(text, table)
+    return hit
 
 
 def _same(q: str, t: str) -> bool:

@@ -249,14 +249,14 @@ def _score(text: str | None, title: str | None, description: str | None = None,
     "Creo Overview" beats "Creo Parametric Overview" for the query
     "creo overview" — both match, and the closer one comes first.
     """
-    phrase = " ".join(terms(text))
+    wanted = terms(text)            # once: this runs for every row (WS-E)
+    phrase = " ".join(wanted)
     if not phrase:
         return NO_MATCH
 
     name = (title or "").strip().lower()
     normalised_title = _normal(name)
 
-    wanted = terms(text)
     haystack = f"{normalised_title} {_normal(description)}"
     # Most demos have none of the words at all: say so before any pattern
     # is tried (2026-11-12, the Searches tab's counts).

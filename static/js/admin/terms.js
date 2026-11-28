@@ -7,7 +7,10 @@
  *
  * Part of the Admin page's script; static/js/admin/main.js loads it. */
 
-import { $, el, session, when } from "./util.js";
+import { $, session } from "./util.js";
+import { when } from "../shared/dates.js";
+import { el } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
 import { loadChanges } from "./access.js";
 
 var groups = [];
@@ -18,16 +21,7 @@ function canEdit() {
 }
 
 function api(method, url, body) {
-  return fetch(url, {
-    method: method,
-    headers: body ? { "Content-Type": "application/json" } : {},
-    body: body ? JSON.stringify(body) : undefined
-  }).then(function (r) {
-    return r.json().catch(function () { return {}; }).then(function (d) {
-      if (!r.ok) throw new Error(d.detail || "HTTP " + r.status);
-      return d;
-    });
-  });
+  return fetchJSON(url, { method: method, body: body || undefined });
 }
 
 function split(text) {

@@ -4,7 +4,8 @@
  * Part of the Admin page's script, split out of static/admin.js on
  * 2026-10-15; static/js/admin/main.js loads it. */
 
-import { $, delta, el, openSheet, tile } from "./util.js";
+import { $, delta, openSheet, tile } from "./util.js";
+import { el } from "../shared/dom.js";
 
 /* ── time ranges ──────────────────────────────────────────────────────
  *

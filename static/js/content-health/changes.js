@@ -4,7 +4,8 @@
  *
  * Part of the Content health page's script (static/content-health.html). */
 
-import { $, el, session } from "../admin/util.js";
+import { $, session } from "../admin/util.js";
+import { el } from "../shared/dom.js";
 import { adminLogTable } from "../admin/logtable.js";
 
 function loadChanges(hostId, category) {

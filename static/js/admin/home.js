@@ -3,7 +3,9 @@
  * Part of the Admin page's script, split out of static/admin.js on
  * 2026-10-15; static/js/admin/main.js loads it. */
 
-import { $, el, gxcMark, row, TYPE_WORD } from "./util.js";
+import { $, gxcMark, row, TYPE_WORD } from "./util.js";
+import { el } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
 
 /* ── Promoted on Home ───────────────────────────────────────────────
  *
@@ -39,15 +41,9 @@ function renderPromoted(state) {
   var status = el("div", "promo-status faint");
   var save = function (next) {
     status.textContent = "Saving…";
-    fetch("/api/admin/promoted", {
+    fetchJSON("/api/admin/promoted", {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ asset_ids: next }),
-    }).then(function (r) {
-      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
-        throw new Error(b.detail || ("HTTP " + r.status));
-      });
-      return r.json();
+      body: { asset_ids: next },
     }).then(renderPromoted).catch(function (err) {
       status.textContent = "Not saved: " + err.message;
       status.className = "promo-status err";

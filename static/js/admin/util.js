@@ -3,7 +3,12 @@
  * (session).
  *
  * Part of the Admin page's script, split out of static/admin.js on
- * 2026-10-15; static/js/admin/main.js loads it. */
+ * 2026-10-15; static/js/admin/main.js loads it. `el`, `when` and the
+ * dialog behaviour are the shared ones (static/js/shared/, WS-G
+ * 2026-11-28). */
+
+import { dialog } from "../shared/dialog.js";
+import { el } from "../shared/dom.js";
 
 var $ = function (id) { return document.getElementById(id); };
 
@@ -11,13 +16,6 @@ function show(view) {
   ["loginView", "offView", "dashView"].forEach(function (id) {
     $(id).hidden = id !== view;
   });
-}
-
-function el(tag, cls, text) {
-  var n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined && text !== null) n.textContent = String(text);
-  return n;
 }
 
 function card(titleText) {
@@ -57,12 +55,6 @@ function localHour(hourUtc) {
   return two(d.getHours()) + ":" + two(d.getMinutes());
 }
 
-function when(iso) {
-  if (!iso) return "—";
-  var d = new Date(iso);
-  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
-
 function tile(host, n, label, note, d) {
   var t = el("div", "tile");
   var top = el("div", "tile__top");
@@ -84,12 +76,29 @@ function delta(now, before) {
   if (pct === 0) return { text: "level", dir: "flat" };
   return { text: (pct > 0 ? "+" : "") + pct + "%", dir: pct > 0 ? "up" : "down" };
 }
+/* The drill-down sheet (admin.html's #overlay): a modal, so Esc closes
+ * it, Tab stays inside, and focus goes back to the row that opened it. */
+var sheetDialog = null;
+function sheet() {
+  if (!sheetDialog) {
+    sheetDialog = dialog($("overlay").querySelector(".sheet"),
+                         { labelledBy: "sheetTitle", onEscape: closeSheet });
+  }
+  return sheetDialog;
+}
+
 function openSheet(title, sub) {
   $("sheetTitle").textContent = title;
   $("sheetSub").textContent = sub || "";
   $("sheetBody").innerHTML = "";
   $("overlay").hidden = false;
+  sheet().open();
   return $("sheetBody");
+}
+
+function closeSheet() {
+  $("overlay").hidden = true;
+  sheet().close();
 }
 var TYPE_WORD = { video: "Video", ldk: "LDK", vdk: "VDK", vm: "Virtual Machine",
                   cad_model: "CAD Dataset" };
@@ -125,6 +134,6 @@ function actorWord(actor) {
 var session = { via: null, permissions: [] };
 
 export {
-  $, actorWord, card, delta, demoLink, el, gxcMark, localHour, openSheet, row, session,
-  show, tile, two, TYPE_WORD, when
+  $, actorWord, card, closeSheet, delta, demoLink, gxcMark, localHour, openSheet, row, session,
+  show, tile, two, TYPE_WORD
 };

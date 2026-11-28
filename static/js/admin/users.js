@@ -4,7 +4,10 @@
  * Part of the Admin page's script, split out of static/admin.js on
  * 2026-10-15; static/js/admin/main.js loads it. */
 
-import { $, actorWord, el, row, session, when } from "./util.js";
+import { $, actorWord, row, session } from "./util.js";
+import { when } from "../shared/dates.js";
+import { el } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
 
 /* ── Users & groups (backend/access.py, 2026-10-06) ───────────────────
  * Groups on the left, the chosen one on the right. Built-in groups keep
@@ -131,18 +134,12 @@ function renderTokens() {
   var status = el("span", "promo-status faint");
   go.addEventListener("click", function () {
     status.textContent = "Creating…";
-    fetch("/api/admin/api-tokens", {
+    fetchJSON("/api/admin/api-tokens", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      body: {
         name: name.value, owner: owner.value, days: Number(days.value),
         permissions: Object.keys(ticks).filter(function (k) { return ticks[k].checked; })
-      }),
-    }).then(function (r) {
-      return r.json().then(function (b) {
-        if (!r.ok) throw new Error(b.detail || ("HTTP " + r.status));
-        return b;
-      });
+      },
     }).then(function (b) {
       tk.secret = { value: b.secret };
       return loadTokens();
@@ -197,13 +194,7 @@ function renderLicences(message, isError) {
       pick.disabled = true;
       status.className = "faint";
       status.textContent = "Uploading…";
-      fetch("/api/admin/consensus-licenses", { method: "POST", body: form })
-        .then(function (r) {
-          return r.json().catch(function () { return {}; }).then(function (b) {
-            if (!r.ok) throw new Error(b.detail || ("HTTP " + r.status));
-            return b;
-          });
-        })
+      fetchJSON("/api/admin/consensus-licenses", { method: "POST", body: form })
         .then(function (b) { cl.data = b; renderLicences("Saved: " + b.count + " people."); })
         .catch(function (e) { renderLicences(e.message, true); });
     });
@@ -430,14 +421,10 @@ function renderEditor() {
       preview.type = "button";
       preview.addEventListener("click", function () {
         preview.disabled = true;
-        fetch("/api/admin/view-as", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ group_id: g.id })
-        }).then(function (r) {
-          return r.json().catch(function () { return {}; }).then(function (d) {
-            if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
-            location.href = "/";
-          });
+        fetchJSON("/api/admin/view-as", {
+          method: "POST", body: { group_id: g.id }
+        }).then(function () {
+          location.href = "/";
         }).catch(function (err) {
           preview.disabled = false;
           ug.flash = err.message;
@@ -762,18 +749,7 @@ function renderMembers(g, draft, editable) {
 function sendAccess(method, url, body, status, createdName) {
   status.textContent = "Saving…";
   status.className = "promo-status faint";
-  fetch(url, {
-    method: method,
-    headers: { "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : undefined,
-  }).then(function (r) {
-    if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
-      var detail = b.detail;
-      if (Array.isArray(detail)) detail = detail.map(function (x) { return x.msg; }).join("; ");
-      throw new Error(detail || ("HTTP " + r.status));
-    });
-    return r.json();
-  }).then(function (d) {
+  fetchJSON(url, { method: method, body: body || undefined }).then(function (d) {
     if (createdName) {
       var made = d.groups.filter(function (g) { return g.name === createdName.trim(); })[0];
       if (made) ug.selected = made.id;

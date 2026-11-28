@@ -6,7 +6,9 @@
  * Part of the Admin page's script, split out of static/admin.js on
  * 2026-10-15; static/js/admin/main.js loads it. */
 
-import { $, actorWord, el, gxcMark, row, session, TYPE_WORD, when } from "./util.js";
+import { $, actorWord, gxcMark, row, session, TYPE_WORD } from "./util.js";
+import { when } from "../shared/dates.js";
+import { el } from "../shared/dom.js";
 import { openAdminLogAt } from "./signins.js";
 import { adminLogTable } from "./logtable.js";
 

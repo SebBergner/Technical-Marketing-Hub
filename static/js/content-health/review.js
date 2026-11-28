@@ -4,7 +4,9 @@
  *
  * Part of the Content health page's script (static/content-health.html). */
 
-import { $, actorWord, demoLink, el, gxcMark, session, TYPE_WORD } from "../admin/util.js";
+import { $, actorWord, demoLink, gxcMark, session, TYPE_WORD } from "../admin/util.js";
+import { el } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
 import { loadChanges } from "./changes.js";
 
 /* ── Content review (2026-10-14) ──────────────────────────────────────
@@ -108,14 +110,10 @@ function loadUploads() {
           var act = function (path) {
             status.textContent = "Saving…";
             status.className = "promo-status faint";
-            fetch("/api/uploads/" + encodeURIComponent(u.id) + "/" + path, {
+            fetchJSON("/api/uploads/" + encodeURIComponent(u.id) + "/" + path, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ note: null }),
-            }).then(function (r) {
-              if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
-                throw new Error(b.detail || ("HTTP " + r.status));
-              });
+              body: { note: null },
+            }).then(function () {
               loadUploads();
               loadChanges("rvChanges", "Content review,Uploads");
             }).catch(function (err) {
@@ -163,14 +161,7 @@ function loadReview() {
 function reviewAction(url, body, status) {
   status.textContent = "Saving…";
   status.className = "promo-status faint";
-  return fetch(url, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }).then(function (r) {
-    if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
-      throw new Error(b.detail || ("HTTP " + r.status));
-    });
+  return fetchJSON(url, { method: "PUT", body: body }).then(function () {
     return loadReview();
   }).catch(function (err) {
     status.textContent = "Not saved: " + err.message;

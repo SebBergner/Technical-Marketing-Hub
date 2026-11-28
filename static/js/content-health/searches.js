@@ -10,7 +10,10 @@
  *
  * Part of the Content health page's script (static/content-health.html). */
 
-import { $, delta, el, tile } from "../admin/util.js";
+import { $, delta, tile } from "../admin/util.js";
+import { when } from "../shared/dates.js";
+import { el } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
 
 var RANGES = [["7d", "7 days", 7], ["30d", "30 days", 30], ["90d", "90 days", 90],
               ["all", "All time", null]];
@@ -385,10 +388,6 @@ function renderAll(d) {
   host.appendChild(wrap);
 }
 
-function when(iso) {
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
-
 function at(iso) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
@@ -415,13 +414,8 @@ function renderStatus(d) {
     b.title = "Work the figures out again now. After that, nobody can refresh for an hour.";
     b.addEventListener("click", function () {
       b.disabled = true;
-      fetch("/api/content-health/searches/refresh", { method: "POST" })
-        .then(function (resp) {
-          return resp.json().then(function (body) {
-            if (!resp.ok) throw new Error(body.detail || ("HTTP " + resp.status));
-          });
-        })
-        .then(loadSearches)
+      fetchJSON("/api/content-health/searches/refresh", { method: "POST" })
+        .then(function () { loadSearches(); })
         .catch(function (err) { b.disabled = false; window.alert(err.message); });
     });
     host.appendChild(b);

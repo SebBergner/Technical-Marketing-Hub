@@ -231,13 +231,17 @@ def test_admin_pages_preload_their_graph_including_shared_modules(client, build,
     preloads = _preloads(client.get(page).text)
     assert preloads[0] == f"/static/v42/{entry}"
     assert "/static/v42/js/admin/util.js" in preloads
+    assert "/static/v42/js/shared/http.js" in preloads
     assert "</head>" in client.get(page).text
     html = client.get(page).text
     assert html.index('rel="modulepreload"') < html.index("</head>")
 
 
-def test_the_migration_page_has_no_modules_to_preload(client, build):
-    assert _preloads(client.get("/migration").text) == []
+def test_the_migration_page_preloads_the_shared_helpers(client, build):
+    # A module since WS-G (2026-11-28), for static/js/shared/.
+    preloads = _preloads(client.get("/migration").text)
+    assert preloads == ["/static/v42/migration.js", "/static/v42/js/shared/dates.js",
+                        "/static/v42/js/shared/dom.js", "/static/v42/js/shared/http.js"]
 
 
 def test_the_graph_follows_multiline_and_parent_imports(tmp_path):

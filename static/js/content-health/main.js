@@ -6,29 +6,16 @@
  * The tab is in the address (#review, #access, #searches). */
 
 import { $, session } from "../admin/util.js";
+import { watchForExpiredSession } from "../shared/http.js";
 import { loadChecks } from "./checks.js";
 import { loadReview } from "./review.js";
 import { loadContentAccess } from "./access.js";
 import { loadSearches } from "./searches.js";
 
-/* A session that runs out with the page open: off to sign in and back here,
- * as on the Hub and Admin pages (the server's 401 carries X-Sign-In). */
-(function watchForExpiredSession() {
-  var original = window.fetch;
-  if (!original || original.hubSignInWatch) return;
-  var watched = function () {
-    return original.apply(this, arguments).then(function (response) {
-      var login = response.status === 401 && response.headers.get("X-Sign-In");
-      if (login) {
-        var here = location.pathname + location.search + location.hash;
-        location.assign(login + "?next=" + encodeURIComponent(here));
-      }
-      return response;
-    });
-  };
-  watched.hubSignInWatch = true;
-  window.fetch = watched;
-})();
+/* When the session runs out with the page open: off to sign in and back
+ * here (static/js/shared/http.js). A 401 without X-Sign-In still means
+ * "the admin password has not been entered", and is left alone. */
+watchForExpiredSession();
 
 var PANELS = { checks: "tabChecks", review: "tabReview", access: "tabAccess",
                searches: "tabSearches" };

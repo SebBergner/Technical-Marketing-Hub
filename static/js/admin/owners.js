@@ -10,7 +10,10 @@
  *
  * Part of the Admin page's script; static/js/admin/main.js loads it. */
 
-import { $, demoLink, el, openSheet, session, when } from "./util.js";
+import { $, demoLink, openSheet, session } from "./util.js";
+import { when } from "../shared/dates.js";
+import { el } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
 import { loadChanges } from "./access.js";
 
 function canManage() {
@@ -94,14 +97,8 @@ function segmentCard(s, general) {
   function save() {
     status.textContent = "Saving…";
     status.className = "promo-status faint";
-    return fetch("/api/admin/report-owners/" + encodeURIComponent(s.segment), {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ owners: people })
-    }).then(function (r) {
-      return r.json().catch(function () { return {}; }).then(function (b) {
-        if (!r.ok) throw new Error(b.detail || ("HTTP " + r.status));
-        return b;
-      });
+    return fetchJSON("/api/admin/report-owners/" + encodeURIComponent(s.segment), {
+      method: "PUT", body: { owners: people }
     }).then(function () {
       status.textContent = "Saved";
       loadOwners();

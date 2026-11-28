@@ -6,6 +6,7 @@
  * at all. The acceptance is recorded on the server against the sign-in, so it
  * follows the person to every browser, and Admin -> Users & groups lists it. */
 
+import { dialog } from "../shared/dialog.js";
 import { escapeHtml } from "../shared/dom.js";
 
 /* Resolves once the person may use the Hub: at once if nothing is due,
@@ -27,7 +28,7 @@ function show(d, done) {
   var overlay = document.createElement("div");
   overlay.className = "hub-disclaimer";
   overlay.innerHTML =
-      '<div class="hub-disclaimer__dialog" role="dialog" aria-modal="true" aria-labelledby="hubDisclaimerTitle">'
+      '<div class="hub-disclaimer__dialog">'
     +   '<h2 class="hub-disclaimer__title" id="hubDisclaimerTitle">' + escapeHtml(d.title) + "</h2>"
     +   '<div class="hub-disclaimer__body">'
     +     "<p>" + escapeHtml(d.intro) + "</p>"
@@ -43,12 +44,11 @@ function show(d, done) {
 
   var button = overlay.querySelector(".hub-disclaimer__accept");
   var status = overlay.querySelector(".hub-disclaimer__status");
-  // Keyboard focus stays inside: Tab and Shift+Tab land on Accept, Escape
-  // does nothing.
-  overlay.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); }
-    if (e.key === "Tab") { e.preventDefault(); button.focus(); }
-  }, true);
+  // Keyboard focus stays inside and Escape does nothing: the terms are
+  // answered, not dismissed (static/js/shared/dialog.js, onEscape null).
+  var modal = dialog(overlay.querySelector(".hub-disclaimer__dialog"),
+                     { labelledBy: "hubDisclaimerTitle", onEscape: null,
+                       initialFocus: button });
   button.addEventListener("click", function () {
     button.disabled = true;
     status.textContent = "Saving…";
@@ -56,6 +56,7 @@ function show(d, done) {
       .then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
         overlay.remove();
+        modal.close();
         document.body.classList.remove("hub-disclaimer-open");
         if (done) done();
       })
@@ -64,5 +65,5 @@ function show(d, done) {
         status.textContent = "Not saved (" + err.message + "). Please try again.";
       });
   });
-  button.focus();
+  modal.open();
 }

@@ -8,6 +8,7 @@
  * the next big update. As it closes, "User guide" pulses
  * and says what it is, so the way back is found by looking, not reading. */
 
+import { dialog } from "../shared/dialog.js";
 import { escapeHtml } from "../shared/dom.js";
 import { BOOK } from "./guide.js";
 
@@ -63,7 +64,7 @@ function show(d) {
   var overlay = document.createElement("div");
   overlay.className = "hub-welcome";
   overlay.innerHTML =
-      '<div class="hub-welcome__dialog" role="dialog" aria-modal="true" aria-labelledby="hubWelcomeTitle">'
+      '<div class="hub-welcome__dialog">'
     +   '<button type="button" class="hub-welcome__x" aria-label="Close">' + icon("i-x") + "</button>"
     +   '<div class="hub-welcome__band" aria-hidden="true">'
     +     '<svg class="hub-welcome__spark" viewBox="0 0 24 24" fill="currentColor">'
@@ -93,7 +94,7 @@ function show(d) {
     closed = true;
     overlay.classList.add("is-leaving");
     setTimeout(function () { overlay.remove(); }, 160);
-    document.removeEventListener("keydown", onKey, true);
+    modal.close();
     // "Don't show again" ticked: seen for good (Liwei, 2026-11-13). Not
     // ticked: back the next day, at most once a day. A failure only means
     // it shows at the next visit.
@@ -102,13 +103,13 @@ function show(d) {
           { method: "POST", credentials: "same-origin" }).catch(function () {});
     pointAtGuide();
   }
-  function onKey(e) { if (e.key === "Escape") close(); }
-  document.addEventListener("keydown", onKey, true);
   overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
   overlay.querySelector(".hub-welcome__x").addEventListener("click", close);
   overlay.querySelector(".hub-welcome__go").addEventListener("click", close);
   overlay.querySelector(".hub-welcome__open").addEventListener("click", close);
-  overlay.querySelector(".hub-welcome__go").focus();
+  var modal = dialog(overlay.querySelector(".hub-welcome__dialog"),
+                     { labelledBy: "hubWelcomeTitle", onEscape: close,
+                       initialFocus: ".hub-welcome__go" }).open();
 }
 
 /* "User guide" pulses for a few seconds with a label beside it. */

@@ -9,6 +9,7 @@ import {
   dateLabel, debounce, durationLabel, LANGUAGE_LABEL, pill, report, setText
 } from "./util.js";
 import { fullDate } from "../shared/dates.js";
+import { dialog } from "../shared/dialog.js";
 import { el as mk, escapeHtml } from "../shared/dom.js";
 import { fetchJSON } from "../shared/http.js";
 import { hubPermissions } from "./permissions.js";
@@ -772,6 +773,7 @@ var MODAL_PREVIEWABLE_KINDS = ["video", "image"];
 //: null. `files` is already filtered to MODAL_PREVIEWABLE_KINDS -- Prev/
 //: Next only ever steps through things that actually render there.
 var filePreviewState = null;
+var filePreviewDialog = null;
 
 function ensureFilePreviewModal() {
   var backdrop = document.getElementById("hubFilePreviewBackdrop");
@@ -826,10 +828,10 @@ function ensureFilePreviewModal() {
     +         ' title="' + SHARE_TITLE + '">'
     +         '<svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share</button>'
     +     '</div>'
-    +     '<button class="hub-preview__close" title="Close">&times;</button>'
+    +     '<button type="button" class="hub-preview__close" title="Close" aria-label="Close">&times;</button>'
     +   '</div>'
     +   '<div class="hub-file-preview__main">'
-    +     '<iframe class="hub-preview__frame" id="hubFilePreviewFrame"'
+    +     '<iframe class="hub-preview__frame" id="hubFilePreviewFrame" title="File preview"'
     +       ' allow="fullscreen"></iframe>'
     // What stands in for the frame when the file cannot play inside it --
     // a Word/PowerPoint/PDF (Office refuses to be framed, see
@@ -859,9 +861,9 @@ function ensureFilePreviewModal() {
     if (state) copyShareLink(this, fileShareUrl(state.asset.id, state.files[state.index].item_id));
   });
   backdrop.addEventListener("click", function (e) { if (e.target === backdrop) shut(); });
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && backdrop.classList.contains("open")) shut();
-  });
+  // Esc, the focus trap and focus back to the file row: static/js/shared/dialog.js.
+  filePreviewDialog = dialog(backdrop.querySelector(".hub-preview__box"),
+                             { labelledBy: "hubFilePreviewTitle", onEscape: shut });
 
   document.getElementById("hubFilePreviewPrev").addEventListener("click", function () {
     if (filePreviewState && filePreviewState.index > 0) {
@@ -971,6 +973,7 @@ function openFilePreview(asset, files, index) {
   ensureFilePreviewModal();
   renderFilePreview();
   document.getElementById("hubFilePreviewBackdrop").classList.add("open");
+  filePreviewDialog.open();
 }
 
 /* `restoreHash`: closed by the person (×, Esc, backdrop) rather than by a
@@ -981,6 +984,7 @@ function closeFilePreview(restoreHash) {
   backdrop.classList.remove("open");
   // Blank the src on close, or a video keeps playing behind the page.
   document.getElementById("hubFilePreviewFrame").src = "about:blank";
+  if (filePreviewDialog) filePreviewDialog.close();
   var state = filePreviewState;
   filePreviewState = null;
   if (restoreHash && state && /\/file\//.test(location.hash)) {

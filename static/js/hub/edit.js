@@ -17,6 +17,7 @@ import { report } from "./util.js";
 import { hubPermissions } from "./permissions.js";
 import { openAssetDetail } from "./detail.js";
 import { refill, videoState } from "./videorules.js";
+import { dialog } from "../shared/dialog.js";
 import { el as mk } from "../shared/dom.js";
 import { fetchJSON } from "../shared/http.js";
 
@@ -76,18 +77,15 @@ function sameValue(a, b) {
 function openConsensusEditor(asset) {
   var overlay = mk("div", "hub-edit__overlay");
   var editor = mk("div", "hub-edit__dialog hub-edit");
-  editor.setAttribute("role", "dialog");
-  editor.setAttribute("aria-label", "Set on the Hub: " + asset.title);
   editor.appendChild(mk("div", "hub-edit__loading", "Loading…"));
   overlay.appendChild(editor);
   document.body.appendChild(overlay);
 
   function close() {
     overlay.remove();
-    document.removeEventListener("keydown", onKey);
+    modal.close();
   }
-  function onKey(e) { if (e.key === "Escape") close(); }
-  document.addEventListener("keydown", onKey);
+  var modal = dialog(editor, { label: "Set on the Hub: " + asset.title, onEscape: close }).open();
 
   call("GET", base(asset) + "/consensus-metadata").then(function (form) {
     editor.innerHTML = "";
@@ -248,18 +246,16 @@ function valueOf(el) {
 function openEditor(asset) {
   var overlay = mk("div", "hub-edit__overlay");
   var editor = mk("div", "hub-edit__dialog hub-edit");
-  editor.setAttribute("role", "dialog");
-  editor.setAttribute("aria-label", "Edit " + asset.title);
   editor.appendChild(mk("div", "hub-edit__loading", "Reading SharePoint…"));
   overlay.appendChild(editor);
   document.body.appendChild(overlay);
 
   function close() {
     overlay.remove();
-    document.removeEventListener("keydown", onKey);
+    modal.close();
   }
-  function onKey(e) { if (e.key === "Escape" && !document.querySelector(".hub-edit__frame")) close(); }
-  document.addEventListener("keydown", onKey);
+  // A frame picker opened over it takes Esc first (dialogs stack).
+  var modal = dialog(editor, { label: "Edit " + asset.title, onEscape: close }).open();
 
   call("GET", base(asset) + "/metadata").then(function (form) {
     editor.innerHTML = "";
@@ -472,21 +468,19 @@ function sendPicture(asset, blob, state) {
  * be drawn onto a canvas and saved as a JPG. */
 function framePicker(asset, videos, state) {
   var overlay = mk("div", "hub-edit__overlay hub-edit__frame");
-  var dialog = mk("div", "hub-edit__dialog");
-  dialog.setAttribute("role", "dialog");
-  dialog.setAttribute("aria-label", "Pick a frame");
-  dialog.appendChild(mk("div", "hub-edit__title", "Pick a frame for the card"));
+  var box = mk("div", "hub-edit__dialog");
+  box.appendChild(mk("div", "hub-edit__title", "Pick a frame for the card"));
   var select = mk("select", "hub-edit__input");
   videos.forEach(function (v) { select.appendChild(new Option(v.name, v.item_id)); });
-  if (videos.length > 1) dialog.appendChild(select);
+  if (videos.length > 1) box.appendChild(select);
   var video = mk("video", "hub-edit__video");
   video.controls = true;
   video.crossOrigin = "anonymous";
   video.preload = "metadata";
   video.muted = true;
-  dialog.appendChild(video);
+  box.appendChild(video);
   var msg = mk("div", "hub-edit__help", "Play or drag to the moment you want, then Use this frame.");
-  dialog.appendChild(msg);
+  box.appendChild(msg);
   var bar = mk("div", "hub-edit__bar");
   var use = mk("button", "hub-edit__save", "Use this frame");
   use.type = "button";
@@ -494,11 +488,17 @@ function framePicker(asset, videos, state) {
   cancel.type = "button";
   bar.appendChild(use);
   bar.appendChild(cancel);
-  dialog.appendChild(bar);
-  overlay.appendChild(dialog);
+  box.appendChild(bar);
+  overlay.appendChild(box);
   document.body.appendChild(overlay);
 
-  function shut() { video.pause(); video.removeAttribute("src"); video.load(); overlay.remove(); }
+  function shut() {
+    video.pause(); video.removeAttribute("src"); video.load(); overlay.remove();
+    modal.close();
+  }
+  var modal = dialog(box, { label: "Pick a frame", onEscape: shut, initialFocus: function () {
+    return videos.length > 1 ? select : video;
+  } }).open();
   function load(itemId) {
     msg.textContent = "Loading the video…";
     call("GET", base(asset) + "/files/" + encodeURIComponent(itemId) + "/frame-source")

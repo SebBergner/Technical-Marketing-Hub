@@ -11,6 +11,7 @@ import { openAssetDetail } from "./detail.js";
 import { openShareFor } from "./share.js";
 import { starButton } from "./favorites.js";
 import { fullDate } from "../shared/dates.js";
+import { dialog } from "../shared/dialog.js";
 
 /* ---------------------------------------------------------------- mapping */
 
@@ -341,6 +342,8 @@ function stopInlinePlayer(thumb) {
  * it: neither play.goconsensus.com nor app.goconsensus.com sends
  * X-Frame-Options or a frame-ancestors policy. Checked 2026-09-02.
  */
+var previewDialog = null;
+
 function openPreview(a) {
   var url = previewUrl(a);
   if (!url) return;
@@ -354,9 +357,9 @@ function openPreview(a) {
         '<div class="hub-preview__box">'
       +   '<div class="hub-preview__bar">'
       +     '<span class="hub-preview__title" id="hubPreviewTitle"></span>'
-      +     '<button class="hub-preview__close" title="Close">&times;</button>'
+      +     '<button type="button" class="hub-preview__close" title="Close" aria-label="Close">&times;</button>'
       +   '</div>'
-      +   '<iframe class="hub-preview__frame" id="hubPreviewFrame"'
+      +   '<iframe class="hub-preview__frame" id="hubPreviewFrame" title="Preview"'
       +     ' allow="fullscreen; autoplay" referrerpolicy="no-referrer"></iframe>'
       + '</div>';
     document.body.appendChild(backdrop);
@@ -365,19 +368,21 @@ function openPreview(a) {
       backdrop.classList.remove("open");
       // Blank the src on close, or the demo keeps playing behind the page.
       document.getElementById("hubPreviewFrame").src = "about:blank";
+      previewDialog.close();
     };
+    // Esc, the focus trap and focus back to the card: static/js/shared/dialog.js.
+    previewDialog = dialog(backdrop.querySelector(".hub-preview__box"),
+                           { labelledBy: "hubPreviewTitle", onEscape: shut });
     backdrop.querySelector(".hub-preview__close").addEventListener("click", shut);
     backdrop.addEventListener("click", function (e) {
       if (e.target === backdrop) shut();
-    });
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && backdrop.classList.contains("open")) shut();
     });
   }
 
   document.getElementById("hubPreviewTitle").textContent = a.title || "";
   document.getElementById("hubPreviewFrame").src = url;
   backdrop.classList.add("open");
+  previewDialog.open();
   noteConsensusPreview(a.id);
 }
 

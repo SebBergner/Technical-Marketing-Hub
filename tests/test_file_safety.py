@@ -155,6 +155,68 @@ def test_a_change_by_another_worker_shows(catalogue):
     assert _ids(catalogue) == {"gxc-b"}
 
 
+def test_a_write_the_catalogue_never_reads_keeps_it_cached(catalogue, monkeypatch):
+    """A sign-in, a favourite or a search-insights update used to throw the
+    catalogue away (2026-11-28, optimisation plan WS-E)."""
+    from backend import access
+    from backend.repositories.json_repo import _atomic_write, _feeds_catalogue
+    built = []
+    real = JsonAssetRepository._build_mirror
+    monkeypatch.setattr(JsonAssetRepository, "_build_mirror",
+                        lambda self: built.append(1) or real(self))
+    assert _ids(catalogue) == {"kit-a", "gxc-b"}
+    for name in ("activity.json", "my_hub.json", "api_tokens.json", "access.json"):
+        path = str(catalogue / "owned" / name)
+        assert not _feeds_catalogue(path), name
+        _atomic_write(path, {"x": 1})
+        assert _ids(catalogue) == {"kit-a", "gxc-b"}
+    assert len(built) == 1, "rebuilt for a file it does not read"
+
+    # One it does read is noticed at once, even when time and size would not
+    # tell: the generation is bumped.
+    hidden = str(catalogue / "owned" / "hidden.json")
+    assert _feeds_catalogue(hidden)
+    assert _feeds_catalogue(access._owned(access.USERS_FILE))
+    assert _feeds_catalogue(str(catalogue / "mirror" / "private" / "value_index.json"))
+    _atomic_write(hidden, {"kit-a": {}})
+    assert _ids(catalogue) == {"gxc-b"}
+    assert len(built) == 2
+
+
+def test_one_request_looks_at_the_catalogue_files_once(catalogue, monkeypatch):
+    """A search asked for the catalogue key four to six times, each one a
+    stat of every file the catalogue reads (2026-11-28, WS-E)."""
+    from fastapi.testclient import TestClient
+
+    from app import app
+    from backend.repositories import json_repo
+    monkeypatch.setattr(settings, "auth_mode", "disabled")
+    looks = []
+    real = JsonAssetRepository._look_at_catalogue_files
+    monkeypatch.setattr(JsonAssetRepository, "_look_at_catalogue_files",
+                        lambda self: looks.append(1) or real(self))
+    client = TestClient(app)
+    assert client.get("/api/assets?q=a").status_code == 200
+    assert len(looks) == 1
+    assert client.get("/api/assets?q=a").status_code == 200
+    assert len(looks) == 2, "a new request looks again"
+
+    # Outside a request nothing is remembered, and in one a write voids it.
+    looks.clear()
+    _ids(catalogue)
+    assert len(looks) > 1, "outside a request every call looks"
+    looks.clear()
+    token = json_repo._request_keys.set({})
+    try:
+        repo = JsonAssetRepository(str(catalogue))
+        repo._catalogue_key(); repo._catalogue_key()
+        assert len(looks) == 1
+        json_repo._atomic_write(str(catalogue / "owned" / "hidden.json"), {"kit-a": {}})
+        assert {a.id for a in repo.list(AssetQuery(limit=50)).items} == {"gxc-b"}
+    finally:
+        json_repo._request_keys.reset(token)
+
+
 def test_gxc_stays_out_for_people_without_it(catalogue):
     assert _ids(catalogue, gxc=False) == {"kit-a"}
     repo = JsonAssetRepository(str(catalogue), gxc=False, gxc_granted=frozenset({"gxc-b"}))

@@ -35,6 +35,7 @@ import os
 import re
 import threading
 from collections import Counter
+from contextvars import ContextVar
 from dataclasses import replace
 from datetime import date, datetime
 from typing import Any
@@ -168,13 +169,61 @@ def _catalogue_changed() -> None:
         _catalogue_generation[0] += 1
 
 
+#: Within one request: data dir -> (generation, key). `_catalogue_key` stats
+#: every file the catalogue reads (some 25, each a round trip on Azure Files)
+#: and one search asked for it four to six times (2026-11-28, optimisation
+#: plan WS-E). A write in this process bumps the generation, which voids it.
+_request_keys: ContextVar[dict | None] = ContextVar("catalogue_request_keys", default=None)
+
+
+class CatalogueOncePerRequest:
+    """ASGI middleware: look at the catalogue's files once per request.
+    Outside a request (scripts, jobs, most tests) every call looks again."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        token = _request_keys.set({})
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            _request_keys.reset(token)
+
+
+def _feeds_catalogue(path: str) -> bool:
+    """Whether the catalogue is built from `path`: anything under mirror/,
+    the owned files in _CATALOGUE_OWNED, and access's users file -- the same
+    files `_catalogue_key` stamps."""
+    from backend import access
+    full = os.path.normpath(os.path.abspath(path))
+    if full == os.path.normpath(os.path.abspath(access._owned(access.USERS_FILE))):
+        return True
+    parts = full.split(os.sep)
+    if "mirror" in parts[:-1]:
+        return True
+    name = parts[-1]
+    return (len(parts) > 1 and parts[-2] == "owned" and name.endswith(".json")
+            and name[:-5] in _CATALOGUE_OWNED)
+
+
 def _atomic_write(path: str, payload: Any) -> None:
     """Write via a temp file of its own and rename, so neither a crash nor
     another worker writing at the same moment can corrupt it
-    (backend/file_safety.py)."""
+    (backend/file_safety.py).
+
+    Only a file the catalogue is built from bumps its generation. Until
+    2026-11-28 every write did -- a sign-in, a favourite, a search-insights
+    update -- so the next request rebuilt the whole catalogue (about 50 ms
+    locally, more on Azure Files) for a change it never reads (optimisation
+    plan WS-E)."""
     from backend.file_safety import write_json
     write_json(path, payload, indent=2, ensure_ascii=False, default=str)
-    _catalogue_changed()
+    if _feeds_catalogue(path):
+        _catalogue_changed()
 
 
 def _ts(stamp: str | None) -> float:
@@ -527,7 +576,20 @@ class JsonAssetRepository(AssetRepository):
 
     def _catalogue_key(self) -> tuple:
         """Everything `_build_mirror` reads, as (name, mtime, size): a write
-        by another worker changes it."""
+        by another worker changes it. Looked at once per request
+        (CatalogueOncePerRequest)."""
+        memo = _request_keys.get()
+        if memo is None:
+            return self._look_at_catalogue_files()
+        generation = _catalogue_generation[0]
+        hit = memo.get(self.dir)
+        if hit is not None and hit[0] == generation:
+            return hit[1]
+        key = self._look_at_catalogue_files()
+        memo[self.dir] = (key[1], key)
+        return key
+
+    def _look_at_catalogue_files(self) -> tuple:
         def stamp(path: str):
             try:
                 st = os.stat(path)

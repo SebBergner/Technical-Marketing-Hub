@@ -11,6 +11,7 @@ import backend.logging_setup  # noqa: F401 -- configures logging on import
 from backend.config import settings
 from backend.version import app_version
 from backend import admin_log, api_docs, csrf, oidc, static_delivery, view_as
+from backend.repositories import json_repo
 from backend.routers import (
     admin, assets, auth, consensus, content_health, curation, debug, disclaimer, graph, me,
     migration,
@@ -165,6 +166,9 @@ app.include_router(api_docs.router)
 # would hide the size from minimum_size and gzip even a 15-byte /health.
 # Pictures, video, 206 range answers and downloads are left alone
 # (static_delivery.GZIP_EXCLUDE).
+# Innermost: the catalogue's files are looked at once per request
+# (json_repo.CatalogueOncePerRequest, WS-E 2026-11-28).
+app.add_middleware(json_repo.CatalogueOncePerRequest)
 app.add_middleware(GZipMiddleware, minimum_size=1024,
                    exclude_content_types=static_delivery.GZIP_EXCLUDE)
 app.add_middleware(admin_log.middleware)

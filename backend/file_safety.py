@@ -145,6 +145,17 @@ def _take(lock_path: str, wait: float, stale: float = STALE_SECONDS) -> None:
             time.sleep(pause)
             pause = min(pause * 2, longest)
             continue
+        except PermissionError:
+            # Windows: a lock file another worker has just removed stays
+            # "delete pending" while anything still has it open (a virus
+            # scan, a stat), and creating it again is refused instead of
+            # reported as existing. It clears in milliseconds; a real
+            # permission problem is raised once `wait` is up (2026-11-28,
+            # seen failing test_no_update_is_lost_across_processes).
+            if time.monotonic() > deadline:
+                raise
+            time.sleep(0.005)
+            continue
         with os.fdopen(fd, "w") as fh:
             fh.write(f"{os.getpid()}")
         return

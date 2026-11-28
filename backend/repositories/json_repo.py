@@ -156,6 +156,11 @@ _CATALOGUE_OWNED = (
 )
 #: data dir -> (key, rows): the catalogue every request in this worker reads.
 _catalogue_cache: dict[str, tuple[tuple, list[dict]]] = {}
+#: mirror file path -> ((mtime_ns, size), records), shared by every repository
+#: in this worker. It was per repository, and deps.get_repo builds one per
+#: request, so every catalogue rebuild parsed all of mirror/ again -- some
+#: 5 MB of JSON, most of the 60 ms a rebuild took locally (2026-11-28, WS-E).
+_mirror_files: dict[str, tuple[tuple, Any]] = {}
 _catalogue_lock = threading.Lock()
 #: The catalogue's words for close matches, with the catalogue they came from.
 _tolerance_cache: dict[str, tuple[list[dict], object]] = {}
@@ -509,7 +514,7 @@ class JsonAssetRepository(AssetRepository):
 
     def __init__(self, data_dir: str, gxc: bool = True,
                  gxc_granted: frozenset[str] = frozenset()):
-        self._mirror_cache: dict[str, tuple[float, list]] = {}
+        self._mirror_cache = _mirror_files
         #: Whether GXC videos exist for whoever this repository serves
         #: (deps.get_repo). True for the Hub's own jobs -- syncs, the daily
         #: run -- which must see everything.
@@ -531,8 +536,11 @@ class JsonAssetRepository(AssetRepository):
 
     # ---------------------------------------------------------------- loading
     def _mirror_file(self, path: str) -> list[dict]:
-        """One mirror file's records, cached by mtime (see _load_mirror)."""
-        stamp = os.path.getmtime(path)
+        """One mirror file's records, cached by time and size (see
+        _load_mirror); size too, now that the cache outlives a request and
+        another worker's rewrite can land within the clock's resolution."""
+        st = os.stat(path)
+        stamp = (st.st_mtime_ns, st.st_size)
         cached = self._mirror_cache.get(path)
         if cached is None or cached[0] != stamp:
             try:
@@ -944,7 +952,8 @@ class JsonAssetRepository(AssetRepository):
         path = os.path.join(self.mirror_dir, PRIVATE_DIR, PARTNER_ACCESS_FILE)
         if not os.path.exists(path):
             return {}
-        stamp = os.path.getmtime(path)
+        st = os.stat(path)
+        stamp = (st.st_mtime_ns, st.st_size)
         cached = self._mirror_cache.get(path)
         if cached is None or cached[0] != stamp:
             cached = (stamp, _read(path, {}))

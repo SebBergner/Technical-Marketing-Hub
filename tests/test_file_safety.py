@@ -217,6 +217,31 @@ def test_one_request_looks_at_the_catalogue_files_once(catalogue, monkeypatch):
         json_repo._request_keys.reset(token)
 
 
+def test_a_rebuild_does_not_parse_the_mirror_again(catalogue, monkeypatch):
+    """Every request has a repository of its own (deps.get_repo); the parsed
+    mirror files are kept per worker, so a rebuild for, say, a hidden demo
+    re-reads owned/hidden.json, not megabytes of mirror (2026-11-28, WS-E)."""
+    from backend.repositories import json_repo
+    parsed = []
+    real = json_repo._read
+    monkeypatch.setattr(json_repo, "_read",
+                        lambda path, *a, **k: (parsed.append(os.path.basename(path))
+                                               if os.path.basename(os.path.dirname(path)) == "mirror"
+                                               else None)
+                        or real(path, *a, **k))
+    json_repo._mirror_files.clear()
+    assert _ids(catalogue) == {"kit-a", "gxc-b"}
+    first = sorted(parsed)
+    assert first == ["gxc_video.json", "sharepoint.json"]
+    json_repo._atomic_write(str(catalogue / "owned" / "hidden.json"), {"kit-a": {}})
+    assert _ids(catalogue) == {"gxc-b"}, "rebuilt"
+    assert sorted(parsed) == first, "without parsing the mirror again"
+    # A mirror file that changes is parsed again, by time and size.
+    (catalogue / "mirror" / "sharepoint.json").write_text(json.dumps(
+        [{"id": "kit-d", "type": "vdk", "title": "D", "products": ["Creo"]}]), encoding="utf-8")
+    assert _ids(catalogue) == {"kit-d", "gxc-b"}
+
+
 def test_gxc_stays_out_for_people_without_it(catalogue):
     assert _ids(catalogue, gxc=False) == {"kit-a"}
     repo = JsonAssetRepository(str(catalogue), gxc=False, gxc_granted=frozenset({"gxc-b"}))

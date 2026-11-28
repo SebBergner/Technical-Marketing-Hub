@@ -10,6 +10,7 @@
 
 import { hubPermissions } from "./permissions.js";
 import { closeAdvancedSearch } from "./search.js";
+import { el as makeEl } from "../shared/dom.js";
 
 function icon(id, cls) {
   return '<svg class="orion-ico ' + (cls || "") + '" aria-hidden="true"><use href="#' + id + '"/></svg>';
@@ -70,9 +71,10 @@ var STEPS = [
   ]]
 ];
 
+/* Not the shared el(): the third argument here is MARKUP -- the guide's own
+ * fixed wording, with <b> and icons in it, never anything a person typed. */
 function el(tag, cls, html) {
-  var n = document.createElement(tag);
-  if (cls) n.className = cls;
+  var n = makeEl(tag, cls);
   if (html != null) n.innerHTML = html;
   return n;
 }

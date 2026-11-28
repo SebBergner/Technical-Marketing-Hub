@@ -17,13 +17,9 @@ import { renderMyFeedback } from "./report.js";
 import { renderMyDemos } from "./upload.js";
 import { closeAdvancedSearch } from "./search.js";
 import { cardPlaylistButton, renderMyPlaylists } from "./playlists.js";
-
-function el(tag, cls, text) {
-  var n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined && text !== null) n.textContent = String(text);
-  return n;
-}
+import { el } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
+import { stampDay } from "../shared/dates.js";
 
 /* The request statuses, in the order a request moves (the Status column's
  * choices), with the words a requester reads beside each. */
@@ -292,15 +288,10 @@ function notesBlock(r) {
       if (area.value.trim().length < 3) { area.focus(); return; }
       save.disabled = true;
       save.textContent = "Adding…";
-      fetch("/api/me/requests/" + encodeURIComponent(r.request_id) + "/notes", {
+      fetchJSON("/api/me/requests/" + encodeURIComponent(r.request_id) + "/notes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: area.value })
-      }).then(function (res) {
-        return res.json().catch(function () { return {}; }).then(function (d) {
-          if (!res.ok) throw new Error(d.detail || "HTTP " + res.status);
-        });
-      }).then(loadRequests)
+        body: { text: area.value }
+      }).then(function () { loadRequests(); })
         .catch(function (err) {
           save.disabled = false;
           save.textContent = "Add note";
@@ -344,8 +335,7 @@ function loadRequests() {
       info.appendChild(el("div", "hub-me__reqtitle", what || r.title || r.request_id));
       if (r.brief) info.appendChild(el("div", "hub-me__reqbrief", r.brief));
       info.appendChild(el("div", "hub-me__reqmeta", [r.request_id,
-        r.created_at ? "sent " + new Date(r.created_at).toLocaleDateString(undefined,
-          { month: "short", day: "numeric", year: "numeric" }) : null]
+        r.created_at ? "sent " + stampDay(r.created_at) : null]
         .filter(Boolean).join(" · ")));
       var d2 = delivered(r.delivered);
       if (d2) info.appendChild(d2);

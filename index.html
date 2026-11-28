@@ -108,7 +108,7 @@
 </svg>
 
 <div class="orion-app">
-  <!-- Phones only (D10, 2026-10-30): the sidebar slides in. static/js/hub-ui.js -->
+  <!-- Phones only (D10, 2026-10-30): the sidebar slides in. static/js/hub/actions.js -->
   <button class="hub-nav-open" id="hubNavOpen" type="button" aria-label="Open the menu"
           aria-expanded="false"><svg class="orion-ico" aria-hidden="true"><use href="#i-panel"/></svg></button>
   <div class="hub-nav-scrim" id="hubNavScrim"></div>
@@ -391,10 +391,10 @@
           <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-hex"/></svg> Asset type <span class="section-head__sub req-required">required</span></div>
           <div class="form-section">
             <div class="stage-row" id="assetTypeRow">
-              <span class="stage-pill" data-value="video" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg> Technical Demo Video</span>
-              <span class="stage-pill" data-value="vdk" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-monitor"/></svg> VDK <span class="orion-subtle" style="font-size:11px;">Video Demo Kit</span></span>
-              <span class="stage-pill" data-value="ldk" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-box"/></svg> LDK <span class="orion-subtle" style="font-size:11px;">Live Demo Kit</span></span>
-              <span class="stage-pill" data-value="other" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-grid"/></svg> Other</span>
+              <button type="button" aria-pressed="false" class="stage-pill" data-value="video" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-video"/></svg> Technical Demo Video</button>
+              <button type="button" aria-pressed="false" class="stage-pill" data-value="vdk" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-monitor"/></svg> VDK <span class="orion-subtle" style="font-size:11px;">Video Demo Kit</span></button>
+              <button type="button" aria-pressed="false" class="stage-pill" data-value="ldk" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-box"/></svg> LDK <span class="orion-subtle" style="font-size:11px;">Live Demo Kit</span></button>
+              <button type="button" aria-pressed="false" class="stage-pill" data-value="other" data-action="pill-asset-type"><svg class="orion-ico--sm orion-ico"><use href="#i-grid"/></svg> Other</button>
             </div>
           </div>
         </div>
@@ -403,11 +403,11 @@
           <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-layers"/></svg> Product scope <span class="section-head__sub"><span class="req-required">required</span> · select all products involved</span></div>
           <div class="form-section">
             <div class="stage-row" id="productScopeRow">
-              <span class="stage-pill" data-value="Windchill" data-action="pill-toggle-scope">Windchill</span>
-              <span class="stage-pill" data-value="Creo" data-action="pill-toggle-scope">Creo</span>
-              <span class="stage-pill" data-value="ServiceMax" data-action="pill-toggle-scope">ServiceMax</span>
-              <span class="stage-pill" data-value="Codebeamer" data-action="pill-toggle-scope">Codebeamer</span>
-              <span class="stage-pill" data-value="Other" data-action="pill-toggle-scope">Other</span>
+              <button type="button" aria-pressed="false" class="stage-pill" data-value="Windchill" data-action="pill-toggle-scope">Windchill</button>
+              <button type="button" aria-pressed="false" class="stage-pill" data-value="Creo" data-action="pill-toggle-scope">Creo</button>
+              <button type="button" aria-pressed="false" class="stage-pill" data-value="ServiceMax" data-action="pill-toggle-scope">ServiceMax</button>
+              <button type="button" aria-pressed="false" class="stage-pill" data-value="Codebeamer" data-action="pill-toggle-scope">Codebeamer</button>
+              <button type="button" aria-pressed="false" class="stage-pill" data-value="Other" data-action="pill-toggle-scope">Other</button>
             </div>
             <div class="derived-output" id="productScopeResult">
               <div class="derived-output__label">Scope</div>
@@ -430,9 +430,9 @@
           <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-message-square"/></svg> Narrative angle</div>
           <div class="form-section">
             <div class="stage-row" id="narrativeAngleRow">
-              <span class="stage-pill stage-pill--active" data-action="pill-select">Value proposition-led</span>
-              <span class="stage-pill" data-action="pill-select">Features &amp; functions-led</span>
-              <span class="stage-pill" data-action="pill-select">Mix of both</span>
+              <button type="button" aria-pressed="true" class="stage-pill stage-pill--active" data-action="pill-select">Value proposition-led</button>
+              <button type="button" aria-pressed="false" class="stage-pill" data-action="pill-select">Features &amp; functions-led</button>
+              <button type="button" aria-pressed="false" class="stage-pill" data-action="pill-select">Mix of both</button>
             </div>
           </div>
         </div>
@@ -443,21 +443,21 @@
             <div class="form-row">
               <label>Desired length</label>
               <div class="stage-row" id="desiredLengthRow">
-                <span class="stage-pill" data-action="pill-select">&lt; 1 min</span>
-                <span class="stage-pill stage-pill--active" data-action="pill-select">1–3 min</span>
-                <span class="stage-pill" data-action="pill-select">3–5 min</span>
-                <span class="stage-pill" data-action="pill-select">5–10 min</span>
-                <span class="stage-pill" data-action="pill-select">10+ min</span>
-                <span class="stage-pill" data-action="pill-select">Not sure</span>
+                <button type="button" aria-pressed="false" class="stage-pill" data-action="pill-select">&lt; 1 min</button>
+                <button type="button" aria-pressed="true" class="stage-pill stage-pill--active" data-action="pill-select">1–3 min</button>
+                <button type="button" aria-pressed="false" class="stage-pill" data-action="pill-select">3–5 min</button>
+                <button type="button" aria-pressed="false" class="stage-pill" data-action="pill-select">5–10 min</button>
+                <button type="button" aria-pressed="false" class="stage-pill" data-action="pill-select">10+ min</button>
+                <button type="button" aria-pressed="false" class="stage-pill" data-action="pill-select">Not sure</button>
               </div>
             </div>
 
             <div class="form-row">
               <label>Is a specific customer involved?</label>
               <div class="stage-row" id="customerRow">
-                <span class="stage-pill stage-pill--active" data-value="none" data-action="pill-customer">No — generic / product only</span>
-                <span class="stage-pill" data-value="footage" data-action="pill-customer">Yes — uses a customer's footage or dataset</span>
-                <span class="stage-pill" data-value="story" data-action="pill-customer">Yes — tells a specific customer's story or value prop</span>
+                <button type="button" aria-pressed="true" class="stage-pill stage-pill--active" data-value="none" data-action="pill-customer">No — generic / product only</button>
+                <button type="button" aria-pressed="false" class="stage-pill" data-value="footage" data-action="pill-customer">Yes — uses a customer's footage or dataset</button>
+                <button type="button" aria-pressed="false" class="stage-pill" data-value="story" data-action="pill-customer">Yes — tells a specific customer's story or value prop</button>
               </div>
               <div class="modal__note" id="customerDataNote" style="display:none;">
                 <svg class="orion-ico orion-ico--sm ico-muted"><use href="#i-info"/></svg>
@@ -476,13 +476,13 @@
                    is left out until after the CK review: too complex for
                    now (Elio, Liwei, 2026-11-06). -->
               <div class="stage-row" id="distributionRow">
-                <span class="stage-pill" data-action="pill-toggle">Social</span>
-                <span class="stage-pill" data-action="pill-toggle">PTC.com</span>
-                <span class="stage-pill" data-action="pill-toggle">Product Launch Kit</span>
-                <span class="stage-pill" data-action="pill-toggle">Marketing Campaign</span>
-                <span class="stage-pill" data-action="pill-toggle">Sales Play</span>
-                <span class="stage-pill" data-action="pill-toggle">Technical Sales Asset</span>
-                <span class="stage-pill" data-action="pill-toggle">Event/Trade Show</span>
+                <button type="button" aria-pressed="false" class="stage-pill" data-action="pill-toggle">Social</button>
+                <button type="button" aria-pressed="false" class="stage-pill" data-action="pill-toggle">PTC.com</button>
+                <button type="button" aria-pressed="false" class="stage-pill" data-action="pill-toggle">Product Launch Kit</button>
+                <button type="button" aria-pressed="false" class="stage-pill" data-action="pill-toggle">Marketing Campaign</button>
+                <button type="button" aria-pressed="false" class="stage-pill" data-action="pill-toggle">Sales Play</button>
+                <button type="button" aria-pressed="false" class="stage-pill" data-action="pill-toggle">Technical Sales Asset</button>
+                <button type="button" aria-pressed="false" class="stage-pill" data-action="pill-toggle">Event/Trade Show</button>
               </div>
             </div>
           </div>
@@ -508,8 +508,8 @@
           <div class="section-head__title" style="margin-bottom:10px;"><svg class="orion-ico ico-indigo"><use href="#i-upload"/></svg> Starting materials</div>
           <div class="form-section">
             <div class="stage-row" id="startingMaterialsRow">
-              <span class="stage-pill stage-pill--active" data-value="have" data-action="pill-starting-materials">I have starting materials</span>
-              <span class="stage-pill" data-value="liberty" data-action="pill-starting-materials">Creative liberty — no starting materials</span>
+              <button type="button" aria-pressed="true" class="stage-pill stage-pill--active" data-value="have" data-action="pill-starting-materials">I have starting materials</button>
+              <button type="button" aria-pressed="false" class="stage-pill" data-value="liberty" data-action="pill-starting-materials">Creative liberty — no starting materials</button>
             </div>
             <div id="attachmentsSection">
               <div class="field-hint">Product brief, messaging document, screen grabs, or existing video snippets — whatever you've got.</div>
@@ -573,8 +573,8 @@
 <div class="modal-backdrop" id="shareBackdrop" data-backdrop="close-share">
   <div class="modal">
     <div class="modal__head">
-      <div class="modal__head-title"><svg class="orion-ico ico-indigo"><use href="#i-send"/></svg> Share to DemoBoard</div>
-      <button class="modal__close" data-action="close-share"><svg class="orion-ico"><use href="#i-x"/></svg></button>
+      <div class="modal__head-title" id="shareHeading"><svg class="orion-ico ico-indigo"><use href="#i-send"/></svg> Share to DemoBoard</div>
+      <button type="button" class="modal__close" data-action="close-share" aria-label="Close"><svg class="orion-ico"><use href="#i-x"/></svg></button>
     </div>
     <div class="modal__body">
       <div class="modal__asset">
@@ -640,8 +640,8 @@
       </div>
     </div>
     <div class="modal__foot">
-      <button class="btn-ghost" data-action="close-share">Cancel</button>
-      <button class="btn-primary-sm" id="generateBtn" data-action="generate-share-link"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Generate &amp; Send DemoBoard</button>
+      <button type="button" class="btn-ghost" data-action="close-share">Cancel</button>
+      <button class="btn-primary-sm" id="generateBtn"><svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Generate &amp; Send DemoBoard</button>
     </div>
   </div>
 </div>
@@ -649,13 +649,13 @@
 <div class="modal-backdrop" id="styleExampleBackdrop" data-backdrop="close-style-example">
   <div class="modal modal--wide">
     <div class="modal__head">
-      <div class="modal__head-title"><svg class="orion-ico ico-indigo"><use href="#i-play"/></svg> <span id="styleExampleTitle">—</span> style example</div>
-      <button class="modal__close" data-action="close-style-example"><svg class="orion-ico"><use href="#i-x"/></svg></button>
+      <div class="modal__head-title" id="styleExampleHeading"><svg class="orion-ico ico-indigo"><use href="#i-play"/></svg> <span id="styleExampleTitle">—</span> style example</div>
+      <button type="button" class="modal__close" data-action="close-style-example" aria-label="Close"><svg class="orion-ico"><use href="#i-x"/></svg></button>
     </div>
     <div class="modal__body">
       <div class="vp-player" id="styleExamplePlayer" style="margin-bottom:0;">
         <video id="styleExampleVideoTag" style="width:100%; height:100%; border-radius:inherit; display:none; background:#000;" controls></video>
-        <button class="vp-player__play" id="styleExamplePlayBtn"><svg><use href="#i-play"/></svg></button>
+        <button type="button" class="vp-player__play" id="styleExamplePlayBtn" aria-label="Play"><svg><use href="#i-play"/></svg></button>
         <span class="vp-player__duration" id="styleExampleDuration"></span>
       </div>
       <div>
@@ -669,13 +669,12 @@
       </div>
     </div>
     <div class="modal__foot">
-      <button class="btn-ghost" data-action="close-style-example">Close</button>
+      <button type="button" class="btn-ghost" data-action="close-style-example">Close</button>
     </div>
   </div>
 </div>
 
 
-<div id="hubApiStatus" class="hub-api-status"></div>
+<div id="hubApiStatus" class="hub-api-status" role="status" aria-live="polite" aria-atomic="true"></div>
 <script src="/static/js/view-as.js" defer></script>
-<script src="/static/js/hub-ui.js" defer></script>
 <script type="module" src="/static/js/hub/main.js"></script>

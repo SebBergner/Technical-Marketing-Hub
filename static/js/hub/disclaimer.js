@@ -6,7 +6,7 @@
  * at all. The acceptance is recorded on the server against the sign-in, so it
  * follows the person to every browser, and Admin -> Users & groups lists it. */
 
-import { escapeHtml } from "./util.js";
+import { escapeHtml } from "../shared/dom.js";
 
 /* Resolves once the person may use the Hub: at once if nothing is due,
  * else on Accept. The welcome pop-up (welcome.js) waits for it. */

@@ -4,7 +4,9 @@
  * Part of the Hub page's script, split out of static/hub-api.js on
  * 2026-10-14; static/js/hub/main.js loads it. */
 
-import { durationLabel, escapeHtml, pill } from "./util.js";
+import { durationLabel, pill } from "./util.js";
+import { escapeHtml } from "../shared/dom.js";
+import { detailMessage } from "../shared/http.js";
 import { videoTypeOf } from "./cards.js";
 import { familyDisplayName } from "./nav.js";
 
@@ -37,26 +39,12 @@ var PRODUCT_SCOPE_EXCLUDED = ["ProENGINEER Wildfire", "Division MOCKUP",
 var PRODUCT_SCOPE_PRIORITY = ["Creo", "Codebeamer", "Windchill", "Jetstream",
                               "IPE", "ServiceMax", "Orbit"];
 
-/* Elio's Scope box is green -- the colour of a result. While nothing is
- * picked it holds a prompt ("Select at least one product."), which then
- * read as a success (Liwei, 2026-10-01). Neutral until a product is
- * chosen. Wraps his computeProductScope(), which his inline handlers
- * look up on window at call time. */
-function wireScopeState() {
-  var compute = window.computeProductScope;
-  if (typeof compute !== "function" || compute.hubWrapped) return;
-  var mark = function () {
-    var box = document.getElementById("productScopeResult");
-    var picked = document.querySelectorAll("#productScopeRow .stage-pill--active").length;
-    if (box) box.classList.toggle("hub-derived--pending", !picked);
-  };
-  window.computeProductScope = function () {
-    var out = compute.apply(this, arguments);
-    mark();
-    return out;
-  };
-  window.computeProductScope.hubWrapped = true;
-  mark();
+/* The Scope box is neutral until a product is chosen (Liwei, 2026-10-01);
+ * inquiry.js's computeProductScope() keeps it so after every click. */
+function markScopePending() {
+  var box = document.getElementById("productScopeResult");
+  var picked = document.querySelectorAll("#productScopeRow .stage-pill--active").length;
+  if (box) box.classList.toggle("hub-derived--pending", !picked);
 }
 
 /* Asset type, Product scope and Brief are required (Elio, 2026-11-10):
@@ -129,8 +117,7 @@ function fillProductPills(facets) {
 
   row.innerHTML = "";
   families.forEach(function (f) {
-    var pill = document.createElement("span");
-    pill.className = "stage-pill";
+    var pill = scopePill();
     // The value submitted stays the raw family name -- taxonomy.py and
     // every stored request still call it "IPE"/"Jetstream"/"Orbit"; only
     // the label a person reads changes, same rule as the nav/dropdown
@@ -144,20 +131,21 @@ function fillProductPills(facets) {
   // "Other" is not a family and has no count; it is the honest home for a
   // product the catalogue has never carried, which is exactly when someone
   // is most likely to be requesting one.
-  var other = document.createElement("span");
-  other.className = "stage-pill";
+  var other = scopePill();
   other.dataset.value = "Other";
   other.textContent = "Other";
   row.appendChild(other);
+}
 
-  // Elio's pills call pillToggle + computeProductScope through inline
-  // onclick; rebuilt ones need the same behaviour bound directly.
-  row.querySelectorAll(".stage-pill").forEach(function (pill) {
-    pill.addEventListener("click", function () {
-      window.pillToggle(pill);
-      if (window.computeProductScope) window.computeProductScope();
-    });
-  });
+/* A product pill as the markup's are: a toggle button, which actions.js's
+ * one listener handles like the ones it replaces. */
+function scopePill() {
+  var pill = document.createElement("button");
+  pill.type = "button";
+  pill.className = "stage-pill";
+  pill.dataset.action = "pill-toggle-scope";
+  pill.setAttribute("aria-pressed", "false");
+  return pill;
 }
 
 /* Files the requester chose, kept as File objects until submission.
@@ -364,7 +352,7 @@ async function submitRequest(event) {
     }
     var data = await response.json();
     if (!response.ok) {
-      requestProblem(data.detail
+      requestProblem(detailMessage(data.detail)
         || ("The request was not saved (HTTP " + response.status + ")."));
       return;
     }
@@ -403,13 +391,11 @@ async function submitRequest(event) {
   }
 }
 
-/* The page's actions call window.submitAssetRequest and
- * window.handleAttachmentFiles when used (static/js/hub-ui.js), so replacing
- * the globals is enough here. */
+/* Submit and the file box reach submitRequest() and takeAttachments()
+ * through actions.js; what is left to wire is the Submit button's state. */
 function wireRequestForm() {
-  window.submitAssetRequest = submitRequest;
-  window.handleAttachmentFiles = takeAttachments;
   wireSubmitState();
+  markScopePending();
 }
 
 /* ── the duplicate check on the request form ──────────────────
@@ -420,10 +406,8 @@ function wireRequestForm() {
  * similar found", which is the worse of the two answers -- a clearance to
  * build something that may already exist, issued without looking.
  *
- * This asks the catalogue instead. Overriding the global rather than
- * editing index.html keeps the one-script-tag contract: the button's inline
- * onclick calls whatever window.checkExistingAsset is when it is clicked,
- * and this file is deferred, so it always wins.
+ * This asks the catalogue instead; the button (inquiry.js's "Kind of demo"
+ * list) reaches it through actions.js.
  */
 var DUPLICATE_LIMIT = 5;
 
@@ -530,7 +514,7 @@ function renderDuplicateCheck(page, products, level, host, relaxed) {
   return note;
 }
 
-window.checkExistingAsset = function (btn, level) {
+function checkExistingAsset(btn, level) {
   var host = document.getElementById("existingCheck-" + level);
   if (!host) return;
   var products = requestScopeProducts();
@@ -599,8 +583,8 @@ window.checkExistingAsset = function (btn, level) {
       warn.appendChild(text);
       host.appendChild(warn);
     });
-};
+}
 
 export {
-  fillProductPills, wireRequestForm, wireScopeState
+  checkExistingAsset, fillProductPills, submitRequest, takeAttachments, wireRequestForm
 };

@@ -3,7 +3,9 @@
  * Part of the Hub page's script, split out of static/hub-api.js on
  * 2026-10-14; static/js/hub/main.js loads it. */
 
-import { escapeHtml, fullDate, getJSON } from "./util.js";
+import { fullDate } from "../shared/dates.js";
+import { escapeHtml } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
 import { assetHref, buildCard, cardImage, paintCoverInto, TYPE_CHIP, videoTypeOf } from "./cards.js";
 import { applyFilters, CONTROLS, navFilter } from "./filters.js";
 import {
@@ -113,7 +115,7 @@ function buildHome(assets, facets) {
   grid.className = "asset-grid";
   featured.appendChild(grid);
   home.appendChild(featured);
-  getJSON("/api/assets/promoted").then(function (items) {
+  fetchJSON("/api/assets/promoted").then(function (items) {
     if (!items.length) return;
     items.forEach(function (a) { grid.appendChild(buildCard(a)); });
     featured.style.display = "";

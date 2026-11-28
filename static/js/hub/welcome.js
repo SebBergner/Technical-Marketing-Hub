@@ -8,7 +8,7 @@
  * the next big update. As it closes, "User guide" pulses
  * and says what it is, so the way back is found by looking, not reading. */
 
-import { escapeHtml } from "./util.js";
+import { escapeHtml } from "../shared/dom.js";
 import { BOOK } from "./guide.js";
 
 var POINTS = [

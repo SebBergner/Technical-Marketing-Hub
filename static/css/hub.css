@@ -358,6 +358,9 @@ video.hub-inline-player__media { object-fit: contain; }
 .stage-pill {
   padding: 7px 14px; border-radius: var(--orion-radius-pill); border: 1px solid var(--orion-border-md);
   font-size: 12.5px; font-weight: 500; cursor: pointer; color: var(--orion-text-2); background: var(--orion-surface);
+  /* A <button aria-pressed> since WS-G (2026-11-28; it was a <span>): the
+     browser's own button font and margin left out, so it looks as before. */
+  font-family: inherit; line-height: inherit; text-align: inherit; margin: 0;
 }
 /* A selected pill inverts, and inverting means BOTH halves flip. The original
    painted the background with --orion-text -- a foreground token -- and left

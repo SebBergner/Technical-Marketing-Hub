@@ -17,27 +17,11 @@ import { report } from "./util.js";
 import { hubPermissions } from "./permissions.js";
 import { openAssetDetail } from "./detail.js";
 import { refill, videoState } from "./videorules.js";
-
-function mk(tag, cls, text) {
-  var n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text != null) n.textContent = text;
-  return n;
-}
+import { el as mk } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
 
 function call(method, url, body) {
-  var opts = { method: method };
-  if (body instanceof FormData) opts.body = body;
-  else if (body) {
-    opts.headers = { "Content-Type": "application/json" };
-    opts.body = JSON.stringify(body);
-  }
-  return fetch(url, opts).then(function (r) {
-    return r.json().catch(function () { return {}; }).then(function (d) {
-      if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
-      return d;
-    });
-  });
+  return fetchJSON(url, { method: method, body: body || undefined });
 }
 
 function base(asset) { return "/api/assets/" + encodeURIComponent(asset.id); }

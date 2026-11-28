@@ -29,15 +29,12 @@ import { closeGuide } from "./guide.js";
 import { closeUpload } from "./upload.js";
 import { closeMyHub } from "./me.js";
 import { closePlaylist } from "./playlists.js";
+import { closeRequestView, isRequestOpen } from "./inquiry.js";
 
-/* Elio's request form (static/js/hub-ui.js). Only when it is open: his
+/* Elio's request form (inquiry.js). Only when it is open: its
  * closeRequestView() also moves the sidebar highlight to Home. */
 function closeRequest() {
-  var page = document.getElementById("requestViewPage");
-  if (page && page.classList.contains("active")
-      && typeof window.closeRequestView === "function") {
-    window.closeRequestView();
-  }
+  if (isRequestOpen()) closeRequestView();
 }
 
 /* Every full page but the catalogue, by the name callers use to keep one

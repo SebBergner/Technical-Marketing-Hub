@@ -154,14 +154,17 @@ def test_a_creators_demos_come_with_their_cards(client):
 
 
 def test_the_hub_page_is_revalidated_and_carries_no_inline_handlers(client):
-    """2026-10-14: index.html is markup only; behaviour lives in
-    static/js/hub-ui.js, and the page must not be served stale after a deploy."""
+    """2026-10-14: index.html is markup only; behaviour lives in the Hub's
+    modules (static/js/hub/actions.js since static/js/hub-ui.js was folded
+    in, 2026-11-28), and the page must not be served stale after a deploy."""
     r = client.get("/")
     assert r.headers["cache-control"] == "no-cache"
     assert "onclick=" not in r.text and "onchange=" not in r.text
     # Under /static/v<build>/ on a deployed build (backend/static_delivery.py);
     # CI stamps BUILD_NUMBER before it runs the suite.
-    assert re.search(r'<script src="/static/(v[^/]+/)?js/hub-ui.js" defer></script>', r.text)
+    assert re.search(r'<script type="module" src="/static/(v[^/]+/)?js/hub/main.js"></script>',
+                     r.text)
+    assert "hub-ui.js" not in r.text
 
 
 def test_the_usage_breakdown_reads_the_catalogue_once_and_names_types(client, monkeypatch):

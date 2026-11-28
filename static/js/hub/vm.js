@@ -4,12 +4,13 @@
  * Part of the Hub page's script, split out of static/hub-api.js on
  * 2026-10-14; static/js/hub/main.js loads it. */
 
-import { getJSON } from "./util.js";
+import { fetchJSON } from "../shared/http.js";
 import { TYPE_CHIP } from "./cards.js";
 import { applyFilters, CONTROLS, navFilter } from "./filters.js";
 import { exitOverlays } from "./nav.js";
 import { hubPermissions } from "./permissions.js";
 import { filePreviewUrl, openAssetDetail } from "./detail.js";
+import { el as vmEl } from "../shared/dom.js";
 
 /* ── virtual machines ─────────────────────────────────────────────────
  *
@@ -36,13 +37,6 @@ var VIA_LABEL = {
 
 function safeHref(url) {
   return /^(https?|ftp):\/\//i.test(url || "") ? url : null;
-}
-
-function vmEl(tag, cls, text) {
-  var n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text != null) n.textContent = text;
-  return n;
 }
 
 function vmCard(icon, title) {
@@ -199,7 +193,7 @@ function vmSupportsCard(asset) {
     var qs = [];
     if (f.segment) qs.push("segment=" + encodeURIComponent(f.segment));
     if (f.type) qs.push("type=" + encodeURIComponent(f.type));
-    getJSON("/api/assets?limit=1&" + qs.join("&")).then(function (r) {
+    fetchJSON("/api/assets?limit=1&" + qs.join("&")).then(function (r) {
       btn.textContent = f.label + " (" + r.total + ") →";
     }).catch(function () {});
   });
@@ -397,7 +391,7 @@ function fillVmCredentials(asset, box, notice) {
         + " because you're signed in. Please keep them inside PTC.";
     })
     .catch(function () {
-      getJSON("/api/auth/me").then(function (me) {
+      fetchJSON("/api/auth/me").then(function (me) {
         notice.textContent = "";
         if (me.mode === "oidc") {
           notice.appendChild(document.createTextNode(count + " " + noun + " hidden. "));

@@ -18,10 +18,14 @@
  * Part of the Hub page's script; static/js/hub/main.js loads it through
  * nav.js and detail.js. */
 
-import { dateLabel, escapeHtml, fullDate, report } from "./util.js";
+import { dateLabel, report } from "./util.js";
+import { fullDate } from "../shared/dates.js";
+import { escapeHtml } from "../shared/dom.js";
 import { hubPermissions } from "./permissions.js";
 import { gxcPill, TYPE_CHIP } from "./cards.js";
 import { closeAdvancedSearch } from "./search.js";
+import { el } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
 
 /* After a GXC video's title: "GXC only", as on its card (cards.gxcPill). */
 function gxcTag(cell, r) {
@@ -43,13 +47,6 @@ var state = {
 
 var AGE_LABEL = { "new": "Under 1 year", recent: "1–2 years", aging: "2–4 years",
                   older: "4 years or more" };
-
-function el(tag, cls, text) {
-  var n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined && text !== null) n.textContent = String(text);
-  return n;
-}
 
 function may(p) { return state.granted.indexOf(p) >= 0; }
 
@@ -588,14 +585,7 @@ function askArchive(bar, ids) {
 function call(kind, id, on, reason) {
   var url = "/api/assets/" + encodeURIComponent(id) + (kind === "archive" ? "/archive" : "/still-current");
   var body = kind === "archive" ? { archived: on, reason: reason || null } : { still_current: on };
-  return fetch(url, { method: "PUT", headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(body) })
-    .then(function (r) {
-      return r.json().catch(function () { return {}; }).then(function (d) {
-        if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
-        return d;
-      });
-    });
+  return fetchJSON(url, { method: "PUT", body: body });
 }
 
 /* One at a time: an archive checks a folder's permissions and moves it, and

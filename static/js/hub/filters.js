@@ -5,7 +5,9 @@
  * Part of the Hub page's script, split out of static/hub-api.js on
  * 2026-10-14; static/js/hub/main.js loads it. */
 
-import { debounce, escapeHtml, getJSON, pill, report } from "./util.js";
+import { debounce, pill, report } from "./util.js";
+import { escapeHtml } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
 import { hubPermissions } from "./permissions.js";
 import { buildCard } from "./cards.js";
 import { exportCsv, rememberView, renderRows, tableView } from "./table.js";
@@ -899,8 +901,8 @@ async function applyFilters() {
 
   var page, facets;
   try {
-    var both = await Promise.all([getJSON("/api/assets?" + assetParams),
-                                  getJSON("/api/taxonomy?" + params)]);
+    var both = await Promise.all([fetchJSON("/api/assets?" + assetParams),
+                                  fetchJSON("/api/taxonomy?" + params)]);
     page = both[0];
     facets = both[1];
   } catch (err) {
@@ -1110,7 +1112,7 @@ async function loadMoreAssets() {
 
   var page;
   try {
-    page = await getJSON("/api/assets?" + params);
+    page = await fetchJSON("/api/assets?" + params);
   } catch (err) {
     console.error("[hub-api] load more failed", err);
     report("Could not load more - " + err.message, true);
@@ -1150,7 +1152,6 @@ function takeOverControls() {
     el.addEventListener(el.tagName === "INPUT" ? "input" : "change", debounced);
   });
   window.hubApplyFilters = applyFilters;   // for anything else that calls it
-  window.hubResetFilters = clearAll;       // data-action="reset-filters"
 }
 
 /* ── the filter bar (Liwei, 2026-10-01) ──────────────────────────────

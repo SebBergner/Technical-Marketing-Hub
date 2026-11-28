@@ -5,11 +5,12 @@
  * Part of the Hub page's script, split out of static/hub-api.js on
  * 2026-10-14; static/js/hub/main.js loads it. */
 
-import { escapeHtml } from "./util.js";
+import { escapeHtml } from "../shared/dom.js";
 import { applyFilters, clearAll, CONTROLS, navFilter, pushNextUrl } from "./filters.js";
 import { addActivityNav } from "./activity.js";
 import { addReviewNav } from "./review.js";
 import { closeOtherViews } from "./views.js";
+import { closeRequestView } from "./inquiry.js";
 
 /* ---------------------------------------------------------- the left nav */
 
@@ -117,10 +118,8 @@ var HIDDEN_UMBRELLAS = ["Servigistics"];
 function exitOverlays() {
   // Called even when the form is shut: it is also what moves the sidebar
   // highlight back to Home, whose own action was removed above.
-  if (typeof window.closeRequestView === "function") {
-    try { window.closeRequestView(); } catch (err) {
-      console.warn("[hub-api] closeRequestView threw", err);
-    }
+  try { closeRequestView(); } catch (err) {
+    console.warn("[hub-api] closeRequestView threw", err);
   }
   closeOtherViews();     // every page, from views.js's one list
   // The hash has to follow, or a refresh reopens the page we just left.
@@ -176,7 +175,7 @@ function wireNav(facets) {
     navTargets[name] = target;
     item.style.cursor = "pointer";
 
-    // Home's own action (close-request in static/js/hub-ui.js) only
+    // Home's own action (close-request in static/js/hub/actions.js) only
     // half-restores the catalogue from underneath a details page;
     // exitOverlays() below does the whole job, that half included.
     if (name === "Home") item.removeAttribute("data-action");

@@ -167,7 +167,7 @@ def test_a_deployed_page_names_only_the_builds_prefix(client, build, page):
 
 def test_a_local_page_is_unchanged_apart_from_preloads(client, local):
     html = client.get("/").text
-    assert '<script src="/static/js/hub-ui.js" defer></script>' in html
+    assert '<script src="/static/js/view-as.js" defer></script>' in html
     assert '<script type="module" src="/static/js/hub/main.js"></script>' in html
     assert "/static/v" not in html
 
@@ -210,10 +210,11 @@ def _preloads(html):
 def test_the_hub_preloads_its_whole_module_graph(client, build):
     import os
     preloads = _preloads(client.get("/").text)
-    hub = sorted(f"/static/v42/js/hub/{f}" for f in os.listdir(f"{static_delivery.STATIC_DIR}/js/hub")
-                 if f.endswith(".js"))
-    # Every module under js/hub is reachable from main.js today; a new one
-    # that is not would simply not be preloaded, which this would flag.
+    hub = sorted(f"/static/v42/js/{d}/{f}" for d in ("hub", "shared")
+                 for f in os.listdir(f"{static_delivery.STATIC_DIR}/js/{d}") if f.endswith(".js"))
+    # Every module under js/hub and js/shared (WS-G, 2026-11-28) is reachable
+    # from main.js today; a new one that is not would simply not be
+    # preloaded, which this would flag.
     assert sorted(preloads) == hub
     assert preloads[0] == "/static/v42/js/hub/main.js"
     assert len(preloads) == len(set(preloads))
@@ -230,13 +231,17 @@ def test_admin_pages_preload_their_graph_including_shared_modules(client, build,
     preloads = _preloads(client.get(page).text)
     assert preloads[0] == f"/static/v42/{entry}"
     assert "/static/v42/js/admin/util.js" in preloads
+    assert "/static/v42/js/shared/http.js" in preloads
     assert "</head>" in client.get(page).text
     html = client.get(page).text
     assert html.index('rel="modulepreload"') < html.index("</head>")
 
 
-def test_the_migration_page_has_no_modules_to_preload(client, build):
-    assert _preloads(client.get("/migration").text) == []
+def test_the_migration_page_preloads_the_shared_helpers(client, build):
+    # A module since WS-G (2026-11-28), for static/js/shared/.
+    preloads = _preloads(client.get("/migration").text)
+    assert preloads == ["/static/v42/migration.js", "/static/v42/js/shared/dates.js",
+                        "/static/v42/js/shared/dom.js", "/static/v42/js/shared/http.js"]
 
 
 def test_the_graph_follows_multiline_and_parent_imports(tmp_path):

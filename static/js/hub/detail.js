@@ -6,9 +6,12 @@
  * 2026-10-14; static/js/hub/main.js loads it. */
 
 import {
-  dateLabel, debounce, durationLabel, escapeHtml, fullDate, getJSON, LANGUAGE_LABEL, pill,
-  report, setText
+  dateLabel, debounce, durationLabel, LANGUAGE_LABEL, pill, report, setText
 } from "./util.js";
+import { fullDate } from "../shared/dates.js";
+import { dialog } from "../shared/dialog.js";
+import { el as mk, escapeHtml } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
 import { hubPermissions } from "./permissions.js";
 import { starButton } from "./favorites.js";
 import { editButton } from "./edit.js";
@@ -29,6 +32,7 @@ import { openMyHub } from "./me.js";
 import { closeSaveMenu, openPlaylist, refreshSaved, saveButton } from "./playlists.js";
 import { advancedHash, advState, fileTotalsText, openAdvancedSearch } from "./search.js";
 import { closeOtherViews } from "./views.js";
+import { openRequestView } from "./inquiry.js";
 
 /* ------------------------------------------------------- the details page */
 
@@ -133,14 +137,14 @@ async function openAssetDetail(id, fileItemId, linkToken) {
   window.hubDetailReturn = null;
   var asset;
   try {
-    asset = await getJSON("/api/assets/" + encodeURIComponent(id)
+    asset = await fetchJSON("/api/assets/" + encodeURIComponent(id)
                           + (linkToken ? "?s=" + encodeURIComponent(linkToken) : ""));
   } catch (err) {
     if (seq !== detailSeq) return;   // superseded: not this one's error to show
     console.error("[hub-api] could not load asset", id, err);
     // A link to a demo that has been hidden or removed used to do nothing
     // at all (2026-10-06): say so, and go back to the catalogue.
-    if (/HTTP 404/.test(String(err && err.message))) {
+    if (err && err.status === 404) {
       report("That demo is not available in the Hub.", true);
       if (location.hash.indexOf("#/asset/") === 0) {
         history.replaceState(null, "", location.pathname + location.search);
@@ -526,7 +530,7 @@ function renderRelated(page, asset) {
   section.querySelector(".hub-related__marked").hidden = true;
 
   var url = "/api/assets/" + encodeURIComponent(asset.id) + "/related";
-  Promise.all([getJSON(url), hubPermissions]).then(function (got) {
+  Promise.all([fetchJSON(url), hubPermissions]).then(function (got) {
     if (!detailAsset || detailAsset.id !== asset.id) return;
     var data = got[0];
     var editor = got[1].indexOf("maintain_content") >= 0;
@@ -593,7 +597,7 @@ function relatedAddButton(section, asset, items, page) {
       var q = input.value.trim();
       hits.innerHTML = "";
       if (q.length < 2) return;
-      getJSON("/api/assets?limit=8&q=" + encodeURIComponent(q)).then(function (page1) {
+      fetchJSON("/api/assets?limit=8&q=" + encodeURIComponent(q)).then(function (page1) {
         if (input.value.trim() !== q) return;
         var found = page1.items.filter(function (a) { return !shown[a.id]; });
         if (!found.length) {
@@ -769,6 +773,7 @@ var MODAL_PREVIEWABLE_KINDS = ["video", "image"];
 //: null. `files` is already filtered to MODAL_PREVIEWABLE_KINDS -- Prev/
 //: Next only ever steps through things that actually render there.
 var filePreviewState = null;
+var filePreviewDialog = null;
 
 function ensureFilePreviewModal() {
   var backdrop = document.getElementById("hubFilePreviewBackdrop");
@@ -823,10 +828,10 @@ function ensureFilePreviewModal() {
     +         ' title="' + SHARE_TITLE + '">'
     +         '<svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Share</button>'
     +     '</div>'
-    +     '<button class="hub-preview__close" title="Close">&times;</button>'
+    +     '<button type="button" class="hub-preview__close" title="Close" aria-label="Close">&times;</button>'
     +   '</div>'
     +   '<div class="hub-file-preview__main">'
-    +     '<iframe class="hub-preview__frame" id="hubFilePreviewFrame"'
+    +     '<iframe class="hub-preview__frame" id="hubFilePreviewFrame" title="File preview"'
     +       ' allow="fullscreen"></iframe>'
     // What stands in for the frame when the file cannot play inside it --
     // a Word/PowerPoint/PDF (Office refuses to be framed, see
@@ -856,9 +861,9 @@ function ensureFilePreviewModal() {
     if (state) copyShareLink(this, fileShareUrl(state.asset.id, state.files[state.index].item_id));
   });
   backdrop.addEventListener("click", function (e) { if (e.target === backdrop) shut(); });
-  document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && backdrop.classList.contains("open")) shut();
-  });
+  // Esc, the focus trap and focus back to the file row: static/js/shared/dialog.js.
+  filePreviewDialog = dialog(backdrop.querySelector(".hub-preview__box"),
+                             { labelledBy: "hubFilePreviewTitle", onEscape: shut });
 
   document.getElementById("hubFilePreviewPrev").addEventListener("click", function () {
     if (filePreviewState && filePreviewState.index > 0) {
@@ -968,6 +973,7 @@ function openFilePreview(asset, files, index) {
   ensureFilePreviewModal();
   renderFilePreview();
   document.getElementById("hubFilePreviewBackdrop").classList.add("open");
+  filePreviewDialog.open();
 }
 
 /* `restoreHash`: closed by the person (×, Esc, backdrop) rather than by a
@@ -978,6 +984,7 @@ function closeFilePreview(restoreHash) {
   backdrop.classList.remove("open");
   // Blank the src on close, or a video keeps playing behind the page.
   document.getElementById("hubFilePreviewFrame").src = "about:blank";
+  if (filePreviewDialog) filePreviewDialog.close();
   var state = filePreviewState;
   filePreviewState = null;
   if (restoreHash && state && /\/file\//.test(location.hash)) {
@@ -1769,7 +1776,7 @@ function routeFromHash() {
   // opens: the list of pages is kept there, once.
   if (hash === "#/request") {
     closeOtherViews("request");
-    if (typeof window.openRequestView === "function") window.openRequestView();
+    openRequestView();
     return;
   }
   // My Hub (A3, 2026-11-12).
@@ -1858,7 +1865,7 @@ function wireDetailPage() {
   if (back) back.addEventListener("click", function (e) {
     if (detailReturnHash) {
       // Synchronously, not via hashchange, so no frame of the catalogue
-      // flashes. And no further: hub-ui.js's "close-detail", on document,
+      // flashes. And no further: actions.js's "close-detail", on document,
       // would put the catalogue back under the view returned to (2026-10-28).
       e.stopPropagation();
       history.pushState(null, "", detailReturnHash);
@@ -1920,13 +1927,6 @@ function renderAccessMark(meta, asset) {
  * working through a list stays on Manage; a waiting request puts a dot on it
  * for whoever may decide.
  */
-function mk(tag, cls, text) {
-  var n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text != null) n.textContent = text;
-  return n;
-}
-
 function whoName(actor) {
   if (actor === "admin-session") return "the admin account";
   return String(actor || "someone").replace(/^(user|dev):/, "");
@@ -1943,16 +1943,7 @@ function manageButton(text, primary) {
 }
 
 function send(method, url, body) {
-  return fetch(url, {
-    method: method,
-    headers: { "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : undefined
-  }).then(function (r) {
-    return r.json().catch(function () { return {}; }).then(function (d) {
-      if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
-      return d;
-    });
-  });
+  return fetchJSON(url, { method: method, body: body || undefined });
 }
 
 /* An inline step under a row: a text box and Confirm / Cancel. */

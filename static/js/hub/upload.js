@@ -21,6 +21,9 @@ import { hubPermissions } from "./permissions.js";
 import { closeActivity } from "./activity.js";
 import { closeAdvancedSearch } from "./search.js";
 import { drawBulk, BULK_STEPS } from "./bulk.js";
+import { el } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
+import { stampDay } from "../shared/dates.js";
 
 //: 32 x 320 KiB: Graph wants chunks in multiples of 320 KiB, under 60 MiB.
 var CHUNK = 32 * 320 * 1024;
@@ -45,13 +48,6 @@ function previewChoice() {
   return videos.some(function (v) { return v.path === up.preview; }) ? up.preview : null;
 }
 
-function el(tag, cls, text) {
-  var n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text != null) n.textContent = text;
-  return n;
-}
-
 /* A request that never got an answer at all -- fetch's bare "Failed to
  * fetch" -- is, on a PTC laptop, nearly always Zscaler: not running or not
  * signed in, it drops the request (Serge's meeting, 2026-10-23: a Create
@@ -63,15 +59,8 @@ function unreachable(what) {
 }
 
 function api(method, url, body) {
-  return fetch(url, {
-    method: method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined
-  }).catch(function () { throw unreachable("the Hub"); }).then(function (r) {
-    return r.json().catch(function () { return {}; }).then(function (d) {
-      if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
-      return d;
-    });
+  return fetchJSON(url, { method: method, body: body || undefined }).catch(function (err) {
+    throw err.network ? unreachable("the Hub") : err;
   });
 }
 
@@ -193,8 +182,7 @@ function renderMyDemos(box, here) {
       if (r.asset_id) title.href = "#/asset/" + encodeURIComponent(r.asset_id);
       info.appendChild(title);
       info.appendChild(el("div", "hub-up__muted", (r.folder_name || "") + " · "
-        + new Date(r.created_at).toLocaleDateString("en-US",
-            { month: "short", day: "numeric", year: "numeric" })));
+        + stampDay(r.created_at, "en-US")));
       if (r.status === "sent_back" && r.note) {
         info.appendChild(el("div", "hub-up__note", "Reviewer: " + r.note));
       }

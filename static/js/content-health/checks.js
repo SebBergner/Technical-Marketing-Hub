@@ -6,7 +6,8 @@
  *
  * Part of the Content health page's script (static/content-health.html). */
 
-import { $, demoLink, el, session, TYPE_WORD } from "../admin/util.js";
+import { $, demoLink, session, TYPE_WORD } from "../admin/util.js";
+import { el } from "../shared/dom.js";
 import { loadProducts } from "./products.js";
 
 var data = null;

@@ -4,14 +4,13 @@
  * Part of the Hub page's script, split out of static/hub-api.js on
  * 2026-10-14; static/js/hub/main.js loads it. */
 
-import {
-  debounce, escapeHtml, getJSON, LANGUAGE_LABEL, pill, TYPE_LABELS
-} from "./util.js";
+import { debounce, LANGUAGE_LABEL, pill, TYPE_LABELS } from "./util.js";
+import { escapeHtml } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
 import { cardImage, paintCoverInto, TYPE_CHIP, videoTypeOf } from "./cards.js";
 import { noteSearch, val } from "./filters.js";
 import { familyDisplayName } from "./nav.js";
 import { buildFileRow, fileHash } from "./detail.js";
-import { closeOtherViews } from "./views.js";
 
 /* ---------------------------------------------------- advanced search
  *
@@ -195,7 +194,7 @@ async function runAdvancedSearch(q, more) {
   if (advState.partial) params.append("partial", "true");
   var page;
   try {
-    page = await getJSON("/api/assets/advanced-search?" + params.toString());
+    page = await fetchJSON("/api/assets/advanced-search?" + params.toString());
   } catch (err) {
     if (seq !== advState.seq) return;
     console.error("[hub-api] advanced search failed", err);
@@ -362,34 +361,6 @@ function wireAdvancedSearch() {
       location.hash = advancedHash(val("hubSearchInput").trim());
     });
     field.appendChild(open);
-  }
-  // Elio's Request view knows nothing of this page; opening it must still
-  // take this page down, or both would show.
-  var openRequest = window.openRequestView;
-  if (typeof openRequest === "function" && !openRequest.hubWrapped) {
-    window.openRequestView = function () {
-      // Every other page, from views.js's one list: the form opened in the
-      // lower half under the user guide (Liwei, 2026-11-08), then under My
-      // Hub and a playlist, which this list here had missed (2026-11-17).
-      closeOtherViews("request");
-      // Opened from a details page, Advanced Search or Hub activity, the
-      // address still named that page, and a refresh went back there.
-      if (location.hash !== "#/request") {
-        history.pushState(null, "", location.pathname + location.search + "#/request");
-      }
-      return openRequest.apply(this, arguments);
-    };
-    window.openRequestView.hubWrapped = true;
-  }
-  var closeRequest = window.closeRequestView;
-  if (typeof closeRequest === "function" && !closeRequest.hubWrapped) {
-    window.closeRequestView = function () {
-      if (location.hash === "#/request") {
-        history.pushState(null, "", location.pathname + location.search);
-      }
-      return closeRequest.apply(this, arguments);
-    };
-    window.closeRequestView.hubWrapped = true;
   }
 }
 

@@ -4,6 +4,46 @@
  * Part of the Hub page's script, split out of static/hub-api.js on
  * 2026-10-14; static/js/hub/main.js loads it. */
 
+import { dialog } from "../shared/dialog.js";
+import { detailMessage } from "../shared/http.js";
+
+/* ---------------------------------------------- showing and hiding it */
+
+/* Elio's three-string opener, from static/js/hub-ui.js (WS-G,
+ * 2026-11-28): the presentation half; openShareFor() below does the rest. */
+var shareDialog = null;
+function shareModalDialog() {
+  if (!shareDialog) {
+    shareDialog = dialog(document.querySelector("#shareBackdrop .modal"),
+                         { labelledBy: "shareHeading", onEscape: closeShareModal,
+                           initialFocus: "#shareRecipientInput" });
+  }
+  return shareDialog;
+}
+
+function openShareModal(title, meta, uuid) {
+  document.getElementById("shareAssetTitle").textContent = title;
+  document.getElementById("shareAssetMeta").textContent = meta;
+  document.getElementById("shareAssetUuid").textContent = "demo_uuid: " + uuid;
+  document.getElementById("shareResult").style.display = "none";
+  document.getElementById("generateBtn").innerHTML = '<svg class="orion-ico--sm orion-ico"><use href="#i-send"/></svg>Generate &amp; Send DemoBoard';
+  document.getElementById("shareBackdrop").classList.add("open");
+}
+
+function closeShareModal() {
+  document.getElementById("shareBackdrop").classList.remove("open");
+  shareModalDialog().close();
+}
+
+function copyShareLink() {
+  var text = "https://" + document.getElementById("shareLinkText").textContent;
+  navigator.clipboard.writeText(text);
+  var btn = document.getElementById("copyBtn");
+  var original = btn.textContent;
+  btn.textContent = "Copied";
+  setTimeout(function () { btn.textContent = original; }, 1500);
+}
+
 /* ---------------------------------------------------- the share modal */
 
 /* Elio's DemoBoard modal was a mockup and said so nowhere: two hardcoded
@@ -116,10 +156,7 @@ function wireShareModal() {
   });
 
   var button = document.getElementById("generateBtn");
-  if (button) {
-    button.removeAttribute("data-action");  // not the mock-up's generateShareLink()
-    button.addEventListener("click", submitShare);
-  }
+  if (button) button.addEventListener("click", submitShare);
 }
 
 async function submitShare() {
@@ -163,7 +200,7 @@ async function submitShare() {
     if (!response.ok) {
       // The endpoint's 409s explain themselves; show that text rather than
       // a generic failure, because it says what to do next.
-      shareError(data.detail || ("Share failed (HTTP " + response.status + ")"));
+      shareError(detailMessage(data.detail) || ("Share failed (HTTP " + response.status + ")"));
       return;
     }
 
@@ -196,7 +233,7 @@ function openShareFor(asset) {
   shareAsset = asset;
   shareRecipients = [];
   var meta = [asset.segment, asset.funnel_stage].filter(Boolean).join(" \u00b7 ");
-  window.openShareModal(asset.title, meta, asset.consensus_uuid);
+  openShareModal(asset.title, meta, asset.consensus_uuid);
 
   document.getElementById("shareOrg").value = "";
   document.getElementById("shareOpp").value = "";
@@ -207,8 +244,9 @@ function openShareFor(asset) {
   document.getElementById("shareResult").style.display = "none";
   shareError("");
   renderRecipients();
+  shareModalDialog().open();
 }
 
 export {
-  openShareFor, wireShareModal
+  closeShareModal, copyShareLink, openShareFor, wireShareModal
 };

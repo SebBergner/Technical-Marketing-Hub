@@ -4,7 +4,8 @@
  *
  * Shared by static/js/admin/ and static/js/content-health/. */
 
-import { actorWord, el } from "./util.js";
+import { actorWord } from "./util.js";
+import { el } from "../shared/dom.js";
 
 function detailWord(d) {
   var parts = [];

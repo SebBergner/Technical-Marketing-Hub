@@ -12,7 +12,9 @@
  *
  * Part of the Content health page's script (static/content-health.html). */
 
-import { $, demoLink, el, TYPE_WORD } from "../admin/util.js";
+import { $, demoLink, TYPE_WORD } from "../admin/util.js";
+import { el } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
 
 var state = null;        // {rows, choices, segments, fallback}
 var rows = [];           // [{row, products, segment, editing, error, picked}]
@@ -73,22 +75,19 @@ function save(items) {
   var saved = 0, failed = 0;
   chunks.reduce(function (prev, chunk) {
     return prev.then(function () {
-      return fetch("/api/content-health/products", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: chunk.map(function (it) {
+      return fetchJSON("/api/content-health/products", {
+        method: "POST",
+        body: { items: chunk.map(function (it) {
           return { asset_id: it.row.asset_id, products: it.products,
                    segment: it.row.segment ? null : it.segment };
-        }) })
-      }).then(function (r) {
-        return r.json().then(function (d) {
-          if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
-          var byId = {};
-          d.results.forEach(function (x) { byId[x.asset_id] = x; });
-          chunk.forEach(function (it) {
-            var x = byId[it.row.asset_id] || { ok: false, error: "No answer for it." };
-            it.saving = false;
-            if (x.ok) { it.done = true; saved++; } else { it.error = x.error; failed++; }
-          });
+        }) }
+      }).then(function (d) {
+        var byId = {};
+        d.results.forEach(function (x) { byId[x.asset_id] = x; });
+        chunk.forEach(function (it) {
+          var x = byId[it.row.asset_id] || { ok: false, error: "No answer for it." };
+          it.saving = false;
+          if (x.ok) { it.done = true; saved++; } else { it.error = x.error; failed++; }
         });
       });
     });

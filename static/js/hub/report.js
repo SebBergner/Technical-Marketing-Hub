@@ -14,19 +14,16 @@
  * Part of the Hub page's script; static/js/hub/main.js loads it through
  * nav.js and detail.js. */
 
-import { fullDate, report as complain } from "./util.js";
+import { report as complain } from "./util.js";
+import { fullDate } from "../shared/dates.js";
 import { hubPermissions } from "./permissions.js";
 import { closeAdvancedSearch } from "./search.js";
 import { noteFeature } from "./features.js";
+import { dialog } from "../shared/dialog.js";
+import { el } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
 
 var categories = null;          // {demo, demo_groups, hub}, from /api/support/options, once
-
-function el(tag, cls, text) {
-  var n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined && text !== null) n.textContent = String(text);
-  return n;
-}
 
 function options() {
   if (categories) return Promise.resolve(categories);
@@ -115,15 +112,10 @@ function reportForm(asset, onDone, onCancel) {
     if (text.value.trim().length < 5) { error.textContent = "Say a little more in Details."; return; }
     send.disabled = true;
     send.textContent = "Sending…";
-    fetch("/api/support/reports", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category: picked.value, details: text.value.trim(),
-                             asset_id: asset ? asset.id : null })
-    }).then(function (r) {
-      return r.json().catch(function () { return {}; }).then(function (d) {
-        if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
-        return d;
-      });
+    fetchJSON("/api/support/reports", {
+      method: "POST",
+      body: { category: picked.value, details: text.value.trim(),
+              asset_id: asset ? asset.id : null }
     }).then(onDone).catch(function (err) {
       send.disabled = false;
       send.textContent = "Send";
@@ -152,9 +144,6 @@ function openReportModal(asset) {
   back = el("div", "modal-backdrop open");
   back.id = "hubReportBackdrop";
   var modal = el("div", "modal");
-  modal.setAttribute("role", "dialog");
-  modal.setAttribute("aria-modal", "true");
-  modal.setAttribute("aria-labelledby", "hubReportTitle");
   modal.innerHTML = '<div class="modal__head"><div class="modal__head-title" id="hubReportTitle">'
     + '<svg class="orion-ico ico-indigo"><use href="#i-message-square"/></svg> Share feedback</div>'
     + '<button class="modal__close" type="button" aria-label="Close"><svg class="orion-ico">'
@@ -166,9 +155,8 @@ function openReportModal(asset) {
   body.appendChild(about);
   function close() {
     back.remove();
-    document.removeEventListener("keydown", onKey);
+    keys.close();
   }
-  function onKey(e) { if (e.key === "Escape") close(); }
   body.appendChild(reportForm(asset, function (answer) {
     body.innerHTML = "";
     body.appendChild(sentNote(answer));
@@ -185,8 +173,9 @@ function openReportModal(asset) {
   modal.addEventListener("click", function (e) {
     if (e.target.closest("a[href='#/help']")) close();
   });
-  document.addEventListener("keydown", onKey);
   document.body.appendChild(back);
+  // Esc, the focus trap and focus back to Share feedback: shared/dialog.js.
+  var keys = dialog(modal, { labelledBy: "hubReportTitle", onEscape: close }).open();
 }
 
 /* ── Get help and My feedback (#/help) ─────────────────────────────────── */
@@ -353,14 +342,9 @@ function editButton(r, about, text, host) {
     cancel.addEventListener("click", function () { box.remove(); text.hidden = false; });
     save.addEventListener("click", function () {
       save.disabled = true;
-      fetch("/api/support/reports/" + encodeURIComponent(r.id), {
+      fetchJSON("/api/support/reports/" + encodeURIComponent(r.id), {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ details: area.value })
-      }).then(function (res) {
-        return res.json().catch(function () { return {}; }).then(function (d) {
-          if (!res.ok) throw new Error(d.detail || "HTTP " + res.status);
-        });
+        body: { details: area.value }
       }).then(function () { renderMyFeedback(host); })
         .catch(function (err) {
           save.disabled = false;
@@ -379,12 +363,7 @@ function withdrawButton(r, host) {
     if (!window.confirm("Withdraw this report? It is closed as Withdrawn and "
                         + "nobody needs to act on it.")) return;
     b.disabled = true;
-    fetch("/api/support/reports/" + encodeURIComponent(r.id) + "/withdraw", { method: "POST" })
-      .then(function (res) {
-        return res.json().catch(function () { return {}; }).then(function (d) {
-          if (!res.ok) throw new Error(d.detail || "HTTP " + res.status);
-        });
-      })
+    fetchJSON("/api/support/reports/" + encodeURIComponent(r.id) + "/withdraw", { method: "POST" })
       .then(function () { renderMyFeedback(host); })
       .catch(function (err) {
         b.disabled = false;

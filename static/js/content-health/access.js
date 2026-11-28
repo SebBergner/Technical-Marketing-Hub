@@ -4,7 +4,9 @@
  *
  * Part of the Content health page's script (static/content-health.html). */
 
-import { $, actorWord, el, gxcMark, session, TYPE_WORD } from "../admin/util.js";
+import { $, actorWord, gxcMark, session, TYPE_WORD } from "../admin/util.js";
+import { el } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
 import { loadChanges } from "./changes.js";
 
 function promoMeta(a) {
@@ -76,14 +78,10 @@ function renderRequests(items) {
       var status = el("span", "promo-status faint");
       var decide = function (yes) {
         status.textContent = "Saving…";
-        fetch("/api/content-health/access-requests/" + encodeURIComponent(q.id) + "/decision", {
+        fetchJSON("/api/content-health/access-requests/" + encodeURIComponent(q.id) + "/decision", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ approve: yes, note: input.value.trim() || null }),
-        }).then(function (r) {
-          if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
-            throw new Error(b.detail || ("HTTP " + r.status));
-          });
+          body: { approve: yes, note: input.value.trim() || null },
+        }).then(function () {
           return loadContentAccess();
         }).catch(function (err) {
           status.textContent = "Not saved: " + err.message;
@@ -124,15 +122,9 @@ function renderRequests(items) {
 function setAccess(assetId, level, status) {
   status.textContent = "Saving…";
   status.className = "promo-status faint";
-  return fetch("/api/assets/" + encodeURIComponent(assetId) + "/access", {
+  return fetchJSON("/api/assets/" + encodeURIComponent(assetId) + "/access", {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ level: level }),
-  }).then(function (r) {
-    if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
-      throw new Error(b.detail || ("HTTP " + r.status));
-    });
-    return r.json();
+    body: { level: level },
   }).then(function () { return loadContentAccess(); })
     .catch(function (err) {
       status.textContent = "Not saved: " + err.message;
@@ -271,16 +263,7 @@ function renderHidden(items) {
   var act = function (method, url, body) {
     status.textContent = "Saving…";
     status.className = "promo-status faint";
-    fetch(url, {
-      method: method,
-      headers: { "Content-Type": "application/json" },
-      body: body ? JSON.stringify(body) : undefined,
-    }).then(function (r) {
-      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
-        throw new Error(b.detail || ("HTTP " + r.status));
-      });
-      return r.json();
-    }).then(renderHidden).catch(function (err) {
+    fetchJSON(url, { method: method, body: body || undefined }).then(renderHidden).catch(function (err) {
       status.textContent = "Not saved: " + err.message;
       status.className = "promo-status err";
     });

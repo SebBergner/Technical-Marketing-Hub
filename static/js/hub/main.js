@@ -1,19 +1,20 @@
 /* The Hub page's script: fills index.html from the live API.
  *
- * Loaded by index.html as a module, after static/js/hub-ui.js (the page's
- * own controls: request form, modals, the data-action dispatcher). Each file
- * in static/js/hub/ is one part of the page -- util, permissions, cards,
- * filters, home, nav, detail, vm, activity, search, request, share, review,
- * report -- and
+ * Loaded by index.html as a module, the page's only script of its own
+ * (static/js/hub-ui.js, the classic script before it, was folded into
+ * actions.js and inquiry.js on 2026-11-28). Each file in static/js/hub/ is
+ * one part of the page -- util, permissions, cards, filters, home, nav,
+ * detail, vm, activity, search, request, share, review, report -- and
  * imports what it uses from the others; until 2026-10-14 they were one
- * 6,000-line static/hub-api.js.
+ * 6,000-line static/hub-api.js. Helpers every page shares are in
+ * static/js/shared/.
  *
- * This file boots the page: the sign-in watch on fetch, the person's
- * permissions, then load(), which fetches the catalogue, builds Home and
- * wires every view.
+ * This file boots the page: the page's own controls (actions.js), the
+ * sign-in watch on fetch, the person's permissions, then load(), which
+ * fetches the catalogue, builds Home and wires every view.
  */
 
-import { getJSON } from "./util.js";
+import { fetchJSON, watchForExpiredSession } from "../shared/http.js";
 import { applyPermissions } from "./permissions.js";
 import {
   enhanceSearchableSelect, fillPublished, fillSelect, fillSidebarCounts,
@@ -26,9 +27,8 @@ import {
 } from "./nav.js";
 import { wireDetailPage } from "./detail.js";
 import { wireAdvancedSearch } from "./search.js";
-import {
-  fillProductPills, wireRequestForm, wireScopeState
-} from "./request.js";
+import { fillProductPills, wireRequestForm } from "./request.js";
+import { wirePageActions } from "./actions.js";
 import { wireShareModal } from "./share.js";
 import { addUploadNav } from "./upload.js";
 import { addHelpNav } from "./report.js";
@@ -38,33 +38,13 @@ import { askDisclaimerIfDue } from "./disclaimer.js";
 import { askWelcomeIfDue } from "./welcome.js";
 import { wireFeatureUsage } from "./features.js";
 
-/* ── when the session runs out with the page open ─────────────────────
- *
- * The server's sign-in gate (backend/oidc.py) answers an API call that
- * has no session with 401 and an X-Sign-In header. A page already open
- * would otherwise just stop loading data, with nothing to say why -- so
- * any such answer sends the person to sign in and back to exactly where
- * they were, including the #/asset/... part the server never sees.
- *
- * Keyed on the header, not on 401 alone: the Admin page's own 401 means
- * "the admin password has not been entered", and must keep meaning that.
- */
-(function watchForExpiredSession() {
-  var original = window.fetch;
-  if (!original || original.hubSignInWatch) return;
-  var watched = function () {
-    return original.apply(this, arguments).then(function (response) {
-      var login = response.status === 401 && response.headers.get("X-Sign-In");
-      if (login) {
-        var here = location.pathname + location.search + location.hash;
-        location.assign(login + "?next=" + encodeURIComponent(here));
-      }
-      return response;
-    });
-  };
-  watched.hubSignInWatch = true;
-  window.fetch = watched;
-})();
+/* When the session runs out with the page open: off to sign in and back
+ * to exactly here (static/js/shared/http.js). */
+watchForExpiredSession();
+
+// Every data-action control and the phone sidebar, before anything loads:
+// the markup is already on screen.
+wirePageActions();
 
 /* The API caps `limit` at 200 -- a deliberate guard rail, so page through it
  * rather than asking for more. Asking for 1000 returns a 422 that looks like
@@ -87,7 +67,7 @@ function bootFailed(message) {
  * thumbnails waited for them). Kept in order, so the pool is the same. */
 async function fetchAllAssets() {
   function page(n) {
-    return getJSON("/api/assets?limit=" + PAGE_SIZE + "&offset=" + (n * PAGE_SIZE));
+    return fetchJSON("/api/assets?limit=" + PAGE_SIZE + "&offset=" + (n * PAGE_SIZE));
   }
   var first = await page(0);
   var all = first.items || [];
@@ -119,7 +99,7 @@ function showTotal(count) {
 async function load() {
   var assets, facets;
   try {
-    var both = await Promise.all([fetchAllAssets(), getJSON("/api/taxonomy")]);
+    var both = await Promise.all([fetchAllAssets(), fetchJSON("/api/taxonomy")]);
     assets = both[0];
     facets = both[1];
   } catch (err) {
@@ -135,7 +115,7 @@ async function load() {
 
   // No window.HUB_ASSET_POOL any more (2026-11-26): ~950 cards, each
   // thumbnail registered with the lazy-load observer, built at boot for a
-  // pool nothing has read since hub-ui.js stopped filtering.
+  // pool nothing has read since the page's old script stopped filtering.
   buildHome(assets, facets);
 
   fillSelect("hubFilterProduct", (facets.product_families || facets.products || [])
@@ -156,7 +136,6 @@ async function load() {
   wireFilterBar();
   wireShareModal();
   wireRequestForm();
-  wireScopeState();
   wireAdvancedSearch();
   wireDetailPage();
   wireFeatureUsage();

@@ -1,25 +1,18 @@
-/* Small helpers every part of the Hub page uses: fetching JSON, the
- * error corner, escaping, dates and durations, pills, and the shared
- * labels for languages and types.
+/* Small helpers every part of the Hub page uses: the message corner,
+ * dates and durations, pills, and the shared labels for languages and
+ * types. Fetching JSON, escaping and plain date formatting are the
+ * shared ones, in static/js/shared/ (WS-G, 2026-11-28).
  *
  * Part of the Hub page's script, split out of static/hub-api.js on
  * 2026-10-14; static/js/hub/main.js loads it. */
+
+import { fullDate } from "../shared/dates.js";
+import { toaster } from "../shared/toast.js";
 
 function durationLabel(seconds) {
   if (!seconds) return "";
   var m = Math.floor(seconds / 60), s = seconds % 60;
   return m + ":" + (s < 10 ? "0" : "") + s;
-}
-
-//: The year only when it is not this one: "21 May" alone read the same
-//: for 2024 and 2026 (2026-10-01).
-function uploadedLabel(iso) {
-  if (!iso) return "";
-  var d = new Date(iso + "T00:00:00");
-  if (isNaN(d)) return "";
-  var opts = { day: "numeric", month: "short" };
-  if (d.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
-  return d.toLocaleDateString("en-US", opts);
 }
 
 function pill(text, kind) {
@@ -32,14 +25,6 @@ function pill(text, kind) {
 function debounce(fn, ms) {
   var t;
   return function () { clearTimeout(t); t = setTimeout(fn, ms); };
-}
-
-/* Month day, year -- "Mar 12, 2024" -- everywhere in the Hub (Liwei,
- * 2026-10-26; it was day month year). */
-function fullDate(iso) {
-  var d = new Date(iso + "T00:00:00");
-  return isNaN(d) ? iso
-    : d.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
 }
 
 /* A demo's date as a tile and a table say it (Serge, 2026-10-23):
@@ -75,35 +60,13 @@ var LANGUAGE_LABEL = { en: "English", zh: "Chinese", de: "German",
                       fr: "French", es: "Spanish", it: "Italian",
                       ja: "Japanese", ko: "Korean" };
 
-/* Safe in text AND in a quoted attribute (2026-11-26). The textContent /
- * innerHTML round trip it replaces left " and ' as they were, so a title
- * with a quote could close a title="..." or data-x='...' it was put in. */
-var HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
-function escapeHtml(text) {
-  return (text == null ? "" : String(text)).replace(/[&<>"']/g, function (c) {
-    return HTML_ESCAPES[c];
-  });
-}
-
-/* Fetch and parse, treating a non-2xx as the failure it is. Reading `.items`
- * off an error body yields undefined, which reads downstream as "no assets"
- * -- a 422 then looks exactly like an empty catalogue. */
-async function getJSON(url) {
-  var response = await fetch(url);
-  if (!response.ok) {
-    throw new Error("HTTP " + response.status + " from " + url);
-  }
-  return response.json();
-}
-
+/* The corner of the page: a toast, read out by screen readers
+ * (static/js/shared/toast.js). Errors stay until the next message. */
+var corner = toaster("hubApiStatus", "hub-api-status", "hub-api-status--error");
 function report(text, isError) {
-  var el = document.getElementById("hubApiStatus");
-  if (!el) return;
-  el.textContent = text;
-  el.className = "hub-api-status" + (isError ? " hub-api-status--error" : "");
+  corner.show(text, isError);
 }
 
 export {
-  dateLabel, debounce, durationLabel, escapeHtml, fullDate, getJSON, LANGUAGE_LABEL,
-  pill, report, setText, TYPE_LABELS, uploadedLabel
+  dateLabel, debounce, durationLabel, LANGUAGE_LABEL, pill, report, setText, TYPE_LABELS
 };

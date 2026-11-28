@@ -4,7 +4,10 @@
  * Part of the Admin page's script, split out of static/admin.js on
  * 2026-10-15; static/js/admin/main.js loads it. */
 
-import { $, card, el, localHour, openSheet, row, session, two, when } from "./util.js";
+import { $, card, localHour, openSheet, row, session, two } from "./util.js";
+import { when } from "../shared/dates.js";
+import { el } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
 
 /* Reload the whole page's figures after a sync: main.js listens, so this
  * file need not import main.js, which imports it (2026-11-11). */
@@ -45,12 +48,7 @@ function syncButton(source, label) {
 }
 
 function postJson(url) {
-  return fetch(url, { method: "POST" }).then(function (r) {
-    return r.json().catch(function () { return {}; }).then(function (body) {
-      if (!r.ok) throw new Error(body.detail || ("HTTP " + r.status));
-      return body;
-    });
-  });
+  return fetchJSON(url, { method: "POST" });
 }
 
 function syncState() {
@@ -261,18 +259,11 @@ function renderAutoSync(a) {
 
   function save() {
     setDisabled(true);
-    fetch("/api/admin/auto-sync", {
+    fetchJSON("/api/admin/auto-sync", {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled: box.checked,
-                             hours_utc: pickers.map(function (p) { return +p.value; }) })
+      body: { enabled: box.checked,
+              hours_utc: pickers.map(function (p) { return +p.value; }) }
     })
-      .then(function (r) {
-        return r.json().catch(function () { return {}; }).then(function (body) {
-          if (!r.ok) throw new Error(body.detail || ("HTTP " + r.status));
-          return body;
-        });
-      })
       .then(function () { load(); })
       .catch(function (err) {
         setDisabled(false);

@@ -10,7 +10,8 @@
  * filters.js owns the query, the sort state and loading more; it calls
  * renderRows() where it used to append cards. */
 
-import { dateLabel, durationLabel, getJSON, LANGUAGE_LABEL, report } from "./util.js";
+import { dateLabel, durationLabel, LANGUAGE_LABEL, report } from "./util.js";
+import { fetchJSON } from "../shared/http.js";
 import { familyDisplayName } from "./nav.js";
 import { openAssetDetail } from "./detail.js";
 import { assetHref, cardImage, gxcPill, paintCoverInto, TYPE_CHIP, whenNearScreen } from "./cards.js";
@@ -230,7 +231,7 @@ async function exportCsv(params, button) {
       var p = new URLSearchParams(params);
       p.set("limit", 200);
       p.set("offset", offset);
-      var page = await getJSON("/api/assets?" + p);
+      var page = await fetchJSON("/api/assets?" + p);
       total = page.total;
       if (!page.items.length) break;
       rows = rows.concat(page.items);

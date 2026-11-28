@@ -15,28 +15,14 @@ import { buildCard, cardImage, paintCoverInto } from "./cards.js";
 import { closeAdvancedSearch } from "./search.js";
 import { report } from "./util.js";
 import { noteFeature } from "./features.js";
-
-function el(tag, cls, text) {
-  var n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined && text !== null) n.textContent = String(text);
-  return n;
-}
+import { el } from "../shared/dom.js";
+import { fetchJSON } from "../shared/http.js";
+import { stampDay } from "../shared/dates.js";
 
 function api(method, url, body) {
   // Making or filling a playlist is using playlists (A16); reading is not.
   if (method !== "GET" && url.indexOf("/api/me/playlists") === 0) noteFeature("playlists");
-  return fetch(url, {
-    method: method,
-    headers: body ? { "Content-Type": "application/json" } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  }).then(function (r) {
-    if (r.status === 204) return null;
-    return r.json().catch(function () { return {}; }).then(function (d) {
-      if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
-      return d;
-    });
-  });
+  return fetchJSON(url, { method: method, body: body || undefined });
 }
 
 function playlistUrl(id) {
@@ -363,8 +349,7 @@ function draw(d) {
   var n = d.items.length;
   document.getElementById("plSub").textContent = [n + (n === 1 ? " demo" : " demos"),
     d.mine ? "your playlist" : (d.owner_name ? "by " + d.owner_name : "shared with you"),
-    d.updated_at ? "updated " + new Date(d.updated_at).toLocaleDateString(undefined,
-      { month: "short", day: "numeric", year: "numeric" }) : null]
+    d.updated_at ? "updated " + stampDay(d.updated_at) : null]
     .filter(Boolean).join(" · ");
   var acts = document.getElementById("plActions");
   acts.innerHTML = "";

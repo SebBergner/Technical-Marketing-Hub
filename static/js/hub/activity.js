@@ -10,6 +10,7 @@ import { hubPermissions } from "./permissions.js";
 import { paintCoverInto } from "./cards.js";
 import { closeAdvancedSearch } from "./search.js";
 import { renderLibrary, usageByTypeCard } from "./dashboard.js";
+import { el as actEl } from "../shared/dom.js";
 
 /* ── Hub activity (#/activity), 2026-10-14 ────────────────────────────
  *
@@ -52,13 +53,6 @@ function showTab(tab) {
   if (use) use.hidden = tab !== "usage";
   var ranges = document.getElementById("hubActRanges");
   if (ranges) ranges.style.visibility = tab === "usage" ? "" : "hidden";
-}
-
-function actEl(tag, cls, text) {
-  var n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text !== undefined && text !== null) n.textContent = String(text);
-  return n;
 }
 
 function plural(n, word) {

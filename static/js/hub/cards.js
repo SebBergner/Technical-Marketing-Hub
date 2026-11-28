@@ -10,6 +10,8 @@ import { familyDisplayName } from "./nav.js";
 import { openAssetDetail } from "./detail.js";
 import { openShareFor } from "./share.js";
 import { starButton } from "./favorites.js";
+import { fullDate } from "../shared/dates.js";
+import { dialog } from "../shared/dialog.js";
 
 /* ---------------------------------------------------------------- mapping */
 
@@ -340,6 +342,8 @@ function stopInlinePlayer(thumb) {
  * it: neither play.goconsensus.com nor app.goconsensus.com sends
  * X-Frame-Options or a frame-ancestors policy. Checked 2026-09-02.
  */
+var previewDialog = null;
+
 function openPreview(a) {
   var url = previewUrl(a);
   if (!url) return;
@@ -353,9 +357,9 @@ function openPreview(a) {
         '<div class="hub-preview__box">'
       +   '<div class="hub-preview__bar">'
       +     '<span class="hub-preview__title" id="hubPreviewTitle"></span>'
-      +     '<button class="hub-preview__close" title="Close">&times;</button>'
+      +     '<button type="button" class="hub-preview__close" title="Close" aria-label="Close">&times;</button>'
       +   '</div>'
-      +   '<iframe class="hub-preview__frame" id="hubPreviewFrame"'
+      +   '<iframe class="hub-preview__frame" id="hubPreviewFrame" title="Preview"'
       +     ' allow="fullscreen; autoplay" referrerpolicy="no-referrer"></iframe>'
       + '</div>';
     document.body.appendChild(backdrop);
@@ -364,19 +368,21 @@ function openPreview(a) {
       backdrop.classList.remove("open");
       // Blank the src on close, or the demo keeps playing behind the page.
       document.getElementById("hubPreviewFrame").src = "about:blank";
+      previewDialog.close();
     };
+    // Esc, the focus trap and focus back to the card: static/js/shared/dialog.js.
+    previewDialog = dialog(backdrop.querySelector(".hub-preview__box"),
+                           { labelledBy: "hubPreviewTitle", onEscape: shut });
     backdrop.querySelector(".hub-preview__close").addEventListener("click", shut);
     backdrop.addEventListener("click", function (e) {
       if (e.target === backdrop) shut();
-    });
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && backdrop.classList.contains("open")) shut();
     });
   }
 
   document.getElementById("hubPreviewTitle").textContent = a.title || "";
   document.getElementById("hubPreviewFrame").src = url;
   backdrop.classList.add("open");
+  previewDialog.open();
   noteConsensusPreview(a.id);
 }
 
@@ -785,12 +791,6 @@ function publishedYear(a) {
   return m ? m[1] : "";
 }
 
-function friendlyDate(iso) {
-  var d = new Date(iso + "T00:00:00");
-  return isNaN(d) ? iso : d.toLocaleDateString("en-US",
-    { year: "numeric", month: "short", day: "numeric" });
-}
-
 /* "New" is the last 120 days (Liwei, 2026-11-05). Under a year, as the
  * "new" band and the Published filter's "Under 1 year" still are, put it on
  * 249 demos -- most of any recent list -- so it said nothing. Between 120
@@ -808,13 +808,13 @@ function ageBadge(a) {
   var year = publishedYear(a);
   if (a.archived) {
     kind = "archived"; icon = "box"; text = "Archived";
-    title = "Archived in the Hub" + (a.archived_at ? " on " + friendlyDate(
+    title = "Archived in the Hub" + (a.archived_at ? " on " + fullDate(
       String(a.archived_at).slice(0, 10)) : "") + ": out of every list and search."
       + " Still in SharePoint.";
   } else if (a.still_current_until) {
     kind = "current"; icon = "check"; text = "Still current";
     title = "A reviewer confirmed the interface shown still matches today's release"
-      + " (until " + friendlyDate(a.still_current_until) + ")."
+      + " (until " + fullDate(a.still_current_until) + ")."
       + (year ? " Published " + year + "." : "");
   } else if (a.age_band === "new" && isNew(a)) {
     kind = "new"; icon = "spark"; text = "New";

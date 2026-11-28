@@ -18,16 +18,10 @@
 
 import { TYPE_LABELS } from "./util.js";
 import { navMarkHtml } from "./nav.js";
+import { el } from "../shared/dom.js";
 
 var TYPE_ORDER = ["video", "ldk", "vdk", "cad_model", "vm"];
 var TYPE_COLOR = { video: 1, ldk: 2, vdk: 3, cad_model: 4, vm: 5 };
-
-function el(tag, cls, text) {
-  var n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text != null) n.textContent = text;
-  return n;
-}
 
 function svgEl(tag, attrs) {
   var n = document.createElementNS("http://www.w3.org/2000/svg", tag);

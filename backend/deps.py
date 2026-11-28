@@ -18,21 +18,17 @@ from backend.auth import (            # noqa: E402,F401
 
 
 def build_repo(gxc: bool = True, gxc_granted: frozenset[str] = frozenset()) -> AssetRepository:
-    """Pick the storage backend from config.
-
-    "json" is the default: SharePoint stays the system of record and the Portal
-    keeps only a server-side index, so there is no database to provision.
-    "sql" is retained and tested for when the catalogue outgrows files.
+    """The catalogue, file-backed: SharePoint stays the system of record and
+    the Portal keeps only a server-side index, so there is no database to
+    provision. (A second, SQL-backed repository was removed on 2026-11-28:
+    never used in production and a quarter the size of this one. The
+    PostgreSQL plan swaps the storage primitives underneath instead.)
 
     `gxc`: whether GXC videos exist for the caller. The Hub's own jobs see
     everything; a request sees what its person may (get_repo).
     `gxc_granted`: without `gxc`, the GXC videos a personal link opened for
     them (backend/gxc_shares.py).
     """
-    if settings.storage_backend == "sql":
-        from backend.db import SessionLocal
-        from backend.repositories.sql_repo import SqlAssetRepository
-        return SqlAssetRepository(SessionLocal())
     return JsonAssetRepository(settings.data_dir, gxc=gxc, gxc_granted=gxc_granted)
 
 

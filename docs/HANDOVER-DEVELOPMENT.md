@@ -372,7 +372,7 @@ retained product.
 The filter lives in exactly one place per repository — `_load_mirror()` in
 `json_repo.py` — so search, filters, browse, rails, facets and a saved
 permalink all inherit it. When this was first implemented, `get(asset_id)` in
-`sql_repo.py` bypassed it: the one route that needs no search or filter, a
+`sql_repo.py` (removed 2026-11-28) bypassed it: the one route that needs no search or filter, a
 saved link, was the one that leaked. A test now covers it. **If you add a read
 path, route it through the funnel.**
 
@@ -511,15 +511,14 @@ app.py                       FastAPI app, router registration, lifespan seeding,
 backend/
   config.py                  every setting, all env-driven. Read this first.
   models.py                  Pydantic domain types
-  tables.py                  SQLAlchemy tables (only for storage_backend="sql")
-  db.py, deps.py             session + repository construction
+  clock.py                   utcnow(): naive UTC, the one clock
+  deps.py                    repository construction
   auth.py                    Easy Auth header parsing, roles, security warnings
   seed.py                    452-asset xlsx snapshot loader (fallback only)
   repositories/
     base.py                  AssetQuery + the AssetRepository ABC — start here
     json_repo.py             THE production backend. Divestment funnel,
                              facet self-exclusion, shrink guard, request store
-    sql_repo.py              retained + tested, not used. Proves the abstraction
   services/
     taxonomy.py              the whole vocabulary problem: families, segments,
                              Consensus tag classification, divestment
@@ -969,10 +968,11 @@ Treat a sudden loss of tags as this expiring, not as a bug.
 
 Seb's call, superseding an earlier plan. Storage is file-backed JSON behind the
 `AssetRepository` interface; at ~950 assets, loading into memory beats a
-database round trip, and there is nothing to provision. `SqlAssetRepository` is
-**retained and runs the same parametrised tests**, which is what actually
-proves the abstraction rather than asserting it. `storage_backend` switches
-between them.
+database round trip, and there is nothing to provision. A second,
+`SqlAssetRepository`, ran the same tests until 2026-11-28 and was then removed:
+never used in production, a quarter the size of the file backend, and the
+PostgreSQL plan (`docs/database-migration-plan-2026-11-22.md`) swaps the
+storage primitives underneath one repository instead of keeping two in parity.
 
 ### 8.2 No counts on Browse-by-Product
 

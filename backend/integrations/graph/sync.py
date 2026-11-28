@@ -25,7 +25,7 @@ from backend.integrations.graph.client import (
 from backend.models import Asset
 from backend.services import sharepoint_mapping as m
 from backend.services import value_index
-from backend.tables import utcnow
+from backend.clock import utcnow
 
 log = logging.getLogger(__name__)
 

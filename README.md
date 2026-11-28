@@ -71,10 +71,10 @@ implementations cannot drift apart.
 shared in March still resolves in December after the file has been renamed. Lose it and every link
 ever shared breaks.
 
-### Swapping the storage backend
+### Storage backend
 
-`STORAGE_BACKEND=json` (default) or `sql`. Both implement `AssetRepository` and both are covered by
-the same parametrised tests, so switching is a config change.
+Files only (`JsonAssetRepository`). An SQL-backed repository existed until 2026-11-28 and was removed
+unused; the move to PostgreSQL is planned in `docs/database-migration-plan-2026-11-22.md`.
 
 ## Status
 

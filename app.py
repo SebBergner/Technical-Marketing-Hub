@@ -10,7 +10,6 @@ from starlette.middleware.sessions import SessionMiddleware
 import backend.logging_setup  # noqa: F401 -- configures logging on import
 from backend.config import settings
 from backend.version import app_version
-from backend.db import SessionLocal, create_all
 from backend import admin_log, api_docs, csrf, oidc, static_delivery, view_as
 from backend.routers import (
     admin, assets, auth, consensus, content_health, curation, debug, disclaimer, graph, me,
@@ -49,9 +48,6 @@ async def lifespan(app: FastAPI):
         logging.getLogger(__name__).exception("could not scrub partner identity")
     from backend.repositories.base import AssetQuery
     from backend.seed import load_seed
-
-    if settings.storage_backend == "sql":
-        create_all()
 
     repo = build_repo()
     empty = repo.list(AssetQuery(limit=1)).total == 0

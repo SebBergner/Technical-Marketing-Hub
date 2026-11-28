@@ -294,7 +294,7 @@ class StubConsensusClient:
         demo = self.get_demo(uuid)
         if demo is None:
             raise ConsensusError(f"demo {uuid} is not registered in Consensus")
-        from backend.tables import utcnow
+        from backend.clock import utcnow
 
         if not trackable:
             return ShareLink(url=demo.preview_link or f"https://play.goconsensus.com/{uuid}",
@@ -624,7 +624,7 @@ class HttpConsensusClient:
         own `previewLink` if link generation is unavailable. Neither carries
         per-recipient tracking.
         """
-        from backend.tables import utcnow
+        from backend.clock import utcnow
 
         demo = self.get_demo(uuid)
         if demo is None:
@@ -651,7 +651,7 @@ class HttpConsensusClient:
 
     def create_marketing_link(self, uuid: str) -> ShareLink:
         """`marketing/createlink` -> `data.item.{uuid, hash}`."""
-        from backend.tables import utcnow
+        from backend.clock import utcnow
 
         payload = self._post(PATHS["create_link"],
                              {"demo_uuid": uuid, "creationSource": "api"})
@@ -673,7 +673,7 @@ class HttpConsensusClient:
         `organization` is enforced here rather than letting Consensus reject the
         call, so the caller gets a useful message.
         """
-        from backend.tables import utcnow
+        from backend.clock import utcnow
 
         if not organization:
             raise ConsensusError(

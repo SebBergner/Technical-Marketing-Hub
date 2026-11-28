@@ -37,11 +37,6 @@ class Settings(BaseSettings):
     auto_sync_scheduler: bool = True
 
     # ---------------------------------------------------------------- storage
-    #: "json" keeps the Portal a server-side index with SharePoint as the centre
-    #: of gravity — no database to provision. "sql" is retained and tested, for
-    #: if the catalogue outgrows files.
-    storage_backend: str = "json"
-
     #: A sync may not replace a source's mirror with less than this fraction
     #: of what it holds (json_repo.replace_source_rows). 0.5 until 2026-11-26,
     #: which would not have caught the 455 -> 308 partial sync of 2026-09-02;
@@ -56,10 +51,6 @@ class Settings(BaseSettings):
     #: Azure Files mount before real users submit anything, or every intake
     #: submission is lost on the next deploy. See docs/ARCHITECTURE.md.
     data_dir: str = os.path.join(BASE_DIR, "data", "runtime")
-
-    # Only used when storage_backend == "sql".
-    database_url: str = f"sqlite:///{os.path.join(BASE_DIR, 'data', 'runtime', 'hub.db')}"
-    sql_echo: bool = False
 
     # ------------------------------------------------------------ Microsoft Graph
     # Pending the IT ticket. Sites.Selected, app-only.

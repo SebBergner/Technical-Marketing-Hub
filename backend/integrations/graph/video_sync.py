@@ -52,7 +52,7 @@ from backend.integrations.graph.sync import _latest_per_item, _relative_path, _w
 from backend.integrations.sync_report import report
 from backend.models import Asset, video_type
 from backend.services import sharepoint_mapping as m
-from backend.tables import utcnow
+from backend.clock import utcnow
 
 log = logging.getLogger(__name__)
 

@@ -116,8 +116,9 @@ centre of gravity, so there is no database to provision, secure or pay for. At t
 round trip, so nothing is lost.
 
 The repository abstraction absorbed this in one new class — `JsonAssetRepository`. Models, routers,
-services, matching and every test were untouched. `SqlAssetRepository` is retained and **both run the
-same parametrised test suite**, which is what actually proves the abstraction holds.
+services, matching and every test were untouched. `SqlAssetRepository` ran the same parametrised test
+suite alongside it until 2026-11-28, when it was removed unused (see
+`docs/database-migration-plan-2026-11-22.md` for the PostgreSQL route).
 
 The mirror/owned split is now *physically visible*, an improvement on SQL where it was a convention:
 
@@ -912,11 +913,11 @@ backend/
   config.py                     # pydantic-settings: SQL conn, GRAPH_*, CONSENSUS_*
   db.py                         # SQLAlchemy engine + session
   models.py                     # Pydantic API models
-  tables.py                     # SQLAlchemy tables (mirror / owned, clearly separated)
+  clock.py                      # utcnow(): naive UTC
   deps.py                       # get_current_user (Easy Auth), get_repo, require_role
   repositories/
     base.py                     # AssetRepository ABC + AssetQuery + Page
-    sql_repo.py                 # the only writer of asset_source
+    json_repo.py                # the only writer of mirror/ and owned/ catalogue files
   integrations/
     graph/
       client.py                 # MSAL token, httpx session, 429 backoff  ← only place creds are read

@@ -48,7 +48,7 @@ from backend.models import (
 from backend.repositories.base import AssetQuery, AssetRepository
 from backend.services import value_index
 from backend.services import content_age, listing, relevance, taxonomy, thumbnails
-from backend.tables import utcnow
+from backend.clock import utcnow
 
 log = logging.getLogger(__name__)
 

@@ -19,7 +19,7 @@ from backend.integrations.consensus import (
 from backend.models import Asset, AssetType
 from backend.repositories.json_repo import JsonAssetRepository
 from backend.routers.consensus import get_client
-from backend.tables import utcnow
+from backend.clock import utcnow
 
 SHAREABLE = "shareable-asset"
 NO_UUID = "no-uuid-asset"

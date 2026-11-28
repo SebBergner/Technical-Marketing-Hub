@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 from app import app
 from backend.deps import get_repo
@@ -19,10 +17,8 @@ from backend.models import (
     Asset, AssetType, MetadataProposal, ProposalOrigin, ProposalState,
 )
 from backend.repositories.json_repo import JsonAssetRepository
-from backend.repositories.sql_repo import SqlAssetRepository
 from backend.routers.curation import get_client
 from backend.services.proposals import CONSENSUS_FIELD, propose_consensus_uuids
-from backend.tables import Base
 
 
 def asset(asset_id, title, uuid=None):
@@ -92,14 +88,10 @@ def test_unique_uuid_is_not_flagged_as_shared():
     assert "SHARED UUID" not in proposals[0].evidence
 
 
-# ─────────────────────────────────────────────── storage, both backends
-@pytest.fixture(params=["json", "sql"])
-def repo(request, tmp_path):
-    if request.param == "json":
-        return JsonAssetRepository(str(tmp_path))
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    return SqlAssetRepository(sessionmaker(bind=engine, expire_on_commit=False)())
+# ─────────────────────────────────────────────────────────────── storage
+@pytest.fixture()
+def repo(tmp_path):
+    return JsonAssetRepository(str(tmp_path))
 
 
 def make_proposal(asset_id="a1", value="u1", confidence=0.9):

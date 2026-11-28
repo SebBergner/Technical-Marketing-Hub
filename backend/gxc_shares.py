@@ -50,7 +50,7 @@ import threading
 import time
 
 from backend.config import settings
-from backend.tables import utcnow
+from backend.clock import utcnow
 
 log = logging.getLogger(__name__)
 

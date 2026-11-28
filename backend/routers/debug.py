@@ -24,13 +24,11 @@ router = APIRouter(prefix="/api/debug", tags=["debug"],
 def backend_info():
     """Which storage and integrations are actually live right now.
 
-    Worth surfacing: the difference between the JSON store and SQL, or between
-    the Consensus stub and the real client, is invisible from the data alone
-    and has caused confusion before.
+    Worth surfacing: the difference between the Consensus stub and the real
+    client is invisible from the data alone and has caused confusion before.
     """
     data_dir = settings.data_dir
     return {
-        "storage_backend": settings.storage_backend,
         "data_dir": data_dir,
         "data_dir_exists": os.path.isdir(data_dir),
         "consensus_configured": settings.consensus_configured,

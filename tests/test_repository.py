@@ -20,15 +20,10 @@ from datetime import date
 import pytest
 
 from backend.services import listing, taxonomy
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from backend.models import Asset, AssetType
 from backend.repositories.base import AssetQuery
 from backend.repositories.json_repo import JsonAssetRepository
-from backend.repositories.sql_repo import SqlAssetRepository
 from backend.seed import load_seed
-from backend.tables import Base
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEED = os.path.join(ROOT, "data", "seed", "assets.json")
@@ -54,18 +49,10 @@ SAMPLE_PRODUCT = next(p for r in SEED_RECORDS for p in r["products"]
                       if not taxonomy.is_excluded([p]))
 
 
-@pytest.fixture(params=["json", "sql"])
-def repo_factory(request, tmp_path):
-    if request.param == "json":
-        def make():
-            return JsonAssetRepository(str(tmp_path))
-    else:
-        engine = create_engine("sqlite:///:memory:")
-        Base.metadata.create_all(engine)
-        session = sessionmaker(bind=engine, expire_on_commit=False)()
-
-        def make():
-            return SqlAssetRepository(session)
+@pytest.fixture()
+def repo_factory(tmp_path):
+    def make():
+        return JsonAssetRepository(str(tmp_path))
     return make
 
 
@@ -482,8 +469,7 @@ def test_the_stable_slug_survives_the_move(repo):
 def test_web_url_survives_a_round_trip(repo):
     """It is the only way a user opens the asset in SharePoint. It was missing
     from the JSON backend's field list, so it silently vanished on every sync
-    while the SQL backend kept it -- exactly the drift the shared test suite
-    exists to catch."""
+    while the (since removed) SQL backend kept it."""
     from backend.models import Asset, AssetType
 
     repo.replace_source_rows([Asset(
@@ -712,10 +698,6 @@ def test_both_syncs_emit_the_identical_report_shape():
 def test_a_replacement_cannot_quietly_discard_most_of_a_source(repo_factory):
     """The bug this exists for, reproduced.
 
-    Json-only: the guard lives in JsonAssetRepository, because the SQL backend
-    has not been used since the file-backed one became the default and putting
-    a tripwire in dead code would only make it look maintained.
-
     A Graph delta sync returns only what changed. `replace_source_rows`
     replaces the mirror wholesale, which is right when the caller enumerated
     everything and catastrophic when it did not. On 2026-09-02 a delta handed
@@ -733,8 +715,6 @@ def test_a_replacement_cannot_quietly_discard_most_of_a_source(repo_factory):
     )
 
     empty_repo = repo_factory()
-    if not isinstance(empty_repo, JsonAssetRepository):
-        pytest.skip("the shrink guard is a JsonAssetRepository behaviour")
 
     full = [Asset(id=f"a{n}", type=AssetType.LDK, title=f"Kit {n}")
             for n in range(20)]
@@ -849,18 +829,8 @@ def test_an_asset_with_no_product_tag_is_kept(empty_repo):
 
 
 def test_filtering_by_tag_is_what_a_tag_chip_clicks(repo_factory):
-    """A details-page tag chip filters the grid by that tag (2026-09-16).
-
-    JSON only, and deliberately so: AssetSource carries no tags column, which
-    is why SqlAssetRepository.facets() has no tags facet either. The SQL
-    backend has not been used since that gap appeared, and closing it is a
-    schema change rather than a query one.
-    """
-    from backend.repositories.json_repo import JsonAssetRepository
-
+    """A details-page tag chip filters the grid by that tag (2026-09-16)."""
     repo = repo_factory()
-    if not isinstance(repo, JsonAssetRepository):
-        pytest.skip("AssetSource has no tags column — see the docstring")
 
     repo.replace_source_rows([
         make_asset("tagged-1", tags=["PTC NEXT", "Windchill"]),

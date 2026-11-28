@@ -149,9 +149,8 @@ def main() -> int:
     # ------------------------------------------------------------ reconcile
     if args.reconcile:
         head("RECONCILIATION  (Consensus vs the local catalogue)")
-        from backend.db import SessionLocal
+        from backend.deps import build_repo
         from backend.repositories.base import AssetQuery
-        from backend.repositories.sql_repo import SqlAssetRepository
         from backend.services.consensus_match import reconcile
 
         try:
@@ -161,8 +160,10 @@ def main() -> int:
             print(f"  FAILED: {exc}")
             return 1
 
-        with SessionLocal() as session:
-            assets = SqlAssetRepository(session).list(AssetQuery(limit=1000)).items
+        # The file-backed catalogue the Hub serves. Until 2026-11-28 this read
+        # the SQL repository, which is empty unless STORAGE_BACKEND=sql -- so
+        # the reconciliation compared Consensus against nothing.
+        assets = build_repo().list(AssetQuery(limit=5000)).items
 
         scope = "all" if args.include_unpublished else "published only"
         print(f"  local assets    {len(assets)}")

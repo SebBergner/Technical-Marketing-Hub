@@ -1,9 +1,8 @@
 """Pydantic models — the shape of data at the application's edges.
 
 These describe what the REST API returns and what the integrations must produce.
-They are deliberately separate from the SQLAlchemy tables in `tables.py`: the
-tables describe storage (and are split mirror/owned), while these describe the
-single joined view the frontend consumes.
+Storage is separate: `json_repo.py` keeps the mirror/owned split on disk,
+while these describe the single joined view the frontend consumes.
 """
 from __future__ import annotations
 

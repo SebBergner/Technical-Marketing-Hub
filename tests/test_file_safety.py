@@ -324,20 +324,25 @@ def test_a_stale_picture_is_shown_at_once_and_fetched_again_behind_it(tmp_path, 
 
 
 # ───────────────────────────────────────────── a long-held lock stays fresh
-def test_a_heartbeat_keeps_a_long_held_lock_from_being_taken_over(tmp_path):
+def test_a_heartbeat_keeps_a_long_held_lock_from_being_taken_over(tmp_path, wait_until):
     """A sync holds its lock for minutes; with a heartbeat it can use a short
     stale time, so a lock left by a dead worker clears in minutes (2026-11-26)."""
     path = str(tmp_path / "sync")
     with file_safety.locked(path, stale=0.6, heartbeat=0.1):
-        time.sleep(1.0)                      # longer than `stale`
+        first = os.path.getmtime(path + ".lock")
+        since = time.monotonic()
+        # Held for longer than `stale`, and touched since it was taken.
+        wait_until(lambda: time.monotonic() - since > 1.0
+                   and os.path.getmtime(path + ".lock") > first,
+                   message="the heartbeat never touched the lock")
         assert file_safety.held(path, stale=0.6), "touched, so still held"
         with pytest.raises(TimeoutError):
             file_safety._take(path + ".lock", wait=0.3, stale=0.6)
     assert not os.path.exists(path + ".lock")
 
 
-def test_without_a_heartbeat_the_same_lock_counts_as_abandoned(tmp_path):
+def test_without_a_heartbeat_the_same_lock_counts_as_abandoned(tmp_path, wait_until):
     path = str(tmp_path / "sync")
     with file_safety.locked(path, stale=0.6):
-        time.sleep(1.0)
-        assert not file_safety.held(path, stale=0.6)
+        wait_until(lambda: not file_safety.held(path, stale=0.6),
+                   message="an untouched lock never went stale")

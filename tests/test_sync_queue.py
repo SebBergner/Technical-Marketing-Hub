@@ -19,7 +19,7 @@ def lock_in_tmp(tmp_path, monkeypatch):
     return path
 
 
-def test_a_request_during_a_sync_runs_once_after_it(monkeypatch):
+def test_a_request_during_a_sync_runs_once_after_it(monkeypatch, wait_until):
     started, release, calls = threading.Event(), threading.Event(), []
 
     def fake(client, repo, actor, full=False):
@@ -38,11 +38,11 @@ def test_a_request_during_a_sync_runs_once_after_it(monkeypatch):
     graph.sync_soon(None, "upload B")          # which cannot see their folders
     assert graph.sync_running()
     release.set()
-    running.join(5)
-    for _ in range(50):
-        if not graph.sync_running():
-            break
-        time.sleep(0.1)
+    running.join(10)
+    assert not running.is_alive()
+    # The follow-up runs in the queue's own thread; once nothing is running
+    # or queued, no further sync can start.
+    wait_until(lambda: not graph.sync_running(), message="the queued sync never finished")
     assert calls == ["button", "queued for upload B"], "exactly one more, after it"
 
 
@@ -52,7 +52,7 @@ def test_two_syncs_never_overlap(monkeypatch):
     def fake(client, repo, actor, full=False):
         inside[0] += 1
         overlap.append(inside[0])
-        time.sleep(0.05)
+        threading.Event().wait(0.05)        # widens the window an overlap would need
         inside[0] -= 1
         return {}
     monkeypatch.setattr(graph, "_run_sync", fake)
@@ -61,11 +61,12 @@ def test_two_syncs_never_overlap(monkeypatch):
     for t in threads:
         t.start()
     for t in threads:
-        t.join(5)
-    assert max(overlap) == 1
+        t.join(10)
+    assert not any(t.is_alive() for t in threads)
+    assert len(overlap) == 4 and max(overlap) == 1
 
 
-def test_a_sync_in_another_worker_is_seen_and_waited_for(lock_in_tmp, monkeypatch):
+def test_a_sync_in_another_worker_is_seen_and_waited_for(lock_in_tmp, monkeypatch, wait_until):
     """2026-11-05: the threading lock covered one gunicorn worker only."""
     calls = []
     monkeypatch.setattr(graph, "_run_sync",
@@ -75,10 +76,13 @@ def test_a_sync_in_another_worker_is_seen_and_waited_for(lock_in_tmp, monkeypatc
     assert graph.sync_running()
     t = threading.Thread(target=graph.run_sync, args=(object(), None, "button"))
     t.start()
-    time.sleep(0.3)
-    assert calls == [], "waits while the other worker syncs"
+    # run_sync takes this worker's lock, then waits on the other worker's file.
+    wait_until(graph._run_lock.locked, message="the sync never started waiting")
+    t.join(0.3)
+    assert t.is_alive() and calls == [], "waits while the other worker syncs"
     os.remove(lock_in_tmp + ".lock")
     t.join(10)
+    assert not t.is_alive()
     assert calls == ["button"]
     assert not graph.sync_running()
 
@@ -96,7 +100,7 @@ def test_a_lock_left_by_a_dead_worker_is_taken_over(lock_in_tmp, monkeypatch):
     assert calls == ["button"]
 
 
-def test_the_button_returns_at_once_and_a_full_request_is_kept(monkeypatch):
+def test_the_button_returns_at_once_and_a_full_request_is_kept(monkeypatch, wait_until):
     """D17: the button queues the sync instead of holding the request open
     past Azure's front end (HTTP 499 on staging, 2026-11-03)."""
     started, release, runs = threading.Event(), threading.Event(), []
@@ -114,8 +118,5 @@ def test_the_button_returns_at_once_and_a_full_request_is_kept(monkeypatch):
     result = graph.sync(full=True, repo=None, actor="liwei", client=object())
     assert result == {"queued": True, "was_running": True}
     release.set()
-    for _ in range(50):
-        if not graph.sync_running():
-            break
-        time.sleep(0.1)
+    wait_until(lambda: not graph.sync_running(), message="the queued syncs never finished")
     assert runs == [("queued for upload", False), ("queued for liwei", True)]

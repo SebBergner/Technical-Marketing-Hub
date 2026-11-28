@@ -25,14 +25,20 @@ from backend.routers import segments
 client = TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def catalogue(seeded_catalogue):
+    """Segments need a catalogue to be counted from: the seed one, in this
+    test's own data directory (until 2026-11-28 the tests read whatever the
+    developer had in data/runtime)."""
+    return seeded_catalogue
+
+
 @pytest.fixture()
 def editorial_file(tmp_path, monkeypatch):
     """Redirect the editorial store, and only it.
 
-    The real one lives under DATA_DIR/owned/, which holds irreplaceable data,
-    so a test must never write there. Redirecting DATA_DIR wholesale would
-    also take the catalogue with it and leave nothing to have segments of --
-    only this one path moves.
+    DATA_DIR is the test's own now (`seeded_catalogue`); the file still
+    goes to `tmp_path`, so its absence and contents are the test's alone.
     """
     path = tmp_path / "segments.json"
     monkeypatch.setattr(segments, "_editorial_path", lambda: str(path))

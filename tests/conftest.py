@@ -44,8 +44,15 @@ def data_dir_in_tmp(tmp_path_factory, monkeypatch):
     its fixture runs after this one.
 
     Not `tmp_path` itself: many tests use that for files of their own and
-    then make it the data directory, or not, as they choose."""
+    then make it the data directory, or not, as they choose.
+
+    It holds an empty `owned/`, as a mounted share does: the folder is
+    outside the code, so /health (backend/health.py) treats it as a mount
+    and fails one without `owned/`. Without this, tests calling /health
+    passed only when app startup happened to seed the catalogue (no source
+    credentials) and failed on a checkout whose .env names Consensus."""
     folder = tmp_path_factory.mktemp("data_dir")
+    (folder / "owned").mkdir()
     monkeypatch.setattr(settings, "data_dir", str(folder))
     monkeypatch.setenv("DATA_DIR", str(folder))
     return folder

@@ -8,29 +8,23 @@
  * what the content is. Everything on screen comes from one call per source --
  * /api/migration/brightcove/status for now. The page computes no figure of
  * its own; it only formats and draws what the server counted.
+ *
+ * A module since WS-G (2026-11-28), for the helpers every page shares
+ * (static/js/shared/): el, fetchJSON, the session watch and dates. It
+ * still shares nothing with the Hub's or Admin's own scripts.
  */
+import { fullDate } from "./js/shared/dates.js";
+import { el } from "./js/shared/dom.js";
+import { fetchJSON, watchForExpiredSession } from "./js/shared/http.js";
+
 (function () {
   "use strict";
 
-  /* Same watch as the Admin page (static/js/admin/main.js): an expired SSO session answers an API call with
-   * 401 plus X-Sign-In, and the page follows it back to sign-in. A 401
-   * without the header means "admin password not entered" and is left alone. */
-  (function watchForExpiredSession() {
-    var original = window.fetch;
-    if (!original || original.hubSignInWatch) return;
-    var watched = function () {
-      return original.apply(this, arguments).then(function (response) {
-        var login = response.status === 401 && response.headers.get("X-Sign-In");
-        if (login) {
-          var here = location.pathname + location.search + location.hash;
-          location.assign(login + "?next=" + encodeURIComponent(here));
-        }
-        return response;
-      });
-    };
-    watched.hubSignInWatch = true;
-    window.fetch = watched;
-  })();
+  /* Same watch as the Admin page: an expired SSO session answers an API
+   * call with 401 plus X-Sign-In, and the page follows it back to sign-in.
+   * A 401 without the header means "admin password not entered" and is
+   * left alone. */
+  watchForExpiredSession();
 
   var $ = function (id) { return document.getElementById(id); };
 
@@ -38,13 +32,6 @@
     ["loadingView", "loginView", "offView", "dashView"].forEach(function (id) {
       $(id).hidden = id !== view;
     });
-  }
-
-  function el(tag, cls, text) {
-    var n = document.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = String(text);
-    return n;
   }
 
   function cardHead(parent, title, pillText, pillClass) {
@@ -79,9 +66,7 @@
   }
 
   function fmtDate(iso) {
-    if (!iso) return "—";
-    var d = new Date(iso + "T00:00:00");
-    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    return iso ? fullDate(iso, "en-GB") : "—";
   }
 
   /* A server timestamp in the VIEWER's time zone. App Service runs in UTC,
@@ -312,17 +297,7 @@
   var sheetId = null, previewTimer = null, runTimer = null, runId = null, sample = null;
 
   function api(method, url, body) {
-    var opts = { method: method, headers: {} };
-    if (body !== undefined) {
-      opts.headers["Content-Type"] = "application/json";
-      opts.body = JSON.stringify(body);
-    }
-    return fetch(url, opts).then(function (r) {
-      return r.json().catch(function () { return {}; }).then(function (j) {
-        if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
-        return j;
-      });
-    });
+    return fetchJSON(url, { method: method, body: body });
   }
 
   function box(cls, text) { return el("div", cls, text); }
@@ -387,13 +362,7 @@
     $("uploadMsg").textContent = "Uploading " + file.name + "…";
     var form = new FormData();
     form.append("file", file);
-    fetch("/api/migration/brightcove/sheets", { method: "POST", body: form })
-      .then(function (r) {
-        return r.json().then(function (j) {
-          if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
-          return j;
-        });
-      })
+    api("POST", "/api/migration/brightcove/sheets", form)
       .then(function (j) { openSheet(j.sheet_id); })
       .catch(function (err) { $("uploadMsg").textContent = "Upload failed: " + err.message; });
   }

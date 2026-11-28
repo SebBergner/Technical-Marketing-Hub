@@ -378,9 +378,8 @@ class BatchLog:
         with self._lock:
             self.recount()
             os.makedirs(batches_dir(), exist_ok=True)
-            from backend.file_safety import replace_with
-            replace_with(self.path, lambda fh: json.dump(self.data, fh, indent=1,
-                                                         ensure_ascii=False))
+            from backend.file_safety import write_json
+            write_json(self.path, self.data, indent=1, ensure_ascii=False)
 
     def finish(self) -> None:
         with self._lock:

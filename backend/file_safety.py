@@ -65,6 +65,17 @@ def replace_with(path: str, write) -> None:
         raise
 
 
+def write_json(path: str, data: Any, **dump_kwargs: Any) -> None:
+    """Write `data` as JSON to `path` through its own temporary file
+    (replace_with). `dump_kwargs` go to json.dump unchanged, so each file
+    keeps the format it has always had (indent, ensure_ascii, default).
+
+    The one way the Hub writes a JSON data file (2026-11-28, optimisation
+    plan WS-F): when the PostgreSQL plan's DocumentStore arrives, this is
+    the seam it replaces."""
+    replace_with(path, lambda fh: json.dump(data, fh, **dump_kwargs))
+
+
 def replace(tmp: str, path: str) -> None:
     """os.replace, tried again for up to a second while another process has
     `path` open: Windows refuses then, and so can an SMB share like Azure

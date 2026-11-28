@@ -73,9 +73,8 @@ def _now() -> str:
 
 
 def _write_json(path: str, data) -> None:
-    from backend.file_safety import replace_with
-    replace_with(path, lambda fh: json.dump(data, fh, indent=1, ensure_ascii=False,
-                                            default=str))
+    from backend.file_safety import write_json
+    write_json(path, data, indent=1, ensure_ascii=False, default=str)
 
 
 def _read_json(path: str, default=None):

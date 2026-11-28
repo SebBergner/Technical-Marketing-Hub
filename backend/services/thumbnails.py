@@ -197,15 +197,15 @@ def _compact_cached(data_path: str, meta_path: str, meta: dict,
     age: the week it is fresh for still counts from when it was fetched."""
     small = compact(*cached)
     try:
-        from backend.file_safety import replace, replace_with, temp_path
+        from backend.file_safety import replace, temp_path, write_json
         stamp = os.path.getmtime(data_path)
         tmp = temp_path(data_path)
         with open(tmp, "wb") as fh:
             fh.write(small[0])
         replace(tmp, data_path)
         os.utime(data_path, (stamp, stamp))
-        replace_with(meta_path, lambda fh: json.dump(
-            {**meta, "content_type": small[1], "compact": COMPACT_VERSION}, fh))
+        write_json(meta_path,
+                   {**meta, "content_type": small[1], "compact": COMPACT_VERSION})
     except OSError as exc:
         log.warning("thumbnail cache not made compact: %s", exc)
     return small
@@ -286,13 +286,13 @@ def get(mirror_dir: str, client, url: str, wait: bool = True) -> tuple[bytes, st
             open(_miss_path(mirror_dir, url), "w").close()
             return cached
         fresh = compact(*fresh)
-        from backend.file_safety import replace, replace_with, temp_path
+        from backend.file_safety import replace, temp_path, write_json
         tmp = temp_path(data_path)
         with open(tmp, "wb") as fh:
             fh.write(fresh[0])
         replace(tmp, data_path)
-        replace_with(meta_path, lambda fh: json.dump(
-            {"content_type": fresh[1], "url": url, "compact": COMPACT_VERSION}, fh))
+        write_json(meta_path,
+                   {"content_type": fresh[1], "url": url, "compact": COMPACT_VERSION})
         if os.path.exists(_miss_path(mirror_dir, url)):
             os.remove(_miss_path(mirror_dir, url))
     except OSError as exc:

@@ -151,9 +151,9 @@ class TokenStore:
             current = self.read()
             current.update(fields)
             os.makedirs(os.path.dirname(self.path), exist_ok=True)
-            from backend.file_safety import replace_with
+            from backend.file_safety import write_json
             # atomic, and a temporary file of its own: never a half-written token
-            replace_with(self.path, lambda fh: json.dump(current, fh, indent=2))
+            write_json(self.path, current, indent=2)
 
     def clear(self) -> None:
         with self._lock:

@@ -158,11 +158,11 @@ def _clean(terms_in, note, groups, own_id=None) -> tuple[list[str], str]:
 
 
 def _save(data_dir, groups, actor) -> dict:
-    from backend.file_safety import replace_with
+    from backend.file_safety import write_json
     path = _path(data_dir)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     data = {"groups": groups, "changed_at": _now(), "changed_by": actor}
-    replace_with(path, lambda fh: json.dump(data, fh, ensure_ascii=False, indent=1))
+    write_json(path, data, ensure_ascii=False, indent=1)
     return data
 
 

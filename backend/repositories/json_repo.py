@@ -172,9 +172,8 @@ def _atomic_write(path: str, payload: Any) -> None:
     """Write via a temp file of its own and rename, so neither a crash nor
     another worker writing at the same moment can corrupt it
     (backend/file_safety.py)."""
-    from backend.file_safety import replace_with
-    replace_with(path, lambda fh: json.dump(payload, fh, indent=2, ensure_ascii=False,
-                                            default=str))
+    from backend.file_safety import write_json
+    write_json(path, payload, indent=2, ensure_ascii=False, default=str)
     _catalogue_changed()
 
 

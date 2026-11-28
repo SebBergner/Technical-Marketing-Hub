@@ -83,7 +83,7 @@ def status(user, data_dir: str | None = None, now: datetime | None = None) -> di
 
 def seen(user, data_dir: str | None = None, now: datetime | None = None) -> dict:
     """Record that this person has seen the current version."""
-    from backend.file_safety import locked, replace_with
+    from backend.file_safety import locked, write_json
     key = key_of(user)
     if not key:
         raise ValueError("Only a signed-in person sees the welcome.")
@@ -96,14 +96,14 @@ def seen(user, data_dir: str | None = None, now: datetime | None = None) -> dict
         row = {"version": VERSION, "seen_at": at,
                "first_seen_at": before.get("first_seen_at") or at}
         data[key] = row
-        replace_with(path, lambda fh: json.dump(data, fh, ensure_ascii=False, indent=1))
+        write_json(path, data, ensure_ascii=False, indent=1)
     return row
 
 
 def shown(user, data_dir: str | None = None, now: datetime | None = None) -> dict:
     """Record that it was closed without "Don't show again": not again for a
     while (AGAIN_AFTER), and what was seen before is kept."""
-    from backend.file_safety import locked, replace_with
+    from backend.file_safety import locked, write_json
     key = key_of(user)
     if not key:
         raise ValueError("Only a signed-in person sees the welcome.")
@@ -115,5 +115,5 @@ def shown(user, data_dir: str | None = None, now: datetime | None = None) -> dic
         row = dict(data.get(key) or {})
         row.update({"shown_version": VERSION, "shown_at": at})
         data[key] = row
-        replace_with(path, lambda fh: json.dump(data, fh, ensure_ascii=False, indent=1))
+        write_json(path, data, ensure_ascii=False, indent=1)
     return row

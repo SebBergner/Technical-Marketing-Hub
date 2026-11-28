@@ -84,8 +84,8 @@ def replace(content: bytes, file_name: str | None, actor: str) -> dict:
              "skipped": skipped, "people": people}
     os.makedirs(os.path.dirname(_path()), exist_ok=True)
     with _lock:
-        from backend.file_safety import replace_with
-        replace_with(_path(), lambda f: json.dump(state, f, indent=1))
+        from backend.file_safety import write_json
+        write_json(_path(), state, indent=1)
     return summary(state)
 
 

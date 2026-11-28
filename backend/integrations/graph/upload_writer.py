@@ -207,9 +207,8 @@ def save_terms(found: dict[str, tuple[str, str]]) -> None:
     path = _terms_path()
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        from backend.file_safety import replace_with
-        replace_with(path, lambda fh: json.dump({k: list(v) for k, v in found.items()}, fh,
-                                                ensure_ascii=False))
+        from backend.file_safety import write_json
+        write_json(path, {k: list(v) for k, v in found.items()}, ensure_ascii=False)
     except OSError as exc:
         log.warning("product terms not saved: %s", exc)
 

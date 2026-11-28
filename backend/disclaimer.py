@@ -108,7 +108,7 @@ def status(user, data_dir: str | None = None) -> dict:
 
 def accept(user, data_dir: str | None = None, now: datetime | None = None) -> dict:
     """Record that this person accepted the current text. Returns their row."""
-    from backend.file_safety import locked, replace_with
+    from backend.file_safety import locked, write_json
     key = key_of(user)
     if not key:
         raise ValueError("Only a signed-in person can accept the disclaimer.")
@@ -125,7 +125,7 @@ def accept(user, data_dir: str | None = None, now: datetime | None = None) -> di
                "first_accepted_at": before.get("first_accepted_at") or at,
                "times": int(before.get("times") or 0) + 1}
         data[key] = row
-        replace_with(path, lambda fh: json.dump(data, fh, ensure_ascii=False, indent=1))
+        write_json(path, data, ensure_ascii=False, indent=1)
     return row
 
 

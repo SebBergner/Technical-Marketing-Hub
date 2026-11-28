@@ -558,7 +558,7 @@ def test_two_threads_never_refresh_with_the_same_refresh_token(tmp_path):
                            base_url="https://app.goconsensus.com", store=store,
                            transport=httpx.MockTransport(handler))
     results, errors = [], []
-    start = threading.Barrier(6)
+    start = threading.Barrier(6, timeout=10)
 
     def worker():
         start.wait()
@@ -571,7 +571,8 @@ def test_two_threads_never_refresh_with_the_same_refresh_token(tmp_path):
     for t in threads:
         t.start()
     for t in threads:
-        t.join()
+        t.join(30)
+    assert not any(t.is_alive() for t in threads), "a refresh never came back"
     assert errors == [] and used == ["r0"], "one refresh, and everyone shares its token"
     assert set(results) == {"a1"} and store.read()["refresh_token"] == "r1"
 

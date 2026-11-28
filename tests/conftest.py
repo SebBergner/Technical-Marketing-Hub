@@ -22,6 +22,9 @@ developer's real `data/runtime`, and a run on a laptop sees what CI sees.
 """
 from __future__ import annotations
 
+import threading
+import time
+
 import pytest
 
 from backend.config import settings
@@ -67,6 +70,24 @@ def seeded_catalogue(data_dir_in_tmp, _seeded_template):
     import shutil
     shutil.copytree(_seeded_template, data_dir_in_tmp, dirs_exist_ok=True)
     return data_dir_in_tmp
+
+
+@pytest.fixture
+def wait_until():
+    """Poll `condition` until it is true or `timeout` seconds pass.
+
+    For tests that wait on a background thread: a fixed `time.sleep` is
+    either too short on a loaded machine (the test fails) or wastes time on
+    an idle one. Returns as soon as the condition holds; fails the test with
+    `message` when the deadline passes."""
+    def wait(condition, timeout: float = 10.0, message: str = "condition never held"):
+        deadline = time.monotonic() + timeout
+        pause = threading.Event()
+        while not condition():
+            if time.monotonic() > deadline:
+                pytest.fail(f"{message} (waited {timeout} s)")
+            pause.wait(0.01)
+    return wait
 
 
 @pytest.fixture(autouse=True)

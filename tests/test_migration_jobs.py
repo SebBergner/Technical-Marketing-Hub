@@ -253,12 +253,18 @@ def test_parallel_uploads_really_overlap_and_all_finish(client, tmp_path, monkey
     graph = FakeGraph(library=LIB)
     monkeypatch.setattr(jobs, "clients", lambda: (graph.client(), brightcove.client()))
     active, peak, guard = [0], [0], threading.Lock()
+    overlapping = threading.Event()
 
     def cdn(request):
         with guard:
             active[0] += 1
             peak[0] = max(peak[0], active[0])
-        time.sleep(0.3)                                 # long enough to overlap
+            if active[0] >= 2:
+                overlapping.set()
+        # Hold the first download open until a second one starts beside it,
+        # rather than sleeping and hoping: one at a time, it gives up after
+        # the timeout and the peak stays 1.
+        overlapping.wait(10)
         with guard:
             active[0] -= 1
         return httpx.Response(200, content=b"x" * SIZE)
@@ -339,7 +345,8 @@ def test_a_restart_resumes_an_unfinished_run_but_not_a_paused_one(client, tmp_pa
     assert jobs.run_status(bid)["state"] == "finished"
 
 
-def test_a_restart_waits_for_the_dead_runs_lock_then_resumes(client, tmp_path, monkeypatch):
+def test_a_restart_waits_for_the_dead_runs_lock_then_resumes(client, tmp_path, monkeypatch,
+                                                            wait_until):
     """Right after a restart the dead process's lock is still fresh. Until
     2026-11-26 auto_resume gave up there; now it waits for the lock to go
     stale, then resumes."""
@@ -353,10 +360,7 @@ def test_a_restart_waits_for_the_dead_runs_lock_then_resumes(client, tmp_path, m
     waiting = []
     monkeypatch.setattr(jobs, "_resume_when_free", lambda: waiting.append(1))
     assert jobs.auto_resume() is None
-    for _ in range(100):                               # the waiter runs in a thread
-        if waiting:
-            break
-        time.sleep(0.01)
+    wait_until(lambda: waiting, message="gave up instead of waiting")   # the waiter's thread
     assert waiting == [1], "waits instead of giving up"
 
     old = time.time() - jobs.STALE_LOCK_SECONDS - 5
